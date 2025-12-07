@@ -1,0 +1,94 @@
+{
+  "common": {
+    "pause": "暫停",
+    "resume": "繼續",
+    "continue": "繼續",
+    "delete": "刪除",
+    "cancel": "取消",
+    "ok": "確定",
+    "close": "關閉",
+    "save": "儲存",
+    "settings": "設定",
+    "yes": "是",
+    "no": "否"
+  },
+  "torrent": {
+    "status": {
+      "all": "全部",
+      "downloading": "下載中",
+      "uploading": "做種中",
+      "pausedDL": "已暫停",
+      "pausedUP": "已暫停",
+      "stalledDL": "等待下載",
+      "stalledUP": "等待上傳",
+      "checkingDL": "檢查中",
+      "checkingUP": "檢查中",
+      "queuedDL": "排隊中",
+      "queuedUP": "排隊中",
+      "error": "錯誤",
+      "missingFiles": "檔案遺失",
+      "allocating": "配置空間中"
+    },
+    "category": "分類",
+    "uncategorized": "未分類",
+    "noTorrentsFound": "沒有找到 Torrent",
+    "table": {
+      "name": "名稱",
+      "statusAndProgress": "狀態與進度",
+      "speed": "速度",
+      "stats": "統計",
+      "actions": "操作",
+      "size": "大小",
+      "eta": "剩餘",
+      "ratio": "比率",
+      "peers": "連接"
+    },
+    "details": {
+      "progress": "進度",
+      "downloadSpeed": "下載速度",
+      "uploadSpeed": "上傳速度",
+      "remainingTime": "剩餘時間",
+      "size": "大小",
+      "status": "狀態",
+      "downloaded": "已下載",
+      "uploaded": "已上傳",
+      "ratio": "分享率",
+      "addedOn": "添加時間",
+      "completedOn": "完成時間",
+      "savePath": "儲存路徑",
+      "hash": "Hash",
+      "peers": "連接數",
+      "seeds": "做種",
+      "leechers": "下載",
+      "connected": "連接數",
+      "totalSwarm": "總數 (Swarm)",
+      "thisSession": "本次"
+    },
+    "actions": {
+      "delete": "刪除",
+      "deleteKeepFiles": "刪除（保留檔案）",
+      "deleteRemoveFiles": "刪除（移除檔案）",
+      "confirmDelete": "確定要刪除嗎？",
+      "confirmDeleteMessage": "此操作無法復原。將永久刪除 torrent <strong>{{name}}</strong>。您可以選擇是否同時刪除相關檔案。",
+      "deleteWithFiles": "是否同時刪除檔案？"
+    }
+  },
+  "sidebar": {
+    "title": "qB-React",
+    "status": "狀態",
+    "categories": "分類"
+  },
+  "login": {
+    "username": "使用者名稱",
+    "password": "密碼",
+    "login": "登入",
+    "failed": "登入失敗",
+    "enterCredentials": "請輸入您的 qBittorrent 使用者名稱和密碼。"
+  },
+  "settings": {
+    "title": "設定",
+    "baseUrl": "基礎 URL",
+    "username": "使用者名稱",
+    "password": "密碼"
+  }
+}

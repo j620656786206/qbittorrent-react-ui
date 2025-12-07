@@ -1,75 +1,323 @@
 import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import type { TorrentState } from '@ctrl/qbittorrent'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { Menu } from 'lucide-react' // Import Menu icon
+import type { Torrent } from '@/components/torrent-table'
 import { Sidebar } from '@/components/sidebar'
-import { Torrent, TorrentTable } from '@/components/torrent-table'
-import { login, getTorrents } from '@/lib/api'
+import { TorrentTable } from '@/components/torrent-table'
+import { TorrentDetail } from '@/components/torrent-detail'
+import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
+import { SettingsModal } from '@/components/settings-modal'
+import { Button } from '@/components/ui/button'
+import { LoginForm } from '@/components/login-form'
+import { useMediaQuery } from '@/lib/hooks' // Import the new hook
+import { useMutation } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 
-type Filter = TorrentState | 'all'
+type Filter = string // Changed from TorrentState to string as TorrentState came from @ctrl/qbittorrent
 
 export const Route = createFileRoute('/')({ component: HomePage })
 
 function HomePage() {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [filter, setFilter] = React.useState<Filter>('all')
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
+  const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(null)
+
+  const isDesktop = useMediaQuery('(min-width: 768px)') // md breakpoint
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false)
+
+  const getBaseUrl = () =>
+    credentials.baseUrl || localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
+
+  // --- State for sync/maindata ---
+  const [rid, setRid] = React.useState<number | undefined>(undefined)
+  const [allTorrentsMap, setAllTorrentsMap] = React.useState<
+    Map<string, Torrent>
+  >(new Map()) // Store torrents as a Map for efficient updates
 
   // --- Step 1: Handle Credentials ---
-  // In a real app, this would be in a context or a more robust store.
   const credentials = {
-    baseUrl: localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080',
-    username: localStorage.getItem('qbit_username') || undefined,
-    password: localStorage.getItem('qbit_password') || undefined,
+    baseUrl:
+      import.meta.env.VITE_QBIT_BASE_URL ||
+      localStorage.getItem('qbit_baseUrl') ||
+      window.location.origin,
+    username:
+      import.meta.env.VITE_QBIT_USERNAME ||
+      localStorage.getItem('qbit_username') ||
+      '',
+    password:
+      import.meta.env.VITE_QBIT_PASSWORD ||
+      localStorage.getItem('qbit_password') ||
+      '',
   }
 
-  // --- Step 2: Login Query ---
-  const { isSuccess: isLoggedIn, isError: isLoginError, error: loginError } = useQuery({
-    queryKey: ['login', credentials.baseUrl, credentials.username],
-    queryFn: () => login(credentials.baseUrl, credentials.username, credentials.password),
-    staleTime: Infinity, // We only need to login once per session
-    retry: 1, // Don't retry login endlessly if it fails
-  });
+  const areCredentialsSet = !!(credentials.username && credentials.password)
 
-  // --- Step 3: Torrents Query ---
-  // This query is only enabled after a successful login.
-  const { data: allTorrents, isLoading: isLoadingTorrents } = useQuery({
-    queryKey: ['torrents'],
-    queryFn: () => getTorrents(credentials.baseUrl),
+  // --- Step 2: Login Query ---
+  const {
+    isSuccess: loginSuccess,
+    isError: isLoginError,
+    error: loginError,
+    isLoading: isLoggingIn,
+  } = useQuery({
+    queryKey: [
+      'login',
+      credentials.baseUrl,
+      localStorage.getItem('qbit_username'),
+    ],
+    queryFn: () =>
+      login(
+        credentials.baseUrl,
+        localStorage.getItem('qbit_username') || '',
+        localStorage.getItem('qbit_password') || '',
+      ),
+    staleTime: Infinity,
+    retry: 1,
+    enabled: areCredentialsSet,
+  })
+
+  console.log('--- HomePage State ---')
+  console.log('areCredentialsSet:', areCredentialsSet)
+  console.log('isLoggingIn:', isLoggingIn)
+  console.log('loginSuccess:', loginSuccess)
+  console.log('isLoginError:', isLoginError)
+  console.log('rid (before maindata query):', rid)
+
+  // --- Step 3: Maindata Query ---
+  const ridRef = React.useRef<number | undefined>(undefined)
+
+  const {
+    data: maindata,
+    isLoading: isLoadingTorrents,
+    isError: isMaindataError,
+    error: maindataError,
+  } = useQuery({
+    queryKey: ['maindata'], // Single query key, rid is managed internally
+    queryFn: async () => {
+      console.log('Fetching maindata with rid:', ridRef.current)
+      const maindata = await getMaindata(credentials.baseUrl, ridRef.current)
+      ridRef.current = maindata.rid // Update ref immediately
+      return maindata
+    },
     refetchInterval: 5000,
-    enabled: isLoggedIn, // <-- DEPENDENCY on login
-  });
+    enabled: loginSuccess, // Only enabled if logged in
+  })
+
+  // Process maindata response using useEffect
+  React.useEffect(() => {
+    if (!maindata) {
+      console.log('maindata is undefined, skipping processing')
+      return
+    }
+
+    console.log('--- Processing maindata ---')
+    console.log('maindata.rid:', maindata.rid)
+    console.log('maindata.full_update:', maindata.full_update)
+    console.log('maindata.torrents keys:', maindata.torrents ? Object.keys(maindata.torrents).length : 0)
+
+    // Update rid state for display purposes
+    setRid(maindata.rid)
+
+    // Update torrents map
+    if (maindata.full_update) {
+      // Full update: replace all torrents
+      const newMap = new Map<string, Torrent>()
+      if (maindata.torrents) {
+        Object.entries(maindata.torrents).forEach(([hash, torrentData]) => {
+          newMap.set(hash, { ...torrentData, hash } as Torrent)
+        })
+      }
+      setAllTorrentsMap(newMap)
+      console.log('Full update: torrents count =', newMap.size)
+    } else {
+      // Incremental update: merge changes
+      setAllTorrentsMap((prevMap) => {
+        const newMap = new Map(prevMap)
+        console.log('Previous map size:', prevMap.size)
+
+        // Add or update torrents
+        if (maindata.torrents) {
+          Object.entries(maindata.torrents).forEach(([hash, torrentData]) => {
+            const existing = newMap.get(hash)
+            newMap.set(hash, { ...existing, ...torrentData, hash } as Torrent)
+          })
+        }
+
+        // Remove deleted torrents
+        if (maindata.torrents_removed) {
+          maindata.torrents_removed.forEach((hash) => {
+            newMap.delete(hash)
+          })
+        }
+
+        console.log('Incremental update: new map size =', newMap.size)
+        return newMap
+      })
+    }
+  }, [maindata])
+
+  console.log('isLoadingTorrents (after maindata query):', isLoadingTorrents)
+  console.log('rid (after maindata query):', rid)
+  // Log the length here, it reflects latest state
 
   // --- Step 4: Client-side Filtering ---
+  const allTorrents = React.useMemo(() => {
+    return Array.from(allTorrentsMap.values())
+  }, [allTorrentsMap])
+
   const filteredTorrents = React.useMemo(() => {
-    if (!allTorrents) return []
     if (filter === 'all') return allTorrents
-    // The API returns an array of objects now, not an object of objects
+
+    // Category filter
+    if (filter.startsWith('category:')) {
+      const category = filter.substring(9) // Remove 'category:' prefix
+      return allTorrents.filter((t: Torrent) => {
+        const torrentCategory = t.category || '未分類'
+        return torrentCategory === category
+      })
+    }
+
+    // Status filter
     return allTorrents.filter((t: Torrent) => t.state === filter)
-  }, [allTorrents, filter]);
+  }, [allTorrents, filter])
+
+  console.log('filteredTorrents.length:', filteredTorrents.length)
+
+  const handleSettingsSave = () => {
+    queryClient.invalidateQueries({ queryKey: ['login'] })
+    queryClient.invalidateQueries({ queryKey: ['maindata'] }) // Invalidate maindata query too
+    ridRef.current = undefined // Reset ridRef to force a full update on next fetch
+    setRid(undefined) // Reset rid state
+    setAllTorrentsMap(new Map()) // Clear torrents data
+  }
+
+  const handleLoginSuccess = () => {
+    setIsSettingsModalOpen(false)
+    // After successful login, ensure maindata query is re-enabled and potentially refetched
+    queryClient.invalidateQueries({ queryKey: ['maindata'] })
+  }
+
+  // Mutations for torrent actions
+  const pauseMutation = useMutation({
+    mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: (hash: string) => resumeTorrent(getBaseUrl(), hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
+      deleteTorrent(getBaseUrl(), hash, deleteFiles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      setSelectedTorrent(null)
+    },
+  })
 
   // --- Step 5: Render UI based on state ---
   const renderContent = () => {
-    if (isLoginError) {
-      return <p className="text-red-400">Login Failed: {loginError?.message}. Please check credentials in localStorage.</p>
+    if (!areCredentialsSet || isLoginError) {
+      return (
+        <LoginForm
+          onLoginSuccess={handleLoginSuccess}
+          initialUsername={credentials.username}
+          initialPassword={credentials.password}
+          error={
+            !areCredentialsSet
+              ? 'Please enter your qBittorrent username and password.'
+              : `Login Failed: ${loginError?.message}`
+          }
+        />
+      )
     }
-    if (!isLoggedIn) {
-      return <p>Logging in...</p>
+
+    if (isLoggingIn || isLoadingTorrents) {
+      return <p>Attempting to log in or loading torrent data...</p>
     }
-    if (isLoadingTorrents) {
-      return <p>Loading torrents...</p>
+
+    // Check for maindata errors separately
+    if (isMaindataError) {
+      return (
+        <p className="text-red-400">
+          Error fetching torrent data: {maindataError?.message}
+        </p>
+      )
     }
-    if (filteredTorrents) {
-      return <TorrentTable torrents={filteredTorrents} />
+
+    if (loginSuccess && filteredTorrents.length > 0) {
+      return (
+        <TorrentTable
+          torrents={filteredTorrents}
+          onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
+        />
+      )
     }
-    return <p>No torrents found.</p>
+
+    // If login is successful but no torrents are found
+    if (loginSuccess && filteredTorrents.length === 0 && !isLoadingTorrents) {
+      return <p>{t('torrent.noTorrentsFound')}</p>
+    }
+
+    return <p>Loading application...</p> // Fallback if no specific state matches
   }
 
   return (
-    <div className="flex h-full">
-      <Sidebar currentFilter={filter} setFilter={setFilter} />
-      <div className="flex-1 p-6 overflow-auto">
-        {renderContent()}
-      </div>
+    <div className="flex flex-col md:flex-row h-full">
+      {' '}
+      {/* Responsive flex container */}
+      {!isDesktop && ( // Mobile menu button
+        <div className="p-4 bg-slate-800 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">qB-React</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileSidebarOpen(true)}
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
+      <Sidebar
+        currentFilter={filter}
+        setFilter={setFilter}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        isMobile={!isDesktop}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+        torrents={allTorrents}
+        categories={{}}
+      />
+      <div className="flex-1 p-6 overflow-auto">{renderContent()}</div>
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onSave={handleSettingsSave}
+      />
+      <TorrentDetail
+        torrent={selectedTorrent}
+        isOpen={!!selectedTorrent}
+        onClose={() => setSelectedTorrent(null)}
+        onPause={() => selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)}
+        onResume={() => selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)}
+        onDelete={() => {
+          if (selectedTorrent) {
+            if (window.confirm(t('torrent.actions.confirmDelete'))) {
+              const deleteFiles = window.confirm(t('torrent.actions.deleteWithFiles'))
+              deleteMutation.mutate({ hash: selectedTorrent.hash, deleteFiles })
+            }
+          }
+        }}
+      />
     </div>
   )
 }

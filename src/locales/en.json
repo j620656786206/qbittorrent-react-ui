@@ -1,0 +1,94 @@
+{
+  "common": {
+    "pause": "Pause",
+    "resume": "Resume",
+    "continue": "Continue",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "close": "Close",
+    "save": "Save",
+    "settings": "Settings",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "torrent": {
+    "status": {
+      "all": "All",
+      "downloading": "Downloading",
+      "uploading": "Seeding",
+      "pausedDL": "Paused",
+      "pausedUP": "Paused",
+      "stalledDL": "Stalled DL",
+      "stalledUP": "Stalled UP",
+      "checkingDL": "Checking",
+      "checkingUP": "Checking",
+      "queuedDL": "Queued",
+      "queuedUP": "Queued",
+      "error": "Error",
+      "missingFiles": "Missing Files",
+      "allocating": "Allocating"
+    },
+    "category": "Category",
+    "uncategorized": "Uncategorized",
+    "noTorrentsFound": "No torrents found.",
+    "table": {
+      "name": "Name",
+      "statusAndProgress": "Status & Progress",
+      "speed": "Speed",
+      "stats": "Stats",
+      "actions": "Actions",
+      "size": "Size",
+      "eta": "ETA",
+      "ratio": "Ratio",
+      "peers": "Peers"
+    },
+    "details": {
+      "progress": "Progress",
+      "downloadSpeed": "Download Speed",
+      "uploadSpeed": "Upload Speed",
+      "remainingTime": "Remaining Time",
+      "size": "Size",
+      "status": "Status",
+      "downloaded": "Downloaded",
+      "uploaded": "Uploaded",
+      "ratio": "Ratio",
+      "addedOn": "Added On",
+      "completedOn": "Completed On",
+      "savePath": "Save Path",
+      "hash": "Hash",
+      "peers": "Peers",
+      "seeds": "Seeds",
+      "leechers": "Leechers",
+      "connected": "Connected",
+      "totalSwarm": "Total (Swarm)",
+      "thisSession": "this session"
+    },
+    "actions": {
+      "delete": "Delete",
+      "deleteKeepFiles": "Delete (Keep Files)",
+      "deleteRemoveFiles": "Delete (Remove Files)",
+      "confirmDelete": "Are you sure you want to delete?",
+      "confirmDeleteMessage": "This action cannot be undone. This will permanently delete the torrent <strong>{{name}}</strong>. You can choose whether to delete the associated files.",
+      "deleteWithFiles": "Also delete files?"
+    }
+  },
+  "sidebar": {
+    "title": "qB-React",
+    "status": "Status",
+    "categories": "Categories"
+  },
+  "login": {
+    "username": "Username",
+    "password": "Password",
+    "login": "Login",
+    "failed": "Login Failed",
+    "enterCredentials": "Please enter your qBittorrent username and password."
+  },
+  "settings": {
+    "title": "Settings",
+    "baseUrl": "Base URL",
+    "username": "Username",
+    "password": "Password"
+  }
+}
