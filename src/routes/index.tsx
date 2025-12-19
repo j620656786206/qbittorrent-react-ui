@@ -23,6 +23,7 @@ function HomePage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [filter, setFilter] = React.useState<Filter>('all')
+  const [searchQuery, setSearchQuery] = React.useState('')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
   const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(null)
 
@@ -169,20 +170,31 @@ function HomePage() {
   }, [allTorrentsMap])
 
   const filteredTorrents = React.useMemo(() => {
-    if (filter === 'all') return allTorrents
+    // First, apply search filter
+    const trimmedSearch = searchQuery.trim().toLowerCase()
+    let result = allTorrents
+
+    if (trimmedSearch) {
+      result = result.filter((t: Torrent) =>
+        t.name?.toLowerCase().includes(trimmedSearch)
+      )
+    }
+
+    // Then, apply status/category filter
+    if (filter === 'all') return result
 
     // Category filter
     if (filter.startsWith('category:')) {
       const category = filter.substring(9) // Remove 'category:' prefix
-      return allTorrents.filter((t: Torrent) => {
+      return result.filter((t: Torrent) => {
         const torrentCategory = t.category || '未分類'
         return torrentCategory === category
       })
     }
 
     // Status filter
-    return allTorrents.filter((t: Torrent) => t.state === filter)
-  }, [allTorrents, filter])
+    return result.filter((t: Torrent) => t.state === filter)
+  }, [allTorrents, filter, searchQuery])
 
   console.log('filteredTorrents.length:', filteredTorrents.length)
 
