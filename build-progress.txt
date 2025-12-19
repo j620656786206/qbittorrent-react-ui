@@ -1,0 +1,71 @@
+=== AUTO-BUILD PROGRESS ===
+
+Project: Add Torrents via Magnet Links and Torrent Files
+Workspace: managed by orchestrator
+Started: 2025-12-19
+
+Workflow Type: feature
+Rationale: This is a new user-facing feature that requires UI components (modal),
+API functions, and integration with existing data flow. It follows the feature
+workflow: API -> UI -> Integration.
+
+Session 1 (Planner):
+- Created implementation_plan.json
+- Phases: 5
+- Total subtasks: 8
+- Created init.sh
+- Updated context.json with detailed patterns
+
+Phase Summary:
+- Phase 1 - API Functions: 3 subtasks (getCategories, addTorrentMagnet, addTorrentFile)
+  - Depends on: none
+  - Parallel safe: yes
+- Phase 2 - Translations: 2 subtasks (en.json, zh-Hant.json)
+  - Depends on: none
+  - Parallel safe: yes
+- Phase 3 - Modal Component: 1 subtask (add-torrent-modal.tsx)
+  - Depends on: phase-1-api, phase-2-translations
+  - Parallel safe: no
+- Phase 4 - UI Integration: 2 subtasks (sidebar button, wire up modal)
+  - Depends on: phase-3-modal
+  - Parallel safe: no
+- Phase 5 - Verification: 1 subtask (manual browser testing)
+  - Depends on: phase-4-ui-integration
+  - Parallel safe: no
+
+Services Involved:
+- main: React frontend application (TypeScript, React 18, Vite, TanStack Query)
+
+Files to Modify:
+- src/lib/api.ts - Add 3 API functions
+- src/components/sidebar.tsx - Add "Add Torrent" button
+- src/routes/index.tsx - Wire up AddTorrentModal
+- src/locales/en.json - English translations
+- src/locales/zh-Hant.json - Traditional Chinese translations
+
+Files to Create:
+- src/components/add-torrent-modal.tsx - Modal dialog component
+
+Parallelism Analysis:
+- Max parallel phases: 2
+- Recommended workers: 1
+- Parallel groups:
+  * [phase-1-api, phase-2-translations] - No dependencies, different file sets
+
+Key Patterns to Follow:
+1. API: Use getApiBaseUrl(), URLSearchParams/FormData, credentials: 'include'
+2. Modal: Use Dialog from Radix UI, controlled open/onOpenChange
+3. Mutations: Use useMutation, invalidate 'maindata' on success
+4. i18n: Nested JSON, t('namespace.key'), both en.json and zh-Hant.json
+
+=== STARTUP COMMAND ===
+
+To continue building this spec, run:
+
+  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 002 --parallel 1
+
+Or manually start development:
+
+  npm run dev
+
+=== END SESSION 1 ===
