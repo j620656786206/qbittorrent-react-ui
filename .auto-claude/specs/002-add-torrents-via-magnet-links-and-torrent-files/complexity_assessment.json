@@ -1,0 +1,69 @@
+{
+  "complexity": "standard",
+  "workflow_type": "feature",
+  "confidence": 0.85,
+  "reasoning": "This is a well-scoped feature with clear patterns to follow. The codebase already has API utilities (lib/api.ts), Dialog components, React Query mutations, and form handling patterns. No external integrations needed - only qBittorrent API which is already integrated. Main work is UI (add torrent modal) + 2 API functions (magnet and file upload).",
+
+  "analysis": {
+    "scope": {
+      "estimated_files": 7,
+      "estimated_services": 1,
+      "is_cross_cutting": false,
+      "notes": "Files: api.ts (add 2 functions), new add-torrent-modal.tsx, sidebar.tsx (add button), routes/index.tsx (wire up modal), locales (2 files for translations), possibly a new file-upload input component. All within single frontend service."
+    },
+    "integrations": {
+      "external_services": [],
+      "new_dependencies": [],
+      "research_needed": false,
+      "notes": "Uses existing qBittorrent WebUI API already integrated. The /api/v2/torrents/add endpoint supports both magnet links and file uploads via multipart form data. No new dependencies required - existing React, Radix UI, and TanStack Query handle everything."
+    },
+    "infrastructure": {
+      "docker_changes": false,
+      "database_changes": false,
+      "config_changes": false,
+      "notes": "Pure frontend feature. No infrastructure changes needed. qBittorrent API is already proxied in development."
+    },
+    "knowledge": {
+      "patterns_exist": true,
+      "research_required": false,
+      "unfamiliar_tech": [],
+      "notes": "Strong existing patterns: 1) API functions in lib/api.ts follow consistent fetch pattern, 2) Dialog components exist (Radix UI), 3) React Query mutations already used for pause/resume/delete, 4) Form handling exists in login-form.tsx and settings-modal.tsx. Only minor research needed for qBittorrent /torrents/add API params."
+    },
+    "risk": {
+      "level": "low",
+      "concerns": [
+        "File upload handling needs proper FormData construction",
+        "Mobile UX for file picker needs attention",
+        "Error handling for invalid magnet links"
+      ],
+      "notes": "Low risk - additive feature that doesn't modify existing functionality. Worst case is upload fails and user retries."
+    }
+  },
+
+  "recommended_phases": [
+    "discovery",
+    "requirements",
+    "context",
+    "spec_writing",
+    "planning",
+    "validation"
+  ],
+
+  "flags": {
+    "needs_research": false,
+    "needs_self_critique": false,
+    "needs_infrastructure_setup": false
+  },
+
+  "validation_recommendations": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "minimal_mode": false,
+    "test_types_required": ["unit", "integration"],
+    "security_scan_required": false,
+    "staging_deployment_required": false,
+    "reasoning": "New feature with API interactions and file upload requires unit tests for form validation logic and integration tests for API calls. No security concerns as this uses existing authenticated qBittorrent session. File upload is to user's own qBittorrent instance, not our servers."
+  },
+
+  "created_at": "2025-01-06T00:00:00.000Z"
+}

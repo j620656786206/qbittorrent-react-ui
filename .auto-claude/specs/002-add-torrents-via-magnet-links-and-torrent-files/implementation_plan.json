@@ -1,0 +1,364 @@
+{
+  "feature": "Add Torrents via Magnet Links and Torrent Files",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a new user-facing feature that requires UI components (modal), API functions, and integration with existing data flow. It follows the feature workflow: API -> UI -> Integration.",
+  "phases": [
+    {
+      "id": "phase-1-api",
+      "name": "API Functions",
+      "type": "implementation",
+      "description": "Add API functions to interact with qBittorrent for adding torrents and fetching categories",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Add getCategories API function",
+          "service": "main",
+          "files_to_modify": [
+            "src/lib/api.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/lib/api.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && grep -q 'getCategories' src/lib/api.ts && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "implementation_notes": "GET /api/v2/torrents/categories - returns { category_name: { name, savePath } }. Follow existing getMaindata pattern.",
+          "notes": "Added getCategories API function with Category and CategoriesResponse types. Build verification passes.",
+          "updated_at": "2025-12-19T17:44:43.799580+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Add addTorrentMagnet API function",
+          "service": "main",
+          "files_to_modify": [
+            "src/lib/api.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/lib/api.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && grep -q 'addTorrentMagnet' src/lib/api.ts && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "implementation_notes": "POST /api/v2/torrents/add with URLSearchParams containing: urls, savepath (optional), category (optional), paused (optional). Follow pauseTorrent pattern.",
+          "notes": "Added addTorrentMagnet API function to src/lib/api.ts. Function uses POST /api/v2/torrents/add endpoint with URLSearchParams for form data. Supports optional savepath, category, and paused parameters. Follows existing API patterns with getApiBaseUrl helper and credentials: 'include'. Project builds successfully with Vite.",
+          "updated_at": "2025-12-19T17:46:54.777120+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Add addTorrentFile API function",
+          "service": "main",
+          "files_to_modify": [
+            "src/lib/api.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/lib/api.ts"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && grep -q 'addTorrentFile' src/lib/api.ts && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "implementation_notes": "POST /api/v2/torrents/add with FormData (multipart) containing: torrents (File), savepath (optional), category (optional), paused (optional). Use FormData instead of URLSearchParams for file upload.",
+          "notes": "Added addTorrentFile API function that uses FormData for multipart/form-data file upload. Follows existing pattern with options for savepath, category, and paused state.",
+          "updated_at": "2025-12-19T17:48:49.364098+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-translations",
+      "name": "Translations",
+      "type": "implementation",
+      "description": "Add i18n translations for the add torrent UI in both English and Traditional Chinese",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Add English translations for add torrent modal",
+          "service": "main",
+          "files_to_modify": [
+            "src/locales/en.json"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/locales/en.json"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'addTorrent' src/locales/en.json && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "implementation_notes": "Add under 'addTorrent' namespace: title, magnetLink, torrentFile, savePath, category, startPaused, add, selectFile, invalidMagnet, addSuccess, addError, etc."
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Add Traditional Chinese translations for add torrent modal",
+          "service": "main",
+          "files_to_modify": [
+            "src/locales/zh-Hant.json"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/locales/zh-Hant.json"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'addTorrent' src/locales/zh-Hant.json && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "implementation_notes": "Same keys as en.json, with Traditional Chinese translations."
+        }
+      ]
+    },
+    {
+      "id": "phase-3-modal",
+      "name": "Add Torrent Modal Component",
+      "type": "implementation",
+      "description": "Create the add torrent modal dialog component with magnet link and file upload tabs",
+      "depends_on": [
+        "phase-1-api",
+        "phase-2-translations"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create AddTorrentModal component with form structure",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [
+            "src/components/add-torrent-modal.tsx"
+          ],
+          "patterns_from": [
+            "src/components/settings-modal.tsx",
+            "src/components/ui/dialog.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && test -f src/components/add-torrent-modal.tsx && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "implementation_notes": "Create modal with: 1) Tabs for Magnet Link vs File Upload, 2) Magnet link textarea input, 3) File input for .torrent files, 4) Optional save path input, 5) Category dropdown (fetch from API), 6) Start paused checkbox, 7) Add button. Use existing Dialog components. Use useMutation for add operations. Use useQuery for categories. Invalidate maindata on success."
+        }
+      ]
+    },
+    {
+      "id": "phase-4-ui-integration",
+      "name": "UI Integration",
+      "type": "implementation",
+      "description": "Add the Add Torrent button to sidebar and wire up the modal in the main page",
+      "depends_on": [
+        "phase-3-modal"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Add 'Add Torrent' button to sidebar",
+          "service": "main",
+          "files_to_modify": [
+            "src/components/sidebar.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/components/sidebar.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && grep -q 'onAddTorrent' src/components/sidebar.tsx && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "implementation_notes": "Add a prominent 'Add Torrent' button at the top of the sidebar (above status filters). Use Plus icon from lucide-react. Add onAddTorrent callback prop. Style similar to existing buttons but more prominent (maybe primary color)."
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Wire up AddTorrentModal in index route",
+          "service": "main",
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "src/routes/index.tsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "npx tsc --noEmit && grep -q 'AddTorrentModal' src/routes/index.tsx && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending",
+          "implementation_notes": "1) Import AddTorrentModal, 2) Add isAddTorrentModalOpen state, 3) Pass onAddTorrent callback to Sidebar, 4) Render AddTorrentModal with open/onClose props."
+        }
+      ]
+    },
+    {
+      "id": "phase-5-verification",
+      "name": "End-to-End Verification",
+      "type": "integration",
+      "description": "Verify the complete add torrent flow works end-to-end",
+      "depends_on": [
+        "phase-4-ui-integration"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Manual verification of add torrent flow",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000/",
+            "checks": [
+              "Add Torrent button visible in sidebar",
+              "Click button opens modal",
+              "Modal has Magnet Link and File tabs",
+              "Can paste magnet link and submit",
+              "Can select .torrent file and submit",
+              "Category dropdown populates",
+              "Start paused checkbox works",
+              "Modal closes on success",
+              "New torrent appears in list",
+              "Mobile view is usable"
+            ]
+          },
+          "status": "pending",
+          "implementation_notes": "Test with real qBittorrent instance. Use sample magnet link: magnet:?xt=urn:btih:EXAMPLEHASH. Test both success and error cases."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 5,
+    "total_subtasks": 8,
+    "services_involved": [
+      "main"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-1-api",
+            "phase-2-translations"
+          ],
+          "reason": "No dependencies, different file sets - can run in parallel"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "1.3x faster than sequential if parallelized"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 002 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All TypeScript compiles without errors",
+      "Add torrent via magnet link works",
+      "Add torrent via file upload works",
+      "Categories populate correctly",
+      "New torrent appears in list after adding",
+      "Mobile view is usable",
+      "Translations appear correctly"
+    ],
+    "verification_steps": [
+      {
+        "name": "TypeScript Compilation",
+        "command": "npx tsc --noEmit",
+        "expected_outcome": "No compilation errors",
+        "type": "lint",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Linting",
+        "command": "npm run lint",
+        "expected_outcome": "No linting errors",
+        "type": "lint",
+        "required": true,
+        "blocking": false
+      },
+      {
+        "name": "Build",
+        "command": "npm run build",
+        "expected_outcome": "Build completes successfully",
+        "type": "build",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "Medium risk feature with new API interactions and file upload. TypeScript compilation and build verification ensure code integrity. Manual browser testing required for UX validation."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": false,
+      "commands": [
+        "npm run test"
+      ],
+      "minimum_coverage": null,
+      "notes": "No existing unit tests in project - focus on manual verification"
+    },
+    "integration_tests": {
+      "required": false,
+      "commands": [],
+      "services_to_test": [
+        "main"
+      ],
+      "notes": "Manual integration testing via browser"
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": [
+        "add-magnet-link",
+        "add-torrent-file",
+        "add-with-category"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:3000/",
+          "checks": [
+            "Add Torrent button visible",
+            "Modal opens/closes",
+            "Form submission works"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "last_updated": "2025-12-19T17:48:49.364118+00:00"
+}

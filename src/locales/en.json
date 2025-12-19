@@ -90,5 +90,42 @@
     "baseUrl": "Base URL",
     "username": "Username",
     "password": "Password"
+  },
+  "addTorrent": {
+    "title": "Add Torrent",
+    "description": "Add a new torrent via magnet link or file upload.",
+    "tabs": {
+      "magnetLink": "Magnet Link",
+      "file": "File"
+    },
+    "magnetLink": {
+      "label": "Magnet Link",
+      "placeholder": "magnet:?xt=urn:btih:..."
+    },
+    "file": {
+      "label": "Torrent File",
+      "placeholder": "Select a .torrent file",
+      "browse": "Browse",
+      "noFile": "No file selected"
+    },
+    "savePath": {
+      "label": "Save Path",
+      "placeholder": "Leave empty for default"
+    },
+    "category": {
+      "label": "Category",
+      "none": "None",
+      "placeholder": "Select a category"
+    },
+    "startPaused": "Start Paused",
+    "add": "Add",
+    "adding": "Adding...",
+    "success": "Torrent added successfully",
+    "error": {
+      "invalidMagnet": "Invalid magnet link. Must start with \"magnet:?\"",
+      "noFile": "Please select a torrent file",
+      "failed": "Failed to add torrent",
+      "network": "Network error. Please try again."
+    }
   }
 }
