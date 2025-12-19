@@ -1,71 +1,81 @@
 === AUTO-BUILD PROGRESS ===
 
-Project: Add Torrents via Magnet Links and Torrent Files
+Project: Search and Filter Torrents by Name
 Workspace: managed by orchestrator
-Started: 2025-12-19
+Started: 2025-12-20
 
 Workflow Type: feature
-Rationale: This is a new user-facing feature that requires UI components (modal),
-API functions, and integration with existing data flow. It follows the feature
-workflow: API -> UI -> Integration.
+Rationale: This is a new user-facing feature that adds search functionality to an
+existing view. It requires adding new UI elements (search input with clear button),
+modifying state management, and updating filtering logic. Standard feature workflow.
 
 Session 1 (Planner):
 - Created implementation_plan.json
-- Phases: 5
-- Total subtasks: 8
-- Created init.sh
+- Phases: 2
+- Total subtasks: 5
 - Updated context.json with detailed patterns
+- init.sh already exists (reusable)
 
 Phase Summary:
-- Phase 1 - API Functions: 3 subtasks (getCategories, addTorrentMagnet, addTorrentFile)
+- Phase 1 - Frontend Implementation: 3 subtasks
+  - Subtask 1-1: Add search state and update filtering logic
+  - Subtask 1-2: Add search input UI with clear button
+  - Subtask 1-3: Add translation keys to locale files
   - Depends on: none
-  - Parallel safe: yes
-- Phase 2 - Translations: 2 subtasks (en.json, zh-Hant.json)
-  - Depends on: none
-  - Parallel safe: yes
-- Phase 3 - Modal Component: 1 subtask (add-torrent-modal.tsx)
-  - Depends on: phase-1-api, phase-2-translations
-  - Parallel safe: no
-- Phase 4 - UI Integration: 2 subtasks (sidebar button, wire up modal)
-  - Depends on: phase-3-modal
-  - Parallel safe: no
-- Phase 5 - Verification: 1 subtask (manual browser testing)
-  - Depends on: phase-4-ui-integration
+  - Parallel safe: no (sequential subtasks)
+
+- Phase 2 - Testing and Verification: 2 subtasks
+  - Subtask 2-1: Browser verification of search functionality
+  - Subtask 2-2: Edge case verification
+  - Depends on: phase-1-frontend
   - Parallel safe: no
 
 Services Involved:
-- main: React frontend application (TypeScript, React 18, Vite, TanStack Query)
+- main: React frontend application (TypeScript, React 18, Vite, TanStack Query, i18next)
 
 Files to Modify:
-- src/lib/api.ts - Add 3 API functions
-- src/components/sidebar.tsx - Add "Add Torrent" button
-- src/routes/index.tsx - Wire up AddTorrentModal
-- src/locales/en.json - English translations
-- src/locales/zh-Hant.json - Traditional Chinese translations
+- src/routes/index.tsx - Add search state, update filtering logic, add search input UI
+- src/locales/en.json - Add search placeholder and clear button translations
+- src/locales/zh-Hant.json - Add Chinese translations
 
-Files to Create:
-- src/components/add-torrent-modal.tsx - Modal dialog component
+Files to Reference:
+- src/routes/index.tsx - Existing filter state and filtering pattern
+- src/components/ui/input.tsx - Input component to reuse
+- src/components/sidebar.tsx - Filter state management example
+- src/components/torrent-table.tsx - Torrent type definition
 
 Parallelism Analysis:
-- Max parallel phases: 2
+- Max parallel phases: 1
 - Recommended workers: 1
-- Parallel groups:
-  * [phase-1-api, phase-2-translations] - No dependencies, different file sets
+- Parallel groups: None - sequential implementation
 
 Key Patterns to Follow:
-1. API: Use getApiBaseUrl(), URLSearchParams/FormData, credentials: 'include'
-2. Modal: Use Dialog from Radix UI, controlled open/onOpenChange
-3. Mutations: Use useMutation, invalidate 'maindata' on success
-4. i18n: Nested JSON, t('namespace.key'), both en.json and zh-Hant.json
+1. State: React.useState for searchQuery, useMemo for filtered results
+2. Filtering: Add search to existing filteredTorrents useMemo chain
+3. UI: Use existing Input component, X icon from lucide-react
+4. i18n: Add keys under torrent.search.* namespace
+
+Implementation Details:
+- Search uses simple includes() not regex (safe for special chars)
+- Case-insensitive: toLowerCase() on both query and torrent name
+- Clear button: Show X icon only when searchQuery is not empty
+- Position: Above TorrentTable in main content area, not in sidebar
+
+Risk Level: low
+- Additive feature that doesn't modify existing behavior
+- Clear patterns to follow from existing codebase
+- Browser verification is primary validation method
 
 === STARTUP COMMAND ===
 
 To continue building this spec, run:
 
-  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 002 --parallel 1
+  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 003 --parallel 1
 
 Or manually start development:
 
   npm run dev
+
+Frontend will be available at: http://localhost:3000
 
 === END SESSION 1 ===
