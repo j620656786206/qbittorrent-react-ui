@@ -22,6 +22,16 @@ export type MaindataResponse = {
     full_update: boolean; // True if it's a full update, false for incremental
 };
 
+// Define types for categories response
+export type Category = {
+    name: string;
+    savePath: string;
+};
+
+export type CategoriesResponse = {
+    [categoryName: string]: Category;
+};
+
 // Helper function to get the actual base URL for fetches
 function getApiBaseUrl(providedBaseUrl: string): string {
   if (import.meta.env.DEV) {
@@ -172,4 +182,23 @@ export async function deleteTorrent(
     throw new Error(`Failed to delete torrent(s) with status: ${res.status}`);
   }
   return true;
+}
+
+/**
+ * Fetches all categories from the qBittorrent API.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @returns {Promise<CategoriesResponse>} - Object mapping category names to their details.
+ */
+export async function getCategories(baseUrl: string): Promise<CategoriesResponse> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/categories`, {
+    credentials: 'include', // Include cookies for authentication
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch categories with status: ${res.status}`);
+  }
+
+  return res.json();
 }
