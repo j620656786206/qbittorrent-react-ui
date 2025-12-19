@@ -1,0 +1,390 @@
+{
+  "feature": "Add Torrents via Magnet Links and .torrent Files",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a new user-facing feature that adds substantial functionality (adding torrents) without modifying existing behavior. It requires new UI components, API functions, and i18n translations following established patterns.",
+  "phases": [
+    {
+      "id": "phase-1-api",
+      "name": "API Layer",
+      "type": "implementation",
+      "description": "Add API functions for adding torrents via magnet links and .torrent files to qBittorrent",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Add addTorrentFromMagnet() API function",
+          "service": "main",
+          "files_to_modify": ["src/lib/api.ts"],
+          "files_to_create": [],
+          "patterns_from": ["src/lib/api.ts (pauseTorrent, deleteTorrent)"],
+          "implementation_notes": "Use FormData for multipart/form-data POST to /api/v2/torrents/add. Include params: urls, savepath, category, paused. Follow existing pattern with getApiBaseUrl() and credentials: 'include'.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Add addTorrentFromFile() API function",
+          "service": "main",
+          "files_to_modify": ["src/lib/api.ts"],
+          "files_to_create": [],
+          "patterns_from": ["src/lib/api.ts (pauseTorrent, deleteTorrent)"],
+          "implementation_notes": "Use FormData with file attachment for multipart/form-data POST to /api/v2/torrents/add. Field name is 'torrents'. Include savepath, category, paused options.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-modal",
+      "name": "Add Torrent Modal Component",
+      "type": "implementation",
+      "description": "Create the AddTorrentModal component with form inputs for magnet link, file upload, and options",
+      "depends_on": ["phase-1-api"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create AddTorrentModal component with basic structure",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": ["src/components/add-torrent-modal.tsx"],
+          "patterns_from": ["src/components/settings-modal.tsx"],
+          "implementation_notes": "Create modal with Dialog from @/components/ui/dialog. Props: isOpen, onClose, onSuccess. Include form state for magnetLink, savePath, category, startPaused.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Add magnet link input and validation",
+          "service": "main",
+          "files_to_modify": ["src/components/add-torrent-modal.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/settings-modal.tsx (Input usage)"],
+          "implementation_notes": "Add textarea for magnet link with validation (must start with magnet:?). Show error state for invalid input. Use i18n keys for labels.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Add .torrent file upload functionality",
+          "service": "main",
+          "files_to_modify": ["src/components/add-torrent-modal.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/ui/input.tsx (file input)"],
+          "implementation_notes": "Add file input accepting .torrent files. Store File object in state. Show selected filename. Allow clearing selection.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Add optional fields (save path, category, start paused)",
+          "service": "main",
+          "files_to_modify": ["src/components/add-torrent-modal.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/settings-modal.tsx"],
+          "implementation_notes": "Add Input for save path (optional), Input for category (optional), checkbox for start paused. All fields should be collapsible under 'Advanced Options'.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-5",
+          "description": "Integrate useMutation for form submission",
+          "service": "main",
+          "files_to_modify": ["src/components/add-torrent-modal.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/routes/index.tsx (pauseMutation, deleteMutation)"],
+          "implementation_notes": "Add useMutation hooks for addTorrentFromMagnet and addTorrentFromFile. On success, call onSuccess prop and close modal. Handle and display errors. Invalidate 'maindata' query.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-integration",
+      "name": "UI Integration",
+      "type": "implementation",
+      "description": "Integrate AddTorrentModal into the main UI with trigger button in sidebar",
+      "depends_on": ["phase-2-modal"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Add 'Add Torrent' button to sidebar",
+          "service": "main",
+          "files_to_modify": ["src/components/sidebar.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/sidebar.tsx (Settings button)"],
+          "implementation_notes": "Add Button with Plus icon above Settings in sidebar. Call onOpenAddTorrent prop when clicked. Handle mobile sidebar close. Add new prop to SidebarProps.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Add modal state and integrate AddTorrentModal in HomePage",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/routes/index.tsx (SettingsModal integration)"],
+          "implementation_notes": "Add isAddTorrentModalOpen state. Pass onOpenAddTorrent to Sidebar. Render AddTorrentModal with proper props. Handle onSuccess to invalidate maindata query.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit",
+            "expected": "No TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-i18n",
+      "name": "Internationalization",
+      "type": "implementation",
+      "description": "Add translations for all new UI text in English and Traditional Chinese",
+      "depends_on": ["phase-2-modal"],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Add English translations for add torrent UI",
+          "service": "main",
+          "files_to_modify": ["src/locales/en.json"],
+          "files_to_create": [],
+          "patterns_from": ["src/locales/en.json"],
+          "implementation_notes": "Add 'addTorrent' section with keys: title, description, magnetLink, magnetLinkPlaceholder, uploadFile, selectFile, noFileSelected, savePath, savePathPlaceholder, category, categoryPlaceholder, startPaused, advancedOptions, add, adding, validation.invalidMagnet, validation.noInput, error.addFailed, success.added",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && cat src/locales/en.json | python3 -m json.tool > /dev/null && echo 'Valid JSON'",
+            "expected": "Valid JSON"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Add Traditional Chinese translations for add torrent UI",
+          "service": "main",
+          "files_to_modify": ["src/locales/zh-Hant.json"],
+          "files_to_create": [],
+          "patterns_from": ["src/locales/zh-Hant.json"],
+          "implementation_notes": "Add same keys as English but with Traditional Chinese translations. Match the existing translation style in the file.",
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && cat src/locales/zh-Hant.json | python3 -m json.tool > /dev/null && echo 'Valid JSON'",
+            "expected": "Valid JSON"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-verification",
+      "name": "Final Verification",
+      "type": "integration",
+      "description": "Verify the complete feature works end-to-end with browser testing",
+      "depends_on": ["phase-3-integration", "phase-4-i18n"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Build verification and TypeScript check",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "cd /Users/alexyu/projects/personal/react-torrent && npx tsc --noEmit && npm run build",
+            "expected": "Build succeeds with no errors"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Browser verification - Add Torrent button visible and modal opens",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000/",
+            "checks": [
+              "Add Torrent button visible in sidebar",
+              "Clicking button opens modal",
+              "Modal has magnet link input",
+              "Modal has file upload input",
+              "Modal has optional save path and category fields",
+              "Modal has start paused checkbox",
+              "Cancel button closes modal"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-3",
+          "description": "Browser verification - Mobile responsive",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000/",
+            "checks": [
+              "Add Torrent button accessible in mobile sidebar",
+              "Modal displays correctly on mobile viewport",
+              "All form inputs are touch-friendly"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 5,
+    "total_subtasks": 13,
+    "services_involved": ["main"],
+    "estimated_files_changed": 6,
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": ["phase-1-api"],
+          "reason": "API layer can be built independently first"
+        },
+        {
+          "phases": ["phase-4-i18n"],
+          "reason": "i18n can run in parallel with phase-3 after phase-2 completes (different files)"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution recommended due to tight dependencies"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 001 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": ["unit", "integration"],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "TypeScript compilation succeeds with no errors",
+      "Build process completes successfully",
+      "Add Torrent button visible in sidebar (desktop and mobile)",
+      "Modal opens and displays all form fields correctly",
+      "Magnet link validation works (rejects invalid input)",
+      "File upload accepts .torrent files",
+      "Optional fields (save path, category, start paused) work",
+      "Successful add shows torrent in list immediately",
+      "Error handling displays user-friendly messages",
+      "i18n translations work in both English and Chinese"
+    ],
+    "verification_steps": [
+      {
+        "name": "TypeScript Check",
+        "command": "npx tsc --noEmit",
+        "expected_outcome": "No type errors",
+        "type": "build",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Production Build",
+        "command": "npm run build",
+        "expected_outcome": "Build succeeds",
+        "type": "build",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Lint Check",
+        "command": "npm run lint",
+        "expected_outcome": "No lint errors",
+        "type": "lint",
+        "required": false,
+        "blocking": false
+      }
+    ],
+    "reasoning": "Medium risk feature with form inputs and file upload. No existing tests in the project, so verification focuses on TypeScript compilation, build success, and browser verification."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": false,
+      "commands": ["npm run test"],
+      "minimum_coverage": null,
+      "notes": "No existing test infrastructure; skip for MVP"
+    },
+    "integration_tests": {
+      "required": false,
+      "commands": [],
+      "services_to_test": ["main"],
+      "notes": "Manual browser verification recommended"
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": [
+        "Add magnet link flow",
+        "Add .torrent file flow",
+        "Add with options flow"
+      ],
+      "notes": "Manual verification for initial implementation"
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:3000/",
+          "checks": [
+            "Add Torrent button visible in sidebar",
+            "Modal opens correctly",
+            "All form inputs functional",
+            "Mobile responsive",
+            "No console errors"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": [],
+      "notes": "N/A - qBittorrent handles all data storage"
+    }
+  },
+  "qa_signoff": null
+}

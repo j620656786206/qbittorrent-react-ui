@@ -1,0 +1,44 @@
+{
+  "task_description": "Add Torrents via Magnet Links and .torrent Files - Enable users to add new torrents to qBittorrent through the React web UI with magnet links, .torrent file upload, and options for save path, category, and start paused state.",
+  "files_to_modify": {
+    "main": [
+      "src/lib/api.ts",
+      "src/components/sidebar.tsx",
+      "src/routes/index.tsx",
+      "src/locales/en.json",
+      "src/locales/zh-Hant.json"
+    ]
+  },
+  "files_to_create": {
+    "main": [
+      "src/components/add-torrent-modal.tsx"
+    ]
+  },
+  "files_to_reference": [
+    "src/components/settings-modal.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/lib/api.ts",
+    "src/routes/index.tsx",
+    "src/components/sidebar.tsx"
+  ],
+  "patterns": {
+    "api_function": "Use getApiBaseUrl() helper, FormData for multipart POST, credentials: 'include', throw Error on !res.ok",
+    "modal_component": "Props: isOpen, onClose, onSuccess. Use Dialog from @/components/ui/dialog. Local state for form fields.",
+    "mutation_hook": "useMutation from @tanstack/react-query with onSuccess calling queryClient.invalidateQueries({ queryKey: ['maindata'] })",
+    "form_layout": "grid gap-4 py-4 with Label and Input from @/components/ui/",
+    "i18n_integration": "useTranslation() hook, t() function, keys like 'section.subsection.key'"
+  },
+  "existing_implementations": {
+    "similar_modal": "src/components/settings-modal.tsx - Shows Dialog pattern with form inputs",
+    "api_pattern": "src/lib/api.ts - pauseTorrent, resumeTorrent, deleteTorrent show POST pattern",
+    "mutation_pattern": "src/routes/index.tsx - pauseMutation, resumeMutation, deleteMutation",
+    "sidebar_button": "src/components/sidebar.tsx - Settings button pattern with icon"
+  },
+  "qbittorrent_api": {
+    "add_torrent_endpoint": "POST /api/v2/torrents/add",
+    "content_type": "multipart/form-data",
+    "magnet_field": "urls",
+    "file_field": "torrents",
+    "optional_fields": ["savepath", "category", "paused"]
+  }
+}

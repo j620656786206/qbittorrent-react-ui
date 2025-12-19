@@ -1,0 +1,59 @@
+{
+  "project_type": "single",
+  "services": {
+    "main": {
+      "path": ".",
+      "tech_stack": ["typescript", "react", "vite", "tanstack-query", "tanstack-router", "radix-ui", "tailwindcss", "i18next"],
+      "port": 3000,
+      "dev_command": "npm run dev",
+      "test_command": "npm run test",
+      "build_command": "npm run build",
+      "lint_command": "npm run lint",
+      "entry_point": "src/main.tsx"
+    }
+  },
+  "infrastructure": {
+    "docker": false,
+    "database": null,
+    "ci": "GitHub Actions"
+  },
+  "conventions": {
+    "linter": "ESLint",
+    "formatter": "Prettier",
+    "testing": "Vitest",
+    "styling": "Tailwind CSS",
+    "component_library": "Radix UI primitives in @/components/ui/",
+    "state_management": "TanStack Query",
+    "routing": "TanStack Router",
+    "i18n": "i18next with react-i18next"
+  },
+  "key_directories": {
+    "src/components": "React components",
+    "src/components/ui": "Reusable UI primitives (Button, Input, Dialog, etc.)",
+    "src/lib": "Utilities and API functions",
+    "src/routes": "TanStack Router route components",
+    "src/locales": "i18n translation files (en.json, zh-Hant.json)"
+  },
+  "patterns": {
+    "api_functions": {
+      "description": "API functions use URLSearchParams for POST body, getApiBaseUrl() helper, and credentials: 'include'",
+      "reference_file": "src/lib/api.ts"
+    },
+    "modal_dialogs": {
+      "description": "Modals use Radix Dialog from @/components/ui/dialog with controlled isOpen/onClose props",
+      "reference_file": "src/components/settings-modal.tsx"
+    },
+    "mutations": {
+      "description": "TanStack Query useMutation with onSuccess invalidating 'maindata' query",
+      "reference_file": "src/routes/index.tsx"
+    },
+    "i18n": {
+      "description": "useTranslation() hook with t() function, keys in nested JSON structure",
+      "reference_files": ["src/locales/en.json", "src/locales/zh-Hant.json"]
+    },
+    "responsive_layout": {
+      "description": "useMediaQuery hook for desktop detection, Sheet component for mobile sidebar",
+      "reference_files": ["src/routes/index.tsx", "src/components/sidebar.tsx"]
+    }
+  }
+}
