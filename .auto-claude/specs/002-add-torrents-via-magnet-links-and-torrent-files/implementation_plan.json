@@ -100,8 +100,10 @@
             "command": "grep -q 'addTorrent' src/locales/en.json && echo 'OK'",
             "expected": "OK"
           },
-          "status": "pending",
-          "implementation_notes": "Add under 'addTorrent' namespace: title, magnetLink, torrentFile, savePath, category, startPaused, add, selectFile, invalidMagnet, addSuccess, addError, etc."
+          "status": "completed",
+          "implementation_notes": "Add under 'addTorrent' namespace: title, magnetLink, torrentFile, savePath, category, startPaused, add, selectFile, invalidMagnet, addSuccess, addError, etc.",
+          "notes": "Added English translations for add torrent modal including: title, description, tab labels (magnetLink, file), input labels and placeholders, savePath, category selector, startPaused toggle, add button states, and error messages.",
+          "updated_at": "2025-12-19T17:50:10.088824+00:00"
         },
         {
           "id": "subtask-2-2",
@@ -360,5 +362,5 @@
     }
   },
   "qa_signoff": null,
-  "last_updated": "2025-12-19T17:48:49.364118+00:00"
+  "last_updated": "2025-12-19T17:50:10.088837+00:00"
 }
