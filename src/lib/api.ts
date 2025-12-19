@@ -247,3 +247,48 @@ export async function addTorrentMagnet(
   }
   return true;
 }
+
+// Options for adding a torrent via .torrent file
+export type AddTorrentFileOptions = {
+  savepath?: string;
+  category?: string;
+  paused?: boolean;
+};
+
+/**
+ * Adds a torrent via .torrent file upload.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {File} file - The .torrent file to upload.
+ * @param {AddTorrentFileOptions} [options] - Optional parameters for save path, category, and paused state.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTorrentFile(
+  baseUrl: string,
+  file: File,
+  options?: AddTorrentFileOptions
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new FormData();
+  formData.append('torrents', file);
+
+  if (options?.savepath) {
+    formData.append('savepath', options.savepath);
+  }
+  if (options?.category) {
+    formData.append('category', options.category);
+  }
+  if (options?.paused !== undefined) {
+    formData.append('paused', options.paused ? 'true' : 'false');
+  }
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add torrent via file with status: ${res.status}`);
+  }
+  return true;
+}
