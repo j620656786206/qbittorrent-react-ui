@@ -275,7 +275,7 @@ function HomePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder={t('torrent.searchPlaceholder', 'Search torrents...')}
+              placeholder={t('torrent.search.placeholder', 'Search torrents...')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-9"
@@ -285,7 +285,7 @@ function HomePage() {
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={t('common.clear', 'Clear')}
+                aria-label={t('torrent.search.clear', 'Clear search')}
               >
                 <X className="h-4 w-4" />
               </button>
