@@ -2,7 +2,7 @@ import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { Menu } from 'lucide-react' // Import Menu icon
+import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
 import type { Torrent } from '@/components/torrent-table'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
@@ -10,6 +10,7 @@ import { TorrentDetail } from '@/components/torrent-detail'
 import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
 import { useMutation } from '@tanstack/react-query'
@@ -266,18 +267,42 @@ function HomePage() {
       )
     }
 
-    if (loginSuccess && filteredTorrents.length > 0) {
+    if (loginSuccess) {
       return (
-        <TorrentTable
-          torrents={filteredTorrents}
-          onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
-        />
-      )
-    }
+        <>
+          {/* Search Input */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder={t('torrent.searchPlaceholder', 'Search torrents...')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={t('common.clear', 'Clear')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-    // If login is successful but no torrents are found
-    if (loginSuccess && filteredTorrents.length === 0 && !isLoadingTorrents) {
-      return <p>{t('torrent.noTorrentsFound')}</p>
+          {/* Torrent List */}
+          {filteredTorrents.length > 0 ? (
+            <TorrentTable
+              torrents={filteredTorrents}
+              onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
+            />
+          ) : (
+            <p>{t('torrent.noTorrentsFound')}</p>
+          )}
+        </>
+      )
     }
 
     return <p>Loading application...</p> // Fallback if no specific state matches
