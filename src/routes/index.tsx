@@ -24,6 +24,7 @@ function HomePage() {
   const queryClient = useQueryClient()
   const [filter, setFilter] = React.useState<Filter>('all')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
+  const [isAddTorrentOpen, setIsAddTorrentOpen] = React.useState(false)
   const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(null)
 
   const isDesktop = useMediaQuery('(min-width: 768px)') // md breakpoint
@@ -291,6 +292,7 @@ function HomePage() {
         currentFilter={filter}
         setFilter={setFilter}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onAddTorrent={() => setIsAddTorrentOpen(true)}
         isMobile={!isDesktop}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}

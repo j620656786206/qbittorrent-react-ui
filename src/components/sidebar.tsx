@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Settings, Folder, Hash } from 'lucide-react'
+import { Settings, Folder, Hash, Plus } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -27,6 +27,7 @@ type SidebarProps = {
   currentFilter: Filter
   setFilter: (filter: Filter) => void
   onOpenSettings: () => void
+  onAddTorrent: () => void
   isMobile: boolean
   isMobileSidebarOpen: boolean
   onCloseMobileSidebar: () => void
@@ -38,6 +39,7 @@ export function Sidebar({
   currentFilter,
   setFilter,
   onOpenSettings,
+  onAddTorrent,
   isMobile,
   isMobileSidebarOpen,
   onCloseMobileSidebar,
@@ -118,8 +120,19 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Settings */}
-      <div className="mt-auto pt-4 border-t border-slate-700">
+      {/* Actions */}
+      <div className="mt-auto pt-4 border-t border-slate-700 space-y-1">
+        <Button
+          variant="ghost"
+          className="justify-start w-full text-sm"
+          onClick={() => {
+            onAddTorrent()
+            if (isMobile) onCloseMobileSidebar()
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t('addTorrent.title')}
+        </Button>
         <Button
           variant="ghost"
           className="justify-start w-full text-sm"
