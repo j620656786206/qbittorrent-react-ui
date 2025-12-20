@@ -9,6 +9,7 @@ import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
+import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
 import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
@@ -319,6 +320,10 @@ function HomePage() {
             }
           }
         }}
+      />
+      <AddTorrentModal
+        isOpen={isAddTorrentOpen}
+        onClose={() => setIsAddTorrentOpen(false)}
       />
     </div>
   )
