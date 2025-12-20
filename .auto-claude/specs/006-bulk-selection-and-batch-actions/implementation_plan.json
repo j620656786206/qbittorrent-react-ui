@@ -1,0 +1,392 @@
+{
+  "feature": "Bulk Selection and Batch Actions",
+  "workflow_type": "feature",
+  "workflow_rationale": "New functionality adding bulk selection UI components (checkboxes, batch action toolbar), state management for selections, and async batch operation handlers. Follows service dependency order: UI foundation → State management → Action handlers → Integration.",
+  "phases": [
+    {
+      "id": "phase-1-ui-foundation",
+      "name": "UI Foundation",
+      "type": "implementation",
+      "description": "Create Radix UI Checkbox component and add checkbox columns to torrent table and card layouts",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Create Radix UI Checkbox component",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": ["src/components/ui/checkbox.tsx"],
+          "patterns_from": ["src/components/ui/button.tsx", "src/components/ui/label.tsx"],
+          "verification": {
+            "type": "command",
+            "command": "npm run build",
+            "expected": "Build succeeds without errors"
+          },
+          "status": "pending",
+          "notes": "Use Radix UI @radix-ui/react-checkbox, wrap with Tailwind CSS styling following existing UI component patterns"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Add checkbox column to TorrentTable desktop layout",
+          "service": "main",
+          "files_to_modify": ["src/components/torrent-table.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/ui/checkbox.tsx"],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Checkbox appears in header row", "Checkboxes appear on each torrent row", "No console errors"]
+          },
+          "status": "pending",
+          "notes": "Add new TableHead and TableCell for checkbox in first column. Pass selectedHashes and toggleSelection as props (to be implemented in phase 2)"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Add checkbox to TorrentCard mobile layout",
+          "service": "main",
+          "files_to_modify": ["src/components/torrent-card.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/ui/checkbox.tsx"],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Checkbox appears on mobile card view", "Card layout adapts to checkbox", "No console errors"]
+          },
+          "status": "pending",
+          "notes": "Add checkbox to top-right or top-left corner of card. Ensure touch-friendly tap target (min 44px)"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-selection-state",
+      "name": "Selection State Management",
+      "type": "implementation",
+      "description": "Implement selection state (Set<string>) in index.tsx with toggle, selectAll, and clearSelection helpers",
+      "depends_on": ["phase-1-ui-foundation"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Add selection state and helper functions to index.tsx",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Clicking checkbox toggles selection", "Selected torrents show visual highlight", "Checkbox state persists correctly"]
+          },
+          "status": "pending",
+          "notes": "Add useState<Set<string>> for selectedHashes. Create toggleSelection, selectAll(filteredTorrents), clearSelection helpers. Pass state and functions to TorrentTable/TorrentCard as props."
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Wire selection state to TorrentTable and TorrentCard",
+          "service": "main",
+          "files_to_modify": ["src/components/torrent-table.tsx", "src/components/torrent-card.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Individual checkbox clicks work", "Visual highlight shows selected state", "Desktop and mobile views both work"]
+          },
+          "status": "pending",
+          "notes": "Accept selectedHashes, toggleSelection as props. Bind checkbox checked={selectedHashes.has(hash)} onCheckedChange={()=>toggleSelection(hash)}. Add selected visual state (e.g., bg-blue-900/30 on TableRow)"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Implement 'Select All' functionality in table header",
+          "service": "main",
+          "files_to_modify": ["src/components/torrent-table.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Header checkbox selects all visible torrents", "Header checkbox state shows indeterminate when some selected", "Select all respects current filters"]
+          },
+          "status": "pending",
+          "notes": "Add header checkbox with checked={all selected}, indeterminate={some selected}, onCheckedChange={selectAll or clearSelection}. Use filteredTorrents for selectAll to respect search/filter state."
+        }
+      ]
+    },
+    {
+      "id": "phase-3-batch-actions-ui",
+      "name": "Batch Actions Toolbar",
+      "type": "implementation",
+      "description": "Create batch actions toolbar component that appears when torrents are selected, showing action buttons and selected count",
+      "depends_on": ["phase-2-selection-state"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create BatchActionsToolbar component",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": ["src/components/batch-actions-toolbar.tsx"],
+          "patterns_from": ["src/components/ui/button.tsx", "src/components/ui/alert-dialog.tsx"],
+          "verification": {
+            "type": "command",
+            "command": "npm run build",
+            "expected": "Build succeeds without errors"
+          },
+          "status": "pending",
+          "notes": "Component accepts: selectedCount, onPause, onResume, onDelete, isPending. Shows count like '5 selected'. Buttons: Pause, Resume, Delete. Use lucide-react icons (Play, Pause, Trash2). Disable all buttons if isPending=true."
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Integrate BatchActionsToolbar into index.tsx",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Toolbar appears when torrents selected", "Toolbar hidden when no selections", "Selected count displays correctly", "All buttons visible"]
+          },
+          "status": "pending",
+          "notes": "Render toolbar above torrent list when selectedHashes.size > 0. Pass selectedCount={selectedHashes.size}. Handler functions to be implemented in phase 4."
+        }
+      ]
+    },
+    {
+      "id": "phase-4-batch-operations",
+      "name": "Batch Operation Handlers",
+      "type": "implementation",
+      "description": "Implement TanStack Query mutations for batch pause, resume, delete, and category assignment with async execution",
+      "depends_on": ["phase-3-batch-actions-ui"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Add batch category assignment API function",
+          "service": "main",
+          "files_to_modify": ["src/lib/api.ts"],
+          "files_to_create": [],
+          "patterns_from": ["src/lib/api.ts"],
+          "verification": {
+            "type": "command",
+            "command": "npm run build",
+            "expected": "Build succeeds, new function exported correctly"
+          },
+          "status": "pending",
+          "notes": "Add setTorrentCategory(baseUrl: string, hashes: string | string[], category: string) function. Use /api/v2/torrents/setCategory endpoint. Follow existing API function patterns (FormData, credentials: 'include')."
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Create batch pause/resume mutations in index.tsx",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/routes/index.tsx"],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Clicking batch pause pauses all selected torrents", "Selections clear after operation", "Query cache invalidates", "UI remains responsive"]
+          },
+          "status": "pending",
+          "notes": "Create batchPauseMutation and batchResumeMutation using useMutation. mutationFn calls pauseTorrent/resumeTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries(['maindata']), clearSelection(). Wire to toolbar onPause/onResume."
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Create batch delete mutation with confirmation dialog",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/torrent-table.tsx"],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Delete button shows confirmation dialog", "Dialog shows selected count", "Option to delete files included", "Deletions execute on confirm", "Selections clear after"]
+          },
+          "status": "pending",
+          "notes": "Create batchDeleteMutation. Use AlertDialog from Radix UI for confirmation (like single delete in torrent-table.tsx). Show count in message. Provide 'Keep Files' and 'Delete Files' buttons. mutationFn calls deleteTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries, clearSelection."
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Create batch category assignment UI and mutation",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx", "src/components/batch-actions-toolbar.tsx"],
+          "files_to_create": [],
+          "patterns_from": ["src/components/ui/dropdown-menu.tsx"],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Category dropdown appears in toolbar", "Selecting category applies to all selected torrents", "Selections clear after", "Category updates visible in torrent list"]
+          },
+          "status": "pending",
+          "notes": "Add category dropdown to BatchActionsToolbar. Fetch categories with getCategories API. Create batchCategoryMutation calling setTorrentCategory(baseUrl, hashes, category). onSuccess: invalidateQueries, clearSelection."
+        }
+      ]
+    },
+    {
+      "id": "phase-5-integration",
+      "name": "Integration and Polish",
+      "type": "integration",
+      "description": "Wire all components together, add loading states, handle edge cases, and verify end-to-end functionality",
+      "depends_on": ["phase-4-batch-operations"],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Add loading states to batch actions",
+          "service": "main",
+          "files_to_modify": ["src/components/batch-actions-toolbar.tsx", "src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Buttons show loading spinner during operations", "Checkboxes disabled during operations", "Toolbar indicates operation in progress"]
+          },
+          "status": "pending",
+          "notes": "Pass isPending from mutations to toolbar. Show spinner icon in buttons during isPending. Disable all checkboxes and buttons while operations run. Use mutation.isPending from TanStack Query."
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Handle edge cases (empty selection, filter changes, partial failures)",
+          "service": "main",
+          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3000",
+            "checks": ["Batch buttons disabled when no selections", "Changing filters clears hidden selections", "Error messages show for partial failures"]
+          },
+          "status": "pending",
+          "notes": "Disable toolbar buttons when selectedHashes.size === 0. Clear selections for torrents that become hidden after filter changes (useEffect watching filteredTorrents). Add error handling in mutations to show toast/alert for failures."
+        },
+        {
+          "id": "subtask-5-3",
+          "description": "End-to-end verification of all batch operations",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "1. Start dev server: npm run dev",
+              "2. Login to qBittorrent instance",
+              "3. Select 5 torrents via checkboxes",
+              "4. Verify toolbar shows '5 selected'",
+              "5. Click batch pause - verify all pause",
+              "6. Select 3 different torrents",
+              "7. Click batch resume - verify all resume",
+              "8. Select 2 torrents, click delete, confirm - verify deletion",
+              "9. Select 10 torrents, assign category - verify category applied",
+              "10. Click select all - verify all visible torrents selected",
+              "11. Verify UI remains responsive during operations",
+              "12. Verify no console errors"
+            ]
+          },
+          "status": "pending",
+          "notes": "Full integration test. Verify all features work together. Check performance with large selections (20+ torrents). Ensure UI doesn't freeze (addresses pain-2-5)."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 5,
+    "total_subtasks": 14,
+    "services_involved": ["main"],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution required - phases have strict dependencies"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 006 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": ["unit", "integration"],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All existing tests pass",
+      "New unit tests for selection state management",
+      "Integration tests for batch API calls",
+      "Browser verification confirms UI elements render correctly",
+      "Performance tests show no UI freezing (addresses pain-2-5)"
+    ],
+    "verification_steps": [
+      {
+        "name": "Unit Tests",
+        "command": "npm test",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Build Check",
+        "command": "npm run build",
+        "expected_outcome": "Build succeeds without errors",
+        "type": "build",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Browser Verification",
+        "command": "npm run dev",
+        "expected_outcome": "App runs at http://localhost:3000, all features work",
+        "type": "manual",
+        "required": true,
+        "blocking": false
+      }
+    ],
+    "reasoning": "Medium risk change requires unit and integration tests. Critical performance concern (UI freezing) must be verified with browser testing. No security-sensitive code involved."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": ["npm test"],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": ["npm test"],
+      "services_to_test": ["main"]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": ["bulk-delete", "bulk-pause", "bulk-category-assignment"]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:3000",
+          "checks": [
+            "Checkboxes appear on torrent rows",
+            "Batch actions toolbar appears when selections exist",
+            "Selected count displays correctly",
+            "All batch operations complete successfully",
+            "UI remains responsive during operations",
+            "No console errors"
+          ]
+        }
+      ]
+    },
+    "performance_verification": {
+      "required": true,
+      "checks": [
+        "Selecting 50+ torrents does not freeze UI",
+        "Batch operations complete in <3 seconds",
+        "No browser 'page unresponsive' warnings"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "created_at": "2025-12-20T20:43:00.000Z",
+  "updated_at": "2025-12-20T20:43:00.000Z"
+}

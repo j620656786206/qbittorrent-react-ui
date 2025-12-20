@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/alexyu/projects/personal/react-torrent/.worktrees/006-bulk-selection-and-batch-actions/logs/.34a33f1be01d4c7b7efca7768825b45637663e07-audit.json",
+    "files": [
+        {
+            "date": 1766234887965,
+            "name": "/Users/alexyu/projects/personal/react-torrent/.worktrees/006-bulk-selection-and-batch-actions/logs/mcp-puppeteer-2025-12-20.log",
+            "hash": "e025f3bff12d7c7276927eeb73423ea79cfde0aa2f49ed2edac8dee8fa060503"
+        }
+    ],
+    "hashType": "sha256"
+}

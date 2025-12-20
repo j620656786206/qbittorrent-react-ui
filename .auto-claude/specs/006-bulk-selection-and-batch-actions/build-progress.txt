@@ -1,0 +1,218 @@
+=== AUTO-BUILD PROGRESS ===
+
+Project: react-torrent
+Spec: 006-bulk-selection-and-batch-actions
+Feature: Bulk Selection and Batch Actions
+Started: 2025-12-20 20:43:00
+
+Workflow Type: feature
+Rationale: New functionality adding bulk selection UI components (checkboxes, batch action toolbar),
+state management for selections, and async batch operation handlers. Addresses critical performance
+issue where VueTorrent users experience UI freezing during bulk operations (pain-2-5).
+
+Session 1 (Planner):
+- Completed deep codebase investigation (PHASE 0)
+- Created/updated context.json with discovered patterns
+- Created implementation_plan.json with 5 phases, 14 subtasks
+- Created init.sh setup script
+- Ready for autonomous implementation
+
+=== CODEBASE INVESTIGATION FINDINGS ===
+
+Tech Stack Confirmed:
+- React 19 + TypeScript
+- TanStack Query (state management)
+- TanStack Router (routing)
+- Radix UI (accessible components)
+- Tailwind CSS (styling)
+- Vite (build tool)
+- Vitest (testing)
+
+Critical Discoveries:
+✅ API already supports batch operations!
+   - pauseTorrent(), resumeTorrent(), deleteTorrent() accept string | string[]
+   - Hashes joined with '|' delimiter for batch calls
+   - No need to write new batch API endpoints
+
+✅ TanStack Query mutation pattern established
+   - useMutation with onSuccess invalidating ['maindata'] query
+   - Pattern exists in src/components/torrent-table.tsx (lines 154-174)
+
+✅ Responsive design pattern exists
+   - Desktop: TorrentTable (table layout)
+   - Mobile: TorrentCard (card layout)
+   - Both will need checkbox support
+
+❌ Missing Radix UI Checkbox component
+   - Must create src/components/ui/checkbox.tsx
+   - Follow pattern from other UI components
+
+=== PHASE SUMMARY ===
+
+Phase 1: UI Foundation (3 subtasks)
+- Create Radix UI Checkbox component
+- Add checkbox column to TorrentTable
+- Add checkbox to TorrentCard mobile view
+Dependencies: None
+Status: pending
+
+Phase 2: Selection State Management (3 subtasks)
+- Add selection state (Set<string>) in index.tsx
+- Wire state to TorrentTable and TorrentCard
+- Implement "Select All" functionality
+Dependencies: phase-1-ui-foundation
+Status: pending
+
+Phase 3: Batch Actions Toolbar (2 subtasks)
+- Create BatchActionsToolbar component
+- Integrate toolbar into index.tsx
+Dependencies: phase-2-selection-state
+Status: pending
+
+Phase 4: Batch Operation Handlers (4 subtasks)
+- Add batch category assignment API function
+- Create batch pause/resume mutations
+- Create batch delete mutation with confirmation
+- Create batch category assignment UI
+Dependencies: phase-3-batch-actions-ui
+Status: pending
+
+Phase 5: Integration and Polish (3 subtasks)
+- Add loading states to batch actions
+- Handle edge cases (empty selection, filter changes, partial failures)
+- End-to-end verification of all batch operations
+Dependencies: phase-4-batch-operations
+Status: pending
+
+=== SERVICES INVOLVED ===
+
+main (React Frontend):
+- Path: /Users/alexyu/projects/personal/react-torrent
+- Port: 3000
+- Dev Command: npm run dev
+- Test Command: npm test
+- Build Command: npm run build
+
+=== PARALLELISM ANALYSIS ===
+
+Max Parallel Phases: 1
+Recommended Workers: 1
+Parallel Groups: None
+
+Reason: Phases have strict sequential dependencies:
+  Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
+
+Each phase builds on the previous:
+- UI components must exist before state can be wired
+- State must be managed before actions can use it
+- Actions must work before integration testing
+
+=== FILES TO MODIFY ===
+
+1. src/components/torrent-table.tsx
+   - Add checkbox column
+   - Wire selection state
+   - Add "Select All" header checkbox
+
+2. src/components/torrent-card.tsx
+   - Add checkbox for mobile view
+   - Wire selection state
+
+3. src/routes/index.tsx
+   - Add selection state management (useState<Set<string>>)
+   - Create helper functions (toggleSelection, selectAll, clearSelection)
+   - Add batch operation mutations
+   - Integrate BatchActionsToolbar
+
+4. src/lib/api.ts
+   - Add setTorrentCategory() function for batch category assignment
+   - (pauseTorrent, resumeTorrent, deleteTorrent already support batch)
+
+=== FILES TO CREATE ===
+
+1. src/components/ui/checkbox.tsx
+   - Radix UI Checkbox wrapper
+   - Tailwind CSS styling
+   - Follow existing UI component patterns
+
+2. src/components/batch-actions-toolbar.tsx
+   - Batch action buttons (Pause, Resume, Delete)
+   - Category dropdown
+   - Selected count display
+   - Loading states
+
+=== VERIFICATION STRATEGY ===
+
+Risk Level: medium
+Test Types Required: unit, integration
+Security Scanning: No
+Staging Deployment: No
+
+Verification Steps:
+1. Unit Tests (npm test) - REQUIRED, BLOCKING
+   - Selection state management tests
+   - Batch operation mutation tests
+
+2. Build Check (npm run build) - REQUIRED, BLOCKING
+   - Ensures TypeScript types are correct
+   - No compilation errors
+
+3. Browser Verification (npm run dev) - REQUIRED, NON-BLOCKING
+   - Visual confirmation of UI elements
+   - Manual testing of batch operations
+   - Performance check (no UI freezing)
+
+QA Acceptance Criteria:
+- All existing tests pass
+- Checkboxes appear on torrent rows
+- Batch actions toolbar appears when selections exist
+- Selected count displays correctly
+- All batch operations complete successfully
+- UI remains responsive during operations (addresses pain-2-5)
+- No console errors
+
+Performance Requirements:
+- Selecting 50+ torrents must not freeze UI
+- Batch operations must complete in <3 seconds
+- No browser "page unresponsive" warnings
+
+=== STARTUP COMMAND ===
+
+To continue building this spec, run:
+
+  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 006 --parallel 1
+
+Or to manually test the environment:
+
+  cd /Users/alexyu/projects/personal/react-torrent
+  npm run dev
+
+Then open: http://localhost:3000
+
+=== IMPLEMENTATION NOTES ===
+
+Key Patterns to Follow:
+1. Use Set<string> for selectedHashes (O(1) lookup performance)
+2. Immutable Set updates: new Set(prev) then modify
+3. TanStack Query mutations invalidate ['maindata'] query on success
+4. Auto-clear selections after successful batch operations
+5. Use Promise.all for parallel API calls (prevent UI blocking)
+6. Add confirmation dialog for destructive actions (delete)
+7. Show loading indicators during operations (mutation.isPending)
+
+Edge Cases to Handle:
+- Empty selection (disable buttons)
+- Filter changes during selection (clear hidden selections)
+- Partial operation failures (show errors, don't clear failed items)
+- Concurrent operations (disable actions while operation running)
+- Large selection sets (optimize for 50+ torrents)
+
+Critical Success Factor:
+✅ UI MUST remain responsive during batch operations
+   - This addresses reported pain point (pain-2-5)
+   - Use async/await with Promise.all for parallel execution
+   - Never use sequential loops that block the event loop
+
+=== END SESSION 1 ===
+
+Next: Coder agent will read implementation_plan.json and begin subtask execution.

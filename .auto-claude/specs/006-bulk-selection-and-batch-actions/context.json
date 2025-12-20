@@ -1,0 +1,42 @@
+{
+  "task_description": "# Bulk Selection and Batch Actions\n\nAllow users to select multiple torrents and perform actions on all selected items at once. Support pause, resume, delete, and category assignment for selected torrents.\n\n## Rationale\nPower users managing large libraries need to perform operations on multiple torrents efficiently. Individual torrent actions are too slow for managing dozens of torrents. VueTorrent users report UI freezing during bulk ops (pain-2-5), so we must optimize this with async operations.\n\n## User Stories\n- As a power user, I want to select multiple completed torrents so that I can delete them all at once\n- As a user, I want to pause all downloading torrents so that I can prioritize bandwidth for other activities\n- As a user, I want to assign a category to multiple torrents so that I can organize my library quickly\n\n## Acceptance Criteria\n- [ ] Users can select individual torrents via checkbox\n- [ ] A 'select all' option selects all visible/filtered torrents\n- [ ] Selected count is displayed in the UI\n- [ ] Batch actions (pause, resume, delete) are available when torrents are selected\n- [ ] Bulk operations are performed asynchronously without freezing the UI\n- [ ] Category can be assigned to multiple torrents at once\n- [ ] Selection is cleared after batch action completes\n",
+  "scoped_services": ["main"],
+  "files_to_modify": [
+    "src/components/torrent-table.tsx",
+    "src/components/torrent-card.tsx",
+    "src/routes/index.tsx",
+    "src/lib/api.ts"
+  ],
+  "files_to_create": [
+    "src/components/ui/checkbox.tsx",
+    "src/components/batch-actions-toolbar.tsx"
+  ],
+  "files_to_reference": [
+    "src/components/torrent-table.tsx",
+    "src/components/ui/button.tsx",
+    "src/components/ui/alert-dialog.tsx",
+    "src/lib/api.ts"
+  ],
+  "patterns": {
+    "mutation_pattern": "TanStack Query useMutation with onSuccess invalidating ['maindata'] query",
+    "selection_state": "Set<string> for O(1) hash lookups with immutable updates",
+    "ui_components": "Radix UI wrapped in src/components/ui/ with Tailwind CSS styling",
+    "batch_api": "API functions already accept string | string[], join with '|' delimiter",
+    "responsive_design": "TorrentTable for desktop (table), TorrentCard for mobile (cards)"
+  },
+  "existing_implementations": {
+    "description": "API already supports batch operations! pauseTorrent, resumeTorrent, deleteTorrent accept string | string[]",
+    "relevant_files": [
+      "src/lib/api.ts (lines 118-185)",
+      "src/components/torrent-table.tsx (lines 154-174 for mutation pattern)"
+    ]
+  },
+  "critical_discoveries": {
+    "api_batch_support": "✅ qBittorrent API client already supports batch operations (string | string[])",
+    "mutation_pattern": "✅ TanStack Query mutations invalidate ['maindata'] query on success",
+    "missing_checkbox": "❌ Radix UI Checkbox component does not exist in src/components/ui/",
+    "responsive_pattern": "✅ Desktop/mobile layouts already split (TorrentTable/TorrentCard)"
+  },
+  "created_at": "2025-12-20T20:43:00.000Z",
+  "updated_at": "2025-12-20T20:43:00.000Z"
+}
