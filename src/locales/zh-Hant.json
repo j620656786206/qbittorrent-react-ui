@@ -32,6 +32,10 @@
     "category": "分類",
     "uncategorized": "未分類",
     "noTorrentsFound": "沒有找到 Torrent",
+    "search": {
+      "placeholder": "搜尋 Torrent...",
+      "clear": "清除搜尋"
+    },
     "table": {
       "name": "名稱",
       "statusAndProgress": "狀態與進度",

@@ -32,6 +32,10 @@
     "category": "Category",
     "uncategorized": "Uncategorized",
     "noTorrentsFound": "No torrents found.",
+    "search": {
+      "placeholder": "Search torrents...",
+      "clear": "Clear search"
+    },
     "table": {
       "name": "Name",
       "statusAndProgress": "Status & Progress",
