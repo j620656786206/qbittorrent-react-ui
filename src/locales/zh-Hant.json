@@ -94,5 +94,42 @@
     "baseUrl": "基礎 URL",
     "username": "使用者名稱",
     "password": "密碼"
+  },
+  "addTorrent": {
+    "title": "新增 Torrent",
+    "description": "透過磁力連結或檔案上傳新增 Torrent。",
+    "tabs": {
+      "magnetLink": "磁力連結",
+      "file": "檔案"
+    },
+    "magnetLink": {
+      "label": "磁力連結",
+      "placeholder": "magnet:?xt=urn:btih:..."
+    },
+    "file": {
+      "label": "Torrent 檔案",
+      "placeholder": "選擇 .torrent 檔案",
+      "browse": "瀏覽",
+      "noFile": "尚未選擇檔案"
+    },
+    "savePath": {
+      "label": "儲存路徑",
+      "placeholder": "留空使用預設路徑"
+    },
+    "category": {
+      "label": "分類",
+      "none": "無",
+      "placeholder": "選擇分類"
+    },
+    "startPaused": "新增後暫停",
+    "add": "新增",
+    "adding": "新增中...",
+    "success": "Torrent 新增成功",
+    "error": {
+      "invalidMagnet": "無效的磁力連結，必須以「magnet:?」開頭",
+      "noFile": "請選擇一個 Torrent 檔案",
+      "failed": "新增 Torrent 失敗",
+      "network": "網路錯誤，請重試。"
+    }
   }
 }

@@ -1,0 +1,57 @@
+{
+  "subtasks": {
+    "subtask-1-1": {
+      "attempts": [
+        {
+          "session": 1,
+          "timestamp": "2025-12-20T01:44:59.045216",
+          "approach": "Implemented: Add getCategories API function",
+          "success": true,
+          "error": null
+        }
+      ],
+      "status": "completed"
+    },
+    "subtask-1-2": {
+      "attempts": [
+        {
+          "session": 2,
+          "timestamp": "2025-12-20T01:47:02.642584",
+          "approach": "Implemented: Add addTorrentMagnet API function",
+          "success": true,
+          "error": null
+        }
+      ],
+      "status": "completed"
+    },
+    "subtask-1-3": {
+      "attempts": [
+        {
+          "session": 3,
+          "timestamp": "2025-12-20T01:48:58.057151",
+          "approach": "Implemented: Add addTorrentFile API function",
+          "success": true,
+          "error": null
+        }
+      ],
+      "status": "completed"
+    },
+    "subtask-2-1": {
+      "attempts": [
+        {
+          "session": 4,
+          "timestamp": "2025-12-20T01:50:20.238386",
+          "approach": "Implemented: Add English translations for add torrent modal",
+          "success": true,
+          "error": null
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "stuck_subtasks": [],
+  "metadata": {
+    "created_at": "2025-12-20T01:42:04.198484",
+    "last_updated": "2025-12-20T01:50:20.238402"
+  }
+}

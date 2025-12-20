@@ -9,6 +9,7 @@ import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
+import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoginForm } from '@/components/login-form'
@@ -26,6 +27,7 @@ function HomePage() {
   const [filter, setFilter] = React.useState<Filter>('all')
   const [searchQuery, setSearchQuery] = React.useState('')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
+  const [isAddTorrentOpen, setIsAddTorrentOpen] = React.useState(false)
   const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(null)
 
   const isDesktop = useMediaQuery('(min-width: 768px)') // md breakpoint
@@ -328,6 +330,7 @@ function HomePage() {
         currentFilter={filter}
         setFilter={setFilter}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onAddTorrent={() => setIsAddTorrentOpen(true)}
         isMobile={!isDesktop}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
@@ -354,6 +357,10 @@ function HomePage() {
             }
           }
         }}
+      />
+      <AddTorrentModal
+        isOpen={isAddTorrentOpen}
+        onClose={() => setIsAddTorrentOpen(false)}
       />
     </div>
   )

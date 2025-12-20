@@ -12,8 +12,8 @@ export const LOCALES: { title: string; value: Locales }[] = [
 ]
 
 export const messages = {
-  [Locales.EN]: en,
-  [Locales.ZH_HANT]: zhHant,
+  [Locales.EN]: { translation: en },
+  [Locales.ZH_HANT]: { translation: zhHant },
 }
 
 export const defaultLocale = Locales.EN

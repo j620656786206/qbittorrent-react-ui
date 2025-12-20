@@ -1,0 +1,74 @@
+{
+  "task_description": "Enable users to add new torrents to qBittorrent through the web UI. Support both magnet link input and .torrent file upload. Include options for save path, category assignment, and start/pause state.",
+  "scoped_services": ["main"],
+  "files_to_modify": {
+    "main": [
+      "src/lib/api.ts",
+      "src/components/sidebar.tsx",
+      "src/routes/index.tsx",
+      "src/locales/en.json",
+      "src/locales/zh-Hant.json"
+    ]
+  },
+  "files_to_create": {
+    "main": [
+      "src/components/add-torrent-modal.tsx"
+    ]
+  },
+  "files_to_reference": [
+    "src/components/settings-modal.tsx",
+    "src/lib/api.ts",
+    "src/components/torrent-table.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/locales/en.json"
+  ],
+  "patterns": {
+    "api_function": {
+      "description": "API functions use getApiBaseUrl() helper, URLSearchParams for form data (FormData for files), credentials: 'include', throw on non-ok responses",
+      "example_file": "src/lib/api.ts",
+      "example_function": "pauseTorrent"
+    },
+    "modal_dialog": {
+      "description": "Modals use Radix Dialog with open/onOpenChange props, DialogHeader/Content/Footer structure, controlled inputs with useState",
+      "example_file": "src/components/settings-modal.tsx"
+    },
+    "mutation": {
+      "description": "Use useMutation with mutationFn, invalidate 'maindata' query on success",
+      "example_file": "src/components/torrent-table.tsx",
+      "example_function": "pauseMutation"
+    },
+    "translations": {
+      "description": "Nested JSON structure, use t('namespace.key') to access, same keys in both en.json and zh-Hant.json",
+      "example_file": "src/locales/en.json"
+    },
+    "sidebar_button": {
+      "description": "Use Button component with variant, lucide-react icons, callback props for actions",
+      "example_file": "src/components/sidebar.tsx"
+    }
+  },
+  "existing_implementations": {
+    "description": "No existing 'add torrent' functionality. The codebase has: login, pause/resume/delete torrents, settings modal. File upload will be new but FormData is standard web API.",
+    "relevant_files": [
+      "src/lib/api.ts",
+      "src/components/settings-modal.tsx"
+    ]
+  },
+  "qbittorrent_api": {
+    "add_torrent_magnet": {
+      "endpoint": "POST /api/v2/torrents/add",
+      "content_type": "application/x-www-form-urlencoded",
+      "params": ["urls", "savepath", "category", "paused"]
+    },
+    "add_torrent_file": {
+      "endpoint": "POST /api/v2/torrents/add",
+      "content_type": "multipart/form-data",
+      "params": ["torrents (File)", "savepath", "category", "paused"]
+    },
+    "get_categories": {
+      "endpoint": "GET /api/v2/torrents/categories",
+      "response": "{ category_name: { name, savePath } }"
+    }
+  },
+  "created_at": "2025-12-19T21:08:05.763958",
+  "updated_at": "2025-12-19T21:30:00.000000"
+}

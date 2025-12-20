@@ -22,6 +22,16 @@ export type MaindataResponse = {
     full_update: boolean; // True if it's a full update, false for incremental
 };
 
+// Define types for categories response
+export type Category = {
+    name: string;
+    savePath: string;
+};
+
+export type CategoriesResponse = {
+    [categoryName: string]: Category;
+};
+
 // Helper function to get the actual base URL for fetches
 function getApiBaseUrl(providedBaseUrl: string): string {
   if (import.meta.env.DEV) {
@@ -170,6 +180,115 @@ export async function deleteTorrent(
 
   if (!res.ok) {
     throw new Error(`Failed to delete torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Fetches all categories from the qBittorrent API.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @returns {Promise<CategoriesResponse>} - Object mapping category names to their details.
+ */
+export async function getCategories(baseUrl: string): Promise<CategoriesResponse> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/categories`, {
+    credentials: 'include', // Include cookies for authentication
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch categories with status: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// Options for adding a torrent via magnet link
+export type AddTorrentMagnetOptions = {
+  savepath?: string;
+  category?: string;
+  paused?: boolean;
+};
+
+/**
+ * Adds a torrent via magnet link.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} magnetLink - The magnet link to add.
+ * @param {AddTorrentMagnetOptions} [options] - Optional parameters for save path, category, and paused state.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTorrentMagnet(
+  baseUrl: string,
+  magnetLink: string,
+  options?: AddTorrentMagnetOptions
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('urls', magnetLink);
+
+  if (options?.savepath) {
+    formData.append('savepath', options.savepath);
+  }
+  if (options?.category) {
+    formData.append('category', options.category);
+  }
+  if (options?.paused !== undefined) {
+    formData.append('paused', options.paused ? 'true' : 'false');
+  }
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add torrent via magnet link with status: ${res.status}`);
+  }
+  return true;
+}
+
+// Options for adding a torrent via .torrent file
+export type AddTorrentFileOptions = {
+  savepath?: string;
+  category?: string;
+  paused?: boolean;
+};
+
+/**
+ * Adds a torrent via .torrent file upload.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {File} file - The .torrent file to upload.
+ * @param {AddTorrentFileOptions} [options] - Optional parameters for save path, category, and paused state.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTorrentFile(
+  baseUrl: string,
+  file: File,
+  options?: AddTorrentFileOptions
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new FormData();
+  formData.append('torrents', file);
+
+  if (options?.savepath) {
+    formData.append('savepath', options.savepath);
+  }
+  if (options?.category) {
+    formData.append('category', options.category);
+  }
+  if (options?.paused !== undefined) {
+    formData.append('paused', options.paused ? 'true' : 'false');
+  }
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add torrent via file with status: ${res.status}`);
   }
   return true;
 }
