@@ -45,7 +45,9 @@
       "size": "Size",
       "eta": "ETA",
       "ratio": "Ratio",
-      "peers": "Peers"
+      "peers": "Peers",
+      "selectAll": "Select all torrents",
+      "selectTorrent": "Select {{name}}"
     },
     "details": {
       "progress": "Progress",

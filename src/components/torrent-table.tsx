@@ -32,6 +32,7 @@ import { MoreHorizontal, Download, Upload, Play, Pause, Trash2 } from 'lucide-re
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { TorrentCard } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // A basic type for the torrent object, we can expand this later
 export type Torrent = {
@@ -194,6 +195,11 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10 px-3">
+              <Checkbox
+                aria-label={t('torrent.table.selectAll')}
+              />
+            </TableHead>
             <TableHead className="w-[35%] min-w-[200px]">{t('torrent.table.name')}</TableHead>
             <TableHead className="w-[20%] min-w-[160px]">{t('torrent.table.statusAndProgress')}</TableHead>
             <TableHead className="w-[15%] min-w-[110px]">{t('torrent.table.speed')}</TableHead>
@@ -211,6 +217,13 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
                 className="cursor-pointer hover:bg-slate-800/50"
                 onClick={() => onTorrentClick?.(torrent)}
               >
+                {/* Checkbox */}
+                <TableCell className="w-10 px-3" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+                  />
+                </TableCell>
+
                 {/* Name + Category */}
                 <TableCell className="font-medium">
                   <div className="space-y-1">

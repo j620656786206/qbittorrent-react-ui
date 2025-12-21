@@ -45,7 +45,9 @@
       "size": "大小",
       "eta": "剩餘",
       "ratio": "比率",
-      "peers": "連接"
+      "peers": "連接",
+      "selectAll": "全選所有 Torrent",
+      "selectTorrent": "選擇 {{name}}"
     },
     "details": {
       "progress": "進度",
