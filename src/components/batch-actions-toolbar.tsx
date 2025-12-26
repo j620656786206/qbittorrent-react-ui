@@ -1,8 +1,15 @@
-import * as React from "react"
 import { useTranslation } from "react-i18next"
-import { Pause, Play, Trash2, X } from "lucide-react"
+import { ChevronDown, Folder, Pause, Play, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
 interface BatchActionsToolbarProps {
@@ -10,7 +17,9 @@ interface BatchActionsToolbarProps {
   onPause: () => void
   onResume: () => void
   onDelete: () => void
+  onSetCategory: (category: string) => void
   onClearSelection: () => void
+  categories?: string[]
   isPending?: boolean
   className?: string
 }
@@ -20,7 +29,9 @@ function BatchActionsToolbar({
   onPause,
   onResume,
   onDelete,
+  onSetCategory,
   onClearSelection,
+  categories = [],
   isPending = false,
   className,
 }: BatchActionsToolbarProps) {
@@ -76,6 +87,37 @@ function BatchActionsToolbar({
           <Play className="h-4 w-4 mr-2" />
           {t("common.resume")}
         </Button>
+
+        {/* Category Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+            >
+              <Folder className="h-4 w-4 mr-2" />
+              {t("batch.setCategory")}
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>{t("batch.selectCategory")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onSetCategory("")}>
+              {t("torrent.uncategorized")}
+            </DropdownMenuItem>
+            {categories.length > 0 && <DropdownMenuSeparator />}
+            {categories.map((category) => (
+              <DropdownMenuItem
+                key={category}
+                onClick={() => onSetCategory(category)}
+              >
+                {category}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Button
           variant="destructive"

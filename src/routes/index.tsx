@@ -8,7 +8,7 @@ import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
-import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
+import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent, getCategories, setTorrentCategory } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
@@ -203,6 +203,20 @@ function HomePage() {
   console.log('rid (after maindata query):', rid)
   // Log the length here, it reflects latest state
 
+  // --- Categories Query ---
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => getCategories(credentials.baseUrl),
+    enabled: loginSuccess,
+    staleTime: 30000, // Refresh every 30 seconds
+  })
+
+  // Extract category names from the response
+  const categoryNames = React.useMemo(() => {
+    if (!categoriesData) return []
+    return Object.keys(categoriesData)
+  }, [categoriesData])
+
   // --- Step 4: Client-side Filtering ---
   const allTorrents = React.useMemo(() => {
     return Array.from(allTorrentsMap.values())
@@ -302,6 +316,15 @@ function HomePage() {
     },
   })
 
+  const batchSetCategoryMutation = useMutation({
+    mutationFn: ({ hashes, category }: { hashes: string[]; category: string }) =>
+      setTorrentCategory(getBaseUrl(), hashes, category),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      clearSelection()
+    },
+  })
+
   // --- Step 5: Render UI based on state ---
   const renderContent = () => {
     if (!areCredentialsSet || isLoginError) {
@@ -375,8 +398,17 @@ function HomePage() {
                 setIsDeleteDialogOpen(true)
               }
             }}
+            onSetCategory={(category) => {
+              if (selectedHashes.size > 0) {
+                batchSetCategoryMutation.mutate({
+                  hashes: Array.from(selectedHashes),
+                  category,
+                })
+              }
+            }}
             onClearSelection={clearSelection}
-            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending}
+            categories={categoryNames}
+            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
           />
 
           {/* Torrent List */}

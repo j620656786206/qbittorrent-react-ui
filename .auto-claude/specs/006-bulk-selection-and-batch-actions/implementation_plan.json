@@ -243,8 +243,9 @@
             "command": "npm run build",
             "expected": "Build succeeds, new function exported correctly"
           },
-          "status": "pending",
-          "notes": "Add setTorrentCategory(baseUrl: string, hashes: string | string[], category: string) function. Use /api/v2/torrents/setCategory endpoint. Follow existing API function patterns (FormData, credentials: 'include')."
+          "status": "completed",
+          "notes": "Added setTorrentCategory(baseUrl, hashes, category) function to src/lib/api.ts. Uses /api/v2/torrents/setCategory endpoint. Follows existing API function patterns with URLSearchParams, credentials: 'include', and support for single or multiple hashes (joined with |). Build passes successfully. Committed as 9dd29a1.",
+          "updated_at": "2025-12-26T12:02:32.675510+00:00"
         },
         {
           "id": "subtask-4-2",
@@ -267,8 +268,9 @@
               "UI remains responsive"
             ]
           },
-          "status": "pending",
-          "notes": "Create batchPauseMutation and batchResumeMutation using useMutation. mutationFn calls pauseTorrent/resumeTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries(['maindata']), clearSelection(). Wire to toolbar onPause/onResume."
+          "status": "completed",
+          "notes": "Created batchPauseMutation and batchResumeMutation in index.tsx. Both mutations call the existing pauseTorrent/resumeTorrent API functions which already support array of hashes. On success, they invalidate the maindata query and clear the selection. Wired to BatchActionsToolbar callbacks.",
+          "updated_at": "2025-12-26T12:04:20.769007+00:00"
         },
         {
           "id": "subtask-4-3",
@@ -292,8 +294,9 @@
               "Selections clear after"
             ]
           },
-          "status": "pending",
-          "notes": "Create batchDeleteMutation. Use AlertDialog from Radix UI for confirmation (like single delete in torrent-table.tsx). Show count in message. Provide 'Keep Files' and 'Delete Files' buttons. mutationFn calls deleteTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries, clearSelection."
+          "status": "completed",
+          "notes": "Implemented batch delete mutation with confirmation dialog. Added AlertDialog that shows selected count with options to delete keeping files or removing files. Selection clears after successful deletion. Added isPending prop to BatchActionsToolbar to disable buttons during mutations.",
+          "updated_at": "2025-12-26T12:08:14.602614+00:00"
         },
         {
           "id": "subtask-4-4",
@@ -518,7 +521,7 @@
   "qa_signoff": null,
   "created_at": "2025-12-20T20:43:00.000Z",
   "updated_at": "2025-12-26T07:04:03.336Z",
-  "last_updated": "2025-12-26T12:01:00.687509+00:00",
+  "last_updated": "2025-12-26T12:08:14.602627+00:00",
   "status": "backlog",
   "planStatus": "pending",
   "recoveryNote": "Task recovered from stuck state at 2025-12-26T01:20:02.146Z"
