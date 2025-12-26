@@ -1,5 +1,6 @@
 import type { LoginPayload } from '@/types/qbit/payloads'
 import type { Torrent } from '@/components/torrent-table'; // Re-use our Torrent type for full data
+import type { TorrentFile } from '@/types/torrent';
 
 // Define types for sync/maindata response
 export type TorrentPartialUpdate = Partial<Torrent> & {
@@ -318,6 +319,61 @@ export async function addTorrentFile(
 
   if (!res.ok) {
     throw new Error(`Failed to add torrent via file with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Fetches the list of files for a specific torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to get files for.
+ * @returns {Promise<TorrentFile[]>} - Array of file objects with index, name, size, progress, and priority.
+ * @throws {Error} - Throws with status 409 if torrent metadata is not yet downloaded.
+ */
+export async function getTorrentFiles(baseUrl: string, hash: string): Promise<Array<TorrentFile>> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/files`);
+  url.searchParams.append('hash', hash);
+
+  const res = await fetch(url.toString(), {
+    credentials: 'include', // Include cookies for authentication
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch torrent files with status: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Sets the download priority for one or more files within a torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent containing the files.
+ * @param {number | number[]} fileIds - Single file index or array of file indexes (use `index` field from API, not array position).
+ * @param {number} priority - The priority to set (0 = Do Not Download, 1 = Normal, 6 = High, 7 = Maximum).
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function setFilePriority(
+  baseUrl: string,
+  hash: string,
+  fileIds: number | number[],
+  priority: number
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hash', hash);
+  formData.append('id', Array.isArray(fileIds) ? fileIds.join('|') : fileIds.toString());
+  formData.append('priority', priority.toString());
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/filePrio`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to set file priority with status: ${res.status}`);
   }
   return true;
 }

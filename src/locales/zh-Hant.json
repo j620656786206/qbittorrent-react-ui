@@ -10,7 +10,9 @@
     "save": "儲存",
     "settings": "設定",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "refresh": "重新整理",
+    "retry": "重試"
   },
   "torrent": {
     "status": {
@@ -68,7 +70,8 @@
       "leechers": "下載",
       "connected": "連接數",
       "totalSwarm": "總數 (Swarm)",
-      "thisSession": "本次"
+      "thisSession": "本次",
+      "files": "檔案"
     },
     "actions": {
       "delete": "刪除",
@@ -148,5 +151,24 @@
       "failed": "新增 Torrent 失敗",
       "network": "網路錯誤，請重試。"
     }
+  },
+  "fileList": {
+    "loading": "載入檔案中...",
+    "metadataPending": "檔案清單不可用",
+    "metadataPendingHint": "Torrent 後設資料仍在下載中，請稍候後重新整理。",
+    "error": "載入檔案失敗",
+    "noFiles": "此 Torrent 沒有檔案",
+    "fileCount": "{{count}} 個檔案",
+    "updatingPriority": "更新優先權中...",
+    "priorityError": "更新優先權失敗"
+  },
+  "fileTree": {
+    "noFiles": "沒有檔案"
+  },
+  "priority": {
+    "doNotDownload": "不下載",
+    "normal": "正常",
+    "high": "高",
+    "maximum": "最高"
   }
 }

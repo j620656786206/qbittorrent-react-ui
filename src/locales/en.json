@@ -10,7 +10,9 @@
     "save": "Save",
     "settings": "Settings",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "refresh": "Refresh",
+    "retry": "Retry"
   },
   "torrent": {
     "status": {
@@ -68,7 +70,8 @@
       "leechers": "Leechers",
       "connected": "Connected",
       "totalSwarm": "Total (Swarm)",
-      "thisSession": "this session"
+      "thisSession": "this session",
+      "files": "Files"
     },
     "actions": {
       "delete": "Delete",
@@ -148,5 +151,24 @@
       "failed": "Failed to add torrent",
       "network": "Network error. Please try again."
     }
+  },
+  "fileList": {
+    "loading": "Loading files...",
+    "metadataPending": "File list unavailable",
+    "metadataPendingHint": "Torrent metadata is still downloading. Please wait and refresh.",
+    "error": "Failed to load files",
+    "noFiles": "No files found for this torrent",
+    "fileCount": "{{count}} file(s)",
+    "updatingPriority": "Updating priority...",
+    "priorityError": "Failed to update priority"
+  },
+  "fileTree": {
+    "noFiles": "No files"
+  },
+  "priority": {
+    "doNotDownload": "Do Not Download",
+    "normal": "Normal",
+    "high": "High",
+    "maximum": "Maximum"
   }
 }
