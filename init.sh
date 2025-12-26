@@ -41,6 +41,18 @@ wait_for_service() {
 echo ""
 echo "Checking prerequisites..."
 
+# Load nvm and use Node version from .nvmrc
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+    echo "Loading nvm..."
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+    if [ -f ".nvmrc" ]; then
+        echo "Using Node.js version from .nvmrc..."
+        nvm use
+    fi
+fi
+
 # Check Node.js
 if ! command -v node &> /dev/null; then
     echo -e "${RED}Node.js is not installed${NC}"
