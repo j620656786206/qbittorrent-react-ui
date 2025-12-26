@@ -7,6 +7,7 @@ import type { Torrent } from '@/components/torrent-table'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
+import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
 import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { AddTorrentModal } from '@/components/add-torrent-modal'
@@ -317,6 +318,21 @@ function HomePage() {
               </button>
             )}
           </div>
+
+          {/* Batch Actions Toolbar - appears when torrents are selected */}
+          <BatchActionsToolbar
+            selectedCount={selectedHashes.size}
+            onPause={() => {
+              // Batch pause - to be implemented in phase 4
+            }}
+            onResume={() => {
+              // Batch resume - to be implemented in phase 4
+            }}
+            onDelete={() => {
+              // Batch delete - to be implemented in phase 4
+            }}
+            onClearSelection={clearSelection}
+          />
 
           {/* Torrent List */}
           {filteredTorrents.length > 0 ? (

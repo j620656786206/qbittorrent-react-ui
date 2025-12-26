@@ -110,8 +110,9 @@
               "Checkbox state persists correctly"
             ]
           },
-          "status": "pending",
-          "notes": "Add useState<Set<string>> for selectedHashes. Create toggleSelection, selectAll(filteredTorrents), clearSelection helpers. Pass state and functions to TorrentTable/TorrentCard as props."
+          "status": "completed",
+          "notes": "Added selection state (selectedHashes as Set<string>) and helper functions (toggleSelection, selectAll, clearSelection) to index.tsx. Updated TorrentTable and TorrentCard interfaces to accept selection props. Props are passed from index.tsx through TorrentTable to TorrentCard. Build passes successfully. Committed as 7f59f46.",
+          "updated_at": "2025-12-26T11:49:47.136917+00:00"
         },
         {
           "id": "subtask-2-2",
@@ -132,8 +133,9 @@
               "Desktop and mobile views both work"
             ]
           },
-          "status": "pending",
-          "notes": "Accept selectedHashes, toggleSelection as props. Bind checkbox checked={selectedHashes.has(hash)} onCheckedChange={()=>toggleSelection(hash)}. Add selected visual state (e.g., bg-blue-900/30 on TableRow)"
+          "status": "completed",
+          "notes": "Wired selection state to both TorrentTable (desktop) and TorrentCard (mobile) components. Header checkbox toggles selectAll/clearSelection. Individual checkboxes use toggleSelection. Visual highlights applied for selected items (blue background/border).",
+          "updated_at": "2025-12-26T11:53:23.940465+00:00"
         },
         {
           "id": "subtask-2-3",
@@ -153,8 +155,9 @@
               "Select all respects current filters"
             ]
           },
-          "status": "pending",
-          "notes": "Add header checkbox with checked={all selected}, indeterminate={some selected}, onCheckedChange={selectAll or clearSelection}. Use filteredTorrents for selectAll to respect search/filter state."
+          "status": "completed",
+          "notes": "Implemented Select All functionality with indeterminate state. Updated Checkbox component to show Minus icon for indeterminate state. Header checkbox now shows: unchecked when no torrents selected, indeterminate when some selected, checked when all selected. All tests pass and build succeeds.",
+          "updated_at": "2025-12-26T11:56:25.350491+00:00"
         }
       ]
     },
@@ -185,8 +188,9 @@
             "command": "npm run build",
             "expected": "Build succeeds without errors"
           },
-          "status": "pending",
-          "notes": "Component accepts: selectedCount, onPause, onResume, onDelete, isPending. Shows count like '5 selected'. Buttons: Pause, Resume, Delete. Use lucide-react icons (Play, Pause, Trash2). Disable all buttons if isPending=true."
+          "status": "completed",
+          "notes": "Created BatchActionsToolbar component at src/components/batch-actions-toolbar.tsx. Component accepts selectedCount, onPause, onResume, onDelete, onClearSelection, and isPending props. Uses lucide-react icons (Play, Pause, Trash2, X). Added translation keys for batch.selected and batch.clearSelection in both en.json and zh-Hant.json. Build passes successfully. Committed as 0e1ee8c.",
+          "updated_at": "2025-12-26T11:59:01.870522+00:00"
         },
         {
           "id": "subtask-3-2",
@@ -513,7 +517,7 @@
   "qa_signoff": null,
   "created_at": "2025-12-20T20:43:00.000Z",
   "updated_at": "2025-12-26T07:04:03.336Z",
-  "last_updated": "2025-12-26T11:46:21.604863+00:00",
+  "last_updated": "2025-12-26T11:59:01.870535+00:00",
   "status": "backlog",
   "planStatus": "pending",
   "recoveryNote": "Task recovered from stuck state at 2025-12-26T01:20:02.146Z"

@@ -1,0 +1,10 @@
+{
+  "discovered_files": {
+    "src/components/ui/checkbox.tsx": {
+      "description": "Checkbox component supports indeterminate state via checked=\"indeterminate\". Shows Minus icon for indeterminate, Check icon for checked. Used in table headers for \"select all\" pattern.",
+      "category": "component-pattern",
+      "discovered_at": "2025-12-26T11:56:37.450078+00:00"
+    }
+  },
+  "last_updated": "2025-12-26T11:56:37.450102+00:00"
+}
