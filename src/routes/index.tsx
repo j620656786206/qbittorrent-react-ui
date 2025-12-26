@@ -33,6 +33,30 @@ function HomePage() {
   const isDesktop = useMediaQuery('(min-width: 768px)') // md breakpoint
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false)
 
+  // --- Selection State for Bulk Operations ---
+  const [selectedHashes, setSelectedHashes] = React.useState<Set<string>>(new Set())
+
+  // Selection helper functions
+  const toggleSelection = React.useCallback((hash: string) => {
+    setSelectedHashes(prev => {
+      const next = new Set(prev)
+      if (next.has(hash)) {
+        next.delete(hash)
+      } else {
+        next.add(hash)
+      }
+      return next
+    })
+  }, [])
+
+  const selectAll = React.useCallback((torrents: Torrent[]) => {
+    setSelectedHashes(new Set(torrents.map(t => t.hash)))
+  }, [])
+
+  const clearSelection = React.useCallback(() => {
+    setSelectedHashes(new Set())
+  }, [])
+
   const getBaseUrl = () =>
     credentials.baseUrl || localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
 
@@ -299,6 +323,10 @@ function HomePage() {
             <TorrentTable
               torrents={filteredTorrents}
               onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
+              selectedHashes={selectedHashes}
+              toggleSelection={toggleSelection}
+              selectAll={() => selectAll(filteredTorrents)}
+              clearSelection={clearSelection}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>

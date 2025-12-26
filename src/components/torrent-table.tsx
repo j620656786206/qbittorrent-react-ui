@@ -144,7 +144,23 @@ function getStatusColor(state: string) {
   return stateColors[state] || 'text-gray-400'
 }
 
-export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]; onTorrentClick?: (torrent: Torrent) => void }) {
+interface TorrentTableProps {
+  torrents: Torrent[]
+  onTorrentClick?: (torrent: Torrent) => void
+  selectedHashes?: Set<string>
+  toggleSelection?: (hash: string) => void
+  selectAll?: () => void
+  clearSelection?: () => void
+}
+
+export function TorrentTable({
+  torrents,
+  onTorrentClick,
+  selectedHashes,
+  toggleSelection,
+  selectAll,
+  clearSelection,
+}: TorrentTableProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const isMobile = !useMediaQuery('(min-width: 768px)') // md breakpoint
@@ -183,6 +199,8 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
             key={torrent.hash}
             torrent={torrent}
             onClick={() => onTorrentClick?.(torrent)}
+            isSelected={selectedHashes?.has(torrent.hash)}
+            onToggleSelection={() => toggleSelection?.(torrent.hash)}
           />
         ))}
       </div>

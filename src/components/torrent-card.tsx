@@ -73,7 +73,14 @@ function getStateKey(state: string): string {
   return `torrent.status.${state}`
 }
 
-export function TorrentCard({ torrent, onClick }: { torrent: Torrent; onClick?: () => void }) {
+interface TorrentCardProps {
+  torrent: Torrent
+  onClick?: () => void
+  isSelected?: boolean
+  onToggleSelection?: () => void
+}
+
+export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection }: TorrentCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)

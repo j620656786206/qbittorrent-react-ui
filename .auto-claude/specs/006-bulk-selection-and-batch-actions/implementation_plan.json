@@ -1,7 +1,7 @@
 {
   "feature": "Bulk Selection and Batch Actions",
   "workflow_type": "feature",
-  "workflow_rationale": "New functionality adding bulk selection UI components (checkboxes, batch action toolbar), state management for selections, and async batch operation handlers. Follows service dependency order: UI foundation → State management → Action handlers → Integration.",
+  "workflow_rationale": "New functionality adding bulk selection UI components (checkboxes, batch action toolbar), state management for selections, and async batch operation handlers. Follows service dependency order: UI foundation \u2192 State management \u2192 Action handlers \u2192 Integration.",
   "phases": [
     {
       "id": "phase-1-ui-foundation",
@@ -16,45 +16,69 @@
           "description": "Create Radix UI Checkbox component",
           "service": "main",
           "files_to_modify": [],
-          "files_to_create": ["src/components/ui/checkbox.tsx"],
-          "patterns_from": ["src/components/ui/button.tsx", "src/components/ui/label.tsx"],
+          "files_to_create": [
+            "src/components/ui/checkbox.tsx"
+          ],
+          "patterns_from": [
+            "src/components/ui/button.tsx",
+            "src/components/ui/label.tsx"
+          ],
           "verification": {
             "type": "command",
             "command": "npm run build",
             "expected": "Build succeeds without errors"
           },
-          "status": "pending",
-          "notes": "Use Radix UI @radix-ui/react-checkbox, wrap with Tailwind CSS styling following existing UI component patterns"
+          "status": "completed",
+          "notes": "Created Radix UI Checkbox component at src/components/ui/checkbox.tsx. Installed @radix-ui/react-checkbox package. Component follows existing patterns from label.tsx and button.tsx. Build succeeds without errors.",
+          "updated_at": "2025-12-20T12:49:40.123050+00:00"
         },
         {
           "id": "subtask-1-2",
           "description": "Add checkbox column to TorrentTable desktop layout",
           "service": "main",
-          "files_to_modify": ["src/components/torrent-table.tsx"],
+          "files_to_modify": [
+            "src/components/torrent-table.tsx"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/components/ui/checkbox.tsx"],
+          "patterns_from": [
+            "src/components/ui/checkbox.tsx"
+          ],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Checkbox appears in header row", "Checkboxes appear on each torrent row", "No console errors"]
+            "checks": [
+              "Checkbox appears in header row",
+              "Checkboxes appear on each torrent row",
+              "No console errors"
+            ]
           },
-          "status": "pending",
-          "notes": "Add new TableHead and TableCell for checkbox in first column. Pass selectedHashes and toggleSelection as props (to be implemented in phase 2)"
+          "status": "completed",
+          "notes": "Added checkbox column to TorrentTable desktop layout. Imported Checkbox component, added checkbox in header row with selectAll aria-label, added checkbox in each torrent row with accessible label. Added translation keys for selectAll and selectTorrent in both en.json and zh-Hant.json. Committed as 0521473.",
+          "updated_at": "2025-12-21T03:32:58.107779+00:00"
         },
         {
           "id": "subtask-1-3",
           "description": "Add checkbox to TorrentCard mobile layout",
           "service": "main",
-          "files_to_modify": ["src/components/torrent-card.tsx"],
+          "files_to_modify": [
+            "src/components/torrent-card.tsx"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/components/ui/checkbox.tsx"],
+          "patterns_from": [
+            "src/components/ui/checkbox.tsx"
+          ],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Checkbox appears on mobile card view", "Card layout adapts to checkbox", "No console errors"]
+            "checks": [
+              "Checkbox appears on mobile card view",
+              "Card layout adapts to checkbox",
+              "No console errors"
+            ]
           },
-          "status": "pending",
-          "notes": "Add checkbox to top-right or top-left corner of card. Ensure touch-friendly tap target (min 44px)"
+          "status": "completed",
+          "notes": "Added checkbox to TorrentCard mobile layout. Checkbox appears in header area on left side of title with proper stopPropagation handling and aria-label for accessibility. Build passes successfully.",
+          "updated_at": "2025-12-26T11:46:21.604849+00:00"
         }
       ]
     },
@@ -63,20 +87,28 @@
       "name": "Selection State Management",
       "type": "implementation",
       "description": "Implement selection state (Set<string>) in index.tsx with toggle, selectAll, and clearSelection helpers",
-      "depends_on": ["phase-1-ui-foundation"],
+      "depends_on": [
+        "phase-1-ui-foundation"
+      ],
       "parallel_safe": false,
       "subtasks": [
         {
           "id": "subtask-2-1",
           "description": "Add selection state and helper functions to index.tsx",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Clicking checkbox toggles selection", "Selected torrents show visual highlight", "Checkbox state persists correctly"]
+            "checks": [
+              "Clicking checkbox toggles selection",
+              "Selected torrents show visual highlight",
+              "Checkbox state persists correctly"
+            ]
           },
           "status": "pending",
           "notes": "Add useState<Set<string>> for selectedHashes. Create toggleSelection, selectAll(filteredTorrents), clearSelection helpers. Pass state and functions to TorrentTable/TorrentCard as props."
@@ -85,13 +117,20 @@
           "id": "subtask-2-2",
           "description": "Wire selection state to TorrentTable and TorrentCard",
           "service": "main",
-          "files_to_modify": ["src/components/torrent-table.tsx", "src/components/torrent-card.tsx"],
+          "files_to_modify": [
+            "src/components/torrent-table.tsx",
+            "src/components/torrent-card.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Individual checkbox clicks work", "Visual highlight shows selected state", "Desktop and mobile views both work"]
+            "checks": [
+              "Individual checkbox clicks work",
+              "Visual highlight shows selected state",
+              "Desktop and mobile views both work"
+            ]
           },
           "status": "pending",
           "notes": "Accept selectedHashes, toggleSelection as props. Bind checkbox checked={selectedHashes.has(hash)} onCheckedChange={()=>toggleSelection(hash)}. Add selected visual state (e.g., bg-blue-900/30 on TableRow)"
@@ -100,13 +139,19 @@
           "id": "subtask-2-3",
           "description": "Implement 'Select All' functionality in table header",
           "service": "main",
-          "files_to_modify": ["src/components/torrent-table.tsx"],
+          "files_to_modify": [
+            "src/components/torrent-table.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Header checkbox selects all visible torrents", "Header checkbox state shows indeterminate when some selected", "Select all respects current filters"]
+            "checks": [
+              "Header checkbox selects all visible torrents",
+              "Header checkbox state shows indeterminate when some selected",
+              "Select all respects current filters"
+            ]
           },
           "status": "pending",
           "notes": "Add header checkbox with checked={all selected}, indeterminate={some selected}, onCheckedChange={selectAll or clearSelection}. Use filteredTorrents for selectAll to respect search/filter state."
@@ -118,7 +163,9 @@
       "name": "Batch Actions Toolbar",
       "type": "implementation",
       "description": "Create batch actions toolbar component that appears when torrents are selected, showing action buttons and selected count",
-      "depends_on": ["phase-2-selection-state"],
+      "depends_on": [
+        "phase-2-selection-state"
+      ],
       "parallel_safe": false,
       "subtasks": [
         {
@@ -126,8 +173,13 @@
           "description": "Create BatchActionsToolbar component",
           "service": "main",
           "files_to_modify": [],
-          "files_to_create": ["src/components/batch-actions-toolbar.tsx"],
-          "patterns_from": ["src/components/ui/button.tsx", "src/components/ui/alert-dialog.tsx"],
+          "files_to_create": [
+            "src/components/batch-actions-toolbar.tsx"
+          ],
+          "patterns_from": [
+            "src/components/ui/button.tsx",
+            "src/components/ui/alert-dialog.tsx"
+          ],
           "verification": {
             "type": "command",
             "command": "npm run build",
@@ -140,13 +192,20 @@
           "id": "subtask-3-2",
           "description": "Integrate BatchActionsToolbar into index.tsx",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Toolbar appears when torrents selected", "Toolbar hidden when no selections", "Selected count displays correctly", "All buttons visible"]
+            "checks": [
+              "Toolbar appears when torrents selected",
+              "Toolbar hidden when no selections",
+              "Selected count displays correctly",
+              "All buttons visible"
+            ]
           },
           "status": "pending",
           "notes": "Render toolbar above torrent list when selectedHashes.size > 0. Pass selectedCount={selectedHashes.size}. Handler functions to be implemented in phase 4."
@@ -158,16 +217,22 @@
       "name": "Batch Operation Handlers",
       "type": "implementation",
       "description": "Implement TanStack Query mutations for batch pause, resume, delete, and category assignment with async execution",
-      "depends_on": ["phase-3-batch-actions-ui"],
+      "depends_on": [
+        "phase-3-batch-actions-ui"
+      ],
       "parallel_safe": false,
       "subtasks": [
         {
           "id": "subtask-4-1",
           "description": "Add batch category assignment API function",
           "service": "main",
-          "files_to_modify": ["src/lib/api.ts"],
+          "files_to_modify": [
+            "src/lib/api.ts"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/lib/api.ts"],
+          "patterns_from": [
+            "src/lib/api.ts"
+          ],
           "verification": {
             "type": "command",
             "command": "npm run build",
@@ -180,13 +245,22 @@
           "id": "subtask-4-2",
           "description": "Create batch pause/resume mutations in index.tsx",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/routes/index.tsx"],
+          "patterns_from": [
+            "src/routes/index.tsx"
+          ],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Clicking batch pause pauses all selected torrents", "Selections clear after operation", "Query cache invalidates", "UI remains responsive"]
+            "checks": [
+              "Clicking batch pause pauses all selected torrents",
+              "Selections clear after operation",
+              "Query cache invalidates",
+              "UI remains responsive"
+            ]
           },
           "status": "pending",
           "notes": "Create batchPauseMutation and batchResumeMutation using useMutation. mutationFn calls pauseTorrent/resumeTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries(['maindata']), clearSelection(). Wire to toolbar onPause/onResume."
@@ -195,13 +269,23 @@
           "id": "subtask-4-3",
           "description": "Create batch delete mutation with confirmation dialog",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/components/torrent-table.tsx"],
+          "patterns_from": [
+            "src/components/torrent-table.tsx"
+          ],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Delete button shows confirmation dialog", "Dialog shows selected count", "Option to delete files included", "Deletions execute on confirm", "Selections clear after"]
+            "checks": [
+              "Delete button shows confirmation dialog",
+              "Dialog shows selected count",
+              "Option to delete files included",
+              "Deletions execute on confirm",
+              "Selections clear after"
+            ]
           },
           "status": "pending",
           "notes": "Create batchDeleteMutation. Use AlertDialog from Radix UI for confirmation (like single delete in torrent-table.tsx). Show count in message. Provide 'Keep Files' and 'Delete Files' buttons. mutationFn calls deleteTorrent with Array.from(selectedHashes). onSuccess: invalidateQueries, clearSelection."
@@ -210,13 +294,23 @@
           "id": "subtask-4-4",
           "description": "Create batch category assignment UI and mutation",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx", "src/components/batch-actions-toolbar.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx",
+            "src/components/batch-actions-toolbar.tsx"
+          ],
           "files_to_create": [],
-          "patterns_from": ["src/components/ui/dropdown-menu.tsx"],
+          "patterns_from": [
+            "src/components/ui/dropdown-menu.tsx"
+          ],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Category dropdown appears in toolbar", "Selecting category applies to all selected torrents", "Selections clear after", "Category updates visible in torrent list"]
+            "checks": [
+              "Category dropdown appears in toolbar",
+              "Selecting category applies to all selected torrents",
+              "Selections clear after",
+              "Category updates visible in torrent list"
+            ]
           },
           "status": "pending",
           "notes": "Add category dropdown to BatchActionsToolbar. Fetch categories with getCategories API. Create batchCategoryMutation calling setTorrentCategory(baseUrl, hashes, category). onSuccess: invalidateQueries, clearSelection."
@@ -228,20 +322,29 @@
       "name": "Integration and Polish",
       "type": "integration",
       "description": "Wire all components together, add loading states, handle edge cases, and verify end-to-end functionality",
-      "depends_on": ["phase-4-batch-operations"],
+      "depends_on": [
+        "phase-4-batch-operations"
+      ],
       "parallel_safe": false,
       "subtasks": [
         {
           "id": "subtask-5-1",
           "description": "Add loading states to batch actions",
           "service": "main",
-          "files_to_modify": ["src/components/batch-actions-toolbar.tsx", "src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/components/batch-actions-toolbar.tsx",
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Buttons show loading spinner during operations", "Checkboxes disabled during operations", "Toolbar indicates operation in progress"]
+            "checks": [
+              "Buttons show loading spinner during operations",
+              "Checkboxes disabled during operations",
+              "Toolbar indicates operation in progress"
+            ]
           },
           "status": "pending",
           "notes": "Pass isPending from mutations to toolbar. Show spinner icon in buttons during isPending. Disable all checkboxes and buttons while operations run. Use mutation.isPending from TanStack Query."
@@ -250,13 +353,19 @@
           "id": "subtask-5-2",
           "description": "Handle edge cases (empty selection, filter changes, partial failures)",
           "service": "main",
-          "files_to_modify": ["src/routes/index.tsx"],
+          "files_to_modify": [
+            "src/routes/index.tsx"
+          ],
           "files_to_create": [],
           "patterns_from": [],
           "verification": {
             "type": "browser",
             "url": "http://localhost:3000",
-            "checks": ["Batch buttons disabled when no selections", "Changing filters clears hidden selections", "Error messages show for partial failures"]
+            "checks": [
+              "Batch buttons disabled when no selections",
+              "Changing filters clears hidden selections",
+              "Error messages show for partial failures"
+            ]
           },
           "status": "pending",
           "notes": "Disable toolbar buttons when selectedHashes.size === 0. Clear selections for torrents that become hidden after filter changes (useEffect watching filteredTorrents). Add error handling in mutations to show toast/alert for failures."
@@ -294,7 +403,9 @@
   "summary": {
     "total_phases": 5,
     "total_subtasks": 14,
-    "services_involved": ["main"],
+    "services_involved": [
+      "main"
+    ],
     "parallelism": {
       "max_parallel_phases": 1,
       "parallel_groups": [],
@@ -307,7 +418,10 @@
     "risk_level": "medium",
     "skip_validation": false,
     "test_creation_phase": "post_implementation",
-    "test_types_required": ["unit", "integration"],
+    "test_types_required": [
+      "unit",
+      "integration"
+    ],
     "security_scanning_required": false,
     "staging_deployment_required": false,
     "acceptance_criteria": [
@@ -348,18 +462,28 @@
   "qa_acceptance": {
     "unit_tests": {
       "required": true,
-      "commands": ["npm test"],
+      "commands": [
+        "npm test"
+      ],
       "minimum_coverage": null
     },
     "integration_tests": {
       "required": true,
-      "commands": ["npm test"],
-      "services_to_test": ["main"]
+      "commands": [
+        "npm test"
+      ],
+      "services_to_test": [
+        "main"
+      ]
     },
     "e2e_tests": {
       "required": false,
       "commands": [],
-      "flows": ["bulk-delete", "bulk-pause", "bulk-category-assignment"]
+      "flows": [
+        "bulk-delete",
+        "bulk-pause",
+        "bulk-category-assignment"
+      ]
     },
     "browser_verification": {
       "required": true,
@@ -388,5 +512,9 @@
   },
   "qa_signoff": null,
   "created_at": "2025-12-20T20:43:00.000Z",
-  "updated_at": "2025-12-20T20:43:00.000Z"
+  "updated_at": "2025-12-26T07:04:03.336Z",
+  "last_updated": "2025-12-26T11:46:21.604863+00:00",
+  "status": "backlog",
+  "planStatus": "pending",
+  "recoveryNote": "Task recovered from stuck state at 2025-12-26T01:20:02.146Z"
 }
