@@ -420,6 +420,7 @@ function HomePage() {
               toggleSelection={toggleSelection}
               selectAll={() => selectAll(filteredTorrents)}
               clearSelection={clearSelection}
+              isBatchPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>

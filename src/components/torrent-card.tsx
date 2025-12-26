@@ -78,9 +78,10 @@ interface TorrentCardProps {
   onClick?: () => void
   isSelected?: boolean
   onToggleSelection?: () => void
+  isBatchPending?: boolean
 }
 
-export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection }: TorrentCardProps) {
+export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, isBatchPending = false }: TorrentCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
@@ -131,6 +132,7 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection }:
           <Checkbox
             checked={isSelected ?? false}
             onCheckedChange={() => onToggleSelection?.()}
+            disabled={isBatchPending}
             aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
           />
         </div>

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { ChevronDown, Folder, Pause, Play, Trash2, X } from "lucide-react"
+import { ChevronDown, Folder, Loader2, Pause, Play, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -68,13 +68,25 @@ function BatchActionsToolbar({
 
       {/* Right side: Action buttons */}
       <div className="flex items-center gap-2">
+        {/* Loading indicator when operation is in progress */}
+        {isPending && (
+          <span className="text-sm text-slate-400 flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t("batch.processing")}
+          </span>
+        )}
+
         <Button
           variant="outline"
           size="sm"
           onClick={onPause}
           disabled={isPending}
         >
-          <Pause className="h-4 w-4 mr-2" />
+          {isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Pause className="h-4 w-4 mr-2" />
+          )}
           {t("common.pause")}
         </Button>
 
@@ -84,7 +96,11 @@ function BatchActionsToolbar({
           onClick={onResume}
           disabled={isPending}
         >
-          <Play className="h-4 w-4 mr-2" />
+          {isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4 mr-2" />
+          )}
           {t("common.resume")}
         </Button>
 
@@ -96,7 +112,11 @@ function BatchActionsToolbar({
               size="sm"
               disabled={isPending}
             >
-              <Folder className="h-4 w-4 mr-2" />
+              {isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Folder className="h-4 w-4 mr-2" />
+              )}
               {t("batch.setCategory")}
               <ChevronDown className="h-4 w-4 ml-2" />
             </Button>
@@ -125,7 +145,11 @@ function BatchActionsToolbar({
           onClick={onDelete}
           disabled={isPending}
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          {isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4 mr-2" />
+          )}
           {t("common.delete")}
         </Button>
       </div>

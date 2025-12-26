@@ -151,6 +151,7 @@ interface TorrentTableProps {
   toggleSelection?: (hash: string) => void
   selectAll?: () => void
   clearSelection?: () => void
+  isBatchPending?: boolean
 }
 
 export function TorrentTable({
@@ -160,6 +161,7 @@ export function TorrentTable({
   toggleSelection,
   selectAll,
   clearSelection,
+  isBatchPending = false,
 }: TorrentTableProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -201,6 +203,7 @@ export function TorrentTable({
             onClick={() => onTorrentClick?.(torrent)}
             isSelected={selectedHashes?.has(torrent.hash)}
             onToggleSelection={() => toggleSelection?.(torrent.hash)}
+            isBatchPending={isBatchPending}
           />
         ))}
       </div>
@@ -231,6 +234,7 @@ export function TorrentTable({
                     selectAll?.()
                   }
                 }}
+                disabled={isBatchPending}
                 aria-label={t('torrent.table.selectAll')}
               />
             </TableHead>
@@ -259,6 +263,7 @@ export function TorrentTable({
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelection?.(torrent.hash)}
+                    disabled={isBatchPending}
                     aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
                   />
                 </TableCell>

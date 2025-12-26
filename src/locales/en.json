@@ -103,7 +103,8 @@
     "setCategory": "Category",
     "selectCategory": "Set Category",
     "confirmDelete": "Delete {{count}} Torrents?",
-    "confirmDeleteMessage": "This action cannot be undone. This will permanently delete <strong>{{count}} torrents</strong>. Choose whether to also delete the associated files."
+    "confirmDeleteMessage": "This action cannot be undone. This will permanently delete <strong>{{count}} torrents</strong>. Choose whether to also delete the associated files.",
+    "processing": "Processing..."
   },
   "addTorrent": {
     "title": "Add Torrent",
