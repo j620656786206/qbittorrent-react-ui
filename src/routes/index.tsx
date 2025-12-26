@@ -17,6 +17,16 @@ import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type Filter = string // Changed from TorrentState to string as TorrentState came from @ctrl/qbittorrent
 
@@ -36,6 +46,7 @@ function HomePage() {
 
   // --- Selection State for Bulk Operations ---
   const [selectedHashes, setSelectedHashes] = React.useState<Set<string>>(new Set())
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
@@ -281,6 +292,16 @@ function HomePage() {
     },
   })
 
+  const batchDeleteMutation = useMutation({
+    mutationFn: ({ hashes, deleteFiles }: { hashes: string[]; deleteFiles: boolean }) =>
+      deleteTorrent(getBaseUrl(), hashes, deleteFiles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      clearSelection()
+      setIsDeleteDialogOpen(false)
+    },
+  })
+
   // --- Step 5: Render UI based on state ---
   const renderContent = () => {
     if (!areCredentialsSet || isLoginError) {
@@ -350,9 +371,12 @@ function HomePage() {
               }
             }}
             onDelete={() => {
-              // Batch delete - to be implemented in next subtask
+              if (selectedHashes.size > 0) {
+                setIsDeleteDialogOpen(true)
+              }
             }}
             onClearSelection={clearSelection}
+            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending}
           />
 
           {/* Torrent List */}
@@ -427,6 +451,46 @@ function HomePage() {
         isOpen={isAddTorrentOpen}
         onClose={() => setIsAddTorrentOpen(false)}
       />
+
+      {/* Batch Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('batch.confirmDelete', { count: selectedHashes.size })}
+            </AlertDialogTitle>
+            <AlertDialogDescription
+              dangerouslySetInnerHTML={{
+                __html: t('batch.confirmDeleteMessage', { count: selectedHashes.size })
+              }}
+            />
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                batchDeleteMutation.mutate({
+                  hashes: Array.from(selectedHashes),
+                  deleteFiles: false
+                })
+              }}
+            >
+              {t('torrent.actions.deleteKeepFiles')}
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => {
+                batchDeleteMutation.mutate({
+                  hashes: Array.from(selectedHashes),
+                  deleteFiles: true
+                })
+              }}
+            >
+              {t('torrent.actions.deleteRemoveFiles')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

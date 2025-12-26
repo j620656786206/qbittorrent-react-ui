@@ -99,7 +99,9 @@
   },
   "batch": {
     "selected": "{{count}} selected",
-    "clearSelection": "Clear"
+    "clearSelection": "Clear",
+    "confirmDelete": "Delete {{count}} Torrents?",
+    "confirmDeleteMessage": "This action cannot be undone. This will permanently delete <strong>{{count}} torrents</strong>. Choose whether to also delete the associated files."
   },
   "addTorrent": {
     "title": "Add Torrent",
