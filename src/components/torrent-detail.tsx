@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { useMediaQuery } from '@/lib/hooks'
 import type { Torrent } from '@/components/torrent-table'
+import { TorrentFileList } from '@/components/TorrentFileList'
 
 // Helper functions
 function formatBytes(bytes: number, decimals = 2) {
@@ -73,6 +74,7 @@ type TorrentDetailProps = {
   onPause?: () => void
   onResume?: () => void
   onDelete?: () => void
+  baseUrl?: string
 }
 
 export function TorrentDetail({
@@ -82,6 +84,7 @@ export function TorrentDetail({
   onPause,
   onResume,
   onDelete,
+  baseUrl,
 }: TorrentDetailProps) {
   const { t } = useTranslation()
   const isMobile = !useMediaQuery('(min-width: 768px)')
@@ -214,6 +217,16 @@ export function TorrentDetail({
           </div>
         </div>
       </div>
+
+      {/* File List */}
+      {baseUrl && (
+        <div className="border-t border-slate-700 pt-4">
+          <h3 className="text-sm font-medium text-slate-300 mb-3">
+            {t('torrent.details.files')}
+          </h3>
+          <TorrentFileList hash={torrent.hash} baseUrl={baseUrl} />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-2 border-t border-slate-700 pt-4">

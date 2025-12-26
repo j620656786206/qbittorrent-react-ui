@@ -522,6 +522,7 @@ function HomePage() {
             }
           }
         }}
+        baseUrl={credentials.baseUrl}
       />
       <AddTorrentModal
         isOpen={isAddTorrentOpen}
