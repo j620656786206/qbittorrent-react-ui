@@ -264,6 +264,23 @@ function HomePage() {
     },
   })
 
+  // --- Batch Mutations for Bulk Operations ---
+  const batchPauseMutation = useMutation({
+    mutationFn: (hashes: string[]) => pauseTorrent(getBaseUrl(), hashes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      clearSelection()
+    },
+  })
+
+  const batchResumeMutation = useMutation({
+    mutationFn: (hashes: string[]) => resumeTorrent(getBaseUrl(), hashes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      clearSelection()
+    },
+  })
+
   // --- Step 5: Render UI based on state ---
   const renderContent = () => {
     if (!areCredentialsSet || isLoginError) {
@@ -323,13 +340,17 @@ function HomePage() {
           <BatchActionsToolbar
             selectedCount={selectedHashes.size}
             onPause={() => {
-              // Batch pause - to be implemented in phase 4
+              if (selectedHashes.size > 0) {
+                batchPauseMutation.mutate(Array.from(selectedHashes))
+              }
             }}
             onResume={() => {
-              // Batch resume - to be implemented in phase 4
+              if (selectedHashes.size > 0) {
+                batchResumeMutation.mutate(Array.from(selectedHashes))
+              }
             }}
             onDelete={() => {
-              // Batch delete - to be implemented in phase 4
+              // Batch delete - to be implemented in next subtask
             }}
             onClearSelection={clearSelection}
           />
