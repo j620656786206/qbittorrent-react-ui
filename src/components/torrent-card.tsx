@@ -114,7 +114,11 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection }:
 
   return (
     <div
-      className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600/50 transition-all cursor-pointer"
+      className={`bg-slate-800/50 rounded-lg p-4 border transition-all cursor-pointer ${
+        isSelected
+          ? 'border-blue-500/50 bg-blue-900/20 hover:border-blue-400/50'
+          : 'border-slate-700/50 hover:border-slate-600/50'
+      }`}
       onClick={onClick}
     >
       {/* Header: Checkbox, Name, and Actions */}
@@ -125,6 +129,8 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection }:
           onClick={(e) => e.stopPropagation()}
         >
           <Checkbox
+            checked={isSelected ?? false}
+            onCheckedChange={() => onToggleSelection?.()}
             aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
           />
         </div>

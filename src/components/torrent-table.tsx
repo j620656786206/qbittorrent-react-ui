@@ -215,6 +215,14 @@ export function TorrentTable({
           <TableRow>
             <TableHead className="w-10 px-3">
               <Checkbox
+                checked={selectedHashes && torrents.length > 0 && selectedHashes.size === torrents.length}
+                onCheckedChange={() => {
+                  if (selectedHashes && selectedHashes.size === torrents.length) {
+                    clearSelection?.()
+                  } else {
+                    selectAll?.()
+                  }
+                }}
                 aria-label={t('torrent.table.selectAll')}
               />
             </TableHead>
@@ -228,16 +236,21 @@ export function TorrentTable({
         <TableBody>
           {torrents.map((torrent) => {
             const isPaused = torrent.state.includes('paused')
+            const isSelected = selectedHashes?.has(torrent.hash) ?? false
 
             return (
               <TableRow
                 key={torrent.hash}
-                className="cursor-pointer hover:bg-slate-800/50"
+                className={`cursor-pointer hover:bg-slate-800/50 transition-colors ${
+                  isSelected ? 'bg-blue-900/30 hover:bg-blue-900/40' : ''
+                }`}
                 onClick={() => onTorrentClick?.(torrent)}
               >
                 {/* Checkbox */}
                 <TableCell className="w-10 px-3" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelection?.(torrent.hash)}
                     aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
                   />
                 </TableCell>
