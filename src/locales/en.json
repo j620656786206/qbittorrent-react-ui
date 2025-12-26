@@ -97,6 +97,10 @@
     "username": "Username",
     "password": "Password"
   },
+  "batch": {
+    "selected": "{{count}} selected",
+    "clearSelection": "Clear"
+  },
   "addTorrent": {
     "title": "Add Torrent",
     "description": "Add a new torrent via magnet link or file upload.",

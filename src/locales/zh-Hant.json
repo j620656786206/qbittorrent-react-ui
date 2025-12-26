@@ -97,6 +97,10 @@
     "username": "使用者名稱",
     "password": "密碼"
   },
+  "batch": {
+    "selected": "已選擇 {{count}} 個",
+    "clearSelection": "清除"
+  },
   "addTorrent": {
     "title": "新增 Torrent",
     "description": "透過磁力連結或檔案上傳新增 Torrent。",
