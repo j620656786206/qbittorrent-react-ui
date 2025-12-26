@@ -23,6 +23,7 @@ import {
 import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import type { Torrent } from '@/components/torrent-table'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // Helper function to format bytes
 function formatBytes(bytes: number, decimals = 2) {
@@ -109,11 +110,22 @@ export function TorrentCard({ torrent, onClick }: { torrent: Torrent; onClick?: 
       className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600/50 transition-all cursor-pointer"
       onClick={onClick}
     >
-      {/* Header: Name and Actions */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <h3 className="font-medium text-white line-clamp-2 flex-1 text-sm">
+      {/* Header: Checkbox, Name, and Actions */}
+      <div className="flex items-start gap-3 mb-3">
+        {/* Checkbox */}
+        <div
+          className="flex-shrink-0 pt-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+          />
+        </div>
+        {/* Name */}
+        <h3 className="font-medium text-white line-clamp-2 flex-1 text-sm min-w-0">
           {torrent.name}
         </h3>
+        {/* Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
