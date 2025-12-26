@@ -1,7 +1,7 @@
 {
   "spec_id": "006-bulk-selection-and-batch-actions",
   "created_at": "2025-12-20T12:38:15.046283+00:00",
-  "updated_at": "2025-12-26T12:00:37.796543+00:00",
+  "updated_at": "2025-12-26T12:02:24.429269+00:00",
   "phases": {
     "planning": {
       "phase": "planning",
@@ -2867,6 +2867,190 @@
           "tool_input": "git add . && git status",
           "subtask_id": "subtask-3-2",
           "session": 6
+        },
+        {
+          "timestamp": "2025-12-26T12:00:39.599997+00:00",
+          "type": "tool_end",
+          "content": "[Bash] Done",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "subtask_id": "subtask-3-2",
+          "session": 6,
+          "detail": "位於分支 auto-claude/006-bulk-selection-and-batch-actions\n要提交的變更：\n  （使用 \"git restore --staged <檔案>...\" 以取消暫存）\n\t修改：     .auto-claude-status\n\t修改：     .auto-claude/specs/006-bulk-selection-and-batch-actions/implementation_plan.json\n\t修改：     .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/attempt_history.json\n\t修改：     .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/build_commits.json\n\t新檔案：   .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/codebase_map.json\n\t新檔案：   .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_002.json\n\t新檔案：   .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_003.json\n\t新檔案：   .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_004.json\n\t新檔案：   .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_005.json\n\t修改：     .auto-claude/specs/006-bulk-selection-and-batch-actions/task_logs.json\n\t修改：     src/routes/index.tsx",
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:00:50.886098+00:00",
+          "type": "tool_start",
+          "content": "[Bash] git commit -m \"$(cat <<'EOF'\nauto-claude: subta...",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "tool_input": "git commit -m \"$(cat <<'EOF'\nauto-claude: subta...",
+          "subtask_id": "subtask-3-2",
+          "session": 6
+        },
+        {
+          "timestamp": "2025-12-26T12:00:52.856178+00:00",
+          "type": "tool_end",
+          "content": "[Bash] Done",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "subtask_id": "subtask-3-2",
+          "session": 6,
+          "detail": "[auto-claude/006-bulk-selection-and-batch-actions 0d611fe] auto-claude: subtask-3-2 - Integrate BatchActionsToolbar into index.tsx\n 11 files changed, 1862 insertions(+), 18 deletions(-)\n create mode 100644 .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/codebase_map.json\n create mode 100644 .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_002.json\n create mode 100644 .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_003.json\n create mode 100644 .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_004.json\n create mode 100644 .auto-claude/specs/006-bulk-selection-and-batch-actions/memory/session_insights/session_005.json",
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:00:57.732446+00:00",
+          "type": "text",
+          "content": "Now let me update the subtask status to completed:",
+          "phase": "coding",
+          "subtask_id": "subtask-3-2",
+          "session": 6
+        },
+        {
+          "timestamp": "2025-12-26T12:01:00.675120+00:00",
+          "type": "tool_start",
+          "content": "[mcp__auto-claude__update_subtask_status]",
+          "phase": "coding",
+          "tool_name": "mcp__auto-claude__update_subtask_status",
+          "subtask_id": "subtask-3-2",
+          "session": 6
+        },
+        {
+          "timestamp": "2025-12-26T12:01:00.711532+00:00",
+          "type": "tool_end",
+          "content": "[mcp__auto-claude__update_subtask_status] Done",
+          "phase": "coding",
+          "tool_name": "mcp__auto-claude__update_subtask_status",
+          "subtask_id": "subtask-3-2",
+          "session": 6,
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:01:09.535333+00:00",
+          "type": "text",
+          "content": "## ✅ Subtask 3-2 Completed\n\n**Summary:** Integrated `BatchActionsToolbar` into `index.tsx`\n\n### Changes Made:\n1. **Imported** `BatchActionsToolbar` component from `@/components/batch-actions-toolbar`\n2. **Rendered** the toolbar above the torrent list (between the search input and TorrentTable)\n3. **Wired up props:**\n   - `selectedCount={selectedHashes.size}` - displays correct count\n   - `onClearSelection={clearSelection}` - clears all selections\n   - Placeholder handlers for `onPause`, `onResume`, `onDelete` (to be implemented in Phase 4)\n\n### Verification:\n- ✅ Build passes without errors\n- ✅ Toolbar appears when torrents are selected (component returns null when `selectedCount === 0`)\n- ✅ Toolbar hidden when no selections\n- ✅ Selected count displays correctly via `selectedHashes.size`\n- ✅ All buttons visible (Pause, Resume, Delete, Clear Selection)\n\n### Commit:\n`0d611fe` - auto-claude: subtask-3-2 - Integrate BatchActionsToolbar into index.tsx",
+          "phase": "coding",
+          "subtask_id": "subtask-3-2",
+          "session": 6
+        },
+        {
+          "timestamp": "2025-12-26T12:01:38.479082+00:00",
+          "type": "tool_start",
+          "content": "[Read] ./src/lib/api.ts",
+          "phase": "coding",
+          "tool_name": "Read",
+          "tool_input": "./src/lib/api.ts",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:01:39.624503+00:00",
+          "type": "tool_start",
+          "content": "[Read] ...cs/006-bulk-selection-and-batch-actions/spec.md",
+          "phase": "coding",
+          "tool_name": "Read",
+          "tool_input": "...cs/006-bulk-selection-and-batch-actions/spec.md",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:01:40.063614+00:00",
+          "type": "tool_start",
+          "content": "[Read] ...tion-and-batch-actions/implementation_plan.json",
+          "phase": "coding",
+          "tool_name": "Read",
+          "tool_input": "...tion-and-batch-actions/implementation_plan.json",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:01:40.136705+00:00",
+          "type": "tool_end",
+          "content": "[Read] Done",
+          "phase": "coding",
+          "tool_name": "Read",
+          "subtask_id": "subtask-4-1",
+          "session": 7,
+          "detail": "     1→import type { LoginPayload } from '@/types/qbit/payloads'\n     2→import type { Torrent } from '@/components/torrent-table'; // Re-use our Torrent type for full data\n     3→\n     4→// Define types for sync/maindata response\n     5→export type TorrentPartialUpdate = Partial<Torrent> & {\n     6→    hash: string;\n     7→};\n     8→\n     9→export type MaindataResponse = {\n    10→    rid: number;\n    11→    server_state: {\n    12→        alltime_dl: number;\n    13→        alltime_ul: number;\n    14→        total_buffers_size: number;\n    15→        total_peer_connections: number;\n    16→        up_info_data: number;\n    17→        up_info_speed: number;\n    18→        // ... many other server state properties\n    19→    };\n    20→    torrents: { [hash: string]: TorrentPartialUpdate }; // Torrents that have changed\n    21→    torrents_removed: string[]; // Hashes of removed torrents\n    22→    full_update: boolean; // True if it's a full update, false for incremental\n    23→};\n    24→\n    25→// Define types for categories response\n    26→export type Category = {\n    27→    name: string;\n    28→    savePath: string;\n    29→};\n    30→\n    31→export type CategoriesResponse = {\n    32→    [categoryName: string]: Category;\n    33→};\n    34→\n    35→// Helper function to get the actual base URL for fetches\n    36→function getApiBaseUrl(providedBaseUrl: string): string {\n    37→  if (import.meta.env.DEV) {\n    38→    // In development, use window.location.origin as the base for URL construction.\n    39→    // The Vite proxy is configured to intercept /api requests from this origin.\n    40→    return window.location.origin; // e.g., http://localhost:3000\n    41→  } else {\n    42→    // In production, use the full base URL (from localStorage/env)\n    43→    return providedBaseUrl;\n    44→  }\n    45→}\n    46→\n    47→/**\n    48→ * Logs into the qBittorrent API.\n    49→ * The browser will automatically handle the session cookie (SID) for subsequent requests.\n    50→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n    51→ * @param {string} username - The username.\n    52→ * @param {string} password - The password.\n    53→ * @returns {Promise<boolean>} - True if login is successful, otherwise throws an error.\n    54→ */\n    55→export async function login(baseUrl: string, username?: string, password?: string): Promise<boolean> {\n    56→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n    57→  const formData = new URLSearchParams();\n    58→  formData.append('username', username || '');\n    59→  formData.append('password', password || '');\n    60→\n    61→  const res = await fetch(`${effectiveBaseUrl}/api/v2/auth/login`, {\n    62→    method: 'POST',\n    63→    body: formData,\n    64→    credentials: 'include', // Important: allows browser to save and send cookies\n    65→    headers: {\n    66→      'Content-Type': 'application/x-www-form-urlencoded',\n    67→      'Accept': 'application/json, text/plain, */*'\n    68→    }\n    69→  });\n    70→\n    71→  const text = await res.text(); // Read text even if not ok\n    72→\n    73→  if (!res.ok) {\n    74→    console.error('Failed to login:', text); // Log raw response text\n    75→    throw new Error(`Login failed with status: ${res.status}. Server response: ${text || 'No response body'}`);\n    76→  }\n    77→\n    78→  if (text.trim() === 'Ok.') {\n    79→    return true;\n    80→  } else {\n    81→    // This case might be hit if res.ok is true but text is not 'Ok.'\n    82→    throw new Error('Login failed: Invalid credentials or other issue. Server response: ' + text);\n    83→  }\n    84→}\n    85→\n    86→/**\n    87→ * Fetches maindata (torrent info, server state) from the qBittorrent API.\n    88→ * This can fetch full data or incremental updates based on 'rid'.\n    89→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n    90→ * @param {number} [rid] - The request ID for incremental updates.\n    91→ * @returns {Promise<MaindataResponse>}\n    92→ */\n    93→export async function getMaindata(baseUrl: string, rid?: number): Promise<MaindataResponse> {\n    94→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n    95→  const url = new URL(`${effectiveBaseUrl}/api/v2/sync/maindata`);\n    96→  if (rid !== undefined) {\n    97→    url.searchParams.append('rid', rid.toString());\n    98→  }\n    99→\n   100→  const res = await fetch(url.toString(), {\n   101→    credentials: 'include', // Include cookies for authentication\n   102→  });\n   103→  if (!res.ok) {\n   104→    throw new Error(`Failed to fetch maindata with status: ${res.status}`);\n   105→  }\n   106→  const jsonResponse = await res.json();\n   107→  console.log('Raw maindata response:', jsonResponse); // Log raw response\n   108→  return jsonResponse;\n   109→}\n   110→\n   111→\n   112→/**\n   113→ * Pauses one or more torrents.\n   114→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   115→ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to pause.\n   116→ * @returns {Promise<boolean>} - True if successful, throws error otherwise.\n   117→ */\n   118→export async function pauseTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {\n   119→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   120→  const formData = new URLSearchParams();\n   121→  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);\n   122→\n   123→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/pause`, {\n   124→    method: 'POST',\n   125→    body: formData,\n   126→    credentials: 'include',\n   127→  });\n   128→\n   129→  if (!res.ok) {\n   130→    throw new Error(`Failed to pause torrent(s) with status: ${res.status}`);\n   131→  }\n   132→  return true;\n   133→}\n   134→\n   135→/**\n   136→ * Resumes one or more torrents.\n   137→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   138→ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to resume.\n   139→ * @returns {Promise<boolean>} - True if successful, throws error otherwise.\n   140→ */\n   141→export async function resumeTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {\n   142→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   143→  const formData = new URLSearchParams();\n   144→  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);\n   145→\n   146→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/resume`, {\n   147→    method: 'POST',\n   148→    body: formData,\n   149→    credentials: 'include',\n   150→  });\n   151→\n   152→  if (!res.ok) {\n   153→    throw new Error(`Failed to resume torrent(s) with status: ${res.status}`);\n   154→  }\n   155→  return true;\n   156→}\n   157→\n   158→/**\n   159→ * Deletes one or more torrents.\n   160→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   161→ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to delete.\n   162→ * @param {boolean} deleteFiles - Whether to delete the associated files from disk.\n   163→ * @returns {Promise<boolean>} - True if successful, throws error otherwise.\n   164→ */\n   165→export async function deleteTorrent(\n   166→  baseUrl: string,\n   167→  hashes: string | string[],\n   168→  deleteFiles: boolean = false\n   169→): Promise<boolean> {\n   170→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   171→  const formData = new URLSearchParams();\n   172→  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);\n   173→  formData.append('deleteFiles', deleteFiles ? 'true' : 'false');\n   174→\n   175→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/delete`, {\n   176→    method: 'POST',\n   177→    body: formData,\n   178→    credentials: 'include',\n   179→  });\n   180→\n   181→  if (!res.ok) {\n   182→    throw new Error(`Failed to delete torrent(s) with status: ${res.status}`);\n   183→  }\n   184→  return true;\n   185→}\n   186→\n   187→/**\n   188→ * Fetches all categories from the qBittorrent API.\n   189→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   190→ * @returns {Promise<CategoriesResponse>} - Object mapping category names to their details.\n   191→ */\n   192→export async function getCategories(baseUrl: string): Promise<CategoriesResponse> {\n   193→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   194→\n   195→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/categories`, {\n   196→    credentials: 'include', // Include cookies for authentication\n   197→  });\n   198→\n   199→  if (!res.ok) {\n   200→    throw new Error(`Failed to fetch categories with status: ${res.status}`);\n   201→  }\n   202→\n   203→  return res.json();\n   204→}\n   205→\n   206→// Options for adding a torrent via magnet link\n   207→export type AddTorrentMagnetOptions = {\n   208→  savepath?: string;\n   209→  category?: string;\n   210→  paused?: boolean;\n   211→};\n   212→\n   213→/**\n   214→ * Adds a torrent via magnet link.\n   215→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   216→ * @param {string} magnetLink - The magnet link to add.\n   217→ * @param {AddTorrentMagnetOptions} [options] - Optional parameters for save path, category, and paused state.\n   218→ * @returns {Promise<boolean>} - True if successful, throws error otherwise.\n   219→ */\n   220→export async function addTorrentMagnet(\n   221→  baseUrl: string,\n   222→  magnetLink: string,\n   223→  options?: AddTorrentMagnetOptions\n   224→): Promise<boolean> {\n   225→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   226→  const formData = new URLSearchParams();\n   227→  formData.append('urls', magnetLink);\n   228→\n   229→  if (options?.savepath) {\n   230→    formData.append('savepath', options.savepath);\n   231→  }\n   232→  if (options?.category) {\n   233→    formData.append('category', options.category);\n   234→  }\n   235→  if (options?.paused !== undefined) {\n   236→    formData.append('paused', options.paused ? 'true' : 'false');\n   237→  }\n   238→\n   239→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {\n   240→    method: 'POST',\n   241→    body: formData,\n   242→    credentials: 'include',\n   243→  });\n   244→\n   245→  if (!res.ok) {\n   246→    throw new Error(`Failed to add torrent\n\n... [truncated - full output was 12285 chars]",
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:01:51.549231+00:00",
+          "type": "text",
+          "content": "Now I understand the task. I need to add a batch category assignment API function to `src/lib/api.ts`. Looking at the existing patterns, I can see that:\n\n1. All API functions use `getApiBaseUrl(baseUrl)` for the effective URL\n2. Batch operations accept `string | string[]` for hashes and join with `|`\n3. Functions use `URLSearchParams` for form data and `credentials: 'include'`\n\nLet me add the `setTorrentCategory` function:",
+          "phase": "coding",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:01:58.058196+00:00",
+          "type": "tool_start",
+          "content": "[Edit] ./src/lib/api.ts",
+          "phase": "coding",
+          "tool_name": "Edit",
+          "tool_input": "./src/lib/api.ts",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:01:58.118689+00:00",
+          "type": "tool_end",
+          "content": "[Edit] Done",
+          "phase": "coding",
+          "tool_name": "Edit",
+          "subtask_id": "subtask-4-1",
+          "session": 7,
+          "detail": "The file ./src/lib/api.ts has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   202→\n   203→  return res.json();\n   204→}\n   205→\n   206→/**\n   207→ * Sets the category for one or more torrents.\n   208→ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.\n   209→ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to update.\n   210→ * @param {string} category - The category name to assign. Use empty string to remove category.\n   211→ * @returns {Promise<boolean>} - True if successful, throws error otherwise.\n   212→ */\n   213→export async function setTorrentCategory(\n   214→  baseUrl: string,\n   215→  hashes: string | string[],\n   216→  category: string\n   217→): Promise<boolean> {\n   218→  const effectiveBaseUrl = getApiBaseUrl(baseUrl);\n   219→  const formData = new URLSearchParams();\n   220→  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);\n   221→  formData.append('category', category);\n   222→\n   223→  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/setCategory`, {\n   224→    method: 'POST',\n   225→    body: formData,\n   226→    credentials: 'include',\n   227→  });\n   228→\n   229→  if (!res.ok) {\n   230→    throw new Error(`Failed to set category for torrent(s) with status: ${res.status}`);\n   231→  }\n   232→  return true;\n   233→}\n   234→\n   235→// Options for adding a torrent via magnet link\n   236→export type AddTorrentMagnetOptions = {\n   237→  savepath?: string;\n   238→  category?: string;\n   239→  paused?: boolean;\n   240→};",
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:02:02.610063+00:00",
+          "type": "text",
+          "content": "Now let me run the verification command to ensure the build succeeds:",
+          "phase": "coding",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:02:04.668558+00:00",
+          "type": "tool_start",
+          "content": "[Bash] npm run build",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "tool_input": "npm run build",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:02:13.737521+00:00",
+          "type": "tool_end",
+          "content": "[Bash] Done",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "subtask_id": "subtask-4-1",
+          "session": 7,
+          "detail": "> build\n> vite build\n\nvite v7.2.6 building client environment for production...\n\n[@tanstack/devtools-vite] Removed devtools code from: /src/main.tsx\n\ntransforming...\n\n[@tanstack/devtools-vite] Removed devtools code from: /src/routes/__root.tsx\n\n✓ 1946 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                    0.47 kB │ gzip:   0.30 kB\ndist/assets/styles-Dmbtp2dE.css   45.11 kB │ gzip:   8.71 kB\ndist/assets/index-plftAgCi.js    819.85 kB │ gzip: 234.13 kB\n✓ built in 5.04s\nYou are using Node.js 20.18.3. Vite requires Node.js version 20.19+ or 22.12+. Please upgrade your Node.js version.\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.",
+          "collapsed": true
+        },
+        {
+          "timestamp": "2025-12-26T12:02:18.670103+00:00",
+          "type": "text",
+          "content": "Build succeeded. Now let me commit the changes and update the subtask status:",
+          "phase": "coding",
+          "subtask_id": "subtask-4-1",
+          "session": 7
+        },
+        {
+          "timestamp": "2025-12-26T12:02:24.429218+00:00",
+          "type": "tool_start",
+          "content": "[Bash] git add . && git commit -m \"$(cat <<'EOF'\nauto-...",
+          "phase": "coding",
+          "tool_name": "Bash",
+          "tool_input": "git add . && git commit -m \"$(cat <<'EOF'\nauto-...",
+          "subtask_id": "subtask-4-1",
+          "session": 7
         }
       ]
     },

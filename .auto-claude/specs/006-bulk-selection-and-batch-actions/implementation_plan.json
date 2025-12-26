@@ -211,8 +211,9 @@
               "All buttons visible"
             ]
           },
-          "status": "pending",
-          "notes": "Render toolbar above torrent list when selectedHashes.size > 0. Pass selectedCount={selectedHashes.size}. Handler functions to be implemented in phase 4."
+          "status": "completed",
+          "notes": "Integrated BatchActionsToolbar into index.tsx. Imported component and rendered it above torrent list (between search input and TorrentTable). Toolbar shows when selectedHashes.size > 0, displays correct count, and has placeholder handlers for onPause, onResume, onDelete (to be implemented in phase 4). Build passes successfully. Committed as 0d611fe.",
+          "updated_at": "2025-12-26T12:01:00.687496+00:00"
         }
       ]
     },
@@ -517,7 +518,7 @@
   "qa_signoff": null,
   "created_at": "2025-12-20T20:43:00.000Z",
   "updated_at": "2025-12-26T07:04:03.336Z",
-  "last_updated": "2025-12-26T11:59:01.870535+00:00",
+  "last_updated": "2025-12-26T12:01:00.687509+00:00",
   "status": "backlog",
   "planStatus": "pending",
   "recoveryNote": "Task recovered from stuck state at 2025-12-26T01:20:02.146Z"
