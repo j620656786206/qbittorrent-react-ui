@@ -47,6 +47,7 @@ function HomePage() {
   // --- Selection State for Bulk Operations ---
   const [selectedHashes, setSelectedHashes] = React.useState<Set<string>>(new Set())
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+  const [batchError, setBatchError] = React.useState<string | null>(null)
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
@@ -119,13 +120,6 @@ function HomePage() {
     enabled: areCredentialsSet,
   })
 
-  console.log('--- HomePage State ---')
-  console.log('areCredentialsSet:', areCredentialsSet)
-  console.log('isLoggingIn:', isLoggingIn)
-  console.log('loginSuccess:', loginSuccess)
-  console.log('isLoginError:', isLoginError)
-  console.log('rid (before maindata query):', rid)
-
   // --- Step 3: Maindata Query ---
   const ridRef = React.useRef<number | undefined>(undefined)
 
@@ -137,7 +131,6 @@ function HomePage() {
   } = useQuery({
     queryKey: ['maindata'], // Single query key, rid is managed internally
     queryFn: async () => {
-      console.log('Fetching maindata with rid:', ridRef.current)
       const maindata = await getMaindata(credentials.baseUrl, ridRef.current)
       ridRef.current = maindata.rid // Update ref immediately
       return maindata
@@ -149,14 +142,8 @@ function HomePage() {
   // Process maindata response using useEffect
   React.useEffect(() => {
     if (!maindata) {
-      console.log('maindata is undefined, skipping processing')
       return
     }
-
-    console.log('--- Processing maindata ---')
-    console.log('maindata.rid:', maindata.rid)
-    console.log('maindata.full_update:', maindata.full_update)
-    console.log('maindata.torrents keys:', maindata.torrents ? Object.keys(maindata.torrents).length : 0)
 
     // Update rid state for display purposes
     setRid(maindata.rid)
@@ -171,12 +158,10 @@ function HomePage() {
         })
       }
       setAllTorrentsMap(newMap)
-      console.log('Full update: torrents count =', newMap.size)
     } else {
       // Incremental update: merge changes
       setAllTorrentsMap((prevMap) => {
         const newMap = new Map(prevMap)
-        console.log('Previous map size:', prevMap.size)
 
         // Add or update torrents
         if (maindata.torrents) {
@@ -193,15 +178,10 @@ function HomePage() {
           })
         }
 
-        console.log('Incremental update: new map size =', newMap.size)
         return newMap
       })
     }
   }, [maindata])
-
-  console.log('isLoadingTorrents (after maindata query):', isLoadingTorrents)
-  console.log('rid (after maindata query):', rid)
-  // Log the length here, it reflects latest state
 
   // --- Categories Query ---
   const { data: categoriesData } = useQuery({
@@ -249,7 +229,34 @@ function HomePage() {
     return result.filter((t: Torrent) => t.state === filter)
   }, [allTorrents, filter, searchQuery])
 
-  console.log('filteredTorrents.length:', filteredTorrents.length)
+  // --- Clear selections that are no longer visible when filter/search changes ---
+  const prevFilterRef = React.useRef<string>(filter)
+  const prevSearchRef = React.useRef<string>(searchQuery)
+
+  React.useEffect(() => {
+    // Only run when filter or search actually changes
+    if (prevFilterRef.current !== filter || prevSearchRef.current !== searchQuery) {
+      prevFilterRef.current = filter
+      prevSearchRef.current = searchQuery
+
+      // Clear selections for torrents that are no longer visible
+      if (selectedHashes.size > 0) {
+        const visibleHashes = new Set(filteredTorrents.map(t => t.hash))
+        const newSelectedHashes = new Set<string>()
+
+        selectedHashes.forEach(hash => {
+          if (visibleHashes.has(hash)) {
+            newSelectedHashes.add(hash)
+          }
+        })
+
+        // Only update if selections changed
+        if (newSelectedHashes.size !== selectedHashes.size) {
+          setSelectedHashes(newSelectedHashes)
+        }
+      }
+    }
+  }, [filter, searchQuery, filteredTorrents, selectedHashes])
 
   const handleSettingsSave = () => {
     queryClient.invalidateQueries({ queryKey: ['login'] })
@@ -295,6 +302,10 @@ function HomePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
+      setBatchError(null)
+    },
+    onError: (error: Error) => {
+      setBatchError(t('batch.error.pause', { message: error.message }))
     },
   })
 
@@ -303,6 +314,10 @@ function HomePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
+      setBatchError(null)
+    },
+    onError: (error: Error) => {
+      setBatchError(t('batch.error.resume', { message: error.message }))
     },
   })
 
@@ -313,6 +328,11 @@ function HomePage() {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
       setIsDeleteDialogOpen(false)
+      setBatchError(null)
+    },
+    onError: (error: Error) => {
+      setIsDeleteDialogOpen(false)
+      setBatchError(t('batch.error.delete', { message: error.message }))
     },
   })
 
@@ -322,6 +342,10 @@ function HomePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
+      setBatchError(null)
+    },
+    onError: (error: Error) => {
+      setBatchError(t('batch.error.category', { message: error.message }))
     },
   })
 
@@ -380,26 +404,45 @@ function HomePage() {
             )}
           </div>
 
+          {/* Batch Error Alert */}
+          {batchError && (
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3 mb-4 text-red-400">
+              <span className="text-sm">{batchError}</span>
+              <button
+                type="button"
+                onClick={() => setBatchError(null)}
+                className="text-red-400 hover:text-red-300 transition-colors"
+                aria-label={t('common.close')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Batch Actions Toolbar - appears when torrents are selected */}
           <BatchActionsToolbar
             selectedCount={selectedHashes.size}
             onPause={() => {
               if (selectedHashes.size > 0) {
+                setBatchError(null)
                 batchPauseMutation.mutate(Array.from(selectedHashes))
               }
             }}
             onResume={() => {
               if (selectedHashes.size > 0) {
+                setBatchError(null)
                 batchResumeMutation.mutate(Array.from(selectedHashes))
               }
             }}
             onDelete={() => {
               if (selectedHashes.size > 0) {
+                setBatchError(null)
                 setIsDeleteDialogOpen(true)
               }
             }}
             onSetCategory={(category) => {
               if (selectedHashes.size > 0) {
+                setBatchError(null)
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
