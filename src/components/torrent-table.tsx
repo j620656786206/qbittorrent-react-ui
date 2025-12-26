@@ -215,7 +215,15 @@ export function TorrentTable({
           <TableRow>
             <TableHead className="w-10 px-3">
               <Checkbox
-                checked={selectedHashes && torrents.length > 0 && selectedHashes.size === torrents.length}
+                checked={
+                  selectedHashes && torrents.length > 0
+                    ? selectedHashes.size === torrents.length
+                      ? true
+                      : selectedHashes.size > 0
+                        ? "indeterminate"
+                        : false
+                    : false
+                }
                 onCheckedChange={() => {
                   if (selectedHashes && selectedHashes.size === torrents.length) {
                     clearSelection?.()
