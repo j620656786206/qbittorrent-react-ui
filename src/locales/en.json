@@ -45,7 +45,9 @@
       "size": "Size",
       "eta": "ETA",
       "ratio": "Ratio",
-      "peers": "Peers"
+      "peers": "Peers",
+      "selectAll": "Select all torrents",
+      "selectTorrent": "Select {{name}}"
     },
     "details": {
       "progress": "Progress",
@@ -94,6 +96,21 @@
     "baseUrl": "Base URL",
     "username": "Username",
     "password": "Password"
+  },
+  "batch": {
+    "selected": "{{count}} selected",
+    "clearSelection": "Clear",
+    "setCategory": "Category",
+    "selectCategory": "Set Category",
+    "confirmDelete": "Delete {{count}} Torrents?",
+    "confirmDeleteMessage": "This action cannot be undone. This will permanently delete <strong>{{count}} torrents</strong>. Choose whether to also delete the associated files.",
+    "processing": "Processing...",
+    "error": {
+      "pause": "Failed to pause torrents: {{message}}",
+      "resume": "Failed to resume torrents: {{message}}",
+      "delete": "Failed to delete torrents: {{message}}",
+      "category": "Failed to set category: {{message}}"
+    }
   },
   "addTorrent": {
     "title": "Add Torrent",

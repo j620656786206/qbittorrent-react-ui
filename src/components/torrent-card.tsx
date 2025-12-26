@@ -23,6 +23,7 @@ import {
 import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import type { Torrent } from '@/components/torrent-table'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // Helper function to format bytes
 function formatBytes(bytes: number, decimals = 2) {
@@ -72,7 +73,15 @@ function getStateKey(state: string): string {
   return `torrent.status.${state}`
 }
 
-export function TorrentCard({ torrent, onClick }: { torrent: Torrent; onClick?: () => void }) {
+interface TorrentCardProps {
+  torrent: Torrent
+  onClick?: () => void
+  isSelected?: boolean
+  onToggleSelection?: () => void
+  isBatchPending?: boolean
+}
+
+export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, isBatchPending = false }: TorrentCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
@@ -106,14 +115,32 @@ export function TorrentCard({ torrent, onClick }: { torrent: Torrent; onClick?: 
 
   return (
     <div
-      className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600/50 transition-all cursor-pointer"
+      className={`bg-slate-800/50 rounded-lg p-4 border transition-all cursor-pointer ${
+        isSelected
+          ? 'border-blue-500/50 bg-blue-900/20 hover:border-blue-400/50'
+          : 'border-slate-700/50 hover:border-slate-600/50'
+      }`}
       onClick={onClick}
     >
-      {/* Header: Name and Actions */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <h3 className="font-medium text-white line-clamp-2 flex-1 text-sm">
+      {/* Header: Checkbox, Name, and Actions */}
+      <div className="flex items-start gap-3 mb-3">
+        {/* Checkbox */}
+        <div
+          className="flex-shrink-0 pt-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={isSelected ?? false}
+            onCheckedChange={() => onToggleSelection?.()}
+            disabled={isBatchPending}
+            aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+          />
+        </div>
+        {/* Name */}
+        <h3 className="font-medium text-white line-clamp-2 flex-1 text-sm min-w-0">
           {torrent.name}
         </h3>
+        {/* Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">

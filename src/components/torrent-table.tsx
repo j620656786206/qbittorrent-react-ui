@@ -32,6 +32,7 @@ import { MoreHorizontal, Download, Upload, Play, Pause, Trash2 } from 'lucide-re
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { TorrentCard } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // A basic type for the torrent object, we can expand this later
 export type Torrent = {
@@ -143,7 +144,25 @@ function getStatusColor(state: string) {
   return stateColors[state] || 'text-gray-400'
 }
 
-export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]; onTorrentClick?: (torrent: Torrent) => void }) {
+interface TorrentTableProps {
+  torrents: Torrent[]
+  onTorrentClick?: (torrent: Torrent) => void
+  selectedHashes?: Set<string>
+  toggleSelection?: (hash: string) => void
+  selectAll?: () => void
+  clearSelection?: () => void
+  isBatchPending?: boolean
+}
+
+export function TorrentTable({
+  torrents,
+  onTorrentClick,
+  selectedHashes,
+  toggleSelection,
+  selectAll,
+  clearSelection,
+  isBatchPending = false,
+}: TorrentTableProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const isMobile = !useMediaQuery('(min-width: 768px)') // md breakpoint
@@ -182,6 +201,9 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
             key={torrent.hash}
             torrent={torrent}
             onClick={() => onTorrentClick?.(torrent)}
+            isSelected={selectedHashes?.has(torrent.hash)}
+            onToggleSelection={() => toggleSelection?.(torrent.hash)}
+            isBatchPending={isBatchPending}
           />
         ))}
       </div>
@@ -194,6 +216,28 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10 px-3">
+              <Checkbox
+                checked={
+                  selectedHashes && torrents.length > 0
+                    ? selectedHashes.size === torrents.length
+                      ? true
+                      : selectedHashes.size > 0
+                        ? "indeterminate"
+                        : false
+                    : false
+                }
+                onCheckedChange={() => {
+                  if (selectedHashes && selectedHashes.size === torrents.length) {
+                    clearSelection?.()
+                  } else {
+                    selectAll?.()
+                  }
+                }}
+                disabled={isBatchPending}
+                aria-label={t('torrent.table.selectAll')}
+              />
+            </TableHead>
             <TableHead className="w-[35%] min-w-[200px]">{t('torrent.table.name')}</TableHead>
             <TableHead className="w-[20%] min-w-[160px]">{t('torrent.table.statusAndProgress')}</TableHead>
             <TableHead className="w-[15%] min-w-[110px]">{t('torrent.table.speed')}</TableHead>
@@ -204,13 +248,26 @@ export function TorrentTable({ torrents, onTorrentClick }: { torrents: Torrent[]
         <TableBody>
           {torrents.map((torrent) => {
             const isPaused = torrent.state.includes('paused')
+            const isSelected = selectedHashes?.has(torrent.hash) ?? false
 
             return (
               <TableRow
                 key={torrent.hash}
-                className="cursor-pointer hover:bg-slate-800/50"
+                className={`cursor-pointer hover:bg-slate-800/50 transition-colors ${
+                  isSelected ? 'bg-blue-900/30 hover:bg-blue-900/40' : ''
+                }`}
                 onClick={() => onTorrentClick?.(torrent)}
               >
+                {/* Checkbox */}
+                <TableCell className="w-10 px-3" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelection?.(torrent.hash)}
+                    disabled={isBatchPending}
+                    aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+                  />
+                </TableCell>
+
                 {/* Name + Category */}
                 <TableCell className="font-medium">
                   <div className="space-y-1">

@@ -203,6 +203,35 @@ export async function getCategories(baseUrl: string): Promise<CategoriesResponse
   return res.json();
 }
 
+/**
+ * Sets the category for one or more torrents.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to update.
+ * @param {string} category - The category name to assign. Use empty string to remove category.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function setTorrentCategory(
+  baseUrl: string,
+  hashes: string | string[],
+  category: string
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+  formData.append('category', category);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/setCategory`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to set category for torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
 // Options for adding a torrent via magnet link
 export type AddTorrentMagnetOptions = {
   savepath?: string;
