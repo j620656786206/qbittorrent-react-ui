@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Progress } from '@/components/ui/progress'
@@ -24,6 +25,11 @@ import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import type { Torrent } from '@/components/torrent-table'
 import { Checkbox } from '@/components/ui/checkbox'
+
+// Virtual scrolling configuration for card view
+const ESTIMATED_CARD_HEIGHT = 180 // Estimated height for dynamic measurement
+const CARD_OVERSCAN = 3 // Extra cards to render above/below viewport
+const CARD_GAP = 12 // Gap between cards (matches gap-3 = 0.75rem = 12px)
 
 // Helper function to format bytes
 function formatBytes(bytes: number, decimals = 2) {
@@ -254,6 +260,78 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+// Virtualized card list component for mobile view
+interface VirtualizedTorrentCardListProps {
+  torrents: Torrent[]
+  onTorrentClick?: (torrent: Torrent) => void
+  selectedHashes?: Set<string>
+  toggleSelection?: (hash: string) => void
+  isBatchPending?: boolean
+}
+
+export function VirtualizedTorrentCardList({
+  torrents,
+  onTorrentClick,
+  selectedHashes,
+  toggleSelection,
+  isBatchPending = false,
+}: VirtualizedTorrentCardListProps) {
+  // Ref for virtual scroll container
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  // Virtual scrolling for card view - renders only visible cards with dynamic height measurement
+  const virtualizer = useVirtualizer({
+    count: torrents.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_CARD_HEIGHT,
+    overscan: CARD_OVERSCAN,
+    gap: CARD_GAP,
+  })
+
+  return (
+    <div
+      ref={parentRef}
+      className="h-full overflow-auto"
+      style={{ contain: 'strict' }}
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const torrent = torrents[virtualItem.index]
+
+          return (
+            <div
+              key={torrent.hash}
+              ref={virtualizer.measureElement}
+              data-index={virtualItem.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <TorrentCard
+                torrent={torrent}
+                onClick={() => onTorrentClick?.(torrent)}
+                isSelected={selectedHashes?.has(torrent.hash)}
+                onToggleSelection={() => toggleSelection?.(torrent.hash)}
+                isBatchPending={isBatchPending}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

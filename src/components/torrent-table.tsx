@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MoreHorizontal, Download, Upload, Play, Pause, Trash2 } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
-import { TorrentCard } from '@/components/torrent-card'
+import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
@@ -315,21 +315,16 @@ export function TorrentTable({
     overscan: OVERSCAN,
   })
 
-  // Mobile card layout
+  // Mobile card layout with virtualized scrolling
   if (isMobile) {
     return (
-      <div className="grid gap-3">
-        {torrents.map((torrent) => (
-          <TorrentCard
-            key={torrent.hash}
-            torrent={torrent}
-            onClick={() => onTorrentClick?.(torrent)}
-            isSelected={selectedHashes?.has(torrent.hash)}
-            onToggleSelection={() => toggleSelection?.(torrent.hash)}
-            isBatchPending={isBatchPending}
-          />
-        ))}
-      </div>
+      <VirtualizedTorrentCardList
+        torrents={torrents}
+        onTorrentClick={onTorrentClick}
+        selectedHashes={selectedHashes}
+        toggleSelection={toggleSelection}
+        isBatchPending={isBatchPending}
+      />
     )
   }
 
