@@ -1,14 +1,6 @@
 import React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -33,6 +25,7 @@ import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import { TorrentCard } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 
 // A basic type for the torrent object, we can expand this later
 export type Torrent = {
@@ -144,6 +137,120 @@ function getStatusColor(state: string) {
   return stateColors[state] || 'text-gray-400'
 }
 
+// Grid column template for consistent layout (mimics table column widths)
+// Columns: checkbox(40px) | name(35%) | status(20%) | speed(15%) | stats(22%) | actions(8%)
+const gridTemplateColumns = '40px minmax(200px, 35fr) minmax(160px, 20fr) minmax(110px, 15fr) minmax(180px, 22fr) minmax(60px, 8fr)'
+
+// Div-based table components for virtual scrolling compatibility
+// Native <table> elements don't support CSS transform, which is required for virtualization
+
+interface DivTableProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode
+}
+
+function DivTable({ className, children, ...props }: DivTableProps) {
+  return (
+    <div
+      data-slot="div-table"
+      className={cn("relative w-full text-sm", className)}
+      role="table"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+function DivTableHeader({ className, children, ...props }: DivTableProps) {
+  return (
+    <div
+      data-slot="div-table-header"
+      className={cn("border-b", className)}
+      role="rowgroup"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+function DivTableBody({ className, children, ...props }: DivTableProps) {
+  return (
+    <div
+      data-slot="div-table-body"
+      className={cn("[&>[data-slot=div-table-row]:last-child]:border-0", className)}
+      role="rowgroup"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+interface DivTableRowProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode
+}
+
+function DivTableRow({ className, children, ...props }: DivTableRowProps) {
+  return (
+    <div
+      data-slot="div-table-row"
+      className={cn(
+        "grid border-b transition-colors",
+        "hover:bg-muted/50 data-[state=selected]:bg-muted",
+        className
+      )}
+      style={{ gridTemplateColumns }}
+      role="row"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+interface DivTableHeadProps extends React.HTMLAttributes<HTMLDivElement> {
+  children?: React.ReactNode
+}
+
+function DivTableHead({ className, children, ...props }: DivTableHeadProps) {
+  return (
+    <div
+      data-slot="div-table-head"
+      className={cn(
+        "text-foreground h-10 px-2 flex items-center font-medium whitespace-nowrap",
+        "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        className
+      )}
+      role="columnheader"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+interface DivTableCellProps extends React.HTMLAttributes<HTMLDivElement> {
+  children?: React.ReactNode
+}
+
+function DivTableCell({ className, children, ...props }: DivTableCellProps) {
+  return (
+    <div
+      data-slot="div-table-cell"
+      className={cn(
+        "p-2 flex items-center whitespace-nowrap",
+        "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        className
+      )}
+      role="cell"
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
 interface TorrentTableProps {
   torrents: Torrent[]
   onTorrentClick?: (torrent: Torrent) => void
@@ -210,13 +317,13 @@ export function TorrentTable({
     )
   }
 
-  // Desktop table layout
+  // Desktop table layout using div-based structure for virtual scrolling compatibility
   return (
     <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-10 px-3">
+      <DivTable>
+        <DivTableHeader>
+          <DivTableRow>
+            <DivTableHead className="px-3">
               <Checkbox
                 checked={
                   selectedHashes && torrents.length > 0
@@ -237,41 +344,43 @@ export function TorrentTable({
                 disabled={isBatchPending}
                 aria-label={t('torrent.table.selectAll')}
               />
-            </TableHead>
-            <TableHead className="w-[35%] min-w-[200px]">{t('torrent.table.name')}</TableHead>
-            <TableHead className="w-[20%] min-w-[160px]">{t('torrent.table.statusAndProgress')}</TableHead>
-            <TableHead className="w-[15%] min-w-[110px]">{t('torrent.table.speed')}</TableHead>
-            <TableHead className="w-[22%] min-w-[180px]">{t('torrent.table.stats')}</TableHead>
-            <TableHead className="w-[8%] text-right">{t('torrent.table.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+            </DivTableHead>
+            <DivTableHead>{t('torrent.table.name')}</DivTableHead>
+            <DivTableHead>{t('torrent.table.statusAndProgress')}</DivTableHead>
+            <DivTableHead>{t('torrent.table.speed')}</DivTableHead>
+            <DivTableHead>{t('torrent.table.stats')}</DivTableHead>
+            <DivTableHead className="justify-end">{t('torrent.table.actions')}</DivTableHead>
+          </DivTableRow>
+        </DivTableHeader>
+        <DivTableBody>
           {torrents.map((torrent) => {
             const isPaused = torrent.state.includes('paused')
             const isSelected = selectedHashes?.has(torrent.hash) ?? false
 
             return (
-              <TableRow
+              <DivTableRow
                 key={torrent.hash}
-                className={`cursor-pointer hover:bg-slate-800/50 transition-colors ${
-                  isSelected ? 'bg-blue-900/30 hover:bg-blue-900/40' : ''
-                }`}
+                className={cn(
+                  "cursor-pointer hover:bg-slate-800/50",
+                  isSelected && "bg-blue-900/30 hover:bg-blue-900/40"
+                )}
                 onClick={() => onTorrentClick?.(torrent)}
+                data-state={isSelected ? "selected" : undefined}
               >
                 {/* Checkbox */}
-                <TableCell className="w-10 px-3" onClick={(e) => e.stopPropagation()}>
+                <DivTableCell className="px-3" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelection?.(torrent.hash)}
                     disabled={isBatchPending}
                     aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
                   />
-                </TableCell>
+                </DivTableCell>
 
                 {/* Name + Category */}
-                <TableCell className="font-medium">
-                  <div className="space-y-1">
-                    <div className="truncate max-w-full" title={torrent.name}>
+                <DivTableCell className="font-medium">
+                  <div className="space-y-1 min-w-0 w-full">
+                    <div className="truncate" title={torrent.name}>
                       {torrent.name}
                     </div>
                     {torrent.category && (
@@ -280,11 +389,11 @@ export function TorrentTable({
                       </span>
                     )}
                   </div>
-                </TableCell>
+                </DivTableCell>
 
                 {/* Status + Progress */}
-                <TableCell>
-                  <div className="space-y-1.5">
+                <DivTableCell>
+                  <div className="space-y-1.5 w-full">
                     <div className="flex items-center justify-between text-xs">
                       <span className={`font-medium ${getStatusColor(torrent.state)}`}>
                         {t(getStateKey(torrent.state))}
@@ -295,10 +404,10 @@ export function TorrentTable({
                     </div>
                     <Progress value={torrent.progress * 100} className="h-1.5" />
                   </div>
-                </TableCell>
+                </DivTableCell>
 
                 {/* Speed */}
-                <TableCell>
+                <DivTableCell>
                   <div className="flex flex-col gap-0.5 text-xs">
                     <div className="flex items-center gap-1 text-blue-400">
                       <Download className="h-3 w-3" />
@@ -309,10 +418,10 @@ export function TorrentTable({
                       <span>{formatBytes(torrent.upspeed)}/s</span>
                     </div>
                   </div>
-                </TableCell>
+                </DivTableCell>
 
                 {/* Stats: Size, ETA, Ratio, Peers */}
-                <TableCell>
+                <DivTableCell>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                     <div className="flex items-center gap-1 text-slate-400">
                       <span className="text-slate-500">{t('torrent.table.size')}:</span>
@@ -333,8 +442,8 @@ export function TorrentTable({
                       <span>{torrent.num_seeds}↑ / {torrent.num_leechs}↓</span>
                     </div>
                   </div>
-                </TableCell>
-                <TableCell className="text-right">
+                </DivTableCell>
+                <DivTableCell className="justify-end">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -406,12 +515,12 @@ export function TorrentTable({
                       </AlertDialog>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </TableCell>
-              </TableRow>
+                </DivTableCell>
+              </DivTableRow>
             )
           })}
-        </TableBody>
-      </Table>
+        </DivTableBody>
+      </DivTable>
     </div>
   )
 }
