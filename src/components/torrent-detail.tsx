@@ -127,6 +127,7 @@ type TorrentDetailProps = {
   onPause?: () => void
   onResume?: () => void
   onDelete?: () => void
+  onRecheck?: () => void
   baseUrl?: string
 }
 
@@ -137,6 +138,7 @@ export function TorrentDetail({
   onPause,
   onResume,
   onDelete,
+  onRecheck,
   baseUrl,
 }: TorrentDetailProps) {
   const { t } = useTranslation()
@@ -318,6 +320,17 @@ export function TorrentDetail({
             {t('common.pause')}
           </Button>
         )}
+        <Button
+          onClick={() => {
+            onRecheck?.()
+            onClose()
+          }}
+          variant="outline"
+          className="flex-1"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          {t('common.forceRecheck')}
+        </Button>
         <Button
           onClick={() => {
             onDelete?.()
