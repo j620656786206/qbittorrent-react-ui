@@ -1,17 +1,23 @@
+import React from 'react'
+import { Folder, Hash, Plus, Settings, Tag as TagIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
+import type { Torrent } from '@/components/torrent-table'
+import type { Tag } from '@/types/tag'
 import { Button } from '@/components/ui/button'
-import { Settings, Folder, Hash, Plus } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { Torrent } from '@/components/torrent-table'
-import { useTranslation } from 'react-i18next'
+import { getTags, parseTagString } from '@/lib/tag-storage'
+import { TagManagerModal } from '@/components/tag-manager-modal'
+import { getColorClass } from '@/components/ui/tag-input'
 
 type Filter = string
 
-const STATUS_FILTERS: { id: Filter; key: string }[] = [
+const STATUS_FILTERS: Array<{ id: Filter; key: string }> = [
   { id: 'all', key: 'torrent.status.all' },
   { id: 'downloading', key: 'torrent.status.downloading' },
   { id: 'uploading', key: 'torrent.status.uploading' },
@@ -31,7 +37,7 @@ type SidebarProps = {
   isMobile: boolean
   isMobileSidebarOpen: boolean
   onCloseMobileSidebar: () => void
-  torrents: Torrent[] // Add torrents prop for counting
+  torrents: Array<Torrent> // Add torrents prop for counting
   categories: Record<string, any> // Add categories from maindata
 }
 
@@ -48,10 +54,21 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation()
 
+  // Tag manager modal state
+  const [isTagManagerOpen, setIsTagManagerOpen] = React.useState(false)
+
+  // Tags from localStorage (refreshed when modal closes)
+  const [storedTags, setStoredTags] = React.useState<Array<Tag>>(() => getTags())
+
+  // Refresh tags from localStorage
+  const refreshTags = React.useCallback(() => {
+    setStoredTags(getTags())
+  }, [])
+
   // Count torrents by status
   const getStatusCount = (statusId: string) => {
     if (statusId === 'all') return torrents.length
-    return torrents.filter(t => t.state === statusId).length
+    return torrents.filter((torrent) => torrent.state === statusId).length
   }
 
   // Get unique categories from torrents
@@ -60,6 +77,28 @@ export function Sidebar({
     acc[cat] = (acc[cat] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  // Count torrents by tag
+  const tagCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {}
+    torrents.forEach((torrent) => {
+      const torrentTags = parseTagString(torrent.tags || '')
+      torrentTags.forEach((tagName) => {
+        counts[tagName] = (counts[tagName] || 0) + 1
+      })
+    })
+    return counts
+  }, [torrents])
+
+  // Get tags with their counts (only show tags that exist in localStorage and have torrents)
+  const tagsWithCounts = React.useMemo(() => {
+    return storedTags
+      .map((tag) => ({
+        tag,
+        count: tagCounts[tag.name] || 0,
+      }))
+      .sort((a, b) => b.count - a.count || a.tag.name.localeCompare(b.tag.name))
+  }, [storedTags, tagCounts])
 
   const sidebarContent = (
     <>
@@ -120,6 +159,52 @@ export function Sidebar({
         </div>
       )}
 
+      {/* Tag Filters */}
+      <div className="mb-6">
+        <h2 className="text-xs font-semibold text-slate-400 uppercase mb-2 flex items-center gap-2">
+          <TagIcon className="h-3 w-3" />
+          {t('sidebar.tags')}
+        </h2>
+        <nav className="flex flex-col space-y-1">
+          {tagsWithCounts.length > 0 ? (
+            tagsWithCounts.map(({ tag, count }) => (
+              <Button
+                key={tag.id}
+                variant={currentFilter === `tag:${tag.name}` ? 'secondary' : 'ghost'}
+                className="justify-between text-sm h-9"
+                onClick={() => {
+                  setFilter(`tag:${tag.name}`)
+                  if (isMobile) onCloseMobileSidebar()
+                }}
+              >
+                <span className="flex items-center gap-2 truncate min-w-0">
+                  <span
+                    className={`h-2 w-2 rounded-full shrink-0 ${getColorClass(tag.color)}`}
+                  />
+                  <span className="truncate">{tag.name}</span>
+                </span>
+                <span className="text-xs text-slate-400 shrink-0 ml-2">{count}</span>
+              </Button>
+            ))
+          ) : (
+            <div className="text-xs text-slate-500 py-2 px-2">
+              {t('tags.sidebar.noTags')}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className="justify-start text-sm h-9 text-slate-400 hover:text-white"
+            onClick={() => {
+              setIsTagManagerOpen(true)
+              if (isMobile) onCloseMobileSidebar()
+            }}
+          >
+            <Plus className="mr-2 h-3 w-3" />
+            {t('tags.sidebar.manageTags')}
+          </Button>
+        </nav>
+      </div>
+
       {/* Actions */}
       <div className="mt-auto pt-4 border-t border-slate-700 space-y-1">
         <Button
@@ -150,21 +235,35 @@ export function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={isMobileSidebarOpen} onOpenChange={onCloseMobileSidebar}>
-        {/* Trigger will be handled by HomePage */}
-        <SheetContent side="left" className="p-4 flex flex-col w-64">
-          <SheetHeader>
-            <SheetTitle>Navigation</SheetTitle>
-          </SheetHeader>
-          {sidebarContent}
-        </SheetContent>
-      </Sheet>
+      <>
+        <Sheet open={isMobileSidebarOpen} onOpenChange={onCloseMobileSidebar}>
+          {/* Trigger will be handled by HomePage */}
+          <SheetContent side="left" className="p-4 flex flex-col w-64">
+            <SheetHeader>
+              <SheetTitle>Navigation</SheetTitle>
+            </SheetHeader>
+            {sidebarContent}
+          </SheetContent>
+        </Sheet>
+        <TagManagerModal
+          isOpen={isTagManagerOpen}
+          onClose={() => setIsTagManagerOpen(false)}
+          onTagsChange={refreshTags}
+        />
+      </>
     );
   }
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-slate-800 p-4 flex flex-col">
-      {sidebarContent}
-    </aside>
+    <>
+      <aside className="w-56 flex-shrink-0 bg-slate-800 p-4 flex flex-col">
+        {sidebarContent}
+      </aside>
+      <TagManagerModal
+        isOpen={isTagManagerOpen}
+        onClose={() => setIsTagManagerOpen(false)}
+        onTagsChange={refreshTags}
+      />
+    </>
   );
 }
