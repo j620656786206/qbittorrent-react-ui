@@ -12,7 +12,8 @@
     "yes": "是",
     "no": "否",
     "refresh": "重新整理",
-    "retry": "重試"
+    "retry": "重試",
+    "forceRecheck": "強制重新檢查"
   },
   "torrent": {
     "status": {
