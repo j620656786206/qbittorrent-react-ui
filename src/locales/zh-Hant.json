@@ -112,6 +112,7 @@
     "error": {
       "pause": "暫停 Torrent 失敗：{{message}}",
       "resume": "繼續 Torrent 失敗：{{message}}",
+      "recheck": "重新檢查 Torrent 失敗：{{message}}",
       "delete": "刪除 Torrent 失敗：{{message}}",
       "category": "設定分類失敗：{{message}}"
     }

@@ -112,6 +112,7 @@
     "error": {
       "pause": "Failed to pause torrents: {{message}}",
       "resume": "Failed to resume torrents: {{message}}",
+      "recheck": "Failed to recheck torrents: {{message}}",
       "delete": "Failed to delete torrents: {{message}}",
       "category": "Failed to set category: {{message}}"
     }
