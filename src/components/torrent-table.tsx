@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { MoreHorizontal, Download, Upload, Play, Pause, Trash2 } from 'lucide-react'
-import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
+import { pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent } from '@/lib/api'
 import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -291,6 +291,13 @@ export function TorrentTable({
 
   const resumeMutation = useMutation({
     mutationFn: (hash: string) => resumeTorrent(getBaseUrl(), hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
+  const recheckMutation = useMutation({
+    mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
