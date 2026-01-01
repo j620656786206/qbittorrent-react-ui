@@ -8,7 +8,7 @@ import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
-import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent, getCategories, setTorrentCategory } from '@/lib/api'
+import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent, getCategories, setTorrentCategory } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
@@ -287,6 +287,13 @@ function HomePage() {
     },
   })
 
+  const recheckMutation = useMutation({
+    mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
       deleteTorrent(getBaseUrl(), hash, deleteFiles),
@@ -318,6 +325,18 @@ function HomePage() {
     },
     onError: (error: Error) => {
       setBatchError(t('batch.error.resume', { message: error.message }))
+    },
+  })
+
+  const batchRecheckMutation = useMutation({
+    mutationFn: (hashes: string[]) => recheckTorrent(getBaseUrl(), hashes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      clearSelection()
+      setBatchError(null)
+    },
+    onError: (error: Error) => {
+      setBatchError(t('batch.error.recheck', { message: error.message }))
     },
   })
 
@@ -434,6 +453,12 @@ function HomePage() {
                 batchResumeMutation.mutate(Array.from(selectedHashes))
               }
             }}
+            onRecheck={() => {
+              if (selectedHashes.size > 0) {
+                setBatchError(null)
+                batchRecheckMutation.mutate(Array.from(selectedHashes))
+              }
+            }}
             onDelete={() => {
               if (selectedHashes.size > 0) {
                 setBatchError(null)
@@ -451,7 +476,7 @@ function HomePage() {
             }}
             onClearSelection={clearSelection}
             categories={categoryNames}
-            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
+            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchRecheckMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
           />
 
           {/* Torrent List */}
@@ -463,7 +488,7 @@ function HomePage() {
               toggleSelection={toggleSelection}
               selectAll={() => selectAll(filteredTorrents)}
               clearSelection={clearSelection}
-              isBatchPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
+              isBatchPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchRecheckMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>
@@ -514,6 +539,7 @@ function HomePage() {
         onClose={() => setSelectedTorrent(null)}
         onPause={() => selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)}
         onResume={() => selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)}
+        onRecheck={() => selectedTorrent && recheckMutation.mutate(selectedTorrent.hash)}
         onDelete={() => {
           if (selectedTorrent) {
             if (window.confirm(t('torrent.actions.confirmDelete'))) {

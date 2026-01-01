@@ -12,7 +12,8 @@
     "yes": "是",
     "no": "否",
     "refresh": "重新整理",
-    "retry": "重試"
+    "retry": "重試",
+    "forceRecheck": "強制重新檢查"
   },
   "torrent": {
     "status": {
@@ -111,6 +112,7 @@
     "error": {
       "pause": "暫停 Torrent 失敗：{{message}}",
       "resume": "繼續 Torrent 失敗：{{message}}",
+      "recheck": "重新檢查 Torrent 失敗：{{message}}",
       "delete": "刪除 Torrent 失敗：{{message}}",
       "category": "設定分類失敗：{{message}}"
     }
