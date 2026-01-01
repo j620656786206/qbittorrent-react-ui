@@ -12,7 +12,8 @@
     "yes": "Yes",
     "no": "No",
     "refresh": "Refresh",
-    "retry": "Retry"
+    "retry": "Retry",
+    "forceRecheck": "Force Recheck"
   },
   "torrent": {
     "status": {

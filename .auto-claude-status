@@ -3,23 +3,23 @@
   "spec": "010-force-recheck-torrents",
   "state": "building",
   "subtasks": {
-    "completed": 4,
+    "completed": 5,
     "total": 10,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Batch Actions Integration",
+    "current": "i18n Translations",
     "id": null,
-    "total": 1
+    "total": 2
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 5,
+    "number": 6,
     "started_at": "2026-01-01T15:42:15.797519"
   },
-  "last_update": "2026-01-01T15:50:18.407249"
+  "last_update": "2026-01-01T15:52:49.660773"
 }
