@@ -33,6 +33,29 @@ export type CategoriesResponse = {
     [categoryName: string]: Category;
 };
 
+// Tracker status codes from qBittorrent API
+export const TrackerStatus = {
+    Disabled: 0,      // Tracker is disabled (used for DHT, PeX, LSD)
+    NotContacted: 1,  // Tracker has not been contacted yet
+    Working: 2,       // Tracker has been contacted and is working
+    Updating: 3,      // Tracker is updating
+    NotWorking: 4,    // Tracker has been contacted but is not working
+} as const;
+
+export type TrackerStatusType = typeof TrackerStatus[keyof typeof TrackerStatus];
+
+// Define types for tracker response
+export type Tracker = {
+    url: string;                  // Tracker URL
+    status: TrackerStatusType;    // Tracker status code (0-4)
+    tier: number;                 // Tracker tier
+    num_peers: number;            // Number of peers for this torrent reported by tracker
+    num_seeds: number;            // Number of seeds for this torrent reported by tracker
+    num_leeches: number;          // Number of leeches for this torrent reported by tracker
+    num_downloaded: number;       // Number of completed downloads reported by tracker
+    msg: string;                  // Tracker message (error message or description)
+};
+
 // Helper function to get the actual base URL for fetches
 function getApiBaseUrl(providedBaseUrl: string): string {
   if (import.meta.env.DEV) {
@@ -374,6 +397,112 @@ export async function setFilePriority(
 
   if (!res.ok) {
     throw new Error(`Failed to set file priority with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Fetches the list of trackers for a specific torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to get trackers for.
+ * @returns {Promise<Tracker[]>} - Array of tracker objects with URL, status, tier, and peer statistics.
+ */
+export async function getTrackers(baseUrl: string, hash: string): Promise<Tracker[]> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/trackers`);
+  url.searchParams.append('hash', hash);
+
+  const res = await fetch(url.toString(), {
+    credentials: 'include', // Include cookies for authentication
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch trackers with status: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Adds one or more trackers to a torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to add trackers to.
+ * @param {string | string[]} urls - Single tracker URL or array of tracker URLs to add.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTrackers(
+  baseUrl: string,
+  hash: string,
+  urls: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hash', hash);
+  // URLs should be separated by newline characters
+  formData.append('urls', Array.isArray(urls) ? urls.join('\n') : urls);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/addTrackers`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add tracker(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Removes one or more trackers from a torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to remove trackers from.
+ * @param {string | string[]} urls - Single tracker URL or array of tracker URLs to remove.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function removeTrackers(
+  baseUrl: string,
+  hash: string,
+  urls: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hash', hash);
+  // URLs should be separated by pipe characters for removal
+  formData.append('urls', Array.isArray(urls) ? urls.join('|') : urls);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTrackers`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to remove tracker(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Reannounces one or more torrents to their trackers.
+ * This forces an immediate announce to all trackers, useful for updating peer/seed counts.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to reannounce.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function reannounceTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/reannounce`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to reannounce torrent(s) with status: ${res.status}`);
   }
   return true;
 }

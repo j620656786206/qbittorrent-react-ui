@@ -170,5 +170,57 @@
     "normal": "Normal",
     "high": "High",
     "maximum": "Maximum"
+  },
+  "trackers": {
+    "title": "Trackers",
+    "loading": "Loading trackers...",
+    "error": "Failed to load trackers",
+    "noTrackers": "No trackers found",
+    "count": "{{count}} tracker(s)",
+    "table": {
+      "status": "Status",
+      "url": "URL",
+      "seeds": "Seeds",
+      "peers": "Peers"
+    },
+    "status": {
+      "disabled": "Disabled",
+      "notContacted": "Not Contacted",
+      "working": "Working",
+      "updating": "Updating",
+      "notWorking": "Not Working",
+      "unknown": "Unknown"
+    },
+    "add": {
+      "button": "Add Tracker",
+      "title": "Add Trackers",
+      "description": "Enter one or more tracker URLs (one per line)",
+      "label": "Tracker URLs",
+      "placeholder": "http://tracker.example.com:6969/announce\nudp://tracker.example.org:1337/announce",
+      "submit": "Add",
+      "adding": "Adding...",
+      "success": "Tracker(s) added successfully",
+      "error": {
+        "empty": "Please enter at least one tracker URL",
+        "invalid": "Invalid tracker URL: {{url}}",
+        "failed": "Failed to add tracker(s)"
+      }
+    },
+    "remove": {
+      "button": "Remove",
+      "title": "Remove Tracker",
+      "description": "Are you sure you want to remove this tracker?",
+      "url": "Tracker URL:",
+      "confirm": "Remove",
+      "removing": "Removing...",
+      "success": "Tracker removed successfully",
+      "error": {
+        "failed": "Failed to remove tracker"
+      }
+    },
+    "reannounce": {
+      "button": "Reannounce",
+      "tooltip": "Force announce to all trackers"
+    }
   }
 }

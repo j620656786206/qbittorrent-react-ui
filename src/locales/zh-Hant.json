@@ -170,5 +170,57 @@
     "normal": "正常",
     "high": "高",
     "maximum": "最高"
+  },
+  "trackers": {
+    "title": "Tracker 列表",
+    "loading": "載入 Tracker 中...",
+    "error": "載入 Tracker 失敗",
+    "noTrackers": "沒有找到 Tracker",
+    "count": "{{count}} 個 Tracker",
+    "table": {
+      "status": "狀態",
+      "url": "網址",
+      "seeds": "做種數",
+      "peers": "連接數"
+    },
+    "status": {
+      "disabled": "停用",
+      "notContacted": "未連接",
+      "working": "正常運作",
+      "updating": "更新中",
+      "notWorking": "無法連接",
+      "unknown": "未知"
+    },
+    "add": {
+      "button": "新增 Tracker",
+      "title": "新增 Tracker",
+      "description": "輸入一個或多個 Tracker 網址（每行一個）",
+      "label": "Tracker 網址",
+      "placeholder": "http://tracker.example.com:6969/announce\nudp://tracker.example.org:1337/announce",
+      "submit": "新增",
+      "adding": "新增中...",
+      "success": "Tracker 新增成功",
+      "error": {
+        "empty": "請輸入至少一個 Tracker 網址",
+        "invalid": "無效的 Tracker 網址：{{url}}",
+        "failed": "新增 Tracker 失敗"
+      }
+    },
+    "remove": {
+      "button": "移除",
+      "title": "移除 Tracker",
+      "description": "確定要移除此 Tracker 嗎？",
+      "url": "Tracker 網址：",
+      "confirm": "移除",
+      "removing": "移除中...",
+      "success": "Tracker 移除成功",
+      "error": {
+        "failed": "移除 Tracker 失敗"
+      }
+    },
+    "reannounce": {
+      "button": "重新宣告",
+      "tooltip": "強制向所有 Tracker 重新宣告"
+    }
   }
 }

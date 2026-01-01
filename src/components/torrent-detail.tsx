@@ -1,34 +1,52 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Download,
+  FolderOpen,
+  HardDrive,
+  Hash as HashIcon,
+  Loader2,
+  MinusCircle,
+  Pause,
+  Play,
+  Plus,
+  Radio,
+  RefreshCw,
+  Trash2,
+  Upload,
+  XCircle,
+} from 'lucide-react'
+
+import type { Torrent } from '@/components/torrent-table'
+import type { Tracker, TrackerStatusType } from '@/lib/api'
+
+import { TorrentFileList } from '@/components/TorrentFileList'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Progress } from '@/components/ui/progress'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
-import {
-  Download,
-  Upload,
-  HardDrive,
-  Clock,
-  Calendar,
-  Hash as HashIcon,
-  FolderOpen,
-  Pause,
-  Play,
-  Trash2,
-} from 'lucide-react'
+import { TrackerStatus, addTrackers, getTrackers, reannounceTorrent, removeTrackers } from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
-import type { Torrent } from '@/components/torrent-table'
-import { TorrentFileList } from '@/components/TorrentFileList'
 
 // Helper functions
 function formatBytes(bytes: number, decimals = 2) {
@@ -65,6 +83,41 @@ function formatDate(timestamp: number) {
 
 function getStateKey(state: string): string {
   return `torrent.status.${state}`
+}
+
+// Tracker status helper functions
+function getTrackerStatusIcon(status: TrackerStatusType): React.ReactNode {
+  switch (status) {
+    case TrackerStatus.Disabled:
+      return <MinusCircle className="h-4 w-4 text-slate-500" />
+    case TrackerStatus.NotContacted:
+      return <Circle className="h-4 w-4 text-slate-400" />
+    case TrackerStatus.Working:
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />
+    case TrackerStatus.Updating:
+      return <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />
+    case TrackerStatus.NotWorking:
+      return <XCircle className="h-4 w-4 text-red-500" />
+    default:
+      return <Circle className="h-4 w-4 text-slate-400" />
+  }
+}
+
+function getTrackerStatusKey(status: TrackerStatusType): string {
+  switch (status) {
+    case TrackerStatus.Disabled:
+      return 'trackers.status.disabled'
+    case TrackerStatus.NotContacted:
+      return 'trackers.status.notContacted'
+    case TrackerStatus.Working:
+      return 'trackers.status.working'
+    case TrackerStatus.Updating:
+      return 'trackers.status.updating'
+    case TrackerStatus.NotWorking:
+      return 'trackers.status.notWorking'
+    default:
+      return 'trackers.status.unknown'
+  }
 }
 
 type TorrentDetailProps = {
@@ -228,6 +281,16 @@ export function TorrentDetail({
         </div>
       )}
 
+      {/* Tracker List */}
+      {baseUrl && (
+        <div className="border-t border-slate-700 pt-4">
+          <h3 className="text-sm font-medium text-slate-300 mb-3">
+            {t('trackers.title')}
+          </h3>
+          <TrackerList hash={torrent.hash} baseUrl={baseUrl} />
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-2 border-t border-slate-700 pt-4">
         {isPaused ? (
@@ -314,5 +377,495 @@ function DetailRow({
         <div className={`text-sm text-white ${valueClassName}`}>{value}</div>
       </div>
     </div>
+  )
+}
+
+// TrackerList component - displays tracker list with status indicators
+type TrackerListProps = {
+  hash: string
+  baseUrl: string
+}
+
+function TrackerList({ hash, baseUrl }: TrackerListProps) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
+  const [trackerToRemove, setTrackerToRemove] = React.useState<Tracker | null>(null)
+
+  // Remove tracker mutation
+  const removeTrackerMutation = useMutation({
+    mutationFn: (url: string) => removeTrackers(baseUrl, hash, url),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
+      setTrackerToRemove(null)
+    },
+  })
+
+  // Reannounce mutation
+  const reannounceMutation = useMutation({
+    mutationFn: () => reannounceTorrent(baseUrl, hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
+    },
+  })
+
+  const {
+    data: trackers,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ['trackers', hash],
+    queryFn: () => getTrackers(baseUrl, hash),
+    refetchInterval: 10000, // Refresh every 10 seconds
+    enabled: !!hash,
+  })
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+        <span className="ml-2 text-slate-400 text-sm">
+          {t('trackers.loading')}
+        </span>
+      </div>
+    )
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 text-center">
+        <AlertCircle className="h-6 w-6 text-red-400 mb-2" />
+        <p className="text-slate-300 text-sm mb-2">
+          {t('trackers.error')}
+        </p>
+        <p className="text-slate-500 text-xs mb-3">
+          {error instanceof Error ? error.message : String(error)}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-xs"
+        >
+          {isFetching ? (
+            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+          ) : (
+            <RefreshCw className="h-3 w-3 mr-1" />
+          )}
+          {t('common.retry')}
+        </Button>
+      </div>
+    )
+  }
+
+  // Empty state - still allow adding trackers and reannouncing
+  if (!trackers || trackers.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <Radio className="h-4 w-4" />
+            <span>{t('trackers.noTrackers')}</span>
+            {reannounceMutation.isPending && (
+              <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reannounceMutation.mutate()}
+              disabled={reannounceMutation.isPending}
+              className="text-xs"
+              title={t('trackers.reannounce.tooltip')}
+            >
+              {reannounceMutation.isPending ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3 mr-1" />
+              )}
+              {t('trackers.reannounce.button')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddDialogOpen(true)}
+              className="text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              {t('trackers.add.button')}
+            </Button>
+          </div>
+        </div>
+
+        {/* Add Tracker Dialog */}
+        <AddTrackerDialog
+          isOpen={isAddDialogOpen}
+          onClose={() => setIsAddDialogOpen(false)}
+          hash={hash}
+          baseUrl={baseUrl}
+        />
+      </div>
+    )
+  }
+
+  // Count user-added trackers (status > 0)
+  const userTrackerCount = trackers.filter(tracker => tracker.status !== TrackerStatus.Disabled).length
+
+  return (
+    <div className="space-y-3">
+      {/* Header with tracker count and action buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Radio className="h-4 w-4" />
+          <span>
+            {t('trackers.count', { count: userTrackerCount })}
+          </span>
+          {(isFetching || reannounceMutation.isPending) && (
+            <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => reannounceMutation.mutate()}
+            disabled={reannounceMutation.isPending}
+            className="text-xs"
+            title={t('trackers.reannounce.tooltip')}
+          >
+            {reannounceMutation.isPending ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3 mr-1" />
+            )}
+            {t('trackers.reannounce.button')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="text-xs"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            {t('trackers.add.button')}
+          </Button>
+        </div>
+      </div>
+
+      {/* Tracker Table */}
+      <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 overflow-hidden">
+        <div className="max-h-[300px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-800/50 sticky top-0">
+              <tr className="text-left text-xs text-slate-400">
+                <th className="px-3 py-2 font-medium">{t('trackers.table.status')}</th>
+                <th className="px-3 py-2 font-medium">{t('trackers.table.url')}</th>
+                <th className="px-3 py-2 font-medium text-center">{t('trackers.table.seeds')}</th>
+                <th className="px-3 py-2 font-medium text-center">{t('trackers.table.peers')}</th>
+                <th className="px-3 py-2 font-medium w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {trackers.map((tracker, index) => (
+                <TrackerRow
+                  key={`${tracker.url}-${index}`}
+                  tracker={tracker}
+                  t={t}
+                  onRemove={() => setTrackerToRemove(tracker)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Tracker Dialog */}
+      <AddTrackerDialog
+        isOpen={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        hash={hash}
+        baseUrl={baseUrl}
+      />
+
+      {/* Remove Tracker Confirmation Dialog */}
+      <Dialog open={!!trackerToRemove} onOpenChange={() => setTrackerToRemove(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t('trackers.remove.title')}</DialogTitle>
+            <DialogDescription>{t('trackers.remove.description')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="text-sm text-slate-400 mb-1">{t('trackers.remove.url')}</div>
+            <div className="text-sm font-mono text-white break-all bg-slate-800/50 rounded-md px-3 py-2">
+              {trackerToRemove?.url}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTrackerToRemove(null)}
+              disabled={removeTrackerMutation.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (trackerToRemove) {
+                  removeTrackerMutation.mutate(trackerToRemove.url)
+                }
+              }}
+              disabled={removeTrackerMutation.isPending}
+            >
+              {removeTrackerMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t('trackers.remove.removing')}
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t('trackers.remove.confirm')}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// Individual tracker row component
+type TrackerRowProps = {
+  tracker: Tracker
+  t: (key: string) => string
+  onRemove: () => void
+}
+
+function TrackerRow({ tracker, t, onRemove }: TrackerRowProps) {
+  const isDisabled = tracker.status === TrackerStatus.Disabled
+  const hasError = tracker.status === TrackerStatus.NotWorking && tracker.msg
+
+  // Truncate long URLs for display
+  const displayUrl = React.useMemo(() => {
+    if (!tracker.url) return '-'
+    // For DHT/PeX/LSD, show the descriptive name
+    if (isDisabled && (tracker.url.includes('DHT') || tracker.url.includes('PeX') || tracker.url.includes('LSD'))) {
+      return tracker.url
+    }
+    // For regular URLs, show a truncated version
+    if (tracker.url.length > 50) {
+      try {
+        const url = new URL(tracker.url)
+        return `${url.protocol}//${url.host}${url.pathname.length > 20 ? url.pathname.substring(0, 20) + '...' : url.pathname}`
+      } catch {
+        return tracker.url.substring(0, 50) + '...'
+      }
+    }
+    return tracker.url
+  }, [tracker.url, isDisabled])
+
+  return (
+    <tr className={`${isDisabled ? 'text-slate-500 bg-slate-800/20' : 'text-slate-200'} hover:bg-slate-800/30 transition-colors`}>
+      {/* Status Column */}
+      <td className="px-3 py-2">
+        <div className="flex items-center gap-2" title={t(getTrackerStatusKey(tracker.status))}>
+          {getTrackerStatusIcon(tracker.status)}
+          <span className="text-xs hidden sm:inline">
+            {t(getTrackerStatusKey(tracker.status))}
+          </span>
+        </div>
+      </td>
+
+      {/* URL Column */}
+      <td className="px-3 py-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-xs break-all" title={tracker.url}>
+            {displayUrl}
+          </span>
+          {/* Show error message if tracker is not working */}
+          {hasError && (
+            <span className="text-xs text-red-400 break-all" title={tracker.msg}>
+              {tracker.msg.length > 60 ? tracker.msg.substring(0, 60) + '...' : tracker.msg}
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Seeds Column */}
+      <td className="px-3 py-2 text-center">
+        <span className={isDisabled ? 'text-slate-600' : 'text-green-400'}>
+          {tracker.num_seeds >= 0 ? tracker.num_seeds : '-'}
+        </span>
+      </td>
+
+      {/* Peers Column */}
+      <td className="px-3 py-2 text-center">
+        <span className={isDisabled ? 'text-slate-600' : 'text-blue-400'}>
+          {tracker.num_peers >= 0 ? tracker.num_peers : '-'}
+        </span>
+      </td>
+
+      {/* Actions Column */}
+      <td className="px-3 py-2 text-center">
+        {!isDisabled && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-slate-400 hover:text-red-400 hover:bg-red-400/10"
+            onClick={onRemove}
+            title={t('trackers.remove.button')}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+// AddTrackerDialog component - dialog for adding new trackers
+type AddTrackerDialogProps = {
+  isOpen: boolean
+  onClose: () => void
+  hash: string
+  baseUrl: string
+}
+
+function AddTrackerDialog({ isOpen, onClose, hash, baseUrl }: AddTrackerDialogProps) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+
+  // Form state
+  const [trackerUrls, setTrackerUrls] = React.useState('')
+  const [error, setError] = React.useState('')
+
+  // Add trackers mutation
+  const addTrackersMutation = useMutation({
+    mutationFn: (urls: Array<string>) => addTrackers(baseUrl, hash, urls),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
+      handleClose()
+    },
+    onError: (err: Error) => {
+      setError(err.message || t('trackers.add.error.failed'))
+    },
+  })
+
+  // Reset form state
+  const resetForm = () => {
+    setTrackerUrls('')
+    setError('')
+  }
+
+  // Handle modal close
+  const handleClose = () => {
+    resetForm()
+    onClose()
+  }
+
+  // Validate tracker URL
+  const isValidTrackerUrl = (url: string): boolean => {
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) return false
+
+    // Check for common tracker URL protocols
+    const validProtocols = ['http://', 'https://', 'udp://', 'wss://']
+    return validProtocols.some((protocol) => trimmedUrl.toLowerCase().startsWith(protocol))
+  }
+
+  // Handle form submission
+  const handleSubmit = () => {
+    setError('')
+
+    // Split URLs by newlines and filter out empty lines
+    const urls = trackerUrls
+      .split('\n')
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0)
+
+    // Check if there are any URLs
+    if (urls.length === 0) {
+      setError(t('trackers.add.error.empty'))
+      return
+    }
+
+    // Validate each URL
+    for (const url of urls) {
+      if (!isValidTrackerUrl(url)) {
+        setError(t('trackers.add.error.invalid', { url }))
+        return
+      }
+    }
+
+    // Submit the URLs
+    addTrackersMutation.mutate(urls)
+  }
+
+  const isSubmitting = addTrackersMutation.isPending
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{t('trackers.add.title')}</DialogTitle>
+          <DialogDescription>{t('trackers.add.description')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          {/* Tracker URLs Input */}
+          <div className="grid gap-2">
+            <Label htmlFor="trackerUrls">{t('trackers.add.label')}</Label>
+            <Textarea
+              id="trackerUrls"
+              value={trackerUrls}
+              onChange={(e) => {
+                setTrackerUrls(e.target.value)
+                setError('')
+              }}
+              placeholder={t('trackers.add.placeholder')}
+              className="font-mono text-sm min-h-[120px]"
+              rows={5}
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="text-sm text-red-500 bg-red-500/10 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {t('trackers.add.adding')}
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('trackers.add.submit')}
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
