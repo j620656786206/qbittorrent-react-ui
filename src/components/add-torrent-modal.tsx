@@ -14,6 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Link2, FileUp, Upload } from 'lucide-react'
 import { addTorrentMagnet, addTorrentFile, getCategories } from '@/lib/api'
+import { TagInput } from '@/components/ui/tag-input'
+import { getTags, formatTagString } from '@/lib/tag-storage'
+import type { Tag } from '@/types/tag'
 
 type TabType = 'magnet' | 'file'
 
@@ -32,8 +35,19 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
   const [savePath, setSavePath] = React.useState('')
   const [category, setCategory] = React.useState('')
+  const [selectedTags, setSelectedTags] = React.useState<string[]>([])
   const [startPaused, setStartPaused] = React.useState(false)
   const [error, setError] = React.useState('')
+
+  // Available tags from localStorage
+  const [availableTags, setAvailableTags] = React.useState<Tag[]>([])
+
+  // Load tags when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setAvailableTags(getTags())
+    }
+  }, [isOpen])
 
   // File input ref
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -54,6 +68,7 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       addTorrentMagnet(getBaseUrl(), magnetLink, {
         savepath: savePath || undefined,
         category: category || undefined,
+        tags: selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
         paused: startPaused,
       }),
     onSuccess: () => {
@@ -71,6 +86,7 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       addTorrentFile(getBaseUrl(), file, {
         savepath: savePath || undefined,
         category: category || undefined,
+        tags: selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
         paused: startPaused,
       }),
     onSuccess: () => {
@@ -89,6 +105,7 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
     setSelectedFile(null)
     setSavePath('')
     setCategory('')
+    setSelectedTags([])
     setStartPaused(false)
     setError('')
     if (fileInputRef.current) {
@@ -249,6 +266,19 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
               ))}
             </select>
           </div>
+
+          {/* Tags Multi-select */}
+          {availableTags.length > 0 && (
+            <div className="grid gap-2">
+              <Label>{t('addTorrent.tags.label')}</Label>
+              <TagInput
+                availableTags={availableTags}
+                value={selectedTags}
+                onChange={setSelectedTags}
+                placeholder={t('addTorrent.tags.placeholder')}
+              />
+            </div>
+          )}
 
           {/* Start Paused Checkbox */}
           <div className="flex items-center gap-2">

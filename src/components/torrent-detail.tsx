@@ -18,6 +18,7 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  Tag as TagIcon,
   Trash2,
   Upload,
   XCircle,
@@ -25,6 +26,7 @@ import {
 
 import type { Torrent } from '@/components/torrent-table'
 import type { Tracker, TrackerStatusType } from '@/lib/api'
+import type { Tag } from '@/types/tag'
 
 import { TorrentFileList } from '@/components/TorrentFileList'
 import { Button } from '@/components/ui/button'
@@ -45,8 +47,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { TrackerStatus, addTrackers, getTrackers, reannounceTorrent, removeTrackers } from '@/lib/api'
+import { TagChip, getColorClass } from '@/components/ui/tag-input'
+import { TrackerStatus, addTorrentTags, addTrackers, getTrackers, reannounceTorrent, removeTorrentTags, removeTrackers } from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
+import { getTags, getTagsByNames, parseTagString } from '@/lib/tag-storage'
 
 // Helper functions
 function formatBytes(bytes: number, decimals = 2) {
@@ -243,6 +247,14 @@ export function TorrentDetail({
             value={torrent.category}
           />
         )}
+        {/* Tags Section */}
+        {baseUrl && (
+          <TorrentTagsEditor
+            hash={torrent.hash}
+            currentTags={torrent.tags || ''}
+            baseUrl={baseUrl}
+          />
+        )}
         <DetailRow
           icon={<FolderOpen className="h-4 w-4" />}
           label={t('torrent.details.savePath')}
@@ -388,6 +400,191 @@ function DetailRow({
       <div className="flex-1 min-w-0">
         <div className="text-xs text-slate-400 mb-0.5">{label}</div>
         <div className={`text-sm text-white ${valueClassName}`}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+// TorrentTagsEditor component - allows editing tags on a torrent
+type TorrentTagsEditorProps = {
+  hash: string
+  currentTags: string
+  baseUrl: string
+}
+
+function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProps) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false)
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  // Get available tags from localStorage
+  const availableTags = React.useMemo(() => getTags(), [])
+
+  // Parse current tags from comma-separated string
+  const currentTagNames = React.useMemo(
+    () => parseTagString(currentTags),
+    [currentTags]
+  )
+
+  // Get Tag objects for current tags (with color info)
+  const currentTagObjects = React.useMemo(
+    () => getTagsByNames(currentTagNames),
+    [currentTagNames]
+  )
+
+  // Get unassigned tags for dropdown
+  const unassignedTags = React.useMemo(() => {
+    return availableTags.filter(
+      (tag) => !currentTagNames.some(
+        (name) => name.toLowerCase() === tag.name.toLowerCase()
+      )
+    )
+  }, [availableTags, currentTagNames])
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Add tag mutation
+  const addTagMutation = useMutation({
+    mutationFn: (tagName: string) => addTorrentTags(baseUrl, hash, tagName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
+  // Remove tag mutation
+  const removeTagMutation = useMutation({
+    mutationFn: (tagName: string) => removeTorrentTags(baseUrl, hash, tagName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
+  const handleAddTag = (tag: Tag) => {
+    addTagMutation.mutate(tag.name)
+    setIsDropdownOpen(false)
+  }
+
+  const handleRemoveTag = (tagName: string) => {
+    removeTagMutation.mutate(tagName)
+  }
+
+  const isLoading = addTagMutation.isPending || removeTagMutation.isPending
+
+  // Don't render if no available tags exist
+  if (availableTags.length === 0 && currentTagObjects.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex items-start gap-3" ref={containerRef}>
+      <div className="text-slate-400 mt-0.5">
+        <TagIcon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-400 mb-1">{t('torrent.details.tags')}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Display current tags */}
+          {currentTagObjects.map((tag) => (
+            <TagChip
+              key={tag.id}
+              tag={tag}
+              onRemove={
+                isLoading ? undefined : () => handleRemoveTag(tag.name)
+              }
+            />
+          ))}
+
+          {/* Display tag names that don't have metadata in localStorage */}
+          {currentTagNames
+            .filter(
+              (name) => !currentTagObjects.some(
+                (tag) => tag.name.toLowerCase() === name.toLowerCase()
+              )
+            )
+            .map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-slate-700/50 text-slate-200"
+              >
+                <span className="size-2 rounded-full shrink-0 bg-slate-500" />
+                <span className="truncate max-w-[100px]" title={name}>
+                  {name}
+                </span>
+                {!isLoading && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(name)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-slate-600/50 transition-colors"
+                  >
+                    <XCircle className="size-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+
+          {/* Add tag button */}
+          {unassignedTags.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-slate-700/30 text-slate-400 hover:bg-slate-700/50 hover:text-slate-200 transition-colors disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Plus className="size-3" />
+                )}
+                <span>{t('torrent.details.addTag')}</span>
+              </button>
+
+              {/* Dropdown menu for adding tags */}
+              {isDropdownOpen && !isLoading && (
+                <div className="absolute z-50 mt-1 left-0 min-w-[120px] rounded-md border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95">
+                  <div className="max-h-[150px] overflow-y-auto">
+                    {unassignedTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleAddTag(tag)}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none cursor-default select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                      >
+                        <span
+                          className={`size-3 rounded-full shrink-0 ${getColorClass(tag.color)}`}
+                        />
+                        <span className="flex-1 truncate text-left">
+                          {tag.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Show placeholder if no tags */}
+          {currentTagNames.length === 0 && unassignedTags.length === 0 && (
+            <span className="text-xs text-slate-500">
+              {t('tags.sidebar.noTags')}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )

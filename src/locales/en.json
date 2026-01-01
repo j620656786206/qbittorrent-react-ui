@@ -72,7 +72,9 @@
       "connected": "Connected",
       "totalSwarm": "Total (Swarm)",
       "thisSession": "this session",
-      "files": "Files"
+      "files": "Files",
+      "tags": "Tags",
+      "addTag": "Add Tag"
     },
     "actions": {
       "delete": "Delete",
@@ -86,7 +88,37 @@
   "sidebar": {
     "title": "qB-React",
     "status": "Status",
-    "categories": "Categories"
+    "categories": "Categories",
+    "tags": "Tags"
+  },
+  "tags": {
+    "sidebar": {
+      "noTags": "No tags yet",
+      "manageTags": "Manage Tags"
+    },
+    "manager": {
+      "title": "Tag Manager",
+      "description": "Create and manage tags to organize your torrents.",
+      "createNew": "Create New Tag",
+      "namePlaceholder": "Enter tag name...",
+      "addTag": "Add Tag",
+      "noColor": "No color",
+      "existingTags": "Existing Tags",
+      "noTags": "No tags created yet",
+      "clickToEdit": "Click to edit"
+    },
+    "delete": {
+      "title": "Delete Tag",
+      "description": "Are you sure you want to delete the tag \"{{name}}\"? This will remove it from all torrents."
+    },
+    "error": {
+      "emptyName": "Tag name cannot be empty",
+      "nameTooLong": "Tag name cannot exceed 50 characters",
+      "invalidName": "Tag name contains invalid characters",
+      "duplicate": "Tag \"{{name}}\" already exists",
+      "createFailed": "Failed to create tag",
+      "updateFailed": "Failed to update tag"
+    }
   },
   "login": {
     "username": "Username",
@@ -142,6 +174,10 @@
       "label": "Category",
       "none": "None",
       "placeholder": "Select a category"
+    },
+    "tags": {
+      "label": "Tags",
+      "placeholder": "Select tags..."
     },
     "startPaused": "Start Paused",
     "add": "Add",

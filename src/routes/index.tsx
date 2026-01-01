@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
 import type { Torrent } from '@/components/torrent-table'
+import { parseTagString } from '@/lib/tag-storage'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
@@ -222,6 +223,16 @@ function HomePage() {
       return result.filter((t: Torrent) => {
         const torrentCategory = t.category || '未分類'
         return torrentCategory === category
+      })
+    }
+
+    // Tag filter (supports multi-tag with OR logic)
+    if (filter.startsWith('tag:')) {
+      const tagNames = filter.substring(4).split(',').map(t => t.trim().toLowerCase())
+      return result.filter((t: Torrent) => {
+        const torrentTags = parseTagString(t.tags || '').map(tag => tag.toLowerCase())
+        // OR logic: show torrents with ANY of the selected tags
+        return tagNames.some(tagName => torrentTags.includes(tagName))
       })
     }
 
