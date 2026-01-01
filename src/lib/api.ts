@@ -260,6 +260,7 @@ export async function setTorrentCategory(
 export type AddTorrentMagnetOptions = {
   savepath?: string;
   category?: string;
+  tags?: string;
   paused?: boolean;
 };
 
@@ -285,6 +286,9 @@ export async function addTorrentMagnet(
   if (options?.category) {
     formData.append('category', options.category);
   }
+  if (options?.tags) {
+    formData.append('tags', options.tags);
+  }
   if (options?.paused !== undefined) {
     formData.append('paused', options.paused ? 'true' : 'false');
   }
@@ -305,6 +309,7 @@ export async function addTorrentMagnet(
 export type AddTorrentFileOptions = {
   savepath?: string;
   category?: string;
+  tags?: string;
   paused?: boolean;
 };
 
@@ -329,6 +334,9 @@ export async function addTorrentFile(
   }
   if (options?.category) {
     formData.append('category', options.category);
+  }
+  if (options?.tags) {
+    formData.append('tags', options.tags);
   }
   if (options?.paused !== undefined) {
     formData.append('paused', options.paused ? 'true' : 'false');

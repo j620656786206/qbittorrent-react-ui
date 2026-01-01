@@ -173,6 +173,10 @@
       "none": "None",
       "placeholder": "Select a category"
     },
+    "tags": {
+      "label": "Tags",
+      "placeholder": "Select tags..."
+    },
     "startPaused": "Start Paused",
     "add": "Add",
     "adding": "Adding...",

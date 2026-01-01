@@ -173,6 +173,10 @@
       "none": "無",
       "placeholder": "選擇分類"
     },
+    "tags": {
+      "label": "標籤",
+      "placeholder": "選擇標籤..."
+    },
     "startPaused": "新增後暫停",
     "add": "新增",
     "adding": "新增中...",
