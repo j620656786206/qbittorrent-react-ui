@@ -72,7 +72,9 @@
       "connected": "Connected",
       "totalSwarm": "Total (Swarm)",
       "thisSession": "this session",
-      "files": "Files"
+      "files": "Files",
+      "tags": "Tags",
+      "addTag": "Add Tag"
     },
     "actions": {
       "delete": "Delete",

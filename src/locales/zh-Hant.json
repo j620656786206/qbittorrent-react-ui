@@ -72,7 +72,9 @@
       "connected": "連接數",
       "totalSwarm": "總數 (Swarm)",
       "thisSession": "本次",
-      "files": "檔案"
+      "files": "檔案",
+      "tags": "標籤",
+      "addTag": "新增標籤"
     },
     "actions": {
       "delete": "刪除",
