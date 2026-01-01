@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Download, Upload, Play, Pause, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Download, Upload, Play, Pause, Trash2, RefreshCw } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent } from '@/lib/api'
 import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
@@ -514,6 +514,15 @@ export function TorrentTable({
                             {t('common.pause')}
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            recheckMutation.mutate(torrent.hash)
+                          }}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          {t('common.forceRecheck')}
+                        </DropdownMenuItem>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem
