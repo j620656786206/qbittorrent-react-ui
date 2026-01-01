@@ -506,3 +506,27 @@ export async function reannounceTorrent(baseUrl: string, hashes: string | string
   }
   return true;
 }
+
+/**
+ * Rechecks (verifies) one or more torrents.
+ * This forces qBittorrent to re-verify the integrity of the torrent's files.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to recheck.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function recheckTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/recheck`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to recheck torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
