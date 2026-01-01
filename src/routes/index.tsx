@@ -287,6 +287,13 @@ function HomePage() {
     },
   })
 
+  const recheckMutation = useMutation({
+    mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
       deleteTorrent(getBaseUrl(), hash, deleteFiles),
@@ -532,6 +539,7 @@ function HomePage() {
         onClose={() => setSelectedTorrent(null)}
         onPause={() => selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)}
         onResume={() => selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)}
+        onRecheck={() => selectedTorrent && recheckMutation.mutate(selectedTorrent.hash)}
         onDelete={() => {
           if (selectedTorrent) {
             if (window.confirm(t('torrent.actions.confirmDelete'))) {
