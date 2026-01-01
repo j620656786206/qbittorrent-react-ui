@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { ChevronDown, Folder, Loader2, Pause, Play, Trash2, X } from "lucide-react"
+import { ChevronDown, Folder, Loader2, Pause, Play, RefreshCw, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +16,7 @@ interface BatchActionsToolbarProps {
   selectedCount: number
   onPause: () => void
   onResume: () => void
+  onRecheck: () => void
   onDelete: () => void
   onSetCategory: (category: string) => void
   onClearSelection: () => void
@@ -28,6 +29,7 @@ function BatchActionsToolbar({
   selectedCount,
   onPause,
   onResume,
+  onRecheck,
   onDelete,
   onSetCategory,
   onClearSelection,
@@ -102,6 +104,20 @@ function BatchActionsToolbar({
             <Play className="h-4 w-4 mr-2" />
           )}
           {t("common.resume")}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRecheck}
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          {t("common.forceRecheck")}
         </Button>
 
         {/* Category Dropdown */}
