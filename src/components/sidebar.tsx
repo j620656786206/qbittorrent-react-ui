@@ -1,16 +1,16 @@
 import React from 'react'
-import { Folder, Hash, Plus, Settings, Tag as TagIcon } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-
-import type { Torrent } from '@/components/torrent-table'
-import type { Tag } from '@/types/tag'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Folder, Hash, Plus, Settings, Tag as TagIcon, Search, X } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import type { Torrent } from '@/components/torrent-table'
+import type { Tag } from '@/types/tag'
+import { useTranslation } from 'react-i18next'
 import { getTags, parseTagString } from '@/lib/tag-storage'
 import { TagManagerModal } from '@/components/tag-manager-modal'
 import { getColorClass } from '@/components/ui/tag-input'
@@ -37,8 +37,10 @@ type SidebarProps = {
   isMobile: boolean
   isMobileSidebarOpen: boolean
   onCloseMobileSidebar: () => void
-  torrents: Array<Torrent> // Add torrents prop for counting
-  categories: Record<string, any> // Add categories from maindata
+  torrents: Array<Torrent>
+  categories: Record<string, any>
+  searchQuery: string
+  setSearchQuery: (query: string) => void
 }
 
 export function Sidebar({
@@ -50,7 +52,9 @@ export function Sidebar({
   isMobileSidebarOpen,
   onCloseMobileSidebar,
   torrents,
-  categories
+  categories,
+  searchQuery,
+  setSearchQuery
 }: SidebarProps) {
   const { t } = useTranslation()
 
@@ -103,6 +107,29 @@ export function Sidebar({
   const sidebarContent = (
     <>
       <h1 className="text-xl font-bold text-white mb-6">{t('sidebar.title')}</h1>
+
+      {/* Search Input */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            type="text"
+            placeholder={t('sidebar.searchPlaceholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Status Filters */}
       <div className="mb-6">

@@ -89,7 +89,9 @@
     "title": "qB-React",
     "status": "Status",
     "categories": "Categories",
-    "tags": "Tags"
+    "tags": "Tags",
+    "searchPlaceholder": "Search torrents...",
+    "clearSearch": "Clear search"
   },
   "tags": {
     "sidebar": {

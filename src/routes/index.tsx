@@ -441,65 +441,69 @@ function HomePage() {
               <button
                 type="button"
                 onClick={() => setBatchError(null)}
-                className="text-red-400 hover:text-red-300 transition-colors"
-                aria-label={t('common.close')}
+                className="text-red-400 hover:text-red-300"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           )}
 
-          {/* Batch Actions Toolbar - appears when torrents are selected */}
-          <BatchActionsToolbar
-            selectedCount={selectedHashes.size}
-            onPause={() => {
-              if (selectedHashes.size > 0) {
-                setBatchError(null)
-                batchPauseMutation.mutate(Array.from(selectedHashes))
-              }
-            }}
-            onResume={() => {
-              if (selectedHashes.size > 0) {
-                setBatchError(null)
-                batchResumeMutation.mutate(Array.from(selectedHashes))
-              }
-            }}
-            onRecheck={() => {
-              if (selectedHashes.size > 0) {
-                setBatchError(null)
-                batchRecheckMutation.mutate(Array.from(selectedHashes))
-              }
-            }}
-            onDelete={() => {
-              if (selectedHashes.size > 0) {
-                setBatchError(null)
-                setIsDeleteDialogOpen(true)
-              }
-            }}
-            onSetCategory={(category) => {
-              if (selectedHashes.size > 0) {
-                setBatchError(null)
+          {/* Batch Actions Toolbar */}
+          {selectedHashes.size > 0 && (
+            <BatchActionsToolbar
+selectedCount={selectedHashes.size}
+              onPause={() => batchPauseMutation.mutate(Array.from(selectedHashes))}
+              onResume={() => batchResumeMutation.mutate(Array.from(selectedHashes))}
+              onRecheck={() => batchRecheckMutation.mutate(Array.from(selectedHashes))}
+              onDelete={() => setIsDeleteDialogOpen(true)}
+              onCategory={(category) =>
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
                 })
               }
-            }}
-            onClearSelection={clearSelection}
-            categories={categoryNames}
-            isPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchRecheckMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
-          />
+              categories={categoryNames}
+            />
+          )}
 
-          {/* Torrent List */}
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('batch.delete.title', 'Delete torrents?')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('batch.delete.description', 'This action cannot be undone.')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    const deleteFiles = window.confirm(
+                      t('batch.delete.withFiles', 'Delete files as well?'),
+                    )
+                    batchDeleteMutation.mutate({
+                      hashes: Array.from(selectedHashes),
+                      deleteFiles,
+                    })
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {t('common.delete', 'Delete')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Torrents Table */}
           {filteredTorrents.length > 0 ? (
             <TorrentTable
               torrents={filteredTorrents}
-              onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
               selectedHashes={selectedHashes}
-              toggleSelection={toggleSelection}
-              selectAll={() => selectAll(filteredTorrents)}
-              clearSelection={clearSelection}
-              isBatchPending={batchPauseMutation.isPending || batchResumeMutation.isPending || batchRecheckMutation.isPending || batchDeleteMutation.isPending || batchSetCategoryMutation.isPending}
+              onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
+              onSelectionChange={toggleSelection}
+              onSelectAll={() => selectAll(filteredTorrents)}
+              onClearSelection={clearSelection}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>
@@ -530,19 +534,24 @@ function HomePage() {
       <Sidebar
         currentFilter={filter}
         setFilter={setFilter}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onAddTorrent={() => setIsAddTorrentOpen(true)}
         isMobile={!isDesktop}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
         torrents={allTorrents}
-        categories={{}}
+        categories={categoriesData || {}}
       />
       <div className="flex-1 p-6 overflow-auto">{renderContent()}</div>
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         onSave={handleSettingsSave}
+      />
+      <AddTorrentModal
+        isOpen={isAddTorrentOpen}
+        onClose={() => setIsAddTorrentOpen(false)}
       />
       <TorrentDetail
         torrent={selectedTorrent}
@@ -559,52 +568,7 @@ function HomePage() {
             }
           }
         }}
-        baseUrl={credentials.baseUrl}
       />
-      <AddTorrentModal
-        isOpen={isAddTorrentOpen}
-        onClose={() => setIsAddTorrentOpen(false)}
-      />
-
-      {/* Batch Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('batch.confirmDelete', { count: selectedHashes.size })}
-            </AlertDialogTitle>
-            <AlertDialogDescription
-              dangerouslySetInnerHTML={{
-                __html: t('batch.confirmDeleteMessage', { count: selectedHashes.size })
-              }}
-            />
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                batchDeleteMutation.mutate({
-                  hashes: Array.from(selectedHashes),
-                  deleteFiles: false
-                })
-              }}
-            >
-              {t('torrent.actions.deleteKeepFiles')}
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="bg-red-500 hover:bg-red-600"
-              onClick={() => {
-                batchDeleteMutation.mutate({
-                  hashes: Array.from(selectedHashes),
-                  deleteFiles: true
-                })
-              }}
-            >
-              {t('torrent.actions.deleteRemoveFiles')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
