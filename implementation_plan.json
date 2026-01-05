@@ -386,5 +386,16 @@
       "notes": "N/A - qBittorrent handles all data storage"
     }
   },
-  "qa_signoff": null
+  "qa_signoff": {
+    "status": "fixes_applied",
+    "timestamp": "2026-01-05T09:34:35Z",
+    "fix_session": 1,
+    "issues_fixed": [
+      {
+        "title": "Implement Multi-Tag Selection UI in Sidebar",
+        "fix_commit": "c2dd459"
+      }
+    ],
+    "ready_for_qa_revalidation": true
+  }
 }
