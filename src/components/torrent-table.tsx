@@ -26,33 +26,8 @@ import { pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent } from '@/li
 import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
-import { cn } from '@/lib/utils'
+import { cn, formatBytes, formatEta } from '@/lib/utils'
 import type { Torrent } from '@/types/torrent';
-
-
-// Helper function to format bytes into KB, MB, GB, etc.
-function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
-
-// Helper function to format ETA
-function formatEta(seconds: number) {
-  if (seconds < 0 || seconds === 8640000) return '∞'
-  if (seconds === 0) return '-'
-
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
 
 // Helper to get state translation key
 function getStateKey(state: string): string {
