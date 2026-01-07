@@ -127,7 +127,6 @@ export async function getMaindata(baseUrl: string, rid?: number): Promise<Mainda
     throw new Error(`Failed to fetch maindata with status: ${res.status}`);
   }
   const jsonResponse = await res.json();
-  console.log('Raw maindata response:', jsonResponse); // Log raw response
   return jsonResponse;
 }
 
