@@ -25,6 +25,7 @@ function filterTorrents(
   const trimmedQuery = searchQuery.trim().toLowerCase()
   if (trimmedQuery) {
     result = result.filter((t: Torrent) =>
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       t.name?.toLowerCase().includes(trimmedQuery),
     )
   }

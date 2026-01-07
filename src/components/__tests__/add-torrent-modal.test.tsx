@@ -186,7 +186,10 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const magnetInput = screen.getByLabelText('Magnet Link')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const magnetInput = screen.getByLabelText(
+        'Magnet Link',
+      ) as HTMLInputElement
       await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
 
       expect(magnetInput.value).toBe('magnet:?xt=urn:btih:test123')
@@ -276,7 +279,10 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const savePathInput = screen.getByLabelText('Save Path')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const savePathInput = screen.getByLabelText(
+        'Save Path',
+      ) as HTMLInputElement
       await user.type(savePathInput, '/downloads/torrents')
 
       expect(savePathInput.value).toBe('/downloads/torrents')
@@ -294,7 +300,10 @@ describe('AddTorrentModal Component', () => {
         ).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const categorySelect = screen.getByLabelText(
+        'Category',
+      ) as HTMLSelectElement
       await user.selectOptions(categorySelect, 'Movies')
 
       expect(categorySelect.value).toBe('Movies')
@@ -321,7 +330,8 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const checkbox = screen.getByLabelText('Start paused')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const checkbox = screen.getByLabelText('Start paused') as HTMLInputElement
       expect(checkbox.checked).toBe(false)
 
       await user.click(checkbox)
@@ -843,8 +853,14 @@ describe('AddTorrentModal Component', () => {
       )
 
       // Form should be reset
-      const resetMagnetInput = screen.getByLabelText('Magnet Link')
-      const resetSavePathInput = screen.getByLabelText('Save Path')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const resetMagnetInput = screen.getByLabelText(
+        'Magnet Link',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const resetSavePathInput = screen.getByLabelText(
+        'Save Path',
+      ) as HTMLInputElement
       expect(resetMagnetInput.value).toBe('')
       expect(resetSavePathInput.value).toBe('')
     })
@@ -1042,7 +1058,10 @@ describe('AddTorrentModal Component', () => {
         expect(screen.getByLabelText('Category')).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const categorySelect = screen.getByLabelText(
+        'Category',
+      ) as HTMLSelectElement
       // Should only have "None" option
       expect(categorySelect.options.length).toBe(1)
       expect(categorySelect.options[0].value).toBe('')
