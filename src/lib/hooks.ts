@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type MediaQueryString = `(min-width: ${number}px)` | `(max-width: ${number}px)`;
 

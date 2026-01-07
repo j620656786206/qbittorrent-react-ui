@@ -1,6 +1,8 @@
 import React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { FileUp, Link2, Upload } from 'lucide-react'
+import type { Tag } from '@/types/tag'
 import {
   Dialog,
   DialogContent,
@@ -12,11 +14,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Link2, FileUp, Upload } from 'lucide-react'
-import { addTorrentMagnet, addTorrentFile, getCategories } from '@/lib/api'
+import { addTorrentFile, addTorrentMagnet, getCategories } from '@/lib/api'
 import { TagInput } from '@/components/ui/tag-input'
-import { getTags, formatTagString } from '@/lib/tag-storage'
-import type { Tag } from '@/types/tag'
+import { formatTagString, getTags } from '@/lib/tag-storage'
 
 type TabType = 'magnet' | 'file'
 
@@ -35,12 +35,12 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
   const [savePath, setSavePath] = React.useState('')
   const [category, setCategory] = React.useState('')
-  const [selectedTags, setSelectedTags] = React.useState<string[]>([])
+  const [selectedTags, setSelectedTags] = React.useState<Array<string>>([])
   const [startPaused, setStartPaused] = React.useState(false)
   const [error, setError] = React.useState('')
 
   // Available tags from localStorage
-  const [availableTags, setAvailableTags] = React.useState<Tag[]>([])
+  const [availableTags, setAvailableTags] = React.useState<Array<Tag>>([])
 
   // Load tags when modal opens
   React.useEffect(() => {
@@ -64,8 +64,8 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
 
   // Add torrent via magnet link mutation
   const addMagnetMutation = useMutation({
-    mutationFn: (magnetLink: string) =>
-      addTorrentMagnet(getBaseUrl(), magnetLink, {
+    mutationFn: (magnet: string) =>
+      addTorrentMagnet(getBaseUrl(), magnet, {
         savepath: savePath || undefined,
         category: category || undefined,
         tags: selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,

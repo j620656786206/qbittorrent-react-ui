@@ -189,9 +189,9 @@ function generateMockTorrent(index: number): Torrent {
  * Generates an array of mock torrents for performance testing
  * @param count Number of mock torrents to generate (default: 1000)
  */
-export function generateMockTorrents(count: number = 1000): Torrent[] {
+export function generateMockTorrents(count: number = 1000): Array<Torrent> {
   const startTime = performance.now()
-  const torrents: Torrent[] = []
+  const torrents: Array<Torrent> = []
 
   for (let i = 0; i < count; i++) {
     torrents.push(generateMockTorrent(i))

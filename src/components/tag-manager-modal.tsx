@@ -1,5 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
+import { Plus, Tag as TagIcon, Trash2, X } from 'lucide-react'
+import type { Tag, TagColor } from '@/types/tag'
 import {
   Dialog,
   DialogContent,
@@ -21,16 +23,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tag as TagIcon, Plus, Trash2, X } from 'lucide-react'
-import type { Tag, TagColor } from '@/types/tag'
 import { TagColors } from '@/types/tag'
 import {
-  getTags,
   createTag,
-  updateTag,
   deleteTag,
-  validateTagName,
+  getTags,
   tagNameExists,
+  updateTag,
+  validateTagName,
 } from '@/lib/tag-storage'
 
 interface TagManagerModalProps {
@@ -47,7 +47,7 @@ export function TagManagerModal({
   const { t } = useTranslation()
 
   // Tags list state
-  const [tags, setTags] = React.useState<Tag[]>([])
+  const [tags, setTags] = React.useState<Array<Tag>>([])
 
   // Form state for creating new tag
   const [newTagName, setNewTagName] = React.useState('')

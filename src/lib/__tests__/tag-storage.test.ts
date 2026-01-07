@@ -1,18 +1,18 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  getTags,
+  clearAllTags,
+  createTag,
+  deleteTag,
+  formatTagString,
   getTagById,
   getTagByName,
-  createTag,
-  updateTag,
-  deleteTag,
-  clearAllTags,
-  tagNameExists,
-  validateTagName,
-  isValidTagColor,
+  getTags,
   getTagsByNames,
+  isValidTagColor,
   parseTagString,
-  formatTagString,
+  tagNameExists,
+  updateTag,
+  validateTagName,
 } from '../tag-storage'
 import type { Tag } from '@/types/tag'
 
@@ -79,7 +79,7 @@ describe('Tag Storage', () => {
     })
 
     it('should return valid tags from localStorage', () => {
-      const validTags: Tag[] = [
+      const validTags: Array<Tag> = [
         { id: 'tag-1', name: 'Movies', color: 'blue', createdAt: Date.now() },
         { id: 'tag-2', name: 'TV Shows', createdAt: Date.now() },
       ]

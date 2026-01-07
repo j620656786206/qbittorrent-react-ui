@@ -1,5 +1,4 @@
-import type { Torrent } from '@/types/torrent';
-import type { TorrentFile } from '@/types/torrent';
+import type { Torrent, TorrentFile  } from '@/types/torrent';
 
 // Define types for sync/maindata response
 export type TorrentPartialUpdate = Partial<Torrent> & {
@@ -17,8 +16,8 @@ export type MaindataResponse = {
         up_info_speed: number;
         // ... many other server state properties
     };
-    torrents: { [hash: string]: TorrentPartialUpdate }; // Torrents that have changed
-    torrents_removed: string[]; // Hashes of removed torrents
+    torrents?: { [hash: string]: TorrentPartialUpdate }; // Torrents that have changed
+    torrents_removed?: Array<string>; // Hashes of removed torrents
     full_update: boolean; // True if it's a full update, false for incremental
 };
 
@@ -137,7 +136,7 @@ export async function getMaindata(baseUrl: string, rid?: number): Promise<Mainda
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to pause.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function pauseTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+export async function pauseTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
   formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
@@ -160,7 +159,7 @@ export async function pauseTorrent(baseUrl: string, hashes: string | string[]): 
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to resume.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function resumeTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+export async function resumeTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
   formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
@@ -186,7 +185,7 @@ export async function resumeTorrent(baseUrl: string, hashes: string | string[]):
  */
 export async function deleteTorrent(
   baseUrl: string,
-  hashes: string | string[],
+  hashes: string | Array<string>,
   deleteFiles: boolean = false
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
@@ -234,7 +233,7 @@ export async function getCategories(baseUrl: string): Promise<CategoriesResponse
  */
 export async function setTorrentCategory(
   baseUrl: string,
-  hashes: string | string[],
+  hashes: string | Array<string>,
   category: string
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
@@ -386,7 +385,7 @@ export async function getTorrentFiles(baseUrl: string, hash: string): Promise<Ar
 export async function setFilePriority(
   baseUrl: string,
   hash: string,
-  fileIds: number | number[],
+  fileIds: number | Array<number>,
   priority: number
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
@@ -413,7 +412,7 @@ export async function setFilePriority(
  * @param {string} hash - The hash of the torrent to get trackers for.
  * @returns {Promise<Tracker[]>} - Array of tracker objects with URL, status, tier, and peer statistics.
  */
-export async function getTrackers(baseUrl: string, hash: string): Promise<Tracker[]> {
+export async function getTrackers(baseUrl: string, hash: string): Promise<Array<Tracker>> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/trackers`);
   url.searchParams.append('hash', hash);
@@ -435,7 +434,7 @@ export async function getTrackers(baseUrl: string, hash: string): Promise<Tracke
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to recheck.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function recheckTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+export async function recheckTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
   formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
@@ -458,7 +457,7 @@ export async function recheckTorrent(baseUrl: string, hashes: string | string[])
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to reannounce.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function reannounceTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+export async function reannounceTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
   formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
@@ -484,8 +483,8 @@ export async function reannounceTorrent(baseUrl: string, hashes: string | string
  */
 export async function addTorrentTags(
   baseUrl: string,
-  hashes: string | string[],
-  tags: string | string[]
+  hashes: string | Array<string>,
+  tags: string | Array<string>
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
@@ -513,8 +512,8 @@ export async function addTorrentTags(
  */
 export async function removeTorrentTags(
   baseUrl: string,
-  hashes: string | string[],
-  tags?: string | string[]
+  hashes: string | Array<string>,
+  tags?: string | Array<string>
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
@@ -545,7 +544,7 @@ export async function removeTorrentTags(
 export async function addTrackers(
   baseUrl: string,
   hash: string,
-  trackers: string | string[]
+  trackers: string | Array<string>
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();
@@ -574,7 +573,7 @@ export async function addTrackers(
 export async function removeTrackers(
   baseUrl: string,
   hash: string,
-  trackers: string | string[]
+  trackers: string | Array<string>
 ): Promise<boolean> {
   const effectiveBaseUrl = getApiBaseUrl(baseUrl);
   const formData = new URLSearchParams();

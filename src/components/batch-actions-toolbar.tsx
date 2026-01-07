@@ -20,7 +20,7 @@ interface BatchActionsToolbarProps {
   onDelete: () => void
   onSetCategory: (category: string) => void
   onClearSelection: () => void
-  categories?: string[]
+  categories?: Array<string>
   isPending?: boolean
   className?: string
 }

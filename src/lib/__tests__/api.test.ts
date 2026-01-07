@@ -1,17 +1,18 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  login,
-  getMaindata,
-  pauseTorrent,
-  resumeTorrent,
+  
+  addTorrentFile,
+  addTorrentMagnet,
   deleteTorrent,
   getCategories,
-  setTorrentCategory,
-  addTorrentMagnet,
-  addTorrentFile,
+  getMaindata,
   getTorrentFiles,
-  type MaindataResponse,
+  login,
+  pauseTorrent,
+  resumeTorrent,
+  setTorrentCategory
 } from '../api'
+import type {MaindataResponse} from '../api';
 
 // Mock fetch
 const mockFetch = vi.fn()
@@ -46,7 +47,7 @@ describe('API Functions', () => {
     it('should login successfully with valid credentials', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       const result = await login(baseUrl, 'admin', 'password123')
@@ -71,7 +72,7 @@ describe('API Functions', () => {
     it('should login successfully with empty credentials', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       const result = await login(baseUrl)
@@ -87,7 +88,7 @@ describe('API Functions', () => {
       import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       await login(baseUrl, 'admin', 'password123')
@@ -101,7 +102,7 @@ describe('API Functions', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        text: async () => 'Unauthorized',
+        text: () => Promise.resolve('Unauthorized'),
       })
 
       await expect(login(baseUrl, 'admin', 'wrong')).rejects.toThrow(
@@ -112,7 +113,7 @@ describe('API Functions', () => {
     it('should throw error when response is ok but text is not "Ok."', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Fails.',
+        text: () => Promise.resolve('Fails.'),
       })
 
       await expect(login(baseUrl, 'admin', 'password')).rejects.toThrow(
@@ -123,7 +124,7 @@ describe('API Functions', () => {
     it('should handle response with whitespace around "Ok."', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => '  Ok.  ',
+        text: () => Promise.resolve('  Ok.  '),
       })
 
       const result = await login(baseUrl, 'admin', 'password123')
@@ -134,7 +135,7 @@ describe('API Functions', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => '',
+        text: () => Promise.resolve(''),
       })
 
       await expect(login(baseUrl, 'admin', 'password')).rejects.toThrow(
@@ -164,7 +165,7 @@ describe('API Functions', () => {
     it('should fetch maindata without rid', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       const result = await getMaindata(baseUrl)
@@ -180,7 +181,7 @@ describe('API Functions', () => {
     it('should fetch maindata with rid parameter', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl, 100)
@@ -191,7 +192,7 @@ describe('API Functions', () => {
     it('should fetch maindata with rid=0', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl, 0)
@@ -203,7 +204,7 @@ describe('API Functions', () => {
       import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl)
@@ -242,7 +243,7 @@ describe('API Functions', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => incrementalResponse,
+        json: () => Promise.resolve(incrementalResponse),
       })
 
       const result = await getMaindata(baseUrl, 123)
@@ -517,7 +518,7 @@ describe('API Functions', () => {
       }
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockCategories,
+        json: () => Promise.resolve(mockCategories),
       })
 
       const result = await getCategories(baseUrl)
@@ -758,7 +759,7 @@ describe('API Functions', () => {
       ]
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockFiles,
+        json: () => Promise.resolve(mockFiles),
       })
 
       const result = await getTorrentFiles(baseUrl, 'abc123')

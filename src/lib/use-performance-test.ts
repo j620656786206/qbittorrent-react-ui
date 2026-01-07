@@ -10,14 +10,14 @@
  * - window.__getPerformanceReport()    // Get performance metrics
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { PerformanceMetrics, generateMockTorrents } from './performance-test-utils'
 import type { Torrent } from '@/types/torrent'
-import { generateMockTorrents, PerformanceMetrics } from './performance-test-utils'
 
 // Global state for mock torrents (persists across component re-renders)
-let globalMockTorrents: Torrent[] = []
+let globalMockTorrents: Array<Torrent> = []
 let globalIsTestMode = false
-let listeners: Set<() => void> = new Set()
+const listeners: Set<() => void> = new Set()
 
 function notifyListeners() {
   listeners.forEach((listener) => listener())
@@ -79,10 +79,10 @@ export function usePerformanceTest() {
 // Expose methods globally in development mode
 if (import.meta.env.DEV) {
   const windowWithTest = window as unknown as {
-    __injectMockTorrents: (count?: number) => Torrent[]
+    __injectMockTorrents: (count?: number) => Array<Torrent>
     __clearMockTorrents: () => void
     __getPerformanceReport: () => object
-    __getMockTorrents: () => Torrent[]
+    __getMockTorrents: () => Array<Torrent>
   }
 
   windowWithTest.__injectMockTorrents = (count: number = 1000) => {

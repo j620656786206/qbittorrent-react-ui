@@ -2,6 +2,8 @@ import React, { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Download, MoreHorizontal, Pause, Play, RefreshCw, Trash2, Upload } from 'lucide-react'
+import type { Torrent } from '@/types/torrent';
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -21,13 +23,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Download, Upload, Play, Pause, Trash2, RefreshCw } from 'lucide-react'
-import { pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent } from '@/lib/api'
+import { deleteTorrent, pauseTorrent, recheckTorrent, resumeTorrent } from '@/lib/api'
 import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatBytes, formatEta } from '@/lib/utils'
-import type { Torrent } from '@/types/torrent';
 
 // Helper to get state translation key
 function getStateKey(state: string): string {
@@ -172,7 +172,7 @@ function DivTableCell({ className, children, ...props }: DivTableCellProps) {
 }
 
 interface TorrentTableProps {
-  torrents: Torrent[]
+  torrents: Array<Torrent>
   onTorrentClick?: (torrent: Torrent) => void
   selectedHashes?: Set<string>
   toggleSelection?: (hash: string) => void

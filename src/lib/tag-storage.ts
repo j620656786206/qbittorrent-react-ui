@@ -12,7 +12,7 @@ const STORAGE_KEY = 'qbit_tags';
  * Uses crypto.randomUUID when available, fallback for older browsers
  */
 function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
   // Fallback for older browsers
@@ -37,7 +37,7 @@ export function isValidTagColor(color: string | undefined): color is TagColor {
  * Retrieves all tags from localStorage
  * @returns Array of Tag objects, empty array if none exist or on parse error
  */
-export function getTags(): Tag[] {
+export function getTags(): Array<Tag> {
   try {
     const storedTags = localStorage.getItem(STORAGE_KEY);
     if (!storedTags) {
@@ -66,7 +66,7 @@ export function getTags(): Tag[] {
  * Persists tags array to localStorage
  * @param tags - Array of Tag objects to store
  */
-function saveTags(tags: Tag[]): void {
+function saveTags(tags: Array<Tag>): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tags));
 }
 
@@ -242,7 +242,7 @@ export function clearAllTags(): void {
  * @param names - Array of tag names to look up
  * @returns Array of matching Tag objects (may be shorter if some names don't exist)
  */
-export function getTagsByNames(names: string[]): Tag[] {
+export function getTagsByNames(names: Array<string>): Array<Tag> {
   const tags = getTags();
   const normalizedNames = names.map((n) => n.toLowerCase().trim());
   return tags.filter((tag) =>
@@ -255,7 +255,7 @@ export function getTagsByNames(names: string[]): Tag[] {
  * @param tagString - Comma-separated string of tag names (e.g., "Movies,HD,4K")
  * @returns Array of tag names
  */
-export function parseTagString(tagString: string): string[] {
+export function parseTagString(tagString: string): Array<string> {
   if (!tagString || !tagString.trim()) {
     return [];
   }
@@ -270,6 +270,6 @@ export function parseTagString(tagString: string): string[] {
  * @param tags - Array of tag names
  * @returns Comma-separated string
  */
-export function formatTagString(tags: string[]): string {
+export function formatTagString(tags: Array<string>): string {
   return tags.filter((t) => t.trim().length > 0).join(',');
 }

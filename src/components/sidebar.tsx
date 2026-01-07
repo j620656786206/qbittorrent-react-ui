@@ -1,16 +1,16 @@
 import React from 'react'
+import { Folder, Hash, Plus, Search, Settings, Tag as TagIcon, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { Torrent } from '@/types/torrent'
+import type { Tag } from '@/types/tag'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Folder, Hash, Plus, Settings, Tag as TagIcon, Search, X } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { Torrent } from '@/types/torrent'
-import type { Tag } from '@/types/tag'
-import { useTranslation } from 'react-i18next'
 import { getTags, parseTagString } from '@/lib/tag-storage'
 import { TagManagerModal } from '@/components/tag-manager-modal'
 import { getColorClass } from '@/components/ui/tag-input'
@@ -75,7 +75,7 @@ export function Sidebar({
   // Sync selectedTagFilters with currentFilter
   React.useEffect(() => {
     if (currentFilter.startsWith('tag:')) {
-      const tagNames = currentFilter.substring(4).split(',').map(t => t.trim())
+      const tagNames = currentFilter.substring(4).split(',').map(tagName => tagName.trim())
       setSelectedTagFilters(new Set(tagNames))
     } else {
       setSelectedTagFilters(new Set())

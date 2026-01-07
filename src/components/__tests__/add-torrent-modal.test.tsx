@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AddTorrentModal } from '../add-torrent-modal'
+
+import { addTorrentFile, addTorrentMagnet, getCategories } from '@/lib/api'
+import { getTags } from '@/lib/tag-storage'
 
 /**
  * Mock react-i18next
@@ -53,11 +56,8 @@ vi.mock('@/lib/api', () => ({
  */
 vi.mock('@/lib/tag-storage', () => ({
   getTags: vi.fn(() => []),
-  formatTagString: vi.fn((tags: string[]) => tags.join(',')),
+  formatTagString: vi.fn((tags: Array<string>) => tags.join(',')),
 }))
-
-import { addTorrentMagnet, addTorrentFile, getCategories } from '@/lib/api'
-import { getTags } from '@/lib/tag-storage'
 
 /**
  * Helper to wrap component with QueryClientProvider
@@ -170,7 +170,7 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const magnetInput = screen.getByLabelText('Magnet Link') as HTMLInputElement
+      const magnetInput = screen.getByLabelText('Magnet Link')
       await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
 
       expect(magnetInput.value).toBe('magnet:?xt=urn:btih:test123')
@@ -248,7 +248,7 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const savePathInput = screen.getByLabelText('Save Path') as HTMLInputElement
+      const savePathInput = screen.getByLabelText('Save Path')
       await user.type(savePathInput, '/downloads/torrents')
 
       expect(savePathInput.value).toBe('/downloads/torrents')
@@ -264,7 +264,7 @@ describe('AddTorrentModal Component', () => {
         expect(screen.getByRole('option', { name: 'Movies' })).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category') as HTMLSelectElement
+      const categorySelect = screen.getByLabelText('Category')
       await user.selectOptions(categorySelect, 'Movies')
 
       expect(categorySelect.value).toBe('Movies')
@@ -287,7 +287,7 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const checkbox = screen.getByLabelText('Start paused') as HTMLInputElement
+      const checkbox = screen.getByLabelText('Start paused')
       expect(checkbox.checked).toBe(false)
 
       await user.click(checkbox)
@@ -764,8 +764,8 @@ describe('AddTorrentModal Component', () => {
       )
 
       // Form should be reset
-      const resetMagnetInput = screen.getByLabelText('Magnet Link') as HTMLInputElement
-      const resetSavePathInput = screen.getByLabelText('Save Path') as HTMLInputElement
+      const resetMagnetInput = screen.getByLabelText('Magnet Link')
+      const resetSavePathInput = screen.getByLabelText('Save Path')
       expect(resetMagnetInput.value).toBe('')
       expect(resetSavePathInput.value).toBe('')
     })
@@ -951,7 +951,7 @@ describe('AddTorrentModal Component', () => {
         expect(screen.getByLabelText('Category')).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category') as HTMLSelectElement
+      const categorySelect = screen.getByLabelText('Category')
       // Should only have "None" option
       expect(categorySelect.options.length).toBe(1)
       expect(categorySelect.options[0].value).toBe('')

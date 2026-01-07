@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { Torrent } from '@/types/torrent'
 
 /**
@@ -15,17 +15,17 @@ import type { Torrent } from '@/types/torrent'
  * @returns Filtered array of torrents
  */
 function filterTorrents(
-  torrents: Torrent[],
+  torrents: Array<Torrent>,
   searchQuery: string,
   filter: string
-): Torrent[] {
+): Array<Torrent> {
   let result = torrents
 
   // Apply search filter first (case-insensitive, trimmed)
   const trimmedQuery = searchQuery.trim().toLowerCase()
   if (trimmedQuery) {
     result = result.filter((t: Torrent) =>
-      t.name?.toLowerCase().includes(trimmedQuery)
+      t.name.toLowerCase().includes(trimmedQuery)
     )
   }
 
@@ -110,7 +110,7 @@ function createMockTorrent(overrides: Partial<Torrent>): Torrent {
 }
 
 // Test data
-const mockTorrents: Torrent[] = [
+const mockTorrents: Array<Torrent> = [
   createMockTorrent({ hash: '1', name: 'Ubuntu Server 22.04 ISO', state: 'downloading', category: 'Linux' }),
   createMockTorrent({ hash: '2', name: 'ubuntu desktop 24.04', state: 'seeding', category: 'Linux' }),
   createMockTorrent({ hash: '3', name: 'Fedora Workstation', state: 'downloading', category: 'Linux' }),
@@ -302,7 +302,7 @@ describe('Torrent Search Filtering', () => {
 
   describe('Edge cases', () => {
     it('handles torrent with undefined name', () => {
-      const torrentsWithUndefinedName: Torrent[] = [
+      const torrentsWithUndefinedName: Array<Torrent> = [
         createMockTorrent({ hash: '1', name: undefined as any, state: 'downloading' }),
         createMockTorrent({ hash: '2', name: 'Valid Name', state: 'downloading' }),
       ]
@@ -312,7 +312,7 @@ describe('Torrent Search Filtering', () => {
     })
 
     it('handles special characters in search', () => {
-      const torrentsWithSpecialChars: Torrent[] = [
+      const torrentsWithSpecialChars: Array<Torrent> = [
         createMockTorrent({ hash: '1', name: 'File (2024) [1080p]', state: 'downloading' }),
         createMockTorrent({ hash: '2', name: 'Regular File', state: 'downloading' }),
       ]
@@ -322,7 +322,7 @@ describe('Torrent Search Filtering', () => {
     })
 
     it('handles brackets in search', () => {
-      const torrentsWithBrackets: Torrent[] = [
+      const torrentsWithBrackets: Array<Torrent> = [
         createMockTorrent({ hash: '1', name: 'File [1080p]', state: 'downloading' }),
         createMockTorrent({ hash: '2', name: 'File 720p', state: 'downloading' }),
       ]

@@ -2,6 +2,8 @@ import React, { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Clock, Download, HardDrive, MoreHorizontal, Pause, Play, Trash2, Upload } from 'lucide-react'
+import type { Torrent } from '@/types/torrent'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,9 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
-import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
-import type { Torrent } from '@/types/torrent'
+import { deleteTorrent, pauseTorrent, resumeTorrent } from '@/lib/api'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatBytes, formatEta } from '@/lib/utils'
 
@@ -242,7 +242,7 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
 
 // Virtualized card list component for mobile view
 interface VirtualizedTorrentCardListProps {
-  torrents: Torrent[]
+  torrents: Array<Torrent>
   onTorrentClick?: (torrent: Torrent) => void
   selectedHashes?: Set<string>
   toggleSelection?: (hash: string) => void

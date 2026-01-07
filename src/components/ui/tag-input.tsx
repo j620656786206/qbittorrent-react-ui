@@ -1,8 +1,8 @@
 import * as React from "react"
-import { X, ChevronDown, Tag as TagIcon } from "lucide-react"
+import { ChevronDown, Tag as TagIcon, X } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import type { Tag, TagColor } from "@/types/tag"
+import { cn } from "@/lib/utils"
 
 /**
  * Get Tailwind background class for a tag color
@@ -64,11 +64,11 @@ function TagChip({ tag, onRemove, className }: TagChipProps) {
  */
 interface TagInputProps {
   /** Available tags to select from */
-  availableTags: Tag[]
+  availableTags: Array<Tag>
   /** Currently selected tag names */
-  value: string[]
+  value: Array<string>
   /** Callback when selection changes */
-  onChange: (selectedTagNames: string[]) => void
+  onChange: (selectedTagNames: Array<string>) => void
   /** Placeholder text when no tags selected */
   placeholder?: string
   /** Additional CSS classes */

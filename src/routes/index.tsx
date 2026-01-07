@@ -1,23 +1,22 @@
 import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
+import { useTranslation } from 'react-i18next'
 import type { Torrent } from '@/types/torrent'
 import { parseTagString } from '@/lib/tag-storage'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
-import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent, getCategories, setTorrentCategory } from '@/lib/api'
+import { deleteTorrent, getCategories, getMaindata, login, pauseTorrent, recheckTorrent, resumeTorrent, setTorrentCategory } from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
-import { useMutation } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,8 +62,8 @@ function HomePage() {
     })
   }, [])
 
-  const selectAll = React.useCallback((torrents: Torrent[]) => {
-    setSelectedHashes(new Set(torrents.map(t => t.hash)))
+  const selectAll = React.useCallback((torrents: Array<Torrent>) => {
+    setSelectedHashes(new Set(torrents.map(torrent => torrent.hash)))
   }, [])
 
   const clearSelection = React.useCallback(() => {
@@ -132,9 +131,9 @@ function HomePage() {
   } = useQuery({
     queryKey: ['maindata'], // Single query key, rid is managed internally
     queryFn: async () => {
-      const maindata = await getMaindata(credentials.baseUrl, ridRef.current)
-      ridRef.current = maindata.rid // Update ref immediately
-      return maindata
+      const response = await getMaindata(credentials.baseUrl, ridRef.current)
+      ridRef.current = response.rid // Update ref immediately
+      return response
     },
     refetchInterval: 5000,
     enabled: loginSuccess, // Only enabled if logged in
@@ -209,8 +208,8 @@ function HomePage() {
     let result = allTorrents
 
     if (trimmedSearch) {
-      result = result.filter((t: Torrent) =>
-        t.name?.toLowerCase().includes(trimmedSearch)
+      result = result.filter((torrent: Torrent) =>
+        torrent.name.toLowerCase().includes(trimmedSearch)
       )
     }
 
@@ -220,24 +219,24 @@ function HomePage() {
     // Category filter
     if (filter.startsWith('category:')) {
       const category = filter.substring(9) // Remove 'category:' prefix
-      return result.filter((t: Torrent) => {
-        const torrentCategory = t.category || '未分類'
+      return result.filter((torrent: Torrent) => {
+        const torrentCategory = torrent.category || '未分類'
         return torrentCategory === category
       })
     }
 
     // Tag filter (supports multi-tag with OR logic)
     if (filter.startsWith('tag:')) {
-      const tagNames = filter.substring(4).split(',').map(t => t.trim().toLowerCase())
-      return result.filter((t: Torrent) => {
-        const torrentTags = parseTagString(t.tags || '').map(tag => tag.toLowerCase())
+      const tagNames = filter.substring(4).split(',').map(tagStr => tagStr.trim().toLowerCase())
+      return result.filter((torrent: Torrent) => {
+        const torrentTags = parseTagString(torrent.tags || '').map(tag => tag.toLowerCase())
         // OR logic: show torrents with ANY of the selected tags
         return tagNames.some(tagName => torrentTags.includes(tagName))
       })
     }
 
     // Status filter
-    return result.filter((t: Torrent) => t.state === filter)
+    return result.filter((torrent: Torrent) => torrent.state === filter)
   }, [allTorrents, filter, searchQuery])
 
   // --- Clear selections that are no longer visible when filter/search changes ---
@@ -252,7 +251,7 @@ function HomePage() {
 
       // Clear selections for torrents that are no longer visible
       if (selectedHashes.size > 0) {
-        const visibleHashes = new Set(filteredTorrents.map(t => t.hash))
+        const visibleHashes = new Set(filteredTorrents.map(torrent => torrent.hash))
         const newSelectedHashes = new Set<string>()
 
         selectedHashes.forEach(hash => {
@@ -316,7 +315,7 @@ function HomePage() {
 
   // --- Batch Mutations for Bulk Operations ---
   const batchPauseMutation = useMutation({
-    mutationFn: (hashes: string[]) => pauseTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => pauseTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -328,7 +327,7 @@ function HomePage() {
   })
 
   const batchResumeMutation = useMutation({
-    mutationFn: (hashes: string[]) => resumeTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => resumeTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -340,7 +339,7 @@ function HomePage() {
   })
 
   const batchRecheckMutation = useMutation({
-    mutationFn: (hashes: string[]) => recheckTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => recheckTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -352,7 +351,7 @@ function HomePage() {
   })
 
   const batchDeleteMutation = useMutation({
-    mutationFn: ({ hashes, deleteFiles }: { hashes: string[]; deleteFiles: boolean }) =>
+    mutationFn: ({ hashes, deleteFiles }: { hashes: Array<string>; deleteFiles: boolean }) =>
       deleteTorrent(getBaseUrl(), hashes, deleteFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
@@ -367,7 +366,7 @@ function HomePage() {
   })
 
   const batchSetCategoryMutation = useMutation({
-    mutationFn: ({ hashes, category }: { hashes: string[]; category: string }) =>
+    mutationFn: ({ hashes, category }: { hashes: Array<string>; category: string }) =>
       setTorrentCategory(getBaseUrl(), hashes, category),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
@@ -404,7 +403,7 @@ function HomePage() {
     if (isMaindataError) {
       return (
         <p className="text-red-400">
-          Error fetching torrent data: {maindataError?.message}
+          Error fetching torrent data: {maindataError.message}
         </p>
       )
     }
