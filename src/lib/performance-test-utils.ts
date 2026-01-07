@@ -11,7 +11,7 @@
  * Or use the global performance test utilities exposed in development mode.
  */
 
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 
 // Random torrent names for realistic testing
 const TORRENT_NAME_PREFIXES = [

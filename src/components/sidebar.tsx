@@ -8,7 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 import type { Tag } from '@/types/tag'
 import { useTranslation } from 'react-i18next'
 import { getTags, parseTagString } from '@/lib/tag-storage'

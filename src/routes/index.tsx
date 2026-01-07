@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 import { parseTagString } from '@/lib/tag-storage'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'

@@ -24,7 +24,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 import type { Tracker, TrackerStatusType } from '@/lib/api'
 import type { Tag } from '@/types/tag'
 

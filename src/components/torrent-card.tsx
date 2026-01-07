@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatBytes, formatEta } from '@/lib/utils'
 

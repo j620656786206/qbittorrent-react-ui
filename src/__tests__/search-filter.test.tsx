@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest'
-
-/**
- * Type definition for torrent (minimal for testing)
- */
-interface Torrent {
-  hash: string
-  name?: string
-  state?: string
-  category?: string
-}
+import type { Torrent } from '@/types/torrent'
 
 /**
  * Filter function that mirrors the filtering logic in src/routes/index.tsx

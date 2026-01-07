@@ -1,5 +1,4 @@
-import type { LoginPayload } from '@/types/qbit/payloads'
-import type { Torrent } from '@/components/torrent-table'; // Re-use our Torrent type for full data
+import type { Torrent } from '@/types/torrent';
 import type { TorrentFile } from '@/types/torrent';
 
 // Define types for sync/maindata response

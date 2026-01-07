@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 import { generateMockTorrents, PerformanceMetrics } from './performance-test-utils'
 
 // Global state for mock torrents (persists across component re-renders)
