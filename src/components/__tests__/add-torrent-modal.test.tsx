@@ -990,8 +990,12 @@ describe('AddTorrentModal Component', () => {
       const longPath = '/very/long/path/'.repeat(20)
       const magnetInput = screen.getByLabelText('Magnet Link')
       const savePathInput = screen.getByLabelText('Save Path')
-      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
-      await user.type(savePathInput, longPath)
+
+      // Use paste instead of type for long strings (more efficient)
+      await user.click(magnetInput)
+      await user.paste('magnet:?xt=urn:btih:test123')
+      await user.click(savePathInput)
+      await user.paste(longPath)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
       await user.click(addButton)

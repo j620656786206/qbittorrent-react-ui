@@ -5,6 +5,11 @@ import {
   pauseTorrent,
   resumeTorrent,
   deleteTorrent,
+  getCategories,
+  setTorrentCategory,
+  addTorrentMagnet,
+  addTorrentFile,
+  getTorrentFiles,
   type MaindataResponse,
 } from '../api'
 
@@ -501,6 +506,281 @@ describe('API Functions', () => {
       const callArgs = mockFetch.mock.calls[0][1]
       const body = callArgs.body as URLSearchParams
       expect(body.get('deleteFiles')).toBe('false')
+    })
+  })
+
+  describe('getCategories', () => {
+    it('should fetch categories successfully', async () => {
+      const mockCategories = {
+        category1: { name: 'category1', savePath: '/path1' },
+        category2: { name: 'category2', savePath: '/path2' },
+      }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCategories,
+      })
+
+      const result = await getCategories(baseUrl)
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v2/torrents/categories'),
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      )
+      expect(result).toEqual(mockCategories)
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      })
+
+      await expect(getCategories(baseUrl)).rejects.toThrow(
+        'Failed to fetch categories with status: 401'
+      )
+    })
+  })
+
+  describe('setTorrentCategory', () => {
+    it('should set category for a single torrent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await setTorrentCategory(baseUrl, 'abc123', 'downloads')
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123')
+      expect(body.get('category')).toBe('downloads')
+    })
+
+    it('should set category for multiple torrents', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await setTorrentCategory(baseUrl, ['abc123', 'def456'], 'movies')
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123|def456')
+      expect(body.get('category')).toBe('movies')
+    })
+
+    it('should remove category with empty string', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await setTorrentCategory(baseUrl, 'abc123', '')
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('category')).toBe('')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+      })
+
+      await expect(setTorrentCategory(baseUrl, 'abc123', 'test')).rejects.toThrow(
+        'Failed to set category for torrent(s) with status: 400'
+      )
+    })
+  })
+
+  describe('addTorrentMagnet', () => {
+    it('should add torrent via magnet link', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('urls')).toBe(magnetLink)
+    })
+
+    it('should add torrent with savepath option', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink, { savepath: '/downloads' })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('savepath')).toBe('/downloads')
+    })
+
+    it('should add torrent with category option', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink, { category: 'movies' })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('category')).toBe('movies')
+    })
+
+    it('should add torrent with tags option', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink, { tags: 'tag1,tag2' })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('tags')).toBe('tag1,tag2')
+    })
+
+    it('should add torrent with paused option', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink, { paused: true })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('paused')).toBe('true')
+    })
+
+    it('should add torrent with all options', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await addTorrentMagnet(baseUrl, magnetLink, {
+        savepath: '/downloads',
+        category: 'movies',
+        tags: 'tag1,tag2',
+        paused: false,
+      })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('savepath')).toBe('/downloads')
+      expect(body.get('category')).toBe('movies')
+      expect(body.get('tags')).toBe('tag1,tag2')
+      expect(body.get('paused')).toBe('false')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 415,
+      })
+
+      const magnetLink = 'magnet:?xt=urn:btih:test123'
+      await expect(addTorrentMagnet(baseUrl, magnetLink)).rejects.toThrow(
+        'Failed to add torrent via magnet link with status: 415'
+      )
+    })
+  })
+
+  describe('addTorrentFile', () => {
+    it('should add torrent via file', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      await addTorrentFile(baseUrl, file)
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v2/torrents/add'),
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        })
+      )
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as FormData
+      expect(body.get('torrents')).toBe(file)
+    })
+
+    it('should add torrent file with options', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      await addTorrentFile(baseUrl, file, {
+        savepath: '/downloads',
+        category: 'movies',
+        tags: 'tag1',
+        paused: true,
+      })
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as FormData
+      expect(body.get('savepath')).toBe('/downloads')
+      expect(body.get('category')).toBe('movies')
+      expect(body.get('tags')).toBe('tag1')
+      expect(body.get('paused')).toBe('true')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 415,
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      await expect(addTorrentFile(baseUrl, file)).rejects.toThrow(
+        'Failed to add torrent via file with status: 415'
+      )
+    })
+  })
+
+  describe('getTorrentFiles', () => {
+    it('should fetch torrent files successfully', async () => {
+      const mockFiles = [
+        { index: 0, name: 'file1.txt', size: 1024, progress: 0.5, priority: 1 },
+        { index: 1, name: 'file2.txt', size: 2048, progress: 0.8, priority: 1 },
+      ]
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockFiles,
+      })
+
+      const result = await getTorrentFiles(baseUrl, 'abc123')
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v2/torrents/files?hash=abc123'),
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      )
+      expect(result).toEqual(mockFiles)
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+      })
+
+      await expect(getTorrentFiles(baseUrl, 'abc123')).rejects.toThrow(
+        'Failed to fetch torrent files with status: 409'
+      )
     })
   })
 })
