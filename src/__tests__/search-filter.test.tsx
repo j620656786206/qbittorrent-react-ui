@@ -25,7 +25,7 @@ function filterTorrents(
   const trimmedQuery = searchQuery.trim().toLowerCase()
   if (trimmedQuery) {
     result = result.filter((t: Torrent) =>
-      t.name.toLowerCase().includes(trimmedQuery),
+      t.name?.toLowerCase().includes(trimmedQuery),
     )
   }
 
