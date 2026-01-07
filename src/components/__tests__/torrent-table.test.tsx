@@ -1,41 +1,5 @@
 import { describe, it, expect } from 'vitest'
-
-/**
- * Helper function to format bytes into KB, MB, GB, etc.
- * Mirrors the function in src/components/torrent-table.tsx
- *
- * @param bytes - Number of bytes to format
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted string with unit (e.g., "1.50 MB")
- */
-function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
-
-/**
- * Helper function to format ETA (Estimated Time of Arrival)
- * Mirrors the function in src/components/torrent-table.tsx
- *
- * @param seconds - Number of seconds remaining
- * @returns Formatted time string (e.g., "2h 30m", "5d 3h", "∞")
- */
-function formatEta(seconds: number) {
-  if (seconds < 0 || seconds === 8640000) return '∞'
-  if (seconds === 0) return '-'
-
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
+import { formatBytes, formatEta } from '@/lib/utils'
 
 /**
  * Helper to get state translation key
