@@ -75,7 +75,7 @@ function HomePage() {
     credentials.baseUrl || localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
 
   // --- State for sync/maindata ---
-  const [rid, setRid] = React.useState<number | undefined>(undefined)
+  const [_rid, setRid] = React.useState<number | undefined>(undefined)
   const [allTorrentsMap, setAllTorrentsMap] = React.useState<
     Map<string, Torrent>
   >(new Map()) // Store torrents as a Map for efficient updates
@@ -451,17 +451,18 @@ function HomePage() {
           {/* Batch Actions Toolbar */}
           {selectedHashes.size > 0 && (
             <BatchActionsToolbar
-selectedCount={selectedHashes.size}
+              selectedCount={selectedHashes.size}
               onPause={() => batchPauseMutation.mutate(Array.from(selectedHashes))}
               onResume={() => batchResumeMutation.mutate(Array.from(selectedHashes))}
               onRecheck={() => batchRecheckMutation.mutate(Array.from(selectedHashes))}
               onDelete={() => setIsDeleteDialogOpen(true)}
-              onCategory={(category) =>
+              onSetCategory={(category: string) =>
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
                 })
               }
+              onClearSelection={clearSelection}
               categories={categoryNames}
             />
           )}
@@ -501,9 +502,9 @@ selectedCount={selectedHashes.size}
               torrents={filteredTorrents}
               selectedHashes={selectedHashes}
               onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
-              onSelectionChange={toggleSelection}
-              onSelectAll={() => selectAll(filteredTorrents)}
-              onClearSelection={clearSelection}
+              toggleSelection={toggleSelection}
+              selectAll={() => selectAll(filteredTorrents)}
+              clearSelection={clearSelection}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>
@@ -537,6 +538,7 @@ selectedCount={selectedHashes.size}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onAddTorrent={() => setIsAddTorrentOpen(true)}
         isMobile={!isDesktop}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}

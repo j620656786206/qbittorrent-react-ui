@@ -1,6 +1,4 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+import { createRootRoute } from '@tanstack/react-router'
 
 import { Layout } from '../components/layout'
 import appCss from '../styles.css?url'

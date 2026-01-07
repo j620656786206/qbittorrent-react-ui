@@ -19,7 +19,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-type MediaQueryString = `(min-width: ${number}px)` | `(max-width: ${number}px)`;
+export type MediaQueryString = `(min-width: ${number}px)` | `(max-width: ${number}px)`;
 
 export function useMediaQuery(query: MediaQueryString): boolean {
   const [matches, setMatches] = useState(false);

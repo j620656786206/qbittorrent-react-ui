@@ -416,7 +416,7 @@ describe('TorrentTable Helper Functions', () => {
           { seconds: 0, expected: '-', description: 'completed/paused' },
         ]
 
-        scenarios.forEach(({ seconds, expected, description }) => {
+        scenarios.forEach(({ seconds, expected }) => {
           expect(formatEta(seconds)).toBe(expected)
         })
       })

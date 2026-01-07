@@ -428,3 +428,167 @@ export async function getTrackers(baseUrl: string, hash: string): Promise<Tracke
 
   return res.json();
 }
+
+/**
+ * Rechecks one or more torrents for integrity.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to recheck.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function recheckTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/recheck`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to recheck torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Reannounces one or more torrents to their trackers.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to reannounce.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function reannounceTorrent(baseUrl: string, hashes: string | string[]): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/reannounce`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to reannounce torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Adds one or more tags to torrents.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to tag.
+ * @param {string | string[]} tags - Single tag or array of tags to add.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTorrentTags(
+  baseUrl: string,
+  hashes: string | string[],
+  tags: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+  formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/addTags`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add tags to torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Removes one or more tags from torrents.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to untag.
+ * @param {string | string[]} tags - Single tag or array of tags to remove. Empty string removes all tags.
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function removeTorrentTags(
+  baseUrl: string,
+  hashes: string | string[],
+  tags?: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+  if (tags !== undefined) {
+    formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags);
+  }
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTags`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to remove tags from torrent(s) with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Adds one or more trackers to a torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to add trackers to.
+ * @param {string | string[]} trackers - Single tracker URL or array of tracker URLs (one per line if string).
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function addTrackers(
+  baseUrl: string,
+  hash: string,
+  trackers: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hash', hash);
+  formData.append('urls', Array.isArray(trackers) ? trackers.join('\n') : trackers);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/addTrackers`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to add trackers to torrent with status: ${res.status}`);
+  }
+  return true;
+}
+
+/**
+ * Removes one or more trackers from a torrent.
+ * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
+ * @param {string} hash - The hash of the torrent to remove trackers from.
+ * @param {string | string[]} trackers - Single tracker URL or array of tracker URLs (one per line if string).
+ * @returns {Promise<boolean>} - True if successful, throws error otherwise.
+ */
+export async function removeTrackers(
+  baseUrl: string,
+  hash: string,
+  trackers: string | string[]
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+  const formData = new URLSearchParams();
+  formData.append('hash', hash);
+  formData.append('urls', Array.isArray(trackers) ? trackers.join('|') : trackers);
+
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTrackers`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to remove trackers from torrent with status: ${res.status}`);
+  }
+  return true;
+}

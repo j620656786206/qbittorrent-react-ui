@@ -89,9 +89,9 @@ describe('AddTorrentModal Component', () => {
     vi.clearAllMocks()
     // Mock getCategories to return some categories
     vi.mocked(getCategories).mockResolvedValue({
-      'Movies': {},
-      'TV Shows': {},
-      'Music': {},
+      'Movies': { name: 'Movies', savePath: '/downloads/movies' },
+      'TV Shows': { name: 'TV Shows', savePath: '/downloads/tv' },
+      'Music': { name: 'Music', savePath: '/downloads/music' },
     })
   })
 
@@ -341,7 +341,7 @@ describe('AddTorrentModal Component', () => {
     it('accepts valid magnet link starting with "magnet:?"', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -359,7 +359,7 @@ describe('AddTorrentModal Component', () => {
     it('trims whitespace from magnet link', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -398,7 +398,7 @@ describe('AddTorrentModal Component', () => {
     it('does not show error when file is selected', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -424,7 +424,7 @@ describe('AddTorrentModal Component', () => {
     it('calls addTorrentMagnet with correct parameters', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -451,7 +451,7 @@ describe('AddTorrentModal Component', () => {
     it('includes savepath when provided', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -477,7 +477,7 @@ describe('AddTorrentModal Component', () => {
     it('includes category when selected', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -509,7 +509,7 @@ describe('AddTorrentModal Component', () => {
     it('includes paused flag when checked', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -536,7 +536,7 @@ describe('AddTorrentModal Component', () => {
     it('closes modal after successful submission', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -556,7 +556,7 @@ describe('AddTorrentModal Component', () => {
     it('calls addTorrentFile with correct parameters', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -589,7 +589,7 @@ describe('AddTorrentModal Component', () => {
     it('includes savepath, category, and paused flag', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -636,7 +636,7 @@ describe('AddTorrentModal Component', () => {
     it('closes modal after successful submission', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -825,8 +825,8 @@ describe('AddTorrentModal Component', () => {
     it('disables buttons while submitting magnet link', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      let resolvePromise: (value: Response) => void
-      const promise = new Promise<Response>((resolve) => {
+      let resolvePromise: (value: boolean) => void
+      const promise = new Promise<boolean>((resolve) => {
         resolvePromise = resolve
       })
       vi.mocked(addTorrentMagnet).mockReturnValue(promise)
@@ -847,15 +847,15 @@ describe('AddTorrentModal Component', () => {
 
       // Resolve promise to clean up
       await waitFor(() => {
-        resolvePromise!(new Response('OK', { status: 200 }))
+        resolvePromise!(true)
       })
     })
 
     it('shows "Adding..." text while submitting', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      let resolvePromise: (value: Response) => void
-      const promise = new Promise<Response>((resolve) => {
+      let resolvePromise: (value: boolean) => void
+      const promise = new Promise<boolean>((resolve) => {
         resolvePromise = resolve
       })
       vi.mocked(addTorrentMagnet).mockReturnValue(promise)
@@ -874,7 +874,7 @@ describe('AddTorrentModal Component', () => {
 
       // Resolve promise to clean up
       await waitFor(() => {
-        resolvePromise!(new Response('OK', { status: 200 }))
+        resolvePromise!(true)
       })
     })
   })
@@ -884,7 +884,7 @@ describe('AddTorrentModal Component', () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
       localStorage.setItem('qbit_baseUrl', 'http://custom-server:9090')
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -907,7 +907,7 @@ describe('AddTorrentModal Component', () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
       localStorage.removeItem('qbit_baseUrl')
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -960,7 +960,7 @@ describe('AddTorrentModal Component', () => {
     it('handles file input with multiple files (only uses first)', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -968,12 +968,11 @@ describe('AddTorrentModal Component', () => {
       const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
       await user.click(fileTabButton)
 
-      // Create multiple files but only first should be used
+      // Create file to upload
       const file1 = new File(['torrent 1'], 'first.torrent', { type: 'application/x-bittorrent' })
-      const file2 = new File(['torrent 2'], 'second.torrent', { type: 'application/x-bittorrent' })
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
 
-      // Simulate selecting first file
+      // Simulate selecting file
       await user.upload(fileInput, file1)
 
       // Should display first file name
@@ -983,7 +982,7 @@ describe('AddTorrentModal Component', () => {
     it('handles very long save path', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 

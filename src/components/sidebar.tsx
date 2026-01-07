@@ -52,7 +52,7 @@ export function Sidebar({
   isMobileSidebarOpen,
   onCloseMobileSidebar,
   torrents,
-  categories,
+  categories: _categories,
   searchQuery,
   setSearchQuery
 }: SidebarProps) {

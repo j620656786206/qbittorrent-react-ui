@@ -1,5 +1,4 @@
 import React from 'react'
-import { Sidebar } from './sidebar'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

@@ -471,7 +471,6 @@ function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProp
               key={tag.name}
               tag={tag}
               onRemove={() => handleRemoveTag(tag.name)}
-              disabled={isLoading}
             />
           ))}
 
