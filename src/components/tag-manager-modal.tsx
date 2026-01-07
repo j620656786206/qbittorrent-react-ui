@@ -52,7 +52,7 @@ export function TagManagerModal({
   // Form state for creating new tag
   const [newTagName, setNewTagName] = React.useState('')
   const [newTagColor, setNewTagColor] = React.useState<TagColor | undefined>(
-    undefined
+    undefined,
   )
   const [error, setError] = React.useState('')
 
@@ -60,13 +60,13 @@ export function TagManagerModal({
   const [editingTagId, setEditingTagId] = React.useState<string | null>(null)
   const [editTagName, setEditTagName] = React.useState('')
   const [editTagColor, setEditTagColor] = React.useState<TagColor | undefined>(
-    undefined
+    undefined,
   )
   const [editError, setEditError] = React.useState('')
 
   // Delete confirmation state
   const [deleteConfirmTag, setDeleteConfirmTag] = React.useState<Tag | null>(
-    null
+    null,
   )
 
   // Load tags when modal opens
@@ -107,7 +107,12 @@ export function TagManagerModal({
     // Validate tag name
     const validationError = validateTagName(newTagName)
     if (validationError) {
-      setError(t(`tags.error.${validationError === 'Tag name cannot be empty' ? 'emptyName' : validationError === 'Tag name cannot exceed 50 characters' ? 'nameTooLong' : 'invalidName'}`, validationError))
+      setError(
+        t(
+          `tags.error.${validationError === 'Tag name cannot be empty' ? 'emptyName' : validationError === 'Tag name cannot exceed 50 characters' ? 'nameTooLong' : 'invalidName'}`,
+          validationError,
+        ),
+      )
       return
     }
 
@@ -124,7 +129,7 @@ export function TagManagerModal({
       refreshTags()
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : t('tags.error.createFailed')
+        err instanceof Error ? err.message : t('tags.error.createFailed'),
       )
     }
   }
@@ -154,7 +159,12 @@ export function TagManagerModal({
     // Validate tag name
     const validationError = validateTagName(editTagName)
     if (validationError) {
-      setEditError(t(`tags.error.${validationError === 'Tag name cannot be empty' ? 'emptyName' : validationError === 'Tag name cannot exceed 50 characters' ? 'nameTooLong' : 'invalidName'}`, validationError))
+      setEditError(
+        t(
+          `tags.error.${validationError === 'Tag name cannot be empty' ? 'emptyName' : validationError === 'Tag name cannot exceed 50 characters' ? 'nameTooLong' : 'invalidName'}`,
+          validationError,
+        ),
+      )
       return
     }
 
@@ -173,7 +183,7 @@ export function TagManagerModal({
       refreshTags()
     } catch (err) {
       setEditError(
-        err instanceof Error ? err.message : t('tags.error.updateFailed')
+        err instanceof Error ? err.message : t('tags.error.updateFailed'),
       )
     }
   }
@@ -195,7 +205,7 @@ export function TagManagerModal({
   // Handle key press for input
   const handleKeyPress = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    action: () => void
+    action: () => void,
   ) => {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -270,13 +280,15 @@ export function TagManagerModal({
                       type="button"
                       className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(color)} ${
                         newTagColor === color
-                          ? 'border-white ring-2 ring-offset-2 ring-' + color + '-500'
+                          ? 'border-white ring-2 ring-offset-2 ring-' +
+                            color +
+                            '-500'
                           : 'border-transparent'
                       }`}
                       onClick={() => setNewTagColor(color)}
                       title={color}
                     />
-                  )
+                  ),
                 )}
               </div>
 
@@ -312,7 +324,9 @@ export function TagManagerModal({
                                 setEditTagName(e.target.value)
                                 setEditError('')
                               }}
-                              onKeyDown={(e) => handleKeyPress(e, handleSaveEdit)}
+                              onKeyDown={(e) =>
+                                handleKeyPress(e, handleSaveEdit)
+                              }
                               className="flex-1 h-8"
                               autoFocus
                             />
@@ -348,14 +362,16 @@ export function TagManagerModal({
                               onClick={() => setEditTagColor(undefined)}
                             />
                             {TagColors.filter(
-                              (c) => c !== 'slate' && c !== 'gray'
+                              (c) => c !== 'slate' && c !== 'gray',
                             ).map((color) => (
                               <button
                                 key={color}
                                 type="button"
                                 className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(color)} ${
                                   editTagColor === color
-                                    ? 'border-white ring-1 ring-offset-1 ring-' + color + '-500'
+                                    ? 'border-white ring-1 ring-offset-1 ring-' +
+                                      color +
+                                      '-500'
                                     : 'border-transparent'
                                 }`}
                                 onClick={() => setEditTagColor(color)}
@@ -363,7 +379,9 @@ export function TagManagerModal({
                             ))}
                           </div>
                           {editError && (
-                            <div className="text-xs text-red-500">{editError}</div>
+                            <div className="text-xs text-red-500">
+                              {editError}
+                            </div>
                           )}
                         </div>
                       ) : (

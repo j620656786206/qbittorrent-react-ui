@@ -53,7 +53,8 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Helper to get baseUrl from localStorage
-  const getBaseUrl = () => localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
+  const getBaseUrl = () =>
+    localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
 
   // Fetch categories
   const { data: categoriesData } = useQuery({
@@ -68,7 +69,8 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       addTorrentMagnet(getBaseUrl(), magnet, {
         savepath: savePath || undefined,
         category: category || undefined,
-        tags: selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
+        tags:
+          selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
         paused: startPaused,
       }),
     onSuccess: () => {
@@ -86,7 +88,8 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       addTorrentFile(getBaseUrl(), file, {
         savepath: savePath || undefined,
         category: category || undefined,
-        tags: selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
+        tags:
+          selectedTags.length > 0 ? formatTagString(selectedTags) : undefined,
         paused: startPaused,
       }),
     onSuccess: () => {
@@ -193,7 +196,9 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
           {/* Magnet Link Input */}
           {activeTab === 'magnet' && (
             <div className="grid gap-2">
-              <Label htmlFor="magnetLink">{t('addTorrent.magnetLink.label')}</Label>
+              <Label htmlFor="magnetLink">
+                {t('addTorrent.magnetLink.label')}
+              </Label>
               <Input
                 id="magnetLink"
                 value={magnetLink}
@@ -301,7 +306,11 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isSubmitting}
+          >
             {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>

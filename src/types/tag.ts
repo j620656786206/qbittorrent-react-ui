@@ -4,11 +4,11 @@
  * Tag-torrent relationships are managed via qBittorrent API
  */
 export type Tag = {
-  id: string; // UUID v4
-  name: string; // Display name (unique, case-insensitive)
-  color?: string; // Optional Tailwind color class (e.g., "blue", "green")
-  createdAt: number; // Unix timestamp
-};
+  id: string // UUID v4
+  name: string // Display name (unique, case-insensitive)
+  color?: string // Optional Tailwind color class (e.g., "blue", "green")
+  createdAt: number // Unix timestamp
+}
 
 /**
  * Available Tailwind color classes for tag color selection
@@ -29,9 +29,9 @@ export const TagColors = [
   'purple',
   'pink',
   'rose',
-] as const;
+] as const
 
 /**
  * Type for valid tag color values
  */
-export type TagColor = (typeof TagColors)[number];
+export type TagColor = (typeof TagColors)[number]

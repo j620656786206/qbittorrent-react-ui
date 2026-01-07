@@ -117,7 +117,9 @@
           "service": "main",
           "files_to_modify": ["src/components/add-torrent-modal.tsx"],
           "files_to_create": [],
-          "patterns_from": ["src/routes/index.tsx (pauseMutation, deleteMutation)"],
+          "patterns_from": [
+            "src/routes/index.tsx (pauseMutation, deleteMutation)"
+          ],
           "implementation_notes": "Add useMutation hooks for addTorrentFromMagnet and addTorrentFromFile. On success, call onSuccess prop and close modal. Handle and display errors. Invalidate 'maindata' query.",
           "verification": {
             "type": "command",

@@ -5,7 +5,11 @@ import { AlertCircle, Files, Loader2, RefreshCw } from 'lucide-react'
 
 import type { FilePriority } from '@/types/torrent'
 import { getTorrentFiles, setFilePriority } from '@/lib/api'
-import { buildFileTree, findNodeByPath, getFileIndicesFromFolder } from '@/lib/fileTree'
+import {
+  buildFileTree,
+  findNodeByPath,
+  getFileIndicesFromFolder,
+} from '@/lib/fileTree'
 import { FileTree } from '@/components/FileTreeNode'
 import { Button } from '@/components/ui/button'
 
@@ -80,7 +84,7 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
     (fileIndex: number, priority: FilePriority) => {
       priorityMutation.mutate({ fileIds: fileIndex, priority })
     },
-    [priorityMutation]
+    [priorityMutation],
   )
 
   // Handle priority change for all files in a folder
@@ -100,7 +104,7 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
         }
       }
     },
-    [files, priorityMutation]
+    [files, priorityMutation],
   )
 
   // Build tree structure from flat file list
@@ -163,9 +167,7 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <AlertCircle className="h-8 w-8 text-red-400 mb-3" />
-        <p className="text-slate-300 text-sm mb-2">
-          {t('fileList.error')}
-        </p>
+        <p className="text-slate-300 text-sm mb-2">{t('fileList.error')}</p>
         <p className="text-slate-500 text-xs mb-4">
           {error instanceof Error ? error.message : String(error)}
         </p>
@@ -192,9 +194,7 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <Files className="h-8 w-8 text-slate-500 mb-3" />
-        <p className="text-slate-400 text-sm">
-          {t('fileList.noFiles')}
-        </p>
+        <p className="text-slate-400 text-sm">{t('fileList.noFiles')}</p>
       </div>
     )
   }
@@ -206,9 +206,7 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-slate-400">
           <Files className="h-4 w-4" />
-          <span>
-            {t('fileList.fileCount', { count: files.length })}
-          </span>
+          <span>{t('fileList.fileCount', { count: files.length })}</span>
           {isFetching && (
             <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
           )}

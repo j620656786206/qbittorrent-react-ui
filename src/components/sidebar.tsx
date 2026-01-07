@@ -1,5 +1,13 @@
 import React from 'react'
-import { Folder, Hash, Plus, Search, Settings, Tag as TagIcon, X } from 'lucide-react'
+import {
+  Folder,
+  Hash,
+  Plus,
+  Search,
+  Settings,
+  Tag as TagIcon,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Torrent } from '@/types/torrent'
 import type { Tag } from '@/types/tag'
@@ -54,7 +62,7 @@ export function Sidebar({
   torrents,
   categories: _categories,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
 }: SidebarProps) {
   const { t } = useTranslation()
 
@@ -62,10 +70,14 @@ export function Sidebar({
   const [isTagManagerOpen, setIsTagManagerOpen] = React.useState(false)
 
   // Tags from localStorage (refreshed when modal closes)
-  const [storedTags, setStoredTags] = React.useState<Array<Tag>>(() => getTags())
+  const [storedTags, setStoredTags] = React.useState<Array<Tag>>(() =>
+    getTags(),
+  )
 
   // Multi-tag filter state
-  const [selectedTagFilters, setSelectedTagFilters] = React.useState<Set<string>>(new Set())
+  const [selectedTagFilters, setSelectedTagFilters] = React.useState<
+    Set<string>
+  >(new Set())
 
   // Refresh tags from localStorage
   const refreshTags = React.useCallback(() => {
@@ -75,7 +87,10 @@ export function Sidebar({
   // Sync selectedTagFilters with currentFilter
   React.useEffect(() => {
     if (currentFilter.startsWith('tag:')) {
-      const tagNames = currentFilter.substring(4).split(',').map(tagName => tagName.trim())
+      const tagNames = currentFilter
+        .substring(4)
+        .split(',')
+        .map((tagName) => tagName.trim())
       setSelectedTagFilters(new Set(tagNames))
     } else {
       setSelectedTagFilters(new Set())
@@ -89,11 +104,14 @@ export function Sidebar({
   }
 
   // Get unique categories from torrents
-  const categoryCounts = torrents.reduce((acc, torrent) => {
-    const cat = torrent.category || t('torrent.uncategorized')
-    acc[cat] = (acc[cat] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  const categoryCounts = torrents.reduce(
+    (acc, torrent) => {
+      const cat = torrent.category || t('torrent.uncategorized')
+      acc[cat] = (acc[cat] || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>,
+  )
 
   // Count torrents by tag
   const tagCounts = React.useMemo(() => {
@@ -119,7 +137,9 @@ export function Sidebar({
 
   const sidebarContent = (
     <>
-      <h1 className="text-xl font-bold text-white mb-6">{t('sidebar.title')}</h1>
+      <h1 className="text-xl font-bold text-white mb-6">
+        {t('sidebar.title')}
+      </h1>
 
       {/* Search Input */}
       <div className="mb-6">
@@ -184,7 +204,11 @@ export function Sidebar({
             {Object.entries(categoryCounts).map(([category, count]) => (
               <Button
                 key={category}
-                variant={currentFilter === `category:${category}` ? 'secondary' : 'ghost'}
+                variant={
+                  currentFilter === `category:${category}`
+                    ? 'secondary'
+                    : 'ghost'
+                }
                 className="justify-between text-sm h-9"
                 onClick={() => {
                   setFilter(`category:${category}`)
@@ -192,7 +216,9 @@ export function Sidebar({
                 }}
               >
                 <span className="truncate">{category}</span>
-                <span className="text-xs text-slate-400 shrink-0 ml-2">{count}</span>
+                <span className="text-xs text-slate-400 shrink-0 ml-2">
+                  {count}
+                </span>
               </Button>
             ))}
           </nav>
@@ -210,7 +236,9 @@ export function Sidebar({
             tagsWithCounts.map(({ tag, count }) => (
               <Button
                 key={tag.id}
-                variant={selectedTagFilters.has(tag.name) ? 'secondary' : 'ghost'}
+                variant={
+                  selectedTagFilters.has(tag.name) ? 'secondary' : 'ghost'
+                }
                 className="justify-between text-sm h-9"
                 onClick={() => {
                   const newSelected = new Set(selectedTagFilters)
@@ -239,7 +267,9 @@ export function Sidebar({
                   />
                   <span className="truncate">{tag.name}</span>
                 </span>
-                <span className="text-xs text-slate-400 shrink-0 ml-2">{count}</span>
+                <span className="text-xs text-slate-400 shrink-0 ml-2">
+                  {count}
+                </span>
               </Button>
             ))
           ) : (
@@ -307,7 +337,7 @@ export function Sidebar({
           onTagsChange={refreshTags}
         />
       </>
-    );
+    )
   }
 
   return (
@@ -321,5 +351,5 @@ export function Sidebar({
         onTagsChange={refreshTags}
       />
     </>
-  );
+  )
 }

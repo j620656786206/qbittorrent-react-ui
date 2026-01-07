@@ -48,7 +48,15 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { TagChip, getColorClass } from '@/components/ui/tag-input'
-import { TrackerStatus, addTorrentTags, addTrackers, getTrackers, reannounceTorrent, removeTorrentTags, removeTrackers } from '@/lib/api'
+import {
+  TrackerStatus,
+  addTorrentTags,
+  addTrackers,
+  getTrackers,
+  reannounceTorrent,
+  removeTorrentTags,
+  removeTrackers,
+} from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
 import { getTags, getTagsByNames, parseTagString } from '@/lib/tag-storage'
 import { formatBytes, formatEta } from '@/lib/utils'
@@ -131,8 +139,12 @@ export function TorrentDetail({
       {/* Progress Section */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-400">{t('torrent.details.progress')}</span>
-          <span className="font-medium">{(torrent.progress * 100).toFixed(2)}%</span>
+          <span className="text-slate-400">
+            {t('torrent.details.progress')}
+          </span>
+          <span className="font-medium">
+            {(torrent.progress * 100).toFixed(2)}%
+          </span>
         </div>
         <Progress value={torrent.progress * 100} className="h-3" />
         <div className="flex items-center justify-between text-xs text-slate-400">
@@ -146,7 +158,9 @@ export function TorrentDetail({
         <div className="bg-slate-800/50 rounded-lg p-3">
           <div className="flex items-center gap-2 text-blue-400 mb-1">
             <Download className="h-4 w-4" />
-            <span className="text-xs font-medium">{t('torrent.details.downloadSpeed')}</span>
+            <span className="text-xs font-medium">
+              {t('torrent.details.downloadSpeed')}
+            </span>
           </div>
           <div className="text-lg font-semibold text-white">
             {formatBytes(torrent.dlspeed)}/s
@@ -156,7 +170,9 @@ export function TorrentDetail({
         <div className="bg-slate-800/50 rounded-lg p-3">
           <div className="flex items-center gap-2 text-green-400 mb-1">
             <Upload className="h-4 w-4" />
-            <span className="text-xs font-medium">{t('torrent.details.uploadSpeed')}</span>
+            <span className="text-xs font-medium">
+              {t('torrent.details.uploadSpeed')}
+            </span>
           </div>
           <div className="text-lg font-semibold text-white">
             {formatBytes(torrent.upspeed)}/s
@@ -166,7 +182,9 @@ export function TorrentDetail({
         <div className="bg-slate-800/50 rounded-lg p-3">
           <div className="flex items-center gap-2 text-slate-400 mb-1">
             <Clock className="h-4 w-4" />
-            <span className="text-xs font-medium">{t('torrent.details.remainingTime')}</span>
+            <span className="text-xs font-medium">
+              {t('torrent.details.remainingTime')}
+            </span>
           </div>
           <div className="text-sm font-semibold text-white">
             {formatEta(torrent.eta)}
@@ -176,7 +194,9 @@ export function TorrentDetail({
         <div className="bg-slate-800/50 rounded-lg p-3">
           <div className="flex items-center gap-2 text-slate-400 mb-1">
             <HardDrive className="h-4 w-4" />
-            <span className="text-xs font-medium">{t('torrent.details.size')}</span>
+            <span className="text-xs font-medium">
+              {t('torrent.details.size')}
+            </span>
           </div>
           <div className="text-sm font-semibold text-white">
             {formatBytes(torrent.size)}
@@ -186,7 +206,11 @@ export function TorrentDetail({
 
       {/* Details List */}
       <div className="space-y-3 border-t border-slate-700 pt-4">
-        <DetailRow icon={<HashIcon className="h-4 w-4" />} label={t('torrent.details.status')} value={t(getStateKey(torrent.state))} />
+        <DetailRow
+          icon={<HashIcon className="h-4 w-4" />}
+          label={t('torrent.details.status')}
+          value={t(getStateKey(torrent.state))}
+        />
         <DetailRow
           icon={<Download className="h-4 w-4" />}
           label={t('torrent.details.downloaded')}
@@ -246,15 +270,21 @@ export function TorrentDetail({
       {/* Peers/Seeds Info */}
       <div className="grid grid-cols-2 gap-3 border-t border-slate-700 pt-4">
         <div className="text-sm">
-          <div className="text-slate-400 mb-1">{t('torrent.details.connected')}</div>
+          <div className="text-slate-400 mb-1">
+            {t('torrent.details.connected')}
+          </div>
           <div className="font-medium">
-            {torrent.num_seeds} {t('torrent.details.seeds')} / {torrent.num_leechs} {t('torrent.details.leechers')}
+            {torrent.num_seeds} {t('torrent.details.seeds')} /{' '}
+            {torrent.num_leechs} {t('torrent.details.leechers')}
           </div>
         </div>
         <div className="text-sm">
-          <div className="text-slate-400 mb-1">{t('torrent.details.totalSwarm')}</div>
+          <div className="text-slate-400 mb-1">
+            {t('torrent.details.totalSwarm')}
+          </div>
           <div className="font-medium">
-            {torrent.num_complete} {t('torrent.details.seeds')} / {torrent.num_incomplete} {t('torrent.details.leechers')}
+            {torrent.num_complete} {t('torrent.details.seeds')} /{' '}
+            {torrent.num_incomplete} {t('torrent.details.leechers')}
           </div>
         </div>
       </div>
@@ -337,7 +367,9 @@ export function TorrentDetail({
       <Sheet open={isOpen} onOpenChange={onClose}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="text-left line-clamp-2">{torrent.name}</SheetTitle>
+            <SheetTitle className="text-left line-clamp-2">
+              {torrent.name}
+            </SheetTitle>
           </SheetHeader>
           <div className="mt-6">{detailContent}</div>
         </SheetContent>
@@ -386,7 +418,11 @@ type TorrentTagsEditorProps = {
   baseUrl: string
 }
 
-function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProps) {
+function TorrentTagsEditor({
+  hash,
+  currentTags,
+  baseUrl,
+}: TorrentTagsEditorProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false)
@@ -398,21 +434,22 @@ function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProp
   // Parse current tags from comma-separated string
   const currentTagNames = React.useMemo(
     () => parseTagString(currentTags),
-    [currentTags]
+    [currentTags],
   )
 
   // Get Tag objects for current tags (with color info)
   const currentTagObjects = React.useMemo(
     () => getTagsByNames(currentTagNames),
-    [currentTagNames]
+    [currentTagNames],
   )
 
   // Get unassigned tags for dropdown
   const unassignedTags = React.useMemo(() => {
     return availableTags.filter(
-      (tag) => !currentTagNames.some(
-        (name) => name.toLowerCase() === tag.name.toLowerCase()
-      )
+      (tag) =>
+        !currentTagNames.some(
+          (name) => name.toLowerCase() === tag.name.toLowerCase(),
+        ),
     )
   }, [availableTags, currentTagNames])
 
@@ -497,7 +534,9 @@ function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProp
                     disabled={isLoading}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 disabled:opacity-50 first:rounded-t-md last:rounded-b-md"
                   >
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(tag.color)}`}></span>
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(tag.color)}`}
+                    ></span>
                     {tag.name}
                   </button>
                 ))}
@@ -524,7 +563,9 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
-  const [trackerToRemove, setTrackerToRemove] = React.useState<Tracker | null>(null)
+  const [trackerToRemove, setTrackerToRemove] = React.useState<Tracker | null>(
+    null,
+  )
   const [newTrackerUrl, setNewTrackerUrl] = React.useState('')
 
   // Remove tracker mutation
@@ -585,9 +626,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <AlertCircle className="h-6 w-6 text-red-400 mb-2" />
-        <p className="text-slate-300 text-sm mb-2">
-          {t('trackers.error')}
-        </p>
+        <p className="text-slate-300 text-sm mb-2">{t('trackers.error')}</p>
         <p className="text-slate-500 text-xs mb-3">
           {error instanceof Error ? error.message : String(error)}
         </p>
@@ -687,9 +726,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
                     addTrackerMutation.mutate(newTrackerUrl)
                   }
                 }}
-                disabled={
-                  addTrackerMutation.isPending || !newTrackerUrl.trim()
-                }
+                disabled={addTrackerMutation.isPending || !newTrackerUrl.trim()}
               >
                 {addTrackerMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -819,9 +856,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
                   addTrackerMutation.mutate(newTrackerUrl)
                 }
               }}
-              disabled={
-                addTrackerMutation.isPending || !newTrackerUrl.trim()
-              }
+              disabled={addTrackerMutation.isPending || !newTrackerUrl.trim()}
             >
               {addTrackerMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

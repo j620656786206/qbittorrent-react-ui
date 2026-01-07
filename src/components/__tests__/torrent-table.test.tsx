@@ -409,7 +409,11 @@ describe('TorrentTable Helper Functions', () => {
           { seconds: 30, expected: '0m', description: '30 seconds left' },
           { seconds: 180, expected: '3m', description: '3 minutes left' },
           { seconds: 3600, expected: '1h 0m', description: '1 hour left' },
-          { seconds: 7260, expected: '2h 1m', description: '2 hours 1 minute left' },
+          {
+            seconds: 7260,
+            expected: '2h 1m',
+            description: '2 hours 1 minute left',
+          },
           { seconds: 86400, expected: '1d 0h', description: '1 day left' },
           { seconds: 172800, expected: '2d 0h', description: '2 days left' },
           { seconds: -1, expected: '∞', description: 'infinite/unknown' },

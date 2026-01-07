@@ -2,8 +2,16 @@ import React, { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Download, MoreHorizontal, Pause, Play, RefreshCw, Trash2, Upload } from 'lucide-react'
-import type { Torrent } from '@/types/torrent';
+import {
+  Download,
+  MoreHorizontal,
+  Pause,
+  Play,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import type { Torrent } from '@/types/torrent'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -23,7 +31,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { deleteTorrent, pauseTorrent, recheckTorrent, resumeTorrent } from '@/lib/api'
+import {
+  deleteTorrent,
+  pauseTorrent,
+  recheckTorrent,
+  resumeTorrent,
+} from '@/lib/api'
 import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -55,7 +68,8 @@ function getStatusColor(state: string) {
 
 // Grid column template for consistent layout (mimics table column widths)
 // Columns: checkbox(40px) | name(35%) | status(20%) | speed(15%) | stats(22%) | actions(8%)
-const gridTemplateColumns = '40px minmax(200px, 35fr) minmax(160px, 20fr) minmax(110px, 15fr) minmax(180px, 22fr) minmax(60px, 8fr)'
+const gridTemplateColumns =
+  '40px minmax(200px, 35fr) minmax(160px, 20fr) minmax(110px, 15fr) minmax(180px, 22fr) minmax(60px, 8fr)'
 
 // Virtual scrolling configuration
 const ROW_HEIGHT = 50 // Fixed height for virtualization
@@ -72,7 +86,7 @@ function DivTable({ className, children, ...props }: DivTableProps) {
   return (
     <div
       data-slot="div-table"
-      className={cn("relative w-full text-sm", className)}
+      className={cn('relative w-full text-sm', className)}
       role="table"
       {...props}
     >
@@ -85,7 +99,7 @@ function DivTableHeader({ className, children, ...props }: DivTableProps) {
   return (
     <div
       data-slot="div-table-header"
-      className={cn("border-b", className)}
+      className={cn('border-b', className)}
       role="rowgroup"
       {...props}
     >
@@ -98,7 +112,10 @@ function DivTableBody({ className, children, ...props }: DivTableProps) {
   return (
     <div
       data-slot="div-table-body"
-      className={cn("[&>[data-slot=div-table-row]:last-child]:border-0", className)}
+      className={cn(
+        '[&>[data-slot=div-table-row]:last-child]:border-0',
+        className,
+      )}
       role="rowgroup"
       {...props}
     >
@@ -111,14 +128,19 @@ interface DivTableRowProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
 }
 
-function DivTableRow({ className, children, style, ...props }: DivTableRowProps & { style?: React.CSSProperties }) {
+function DivTableRow({
+  className,
+  children,
+  style,
+  ...props
+}: DivTableRowProps & { style?: React.CSSProperties }) {
   return (
     <div
       data-slot="div-table-row"
       className={cn(
-        "grid border-b transition-colors",
-        "hover:bg-muted/50 data-[state=selected]:bg-muted",
-        className
+        'grid border-b transition-colors',
+        'hover:bg-muted/50 data-[state=selected]:bg-muted',
+        className,
       )}
       style={{ gridTemplateColumns, height: `${ROW_HEIGHT}px`, ...style }}
       role="row"
@@ -138,9 +160,9 @@ function DivTableHead({ className, children, ...props }: DivTableHeadProps) {
     <div
       data-slot="div-table-head"
       className={cn(
-        "text-foreground h-10 px-2 flex items-center font-medium whitespace-nowrap",
-        "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        className
+        'text-foreground h-10 px-2 flex items-center font-medium whitespace-nowrap',
+        '[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        className,
       )}
       role="columnheader"
       {...props}
@@ -159,9 +181,9 @@ function DivTableCell({ className, children, ...props }: DivTableCellProps) {
     <div
       data-slot="div-table-cell"
       className={cn(
-        "p-2 flex items-center whitespace-nowrap",
-        "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        className
+        'p-2 flex items-center whitespace-nowrap',
+        '[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        className,
       )}
       role="cell"
       {...props}
@@ -195,7 +217,8 @@ export function TorrentTable({
   const isMobile = !useMediaQuery('(min-width: 768px)') // md breakpoint
 
   // Helper to get baseUrl from localStorage
-  const getBaseUrl = () => localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
+  const getBaseUrl = () =>
+    localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
 
   const pauseMutation = useMutation({
     mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
@@ -219,8 +242,13 @@ export function TorrentTable({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
-      deleteTorrent(getBaseUrl(), hash, deleteFiles),
+    mutationFn: ({
+      hash,
+      deleteFiles,
+    }: {
+      hash: string
+      deleteFiles: boolean
+    }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
@@ -264,12 +292,15 @@ export function TorrentTable({
                     ? selectedHashes.size === torrents.length
                       ? true
                       : selectedHashes.size > 0
-                        ? "indeterminate"
+                        ? 'indeterminate'
                         : false
                     : false
                 }
                 onCheckedChange={() => {
-                  if (selectedHashes && selectedHashes.size === torrents.length) {
+                  if (
+                    selectedHashes &&
+                    selectedHashes.size === torrents.length
+                  ) {
                     clearSelection?.()
                   } else {
                     selectAll?.()
@@ -283,7 +314,9 @@ export function TorrentTable({
             <DivTableHead>{t('torrent.table.statusAndProgress')}</DivTableHead>
             <DivTableHead>{t('torrent.table.speed')}</DivTableHead>
             <DivTableHead>{t('torrent.table.stats')}</DivTableHead>
-            <DivTableHead className="justify-end">{t('torrent.table.actions')}</DivTableHead>
+            <DivTableHead className="justify-end">
+              {t('torrent.table.actions')}
+            </DivTableHead>
           </DivTableRow>
         </DivTableHeader>
       </DivTable>
@@ -311,8 +344,8 @@ export function TorrentTable({
                 <DivTableRow
                   key={torrent.hash}
                   className={cn(
-                    "cursor-pointer hover:bg-slate-800/50",
-                    isSelected && "bg-blue-900/30 hover:bg-blue-900/40"
+                    'cursor-pointer hover:bg-slate-800/50',
+                    isSelected && 'bg-blue-900/30 hover:bg-blue-900/40',
                   )}
                   style={{
                     position: 'absolute',
@@ -322,15 +355,20 @@ export function TorrentTable({
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                   onClick={() => onTorrentClick?.(torrent)}
-                  data-state={isSelected ? "selected" : undefined}
+                  data-state={isSelected ? 'selected' : undefined}
                 >
                   {/* Checkbox */}
-                  <DivTableCell className="px-3" onClick={(e) => e.stopPropagation()}>
+                  <DivTableCell
+                    className="px-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleSelection?.(torrent.hash)}
                       disabled={isBatchPending}
-                      aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+                      aria-label={t('torrent.table.selectTorrent', {
+                        name: torrent.name,
+                      })}
                     />
                   </DivTableCell>
 
@@ -352,14 +390,19 @@ export function TorrentTable({
                   <DivTableCell>
                     <div className="space-y-1.5 w-full">
                       <div className="flex items-center justify-between text-xs">
-                        <span className={`font-medium ${getStatusColor(torrent.state)}`}>
+                        <span
+                          className={`font-medium ${getStatusColor(torrent.state)}`}
+                        >
                           {t(getStateKey(torrent.state))}
                         </span>
                         <span className="text-slate-400">
                           {(torrent.progress * 100).toFixed(1)}%
                         </span>
                       </div>
-                      <Progress value={torrent.progress * 100} className="h-1.5" />
+                      <Progress
+                        value={torrent.progress * 100}
+                        className="h-1.5"
+                      />
                     </div>
                   </DivTableCell>
 
@@ -381,28 +424,43 @@ export function TorrentTable({
                   <DivTableCell>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                       <div className="flex items-center gap-1 text-slate-400">
-                        <span className="text-slate-500">{t('torrent.table.size')}:</span>
+                        <span className="text-slate-500">
+                          {t('torrent.table.size')}:
+                        </span>
                         <span>{formatBytes(torrent.size)}</span>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400">
-                        <span className="text-slate-500">{t('torrent.table.eta')}:</span>
+                        <span className="text-slate-500">
+                          {t('torrent.table.eta')}:
+                        </span>
                         <span>{formatEta(torrent.eta)}</span>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400">
-                        <span className="text-slate-500">{t('torrent.table.ratio')}:</span>
-                        <span className={torrent.ratio >= 1 ? 'text-green-400' : ''}>
+                        <span className="text-slate-500">
+                          {t('torrent.table.ratio')}:
+                        </span>
+                        <span
+                          className={torrent.ratio >= 1 ? 'text-green-400' : ''}
+                        >
                           {torrent.ratio.toFixed(2)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400">
-                        <span className="text-slate-500">{t('torrent.table.peers')}:</span>
-                        <span>{torrent.num_seeds}↑ / {torrent.num_leechs}↓</span>
+                        <span className="text-slate-500">
+                          {t('torrent.table.peers')}:
+                        </span>
+                        <span>
+                          {torrent.num_seeds}↑ / {torrent.num_leechs}↓
+                        </span>
                       </div>
                     </div>
                   </DivTableCell>
                   <DivTableCell className="justify-end">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuTrigger
+                        asChild
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -448,21 +506,33 @@ export function TorrentTable({
                               {t('common.delete')}
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
-                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogContent
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <AlertDialogHeader>
-                              <AlertDialogTitle>{t('torrent.actions.confirmDelete')}</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                {t('torrent.actions.confirmDelete')}
+                              </AlertDialogTitle>
                               <AlertDialogDescription
                                 dangerouslySetInnerHTML={{
-                                  __html: t('torrent.actions.confirmDeleteMessage', { name: torrent.name })
+                                  __html: t(
+                                    'torrent.actions.confirmDeleteMessage',
+                                    { name: torrent.name },
+                                  ),
                                 }}
                               />
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                              <AlertDialogCancel>
+                                {t('common.cancel')}
+                              </AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  deleteMutation.mutate({ hash: torrent.hash, deleteFiles: false })
+                                  deleteMutation.mutate({
+                                    hash: torrent.hash,
+                                    deleteFiles: false,
+                                  })
                                 }}
                               >
                                 {t('torrent.actions.deleteKeepFiles')}
@@ -471,7 +541,10 @@ export function TorrentTable({
                                 className="bg-red-500 hover:bg-red-600"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  deleteMutation.mutate({ hash: torrent.hash, deleteFiles: true })
+                                  deleteMutation.mutate({
+                                    hash: torrent.hash,
+                                    deleteFiles: true,
+                                  })
                                 }}
                               >
                                 {t('torrent.actions.deleteRemoveFiles')}

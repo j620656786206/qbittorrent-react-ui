@@ -17,7 +17,7 @@ import type { Torrent } from '@/types/torrent'
 function filterTorrents(
   torrents: Array<Torrent>,
   searchQuery: string,
-  filter: string
+  filter: string,
 ): Array<Torrent> {
   let result = torrents
 
@@ -25,7 +25,7 @@ function filterTorrents(
   const trimmedQuery = searchQuery.trim().toLowerCase()
   if (trimmedQuery) {
     result = result.filter((t: Torrent) =>
-      t.name.toLowerCase().includes(trimmedQuery)
+      t.name.toLowerCase().includes(trimmedQuery),
     )
   }
 
@@ -111,14 +111,53 @@ function createMockTorrent(overrides: Partial<Torrent>): Torrent {
 
 // Test data
 const mockTorrents: Array<Torrent> = [
-  createMockTorrent({ hash: '1', name: 'Ubuntu Server 22.04 ISO', state: 'downloading', category: 'Linux' }),
-  createMockTorrent({ hash: '2', name: 'ubuntu desktop 24.04', state: 'seeding', category: 'Linux' }),
-  createMockTorrent({ hash: '3', name: 'Fedora Workstation', state: 'downloading', category: 'Linux' }),
-  createMockTorrent({ hash: '4', name: 'Movie Collection 2024', state: 'paused', category: 'Movies' }),
-  createMockTorrent({ hash: '5', name: 'movie trailers pack', state: 'downloading', category: 'Movies' }),
-  createMockTorrent({ hash: '6', name: 'Game of Thrones S01', state: 'seeding', category: 'TV' }),
-  createMockTorrent({ hash: '7', name: 'Breaking Bad Complete', state: 'paused', category: '' }),
-  createMockTorrent({ hash: '8', name: 'No Category Torrent', state: 'downloading' }), // category is empty string
+  createMockTorrent({
+    hash: '1',
+    name: 'Ubuntu Server 22.04 ISO',
+    state: 'downloading',
+    category: 'Linux',
+  }),
+  createMockTorrent({
+    hash: '2',
+    name: 'ubuntu desktop 24.04',
+    state: 'seeding',
+    category: 'Linux',
+  }),
+  createMockTorrent({
+    hash: '3',
+    name: 'Fedora Workstation',
+    state: 'downloading',
+    category: 'Linux',
+  }),
+  createMockTorrent({
+    hash: '4',
+    name: 'Movie Collection 2024',
+    state: 'paused',
+    category: 'Movies',
+  }),
+  createMockTorrent({
+    hash: '5',
+    name: 'movie trailers pack',
+    state: 'downloading',
+    category: 'Movies',
+  }),
+  createMockTorrent({
+    hash: '6',
+    name: 'Game of Thrones S01',
+    state: 'seeding',
+    category: 'TV',
+  }),
+  createMockTorrent({
+    hash: '7',
+    name: 'Breaking Bad Complete',
+    state: 'paused',
+    category: '',
+  }),
+  createMockTorrent({
+    hash: '8',
+    name: 'No Category Torrent',
+    state: 'downloading',
+  }), // category is empty string
 ]
 
 describe('Torrent Search Filtering', () => {
@@ -252,7 +291,11 @@ describe('Torrent Search Filtering', () => {
     })
 
     it('filters torrents with undefined category as uncategorized', () => {
-      const result = filterTorrents(mockTorrents, 'No Category', 'category:未分類')
+      const result = filterTorrents(
+        mockTorrents,
+        'No Category',
+        'category:未分類',
+      )
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('No Category Torrent')
     })
@@ -285,7 +328,11 @@ describe('Torrent Search Filtering', () => {
     })
 
     it('returns empty array for matching search but non-matching status', () => {
-      const result = filterTorrents(mockTorrents, 'Game of Thrones', 'downloading')
+      const result = filterTorrents(
+        mockTorrents,
+        'Game of Thrones',
+        'downloading',
+      )
       expect(result).toEqual([])
     })
 
@@ -303,8 +350,16 @@ describe('Torrent Search Filtering', () => {
   describe('Edge cases', () => {
     it('handles torrent with undefined name', () => {
       const torrentsWithUndefinedName: Array<Torrent> = [
-        createMockTorrent({ hash: '1', name: undefined as any, state: 'downloading' }),
-        createMockTorrent({ hash: '2', name: 'Valid Name', state: 'downloading' }),
+        createMockTorrent({
+          hash: '1',
+          name: undefined as any,
+          state: 'downloading',
+        }),
+        createMockTorrent({
+          hash: '2',
+          name: 'Valid Name',
+          state: 'downloading',
+        }),
       ]
       const result = filterTorrents(torrentsWithUndefinedName, 'valid', 'all')
       expect(result).toHaveLength(1)
@@ -313,8 +368,16 @@ describe('Torrent Search Filtering', () => {
 
     it('handles special characters in search', () => {
       const torrentsWithSpecialChars: Array<Torrent> = [
-        createMockTorrent({ hash: '1', name: 'File (2024) [1080p]', state: 'downloading' }),
-        createMockTorrent({ hash: '2', name: 'Regular File', state: 'downloading' }),
+        createMockTorrent({
+          hash: '1',
+          name: 'File (2024) [1080p]',
+          state: 'downloading',
+        }),
+        createMockTorrent({
+          hash: '2',
+          name: 'Regular File',
+          state: 'downloading',
+        }),
       ]
       const result = filterTorrents(torrentsWithSpecialChars, '(2024)', 'all')
       expect(result).toHaveLength(1)
@@ -323,8 +386,16 @@ describe('Torrent Search Filtering', () => {
 
     it('handles brackets in search', () => {
       const torrentsWithBrackets: Array<Torrent> = [
-        createMockTorrent({ hash: '1', name: 'File [1080p]', state: 'downloading' }),
-        createMockTorrent({ hash: '2', name: 'File 720p', state: 'downloading' }),
+        createMockTorrent({
+          hash: '1',
+          name: 'File [1080p]',
+          state: 'downloading',
+        }),
+        createMockTorrent({
+          hash: '2',
+          name: 'File 720p',
+          state: 'downloading',
+        }),
       ]
       const result = filterTorrents(torrentsWithBrackets, '[1080p]', 'all')
       expect(result).toHaveLength(1)

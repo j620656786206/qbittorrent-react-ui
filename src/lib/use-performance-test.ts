@@ -11,7 +11,10 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { PerformanceMetrics, generateMockTorrents } from './performance-test-utils'
+import {
+  PerformanceMetrics,
+  generateMockTorrents,
+} from './performance-test-utils'
 import type { Torrent } from '@/types/torrent'
 
 // Global state for mock torrents (persists across component re-renders)
@@ -44,7 +47,7 @@ export function usePerformanceTest() {
     const endTime = performance.now()
 
     console.info(
-      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`
+      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`,
     )
 
     notifyListeners()
@@ -92,10 +95,14 @@ if (import.meta.env.DEV) {
     const endTime = performance.now()
 
     console.info(
-      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`
+      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`,
     )
-    console.info('[Performance Test] Mock torrents available via window.__getMockTorrents()')
-    console.info('[Performance Test] To use in the app, see the Performance Testing Guide')
+    console.info(
+      '[Performance Test] Mock torrents available via window.__getMockTorrents()',
+    )
+    console.info(
+      '[Performance Test] To use in the app, see the Performance Testing Guide',
+    )
 
     notifyListeners()
     return globalMockTorrents

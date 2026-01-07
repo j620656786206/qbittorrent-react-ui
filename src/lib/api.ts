@@ -1,68 +1,69 @@
-import type { Torrent, TorrentFile  } from '@/types/torrent';
+import type { Torrent, TorrentFile } from '@/types/torrent'
 
 // Define types for sync/maindata response
 export type TorrentPartialUpdate = Partial<Torrent> & {
-    hash: string;
-};
+  hash: string
+}
 
 export type MaindataResponse = {
-    rid: number;
-    server_state: {
-        alltime_dl: number;
-        alltime_ul: number;
-        total_buffers_size: number;
-        total_peer_connections: number;
-        up_info_data: number;
-        up_info_speed: number;
-        // ... many other server state properties
-    };
-    torrents?: { [hash: string]: TorrentPartialUpdate }; // Torrents that have changed
-    torrents_removed?: Array<string>; // Hashes of removed torrents
-    full_update: boolean; // True if it's a full update, false for incremental
-};
+  rid: number
+  server_state: {
+    alltime_dl: number
+    alltime_ul: number
+    total_buffers_size: number
+    total_peer_connections: number
+    up_info_data: number
+    up_info_speed: number
+    // ... many other server state properties
+  }
+  torrents?: { [hash: string]: TorrentPartialUpdate } // Torrents that have changed
+  torrents_removed?: Array<string> // Hashes of removed torrents
+  full_update: boolean // True if it's a full update, false for incremental
+}
 
 // Define types for categories response
 export type Category = {
-    name: string;
-    savePath: string;
-};
+  name: string
+  savePath: string
+}
 
 export type CategoriesResponse = {
-    [categoryName: string]: Category;
-};
+  [categoryName: string]: Category
+}
 
 // Tracker status codes from qBittorrent API
 export const TrackerStatus = {
-    Disabled: 0,      // Tracker is disabled (used for DHT, PeX, LSD)
-    NotContacted: 1,  // Tracker has not been contacted yet
-    Working: 2,       // Tracker has been contacted and is working
-    Updating: 3,      // Tracker is updating
-    NotWorking: 4,    // Tracker has been contacted but is not working
-} as const;
+  Disabled: 0, // Tracker is disabled (used for DHT, PeX, LSD)
+  NotContacted: 1, // Tracker has not been contacted yet
+  Working: 2, // Tracker has been contacted and is working
+  Updating: 3, // Tracker is updating
+  NotWorking: 4, // Tracker has been contacted but is not working
+} as const
 
-export type TrackerStatusType = typeof TrackerStatus[keyof typeof TrackerStatus];
+export type TrackerStatusType =
+  (typeof TrackerStatus)[keyof typeof TrackerStatus]
 
 // Define types for tracker response
 export type Tracker = {
-    url: string;                  // Tracker URL
-    status: TrackerStatusType;    // Tracker status code (0-4)
-    tier: number;                 // Tracker tier
-    num_peers: number;            // Number of peers for this torrent reported by tracker
-    num_seeds: number;            // Number of seeds for this torrent reported by tracker
-    num_leeches: number;          // Number of leeches for this torrent reported by tracker
-    num_downloaded: number;       // Number of completed downloads reported by tracker
-    msg: string;                  // Tracker message (error message or description)
-};
+  url: string // Tracker URL
+  status: TrackerStatusType // Tracker status code (0-4)
+  tier: number // Tracker tier
+  num_peers: number // Number of peers for this torrent reported by tracker
+  num_seeds: number // Number of seeds for this torrent reported by tracker
+  num_leeches: number // Number of leeches for this torrent reported by tracker
+  num_downloaded: number // Number of completed downloads reported by tracker
+  msg: string // Tracker message (error message or description)
+}
 
 // Helper function to get the actual base URL for fetches
 function getApiBaseUrl(providedBaseUrl: string): string {
   if (import.meta.env.DEV) {
     // In development, use window.location.origin as the base for URL construction.
     // The Vite proxy is configured to intercept /api requests from this origin.
-    return window.location.origin; // e.g., http://localhost:3000
+    return window.location.origin // e.g., http://localhost:3000
   } else {
     // In production, use the full base URL (from localStorage/env)
-    return providedBaseUrl;
+    return providedBaseUrl
   }
 }
 
@@ -74,11 +75,15 @@ function getApiBaseUrl(providedBaseUrl: string): string {
  * @param {string} password - The password.
  * @returns {Promise<boolean>} - True if login is successful, otherwise throws an error.
  */
-export async function login(baseUrl: string, username?: string, password?: string): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('username', username || '');
-  formData.append('password', password || '');
+export async function login(
+  baseUrl: string,
+  username?: string,
+  password?: string,
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('username', username || '')
+  formData.append('password', password || '')
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/auth/login`, {
     method: 'POST',
@@ -86,22 +91,27 @@ export async function login(baseUrl: string, username?: string, password?: strin
     credentials: 'include', // Important: allows browser to save and send cookies
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json, text/plain, */*'
-    }
-  });
+      Accept: 'application/json, text/plain, */*',
+    },
+  })
 
-  const text = await res.text(); // Read text even if not ok
+  const text = await res.text() // Read text even if not ok
 
   if (!res.ok) {
-    console.error('Failed to login:', text); // Log raw response text
-    throw new Error(`Login failed with status: ${res.status}. Server response: ${text || 'No response body'}`);
+    console.error('Failed to login:', text) // Log raw response text
+    throw new Error(
+      `Login failed with status: ${res.status}. Server response: ${text || 'No response body'}`,
+    )
   }
 
   if (text.trim() === 'Ok.') {
-    return true;
+    return true
   } else {
     // This case might be hit if res.ok is true but text is not 'Ok.'
-    throw new Error('Login failed: Invalid credentials or other issue. Server response: ' + text);
+    throw new Error(
+      'Login failed: Invalid credentials or other issue. Server response: ' +
+        text,
+    )
   }
 }
 
@@ -112,23 +122,25 @@ export async function login(baseUrl: string, username?: string, password?: strin
  * @param {number} [rid] - The request ID for incremental updates.
  * @returns {Promise<MaindataResponse>}
  */
-export async function getMaindata(baseUrl: string, rid?: number): Promise<MaindataResponse> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const url = new URL(`${effectiveBaseUrl}/api/v2/sync/maindata`);
+export async function getMaindata(
+  baseUrl: string,
+  rid?: number,
+): Promise<MaindataResponse> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const url = new URL(`${effectiveBaseUrl}/api/v2/sync/maindata`)
   if (rid !== undefined) {
-    url.searchParams.append('rid', rid.toString());
+    url.searchParams.append('rid', rid.toString())
   }
 
   const res = await fetch(url.toString(), {
     credentials: 'include', // Include cookies for authentication
-  });
+  })
   if (!res.ok) {
-    throw new Error(`Failed to fetch maindata with status: ${res.status}`);
+    throw new Error(`Failed to fetch maindata with status: ${res.status}`)
   }
-  const jsonResponse = await res.json();
-  return jsonResponse;
+  const jsonResponse = await res.json()
+  return jsonResponse
 }
-
 
 /**
  * Pauses one or more torrents.
@@ -136,21 +148,24 @@ export async function getMaindata(baseUrl: string, rid?: number): Promise<Mainda
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to pause.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function pauseTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+export async function pauseTorrent(
+  baseUrl: string,
+  hashes: string | Array<string>,
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/pause`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to pause torrent(s) with status: ${res.status}`);
+    throw new Error(`Failed to pause torrent(s) with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -159,21 +174,24 @@ export async function pauseTorrent(baseUrl: string, hashes: string | Array<strin
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to resume.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function resumeTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+export async function resumeTorrent(
+  baseUrl: string,
+  hashes: string | Array<string>,
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/resume`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to resume torrent(s) with status: ${res.status}`);
+    throw new Error(`Failed to resume torrent(s) with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -186,23 +204,23 @@ export async function resumeTorrent(baseUrl: string, hashes: string | Array<stri
 export async function deleteTorrent(
   baseUrl: string,
   hashes: string | Array<string>,
-  deleteFiles: boolean = false
+  deleteFiles: boolean = false,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
-  formData.append('deleteFiles', deleteFiles ? 'true' : 'false');
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
+  formData.append('deleteFiles', deleteFiles ? 'true' : 'false')
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/delete`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to delete torrent(s) with status: ${res.status}`);
+    throw new Error(`Failed to delete torrent(s) with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -210,18 +228,20 @@ export async function deleteTorrent(
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
  * @returns {Promise<CategoriesResponse>} - Object mapping category names to their details.
  */
-export async function getCategories(baseUrl: string): Promise<CategoriesResponse> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
+export async function getCategories(
+  baseUrl: string,
+): Promise<CategoriesResponse> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/categories`, {
     credentials: 'include', // Include cookies for authentication
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch categories with status: ${res.status}`);
+    throw new Error(`Failed to fetch categories with status: ${res.status}`)
   }
 
-  return res.json();
+  return res.json()
 }
 
 /**
@@ -234,32 +254,34 @@ export async function getCategories(baseUrl: string): Promise<CategoriesResponse
 export async function setTorrentCategory(
   baseUrl: string,
   hashes: string | Array<string>,
-  category: string
+  category: string,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
-  formData.append('category', category);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
+  formData.append('category', category)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/setCategory`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to set category for torrent(s) with status: ${res.status}`);
+    throw new Error(
+      `Failed to set category for torrent(s) with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 // Options for adding a torrent via magnet link
 export type AddTorrentMagnetOptions = {
-  savepath?: string;
-  category?: string;
-  tags?: string;
-  paused?: boolean;
-};
+  savepath?: string
+  category?: string
+  tags?: string
+  paused?: boolean
+}
 
 /**
  * Adds a torrent via magnet link.
@@ -271,44 +293,46 @@ export type AddTorrentMagnetOptions = {
 export async function addTorrentMagnet(
   baseUrl: string,
   magnetLink: string,
-  options?: AddTorrentMagnetOptions
+  options?: AddTorrentMagnetOptions,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('urls', magnetLink);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('urls', magnetLink)
 
   if (options?.savepath) {
-    formData.append('savepath', options.savepath);
+    formData.append('savepath', options.savepath)
   }
   if (options?.category) {
-    formData.append('category', options.category);
+    formData.append('category', options.category)
   }
   if (options?.tags) {
-    formData.append('tags', options.tags);
+    formData.append('tags', options.tags)
   }
   if (options?.paused !== undefined) {
-    formData.append('paused', options.paused ? 'true' : 'false');
+    formData.append('paused', options.paused ? 'true' : 'false')
   }
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to add torrent via magnet link with status: ${res.status}`);
+    throw new Error(
+      `Failed to add torrent via magnet link with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 // Options for adding a torrent via .torrent file
 export type AddTorrentFileOptions = {
-  savepath?: string;
-  category?: string;
-  tags?: string;
-  paused?: boolean;
-};
+  savepath?: string
+  category?: string
+  tags?: string
+  paused?: boolean
+}
 
 /**
  * Adds a torrent via .torrent file upload.
@@ -320,35 +344,35 @@ export type AddTorrentFileOptions = {
 export async function addTorrentFile(
   baseUrl: string,
   file: File,
-  options?: AddTorrentFileOptions
+  options?: AddTorrentFileOptions,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new FormData();
-  formData.append('torrents', file);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new FormData()
+  formData.append('torrents', file)
 
   if (options?.savepath) {
-    formData.append('savepath', options.savepath);
+    formData.append('savepath', options.savepath)
   }
   if (options?.category) {
-    formData.append('category', options.category);
+    formData.append('category', options.category)
   }
   if (options?.tags) {
-    formData.append('tags', options.tags);
+    formData.append('tags', options.tags)
   }
   if (options?.paused !== undefined) {
-    formData.append('paused', options.paused ? 'true' : 'false');
+    formData.append('paused', options.paused ? 'true' : 'false')
   }
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/add`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to add torrent via file with status: ${res.status}`);
+    throw new Error(`Failed to add torrent via file with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -358,20 +382,23 @@ export async function addTorrentFile(
  * @returns {Promise<TorrentFile[]>} - Array of file objects with index, name, size, progress, and priority.
  * @throws {Error} - Throws with status 409 if torrent metadata is not yet downloaded.
  */
-export async function getTorrentFiles(baseUrl: string, hash: string): Promise<Array<TorrentFile>> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/files`);
-  url.searchParams.append('hash', hash);
+export async function getTorrentFiles(
+  baseUrl: string,
+  hash: string,
+): Promise<Array<TorrentFile>> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/files`)
+  url.searchParams.append('hash', hash)
 
   const res = await fetch(url.toString(), {
     credentials: 'include', // Include cookies for authentication
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch torrent files with status: ${res.status}`);
+    throw new Error(`Failed to fetch torrent files with status: ${res.status}`)
   }
 
-  return res.json();
+  return res.json()
 }
 
 /**
@@ -386,24 +413,27 @@ export async function setFilePriority(
   baseUrl: string,
   hash: string,
   fileIds: number | Array<number>,
-  priority: number
+  priority: number,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hash', hash);
-  formData.append('id', Array.isArray(fileIds) ? fileIds.join('|') : fileIds.toString());
-  formData.append('priority', priority.toString());
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hash', hash)
+  formData.append(
+    'id',
+    Array.isArray(fileIds) ? fileIds.join('|') : fileIds.toString(),
+  )
+  formData.append('priority', priority.toString())
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/filePrio`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to set file priority with status: ${res.status}`);
+    throw new Error(`Failed to set file priority with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -412,20 +442,23 @@ export async function setFilePriority(
  * @param {string} hash - The hash of the torrent to get trackers for.
  * @returns {Promise<Tracker[]>} - Array of tracker objects with URL, status, tier, and peer statistics.
  */
-export async function getTrackers(baseUrl: string, hash: string): Promise<Array<Tracker>> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/trackers`);
-  url.searchParams.append('hash', hash);
+export async function getTrackers(
+  baseUrl: string,
+  hash: string,
+): Promise<Array<Tracker>> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const url = new URL(`${effectiveBaseUrl}/api/v2/torrents/trackers`)
+  url.searchParams.append('hash', hash)
 
   const res = await fetch(url.toString(), {
     credentials: 'include', // Include cookies for authentication
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch trackers with status: ${res.status}`);
+    throw new Error(`Failed to fetch trackers with status: ${res.status}`)
   }
 
-  return res.json();
+  return res.json()
 }
 
 /**
@@ -434,21 +467,24 @@ export async function getTrackers(baseUrl: string, hash: string): Promise<Array<
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to recheck.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function recheckTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+export async function recheckTorrent(
+  baseUrl: string,
+  hashes: string | Array<string>,
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/recheck`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to recheck torrent(s) with status: ${res.status}`);
+    throw new Error(`Failed to recheck torrent(s) with status: ${res.status}`)
   }
-  return true;
+  return true
 }
 
 /**
@@ -457,21 +493,26 @@ export async function recheckTorrent(baseUrl: string, hashes: string | Array<str
  * @param {string | string[]} hashes - Single hash or array of hashes of torrents to reannounce.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
-export async function reannounceTorrent(baseUrl: string, hashes: string | Array<string>): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+export async function reannounceTorrent(
+  baseUrl: string,
+  hashes: string | Array<string>,
+): Promise<boolean> {
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/reannounce`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to reannounce torrent(s) with status: ${res.status}`);
+    throw new Error(
+      `Failed to reannounce torrent(s) with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 /**
@@ -484,23 +525,25 @@ export async function reannounceTorrent(baseUrl: string, hashes: string | Array<
 export async function addTorrentTags(
   baseUrl: string,
   hashes: string | Array<string>,
-  tags: string | Array<string>
+  tags: string | Array<string>,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
-  formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
+  formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags)
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/addTags`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to add tags to torrent(s) with status: ${res.status}`);
+    throw new Error(
+      `Failed to add tags to torrent(s) with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 /**
@@ -513,25 +556,27 @@ export async function addTorrentTags(
 export async function removeTorrentTags(
   baseUrl: string,
   hashes: string | Array<string>,
-  tags?: string | Array<string>
+  tags?: string | Array<string>,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hashes', Array.isArray(hashes) ? hashes.join('|') : hashes)
   if (tags !== undefined) {
-    formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags);
+    formData.append('tags', Array.isArray(tags) ? tags.join(',') : tags)
   }
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTags`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to remove tags from torrent(s) with status: ${res.status}`);
+    throw new Error(
+      `Failed to remove tags from torrent(s) with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 /**
@@ -544,23 +589,28 @@ export async function removeTorrentTags(
 export async function addTrackers(
   baseUrl: string,
   hash: string,
-  trackers: string | Array<string>
+  trackers: string | Array<string>,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hash', hash);
-  formData.append('urls', Array.isArray(trackers) ? trackers.join('\n') : trackers);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hash', hash)
+  formData.append(
+    'urls',
+    Array.isArray(trackers) ? trackers.join('\n') : trackers,
+  )
 
   const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/addTrackers`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-  });
+  })
 
   if (!res.ok) {
-    throw new Error(`Failed to add trackers to torrent with status: ${res.status}`);
+    throw new Error(
+      `Failed to add trackers to torrent with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }
 
 /**
@@ -573,21 +623,29 @@ export async function addTrackers(
 export async function removeTrackers(
   baseUrl: string,
   hash: string,
-  trackers: string | Array<string>
+  trackers: string | Array<string>,
 ): Promise<boolean> {
-  const effectiveBaseUrl = getApiBaseUrl(baseUrl);
-  const formData = new URLSearchParams();
-  formData.append('hash', hash);
-  formData.append('urls', Array.isArray(trackers) ? trackers.join('|') : trackers);
+  const effectiveBaseUrl = getApiBaseUrl(baseUrl)
+  const formData = new URLSearchParams()
+  formData.append('hash', hash)
+  formData.append(
+    'urls',
+    Array.isArray(trackers) ? trackers.join('|') : trackers,
+  )
 
-  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTrackers`, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include',
-  });
+  const res = await fetch(
+    `${effectiveBaseUrl}/api/v2/torrents/removeTrackers`,
+    {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    },
+  )
 
   if (!res.ok) {
-    throw new Error(`Failed to remove trackers from torrent with status: ${res.status}`);
+    throw new Error(
+      `Failed to remove trackers from torrent with status: ${res.status}`,
+    )
   }
-  return true;
+  return true
 }

@@ -1,7 +1,7 @@
 import React from 'react'
 import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { RenderOptions } from '@testing-library/react';
+import type { RenderOptions } from '@testing-library/react'
 
 /**
  * Create a QueryClient for testing with appropriate defaults
@@ -32,11 +32,7 @@ interface ProvidersProps {
 export function Providers({ children, queryClient }: ProvidersProps) {
   const client = queryClient || createTestQueryClient()
 
-  return (
-    <QueryClientProvider client={client}>
-      {children}
-    </QueryClientProvider>
-  )
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
 /**

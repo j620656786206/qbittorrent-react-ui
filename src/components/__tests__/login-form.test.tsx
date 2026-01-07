@@ -20,7 +20,7 @@ function renderLoginForm(props: React.ComponentProps<typeof LoginForm>) {
     ...render(
       <QueryClientProvider client={queryClient}>
         <LoginForm {...props} />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     ),
   }
 }
@@ -369,7 +369,7 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       let usernameInput = screen.getByLabelText('Username')
@@ -382,7 +382,7 @@ describe('LoginForm Component', () => {
             initialUsername="user2"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       usernameInput = screen.getByLabelText('Username')
@@ -398,7 +398,7 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       let passwordInput = screen.getByLabelText('Password')
@@ -411,7 +411,7 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass2"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       passwordInput = screen.getByLabelText('Password')

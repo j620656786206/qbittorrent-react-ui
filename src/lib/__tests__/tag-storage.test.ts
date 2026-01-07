@@ -57,7 +57,9 @@ describe('Tag Storage', () => {
     })
 
     it('should return empty array when localStorage contains non-array', () => {
-      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({ notAnArray: true }))
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ notAnArray: true }),
+      )
       const tags = getTags()
       expect(tags).toEqual([])
     })
@@ -127,11 +129,15 @@ describe('Tag Storage', () => {
 
     it('should throw error for tag name exceeding 50 characters', () => {
       const longName = 'a'.repeat(51)
-      expect(() => createTag(longName)).toThrow('Tag name cannot exceed 50 characters')
+      expect(() => createTag(longName)).toThrow(
+        'Tag name cannot exceed 50 characters',
+      )
     })
 
     it('should throw error for tag name containing commas', () => {
-      expect(() => createTag('Movies, TV')).toThrow('Tag name cannot contain commas')
+      expect(() => createTag('Movies, TV')).toThrow(
+        'Tag name cannot contain commas',
+      )
     })
 
     it('should throw error for duplicate tag name (case-insensitive)', () => {
@@ -212,20 +218,22 @@ describe('Tag Storage', () => {
 
     it('should throw error when tag not found', () => {
       expect(() => updateTag('non-existent-id', { name: 'New Name' })).toThrow(
-        'Tag with ID "non-existent-id" not found'
+        'Tag with ID "non-existent-id" not found',
       )
     })
 
     it('should throw error for empty new name', () => {
       const tag = createTag('Movies')
-      expect(() => updateTag(tag.id, { name: '' })).toThrow('Tag name cannot be empty')
+      expect(() => updateTag(tag.id, { name: '' })).toThrow(
+        'Tag name cannot be empty',
+      )
     })
 
     it('should throw error for duplicate new name (case-insensitive)', () => {
       createTag('Movies')
       const tag2 = createTag('TV Shows')
       expect(() => updateTag(tag2.id, { name: 'Movies' })).toThrow(
-        'Tag "Movies" already exists'
+        'Tag "Movies" already exists',
       )
     })
 
@@ -311,11 +319,15 @@ describe('Tag Storage', () => {
     })
 
     it('should return error for name exceeding 50 characters', () => {
-      expect(validateTagName('a'.repeat(51))).toBe('Tag name cannot exceed 50 characters')
+      expect(validateTagName('a'.repeat(51))).toBe(
+        'Tag name cannot exceed 50 characters',
+      )
     })
 
     it('should return error for name containing commas', () => {
-      expect(validateTagName('Movies, TV')).toBe('Tag name cannot contain commas')
+      expect(validateTagName('Movies, TV')).toBe(
+        'Tag name cannot contain commas',
+      )
     })
   })
 

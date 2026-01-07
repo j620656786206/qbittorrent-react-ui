@@ -20,19 +20,23 @@ const createMatchMediaMock = (matches: boolean) => {
   const mediaQueryList: MediaQueryListMock = {
     matches,
     media: '',
-    addEventListener: vi.fn((event: string, handler: (event: MediaQueryListEvent) => void) => {
-      if (event === 'change') {
-        listeners.push(handler)
-      }
-    }),
-    removeEventListener: vi.fn((event: string, handler: (event: MediaQueryListEvent) => void) => {
-      if (event === 'change') {
-        const index = listeners.indexOf(handler)
-        if (index > -1) {
-          listeners.splice(index, 1)
+    addEventListener: vi.fn(
+      (event: string, handler: (event: MediaQueryListEvent) => void) => {
+        if (event === 'change') {
+          listeners.push(handler)
         }
-      }
-    }),
+      },
+    ),
+    removeEventListener: vi.fn(
+      (event: string, handler: (event: MediaQueryListEvent) => void) => {
+        if (event === 'change') {
+          const index = listeners.indexOf(handler)
+          if (index > -1) {
+            listeners.splice(index, 1)
+          }
+        }
+      },
+    ),
     addListener: vi.fn(),
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
@@ -56,7 +60,9 @@ describe('useMediaQuery', () => {
   beforeEach(() => {
     originalMatchMedia = window.matchMedia
     matchMediaMock = createMatchMediaMock(false)
-    window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+    window.matchMedia = vi.fn(
+      () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+    )
   })
 
   afterEach(() => {
@@ -79,7 +85,9 @@ describe('useMediaQuery', () => {
   describe('Media Query Matching', () => {
     it('should return true when media query matches', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -90,7 +98,9 @@ describe('useMediaQuery', () => {
 
     it('should return false when media query does not match', async () => {
       matchMediaMock = createMatchMediaMock(false)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -103,7 +113,9 @@ describe('useMediaQuery', () => {
   describe('Media Query Changes', () => {
     it('should update when media query match changes from false to true', async () => {
       matchMediaMock = createMatchMediaMock(false)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -120,7 +132,9 @@ describe('useMediaQuery', () => {
 
     it('should update when media query match changes from true to false', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -137,7 +151,9 @@ describe('useMediaQuery', () => {
 
     it('should handle multiple changes', async () => {
       matchMediaMock = createMatchMediaMock(false)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -165,36 +181,37 @@ describe('useMediaQuery', () => {
   describe('Event Listener Management', () => {
     it('should add event listener on mount', () => {
       renderHook(() => useMediaQuery('(min-width: 768px)'))
-      expect(matchMediaMock.mediaQueryList.addEventListener).toHaveBeenCalledWith(
-        'change',
-        expect.any(Function)
-      )
+      expect(
+        matchMediaMock.mediaQueryList.addEventListener,
+      ).toHaveBeenCalledWith('change', expect.any(Function))
     })
 
     it('should remove event listener on unmount', () => {
       const { unmount } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
-      const addListenerCalls = matchMediaMock.mediaQueryList.addEventListener.mock.calls
+      const addListenerCalls =
+        matchMediaMock.mediaQueryList.addEventListener.mock.calls
       expect(addListenerCalls.length).toBe(1)
       const handler = addListenerCalls[0][1]
 
       unmount()
 
-      expect(matchMediaMock.mediaQueryList.removeEventListener).toHaveBeenCalledWith(
-        'change',
-        handler
-      )
+      expect(
+        matchMediaMock.mediaQueryList.removeEventListener,
+      ).toHaveBeenCalledWith('change', handler)
     })
 
     it('should not leak event listeners on multiple renders', () => {
       const { rerender } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
-      const initialAddCalls = matchMediaMock.mediaQueryList.addEventListener.mock.calls.length
+      const initialAddCalls =
+        matchMediaMock.mediaQueryList.addEventListener.mock.calls.length
 
       rerender()
       rerender()
 
-      const finalAddCalls = matchMediaMock.mediaQueryList.addEventListener.mock.calls.length
+      const finalAddCalls =
+        matchMediaMock.mediaQueryList.addEventListener.mock.calls.length
       expect(finalAddCalls).toBe(initialAddCalls)
     })
   })
@@ -202,8 +219,15 @@ describe('useMediaQuery', () => {
   describe('Query Parameter Changes', () => {
     it('should update when query parameter changes', async () => {
       const { result, rerender } = renderHook(
-        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) => useMediaQuery(query),
-        { initialProps: { query: '(min-width: 768px)' as '(min-width: 768px)' | '(min-width: 1024px)' } }
+        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) =>
+          useMediaQuery(query),
+        {
+          initialProps: {
+            query: '(min-width: 768px)' as
+              | '(min-width: 768px)'
+              | '(min-width: 1024px)',
+          },
+        },
       )
 
       await waitFor(() => {
@@ -211,7 +235,9 @@ describe('useMediaQuery', () => {
       })
 
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       rerender({ query: '(min-width: 1024px)' })
 
@@ -223,25 +249,36 @@ describe('useMediaQuery', () => {
 
     it('should clean up old listener when query changes', async () => {
       const firstMock = createMatchMediaMock(false)
-      window.matchMedia = vi.fn(() => firstMock.mediaQueryList as unknown as MediaQueryList)
-
-      const { rerender } = renderHook(
-        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) => useMediaQuery(query),
-        { initialProps: { query: '(min-width: 768px)' as '(min-width: 768px)' | '(min-width: 1024px)' } }
+      window.matchMedia = vi.fn(
+        () => firstMock.mediaQueryList as unknown as MediaQueryList,
       )
 
-      const firstHandler = firstMock.mediaQueryList.addEventListener.mock.calls[0][1]
+      const { rerender } = renderHook(
+        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) =>
+          useMediaQuery(query),
+        {
+          initialProps: {
+            query: '(min-width: 768px)' as
+              | '(min-width: 768px)'
+              | '(min-width: 1024px)',
+          },
+        },
+      )
+
+      const firstHandler =
+        firstMock.mediaQueryList.addEventListener.mock.calls[0][1]
 
       const secondMock = createMatchMediaMock(false)
-      window.matchMedia = vi.fn(() => secondMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => secondMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       rerender({ query: '(min-width: 1024px)' })
 
       await waitFor(() => {
-        expect(firstMock.mediaQueryList.removeEventListener).toHaveBeenCalledWith(
-          'change',
-          firstHandler
-        )
+        expect(
+          firstMock.mediaQueryList.removeEventListener,
+        ).toHaveBeenCalledWith('change', firstHandler)
       })
     })
   })
@@ -249,7 +286,9 @@ describe('useMediaQuery', () => {
   describe('Different Query Types', () => {
     it('should handle min-width queries', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
 
@@ -260,7 +299,9 @@ describe('useMediaQuery', () => {
 
     it('should handle max-width queries', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
       const { result } = renderHook(() => useMediaQuery('(max-width: 768px)'))
 
@@ -271,11 +312,19 @@ describe('useMediaQuery', () => {
 
     it('should handle different breakpoint values', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
-      const { result: result1 } = renderHook(() => useMediaQuery('(min-width: 640px)'))
-      const { result: result2 } = renderHook(() => useMediaQuery('(min-width: 1280px)'))
-      const { result: result3 } = renderHook(() => useMediaQuery('(max-width: 1536px)'))
+      const { result: result1 } = renderHook(() =>
+        useMediaQuery('(min-width: 640px)'),
+      )
+      const { result: result2 } = renderHook(() =>
+        useMediaQuery('(min-width: 1280px)'),
+      )
+      const { result: result3 } = renderHook(() =>
+        useMediaQuery('(max-width: 1536px)'),
+      )
 
       await waitFor(() => {
         expect(result1.current).toBe(true)
@@ -288,10 +337,16 @@ describe('useMediaQuery', () => {
   describe('Multiple Hook Instances', () => {
     it('should remain stable when same query is used multiple times', async () => {
       matchMediaMock = createMatchMediaMock(true)
-      window.matchMedia = vi.fn(() => matchMediaMock.mediaQueryList as unknown as MediaQueryList)
+      window.matchMedia = vi.fn(
+        () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
+      )
 
-      const { result: result1 } = renderHook(() => useMediaQuery('(min-width: 768px)'))
-      const { result: result2 } = renderHook(() => useMediaQuery('(min-width: 768px)'))
+      const { result: result1 } = renderHook(() =>
+        useMediaQuery('(min-width: 768px)'),
+      )
+      const { result: result2 } = renderHook(() =>
+        useMediaQuery('(min-width: 768px)'),
+      )
 
       await waitFor(() => {
         expect(result1.current).toBe(true)
@@ -317,8 +372,12 @@ describe('useMediaQuery', () => {
         return mock2.mediaQueryList as unknown as MediaQueryList
       })
 
-      const { result: result1 } = renderHook(() => useMediaQuery('(min-width: 768px)'))
-      const { result: result2 } = renderHook(() => useMediaQuery('(min-width: 1024px)'))
+      const { result: result1 } = renderHook(() =>
+        useMediaQuery('(min-width: 768px)'),
+      )
+      const { result: result2 } = renderHook(() =>
+        useMediaQuery('(min-width: 1024px)'),
+      )
 
       await waitFor(() => {
         expect(result1.current).toBe(true)

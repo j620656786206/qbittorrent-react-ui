@@ -13,6 +13,7 @@ react-torrent is a modern web UI for qBittorrent built with React, Vite, TanStac
 **CRITICAL**: This project requires Node.js **20.19+** or **22.12+** for Vite 7.x compatibility.
 
 The project uses `.nvmrc` to specify the Node version:
+
 ```
 lts/iron  # Currently resolves to v20.19.6
 ```
@@ -61,6 +62,7 @@ VITE_QBIT_PASSWORD=H9j7kEpJecaq
 ### Testing Connection
 
 To test features that interact with qBittorrent (add torrents, fetch data, etc.), ensure:
+
 1. qBittorrent is running at the configured URL
 2. Credentials in `.env` are correct
 3. Network access to the qBittorrent instance is available
@@ -125,6 +127,7 @@ When adding new qBittorrent API endpoints:
 4. Use `getApiBaseUrl()` helper for URL construction
 
 Example:
+
 ```typescript
 export async function myNewApiFunction(param: string): Promise<Response> {
   return fetch(`${getApiBaseUrl()}/api/v2/endpoint/${param}`, {
@@ -150,6 +153,7 @@ export async function myNewApiFunction(param: string): Promise<Response> {
 ### TypeScript Compilation
 
 Always verify TypeScript compiles without errors:
+
 ```bash
 bash -c 'source ~/.nvm/nvm.sh && nvm use && npx tsc --noEmit'
 ```
@@ -159,6 +163,7 @@ bash -c 'source ~/.nvm/nvm.sh && nvm use && npx tsc --noEmit'
 ### "Vite requires Node.js version 20.19+ or 22.12+"
 
 This warning means the wrong Node.js version is active. Fix:
+
 1. Run `nvm use` to activate the correct version from `.nvmrc`
 2. Verify with `node --version` (should show v20.19.6 or higher)
 
