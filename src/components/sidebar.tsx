@@ -64,10 +64,23 @@ export function Sidebar({
   // Tags from localStorage (refreshed when modal closes)
   const [storedTags, setStoredTags] = React.useState<Array<Tag>>(() => getTags())
 
+  // Multi-tag filter state
+  const [selectedTagFilters, setSelectedTagFilters] = React.useState<Set<string>>(new Set())
+
   // Refresh tags from localStorage
   const refreshTags = React.useCallback(() => {
     setStoredTags(getTags())
   }, [])
+
+  // Sync selectedTagFilters with currentFilter
+  React.useEffect(() => {
+    if (currentFilter.startsWith('tag:')) {
+      const tagNames = currentFilter.substring(4).split(',').map(t => t.trim())
+      setSelectedTagFilters(new Set(tagNames))
+    } else {
+      setSelectedTagFilters(new Set())
+    }
+  }, [currentFilter])
 
   // Count torrents by status
   const getStatusCount = (statusId: string) => {
@@ -197,10 +210,26 @@ export function Sidebar({
             tagsWithCounts.map(({ tag, count }) => (
               <Button
                 key={tag.id}
-                variant={currentFilter === `tag:${tag.name}` ? 'secondary' : 'ghost'}
+                variant={selectedTagFilters.has(tag.name) ? 'secondary' : 'ghost'}
                 className="justify-between text-sm h-9"
                 onClick={() => {
-                  setFilter(`tag:${tag.name}`)
+                  const newSelected = new Set(selectedTagFilters)
+
+                  // Toggle tag selection
+                  if (newSelected.has(tag.name)) {
+                    newSelected.delete(tag.name)
+                  } else {
+                    newSelected.add(tag.name)
+                  }
+
+                  // Update filter based on selection
+                  if (newSelected.size === 0) {
+                    setFilter('all')
+                  } else {
+                    const tagList = Array.from(newSelected).join(',')
+                    setFilter(`tag:${tagList}`)
+                  }
+
                   if (isMobile) onCloseMobileSidebar()
                 }}
               >

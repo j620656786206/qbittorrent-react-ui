@@ -484,105 +484,56 @@ function TorrentTagsEditor({ hash, currentTags, baseUrl }: TorrentTagsEditorProp
 
   const isLoading = addTagMutation.isPending || removeTagMutation.isPending
 
-  // Don't render if no available tags exist
-  if (availableTags.length === 0 && currentTagObjects.length === 0) {
-    return null
-  }
-
   return (
     <div className="flex items-start gap-3" ref={containerRef}>
       <div className="text-slate-400 mt-0.5">
         <TagIcon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-slate-400 mb-1">{t('torrent.details.tags')}</div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Display current tags */}
+        <div className="text-xs text-slate-400 mb-0.5">{t('torrent.tags')}</div>
+        <div className="flex flex-wrap gap-2 items-center relative">
           {currentTagObjects.map((tag) => (
             <TagChip
-              key={tag.id}
+              key={tag.name}
               tag={tag}
-              onRemove={
-                isLoading ? undefined : () => handleRemoveTag(tag.name)
-              }
+              onRemove={() => handleRemoveTag(tag.name)}
+              disabled={isLoading}
             />
           ))}
 
-          {/* Display tag names that don't have metadata in localStorage */}
-          {currentTagNames
-            .filter(
-              (name) => !currentTagObjects.some(
-                (tag) => tag.name.toLowerCase() === name.toLowerCase()
-              )
-            )
-            .map((name) => (
-              <span
-                key={name}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-slate-700/50 text-slate-200"
-              >
-                <span className="size-2 rounded-full shrink-0 bg-slate-500" />
-                <span className="truncate max-w-[100px]" title={name}>
-                  {name}
-                </span>
-                {!isLoading && (
+          {/* Add Tag Button */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isLoading}
+              className="h-6 px-2 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              {t('torrent.addTag')}
+            </Button>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && unassignedTags.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-10 min-w-max">
+                {unassignedTags.map((tag) => (
                   <button
-                    type="button"
-                    onClick={() => handleRemoveTag(name)}
-                    className="ml-0.5 rounded-full p-0.5 hover:bg-slate-600/50 transition-colors"
+                    key={tag.name}
+                    onClick={() => handleAddTag(tag)}
+                    disabled={isLoading}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 disabled:opacity-50 first:rounded-t-md last:rounded-b-md"
                   >
-                    <XCircle className="size-3" />
+                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(tag.color)}`}></span>
+                    {tag.name}
                   </button>
-                )}
-              </span>
-            ))}
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Add tag button */}
-          {unassignedTags.length > 0 && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-slate-700/30 text-slate-400 hover:bg-slate-700/50 hover:text-slate-200 transition-colors disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Plus className="size-3" />
-                )}
-                <span>{t('torrent.details.addTag')}</span>
-              </button>
-
-              {/* Dropdown menu for adding tags */}
-              {isDropdownOpen && !isLoading && (
-                <div className="absolute z-50 mt-1 left-0 min-w-[120px] rounded-md border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95">
-                  <div className="max-h-[150px] overflow-y-auto">
-                    {unassignedTags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => handleAddTag(tag)}
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none cursor-default select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                      >
-                        <span
-                          className={`size-3 rounded-full shrink-0 ${getColorClass(tag.color)}`}
-                        />
-                        <span className="flex-1 truncate text-left">
-                          {tag.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Show placeholder if no tags */}
-          {currentTagNames.length === 0 && unassignedTags.length === 0 && (
-            <span className="text-xs text-slate-500">
-              {t('tags.sidebar.noTags')}
-            </span>
+          {isLoading && (
+            <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
           )}
         </div>
       </div>
@@ -601,6 +552,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   const queryClient = useQueryClient()
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
   const [trackerToRemove, setTrackerToRemove] = React.useState<Tracker | null>(null)
+  const [newTrackerUrl, setNewTrackerUrl] = React.useState('')
 
   // Remove tracker mutation
   const removeTrackerMutation = useMutation({
@@ -608,6 +560,16 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
       setTrackerToRemove(null)
+    },
+  })
+
+  // Add tracker mutation
+  const addTrackerMutation = useMutation({
+    mutationFn: (url: string) => addTrackers(baseUrl, hash, url),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
+      setIsAddDialogOpen(false)
+      setNewTrackerUrl('')
     },
   })
 
@@ -690,54 +652,95 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => reannounceMutation.mutate()}
-              disabled={reannounceMutation.isPending}
-              className="text-xs"
-              title={t('trackers.reannounce.tooltip')}
-            >
-              {reannounceMutation.isPending ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3 mr-1" />
-              )}
-              {t('trackers.reannounce.button')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={() => setIsAddDialogOpen(true)}
+              disabled={addTrackerMutation.isPending}
               className="text-xs"
             >
               <Plus className="h-3 w-3 mr-1" />
-              {t('trackers.add.button')}
+              {t('trackers.add')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => reannounceMutation.mutate()}
+              disabled={reannounceMutation.isPending}
+              className="text-xs"
+            >
+              {reannounceMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <Radio className="h-3 w-3 mr-1" />
+              )}
+              {t('trackers.reannounce')}
             </Button>
           </div>
         </div>
 
         {/* Add Tracker Dialog */}
-        <AddTrackerDialog
-          isOpen={isAddDialogOpen}
-          onClose={() => setIsAddDialogOpen(false)}
-          hash={hash}
-          baseUrl={baseUrl}
-        />
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t('trackers.addTracker')}</DialogTitle>
+              <DialogDescription>
+                {t('trackers.addTrackerDescription')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="tracker-url">{t('trackers.trackerUrl')}</Label>
+                <Textarea
+                  id="tracker-url"
+                  placeholder="http://tracker.example.com:6969/announce"
+                  value={newTrackerUrl}
+                  onChange={(e) => setNewTrackerUrl(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddDialogOpen(false)
+                  setNewTrackerUrl('')
+                }}
+                disabled={addTrackerMutation.isPending}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (newTrackerUrl.trim()) {
+                    addTrackerMutation.mutate(newTrackerUrl)
+                  }
+                }}
+                disabled={
+                  addTrackerMutation.isPending || !newTrackerUrl.trim()
+                }
+              >
+                {addTrackerMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                {t('trackers.add')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
 
-  // Count user-added trackers (status > 0)
-  const userTrackerCount = trackers.filter(tracker => tracker.status !== TrackerStatus.Disabled).length
-
+  // Tracker list
   return (
     <div className="space-y-3">
-      {/* Header with tracker count and action buttons */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Radio className="h-4 w-4" />
           <span>
-            {t('trackers.count', { count: userTrackerCount })}
+            {trackers.length} {t('trackers.title')}
           </span>
-          {(isFetching || reannounceMutation.isPending) && (
+          {isFetching && (
             <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
           )}
         </div>
@@ -745,80 +748,136 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => reannounceMutation.mutate()}
-            disabled={reannounceMutation.isPending}
-            className="text-xs"
-            title={t('trackers.reannounce.tooltip')}
-          >
-            {reannounceMutation.isPending ? (
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3 w-3 mr-1" />
-            )}
-            {t('trackers.reannounce.button')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setIsAddDialogOpen(true)}
+            disabled={addTrackerMutation.isPending}
             className="text-xs"
           >
             <Plus className="h-3 w-3 mr-1" />
-            {t('trackers.add.button')}
+            {t('trackers.add')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => reannounceMutation.mutate()}
+            disabled={reannounceMutation.isPending}
+            className="text-xs"
+          >
+            {reannounceMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <Radio className="h-3 w-3 mr-1" />
+            )}
+            {t('trackers.reannounce')}
           </Button>
         </div>
       </div>
 
-      {/* Tracker Table */}
-      <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 overflow-hidden">
-        <div className="max-h-[300px] overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-800/50 sticky top-0">
-              <tr className="text-left text-xs text-slate-400">
-                <th className="px-3 py-2 font-medium">{t('trackers.table.status')}</th>
-                <th className="px-3 py-2 font-medium">{t('trackers.table.url')}</th>
-                <th className="px-3 py-2 font-medium text-center">{t('trackers.table.seeds')}</th>
-                <th className="px-3 py-2 font-medium text-center">{t('trackers.table.peers')}</th>
-                <th className="px-3 py-2 font-medium w-12"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {trackers.map((tracker, index) => (
-                <TrackerRow
-                  key={`${tracker.url}-${index}`}
-                  tracker={tracker}
-                  t={t}
-                  onRemove={() => setTrackerToRemove(tracker)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Tracker list items */}
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {trackers.map((tracker) => (
+          <div
+            key={tracker.url}
+            className="flex items-center justify-between gap-3 p-2 bg-slate-800/50 rounded-lg text-sm"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {getTrackerStatusIcon(tracker.status)}
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-white truncate">
+                  {tracker.url}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {t(getTrackerStatusKey(tracker.status))}
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTrackerToRemove(tracker)}
+              disabled={removeTrackerMutation.isPending}
+              className="text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20"
+            >
+              {removeTrackerMutation.isPending &&
+              trackerToRemove?.url === tracker.url ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+            </Button>
+          </div>
+        ))}
       </div>
 
       {/* Add Tracker Dialog */}
-      <AddTrackerDialog
-        isOpen={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        hash={hash}
-        baseUrl={baseUrl}
-      />
-
-      {/* Remove Tracker Confirmation Dialog */}
-      <Dialog open={!!trackerToRemove} onOpenChange={() => setTrackerToRemove(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('trackers.remove.title')}</DialogTitle>
-            <DialogDescription>{t('trackers.remove.description')}</DialogDescription>
+            <DialogTitle>{t('trackers.addTracker')}</DialogTitle>
+            <DialogDescription>
+              {t('trackers.addTrackerDescription')}
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="py-4">
-            <div className="text-sm text-slate-400 mb-1">{t('trackers.remove.url')}</div>
-            <div className="text-sm font-mono text-white break-all bg-slate-800/50 rounded-md px-3 py-2">
-              {trackerToRemove?.url}
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="tracker-url">{t('trackers.trackerUrl')}</Label>
+              <Textarea
+                id="tracker-url"
+                placeholder="http://tracker.example.com:6969/announce"
+                value={newTrackerUrl}
+                onChange={(e) => setNewTrackerUrl(e.target.value)}
+                className="font-mono text-xs"
+              />
             </div>
           </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false)
+                setNewTrackerUrl('')
+              }}
+              disabled={addTrackerMutation.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => {
+                if (newTrackerUrl.trim()) {
+                  addTrackerMutation.mutate(newTrackerUrl)
+                }
+              }}
+              disabled={
+                addTrackerMutation.isPending || !newTrackerUrl.trim()
+              }
+            >
+              {addTrackerMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              {t('trackers.add')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
+      {/* Remove Tracker Confirmation Dialog */}
+      <Dialog
+        open={trackerToRemove !== null}
+        onOpenChange={() => setTrackerToRemove(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('trackers.removeTracker')}</DialogTitle>
+            <DialogDescription>
+              {t('trackers.removeTrackerConfirmation')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-300 font-mono break-all">
+              {trackerToRemove?.url}
+            </p>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -837,245 +896,15 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
               disabled={removeTrackerMutation.isPending}
             >
               {removeTrackerMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {t('trackers.remove.removing')}
-                </>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {t('trackers.remove.confirm')}
-                </>
+                <Trash2 className="h-4 w-4 mr-2" />
               )}
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-// Individual tracker row component
-type TrackerRowProps = {
-  tracker: Tracker
-  t: (key: string) => string
-  onRemove: () => void
-}
-
-function TrackerRow({ tracker, t, onRemove }: TrackerRowProps) {
-  const isDisabled = tracker.status === TrackerStatus.Disabled
-  const hasError = tracker.status === TrackerStatus.NotWorking && tracker.msg
-
-  // Truncate long URLs for display
-  const displayUrl = React.useMemo(() => {
-    if (!tracker.url) return '-'
-    // For DHT/PeX/LSD, show the descriptive name
-    if (isDisabled && (tracker.url.includes('DHT') || tracker.url.includes('PeX') || tracker.url.includes('LSD'))) {
-      return tracker.url
-    }
-    // For regular URLs, show a truncated version
-    if (tracker.url.length > 50) {
-      try {
-        const url = new URL(tracker.url)
-        return `${url.protocol}//${url.host}${url.pathname.length > 20 ? url.pathname.substring(0, 20) + '...' : url.pathname}`
-      } catch {
-        return tracker.url.substring(0, 50) + '...'
-      }
-    }
-    return tracker.url
-  }, [tracker.url, isDisabled])
-
-  return (
-    <tr className={`${isDisabled ? 'text-slate-500 bg-slate-800/20' : 'text-slate-200'} hover:bg-slate-800/30 transition-colors`}>
-      {/* Status Column */}
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-2" title={t(getTrackerStatusKey(tracker.status))}>
-          {getTrackerStatusIcon(tracker.status)}
-          <span className="text-xs hidden sm:inline">
-            {t(getTrackerStatusKey(tracker.status))}
-          </span>
-        </div>
-      </td>
-
-      {/* URL Column */}
-      <td className="px-3 py-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-xs break-all" title={tracker.url}>
-            {displayUrl}
-          </span>
-          {/* Show error message if tracker is not working */}
-          {hasError && (
-            <span className="text-xs text-red-400 break-all" title={tracker.msg}>
-              {tracker.msg.length > 60 ? tracker.msg.substring(0, 60) + '...' : tracker.msg}
-            </span>
-          )}
-        </div>
-      </td>
-
-      {/* Seeds Column */}
-      <td className="px-3 py-2 text-center">
-        <span className={isDisabled ? 'text-slate-600' : 'text-green-400'}>
-          {tracker.num_seeds >= 0 ? tracker.num_seeds : '-'}
-        </span>
-      </td>
-
-      {/* Peers Column */}
-      <td className="px-3 py-2 text-center">
-        <span className={isDisabled ? 'text-slate-600' : 'text-blue-400'}>
-          {tracker.num_peers >= 0 ? tracker.num_peers : '-'}
-        </span>
-      </td>
-
-      {/* Actions Column */}
-      <td className="px-3 py-2 text-center">
-        {!isDisabled && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-slate-400 hover:text-red-400 hover:bg-red-400/10"
-            onClick={onRemove}
-            title={t('trackers.remove.button')}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-// AddTrackerDialog component - dialog for adding new trackers
-type AddTrackerDialogProps = {
-  isOpen: boolean
-  onClose: () => void
-  hash: string
-  baseUrl: string
-}
-
-function AddTrackerDialog({ isOpen, onClose, hash, baseUrl }: AddTrackerDialogProps) {
-  const { t } = useTranslation()
-  const queryClient = useQueryClient()
-
-  // Form state
-  const [trackerUrls, setTrackerUrls] = React.useState('')
-  const [error, setError] = React.useState('')
-
-  // Add trackers mutation
-  const addTrackersMutation = useMutation({
-    mutationFn: (urls: Array<string>) => addTrackers(baseUrl, hash, urls),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
-      handleClose()
-    },
-    onError: (err: Error) => {
-      setError(err.message || t('trackers.add.error.failed'))
-    },
-  })
-
-  // Reset form state
-  const resetForm = () => {
-    setTrackerUrls('')
-    setError('')
-  }
-
-  // Handle modal close
-  const handleClose = () => {
-    resetForm()
-    onClose()
-  }
-
-  // Validate tracker URL
-  const isValidTrackerUrl = (url: string): boolean => {
-    const trimmedUrl = url.trim()
-    if (!trimmedUrl) return false
-
-    // Check for common tracker URL protocols
-    const validProtocols = ['http://', 'https://', 'udp://', 'wss://']
-    return validProtocols.some((protocol) => trimmedUrl.toLowerCase().startsWith(protocol))
-  }
-
-  // Handle form submission
-  const handleSubmit = () => {
-    setError('')
-
-    // Split URLs by newlines and filter out empty lines
-    const urls = trackerUrls
-      .split('\n')
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0)
-
-    // Check if there are any URLs
-    if (urls.length === 0) {
-      setError(t('trackers.add.error.empty'))
-      return
-    }
-
-    // Validate each URL
-    for (const url of urls) {
-      if (!isValidTrackerUrl(url)) {
-        setError(t('trackers.add.error.invalid', { url }))
-        return
-      }
-    }
-
-    // Submit the URLs
-    addTrackersMutation.mutate(urls)
-  }
-
-  const isSubmitting = addTrackersMutation.isPending
-
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{t('trackers.add.title')}</DialogTitle>
-          <DialogDescription>{t('trackers.add.description')}</DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 py-4">
-          {/* Tracker URLs Input */}
-          <div className="grid gap-2">
-            <Label htmlFor="trackerUrls">{t('trackers.add.label')}</Label>
-            <Textarea
-              id="trackerUrls"
-              value={trackerUrls}
-              onChange={(e) => {
-                setTrackerUrls(e.target.value)
-                setError('')
-              }}
-              placeholder={t('trackers.add.placeholder')}
-              className="font-mono text-sm min-h-[120px]"
-              rows={5}
-            />
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="text-sm text-red-500 bg-red-500/10 rounded-md px-3 py-2">
-              {error}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {t('trackers.add.adding')}
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('trackers.add.submit')}
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
