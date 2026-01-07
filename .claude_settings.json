@@ -11,14 +11,24 @@
       "Edit(./**)",
       "Glob(./**)",
       "Grep(./**)",
+      "Read(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/**)",
+      "Write(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/**)",
+      "Edit(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/**)",
+      "Glob(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/**)",
+      "Grep(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/**)",
+      "Read(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/.auto-claude/specs/019-comprehensive-test-suite/**)",
+      "Write(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/.auto-claude/specs/019-comprehensive-test-suite/**)",
+      "Edit(/Users/alexyu/projects/personal/react-torrent/.worktrees/019-comprehensive-test-suite/.auto-claude/specs/019-comprehensive-test-suite/**)",
       "Bash(*)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs",
-      "mcp__graphiti-memory__search_nodes",
-      "mcp__graphiti-memory__search_facts",
-      "mcp__graphiti-memory__add_episode",
-      "mcp__graphiti-memory__get_episodes",
-      "mcp__graphiti-memory__get_entity_edge"
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
     ]
   }
 }
