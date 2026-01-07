@@ -27,67 +27,7 @@ import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
-
-// A basic type for the torrent object, we can expand this later
-export type Torrent = {
-  added_on: number; // Unix timestamp
-  amount_left: number; // bytes
-  auto_tmm: boolean;
-  availability: number; // eg. 0.0071655581634163
-  category: string;
-  comment: string;
-  completed: number; // bytes
-  completion_on: number; // Unix timestamp
-  content_path: string;
-  dl_limit: number; // bytes/s
-  dlspeed: number; // bytes/s
-  download_path: string;
-  downloaded: number; // bytes
-  downloaded_session: number; // bytes
-  eta: number; // seconds (remaining time)
-  f_l_piece_prio: boolean; // First Last Piece Priority
-  force_start: boolean;
-  has_metadata: boolean;
-  hash: string;
-  inactive_seeding_time_limit: number;
-  infohash_v1: string;
-  infohash_v2: string;
-  last_activity: number; // Unix timestamp
-  magnet_uri: string;
-  max_inactive_seeding_time: number; // minutes, -1 for infinite
-  max_ratio: number; // eg. -1 (infinite)
-  max_seeding_time: number; // minutes, -1 for infinite
-  name: string;
-  num_complete: number; // number of seeds in the swarm
-  num_incomplete: number; // number of leechers in the swarm
-  num_leechs: number; // number of leechers connected to
-  num_seeds: number; // number of seeds connected to
-  popularity: number;
-  priority: number;
-  private: boolean;
-  progress: number; // [0, 1]
-  ratio: number;
-  ratio_limit: number;
-  reannounce: number; // seconds
-  root_path: string;
-  save_path: string;
-  seeding_time: number; // seconds
-  seeding_time_limit: number; // seconds, -2 for infinite
-  seen_complete: number; // Unix timestamp
-  seq_dl: boolean; // Sequential Download
-  size: number; // bytes (total size of torrent)
-  state: string; // e.g., "downloading", "uploading", "pausedDL", "missingFiles"
-  super_seeding: boolean;
-  tags: string;
-  time_active: number; // seconds
-  total_size: number; // bytes
-  tracker: string;
-  trackers_count: number;
-  up_limit: number; // bytes/s
-  uploaded: number; // bytes
-  uploaded_session: number; // bytes
-  upspeed: number; // bytes/s
-};
+import type { Torrent } from '@/types/torrent';
 
 
 // Helper function to format bytes into KB, MB, GB, etc.
