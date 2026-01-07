@@ -51,35 +51,9 @@ import { TagChip, getColorClass } from '@/components/ui/tag-input'
 import { TrackerStatus, addTorrentTags, addTrackers, getTrackers, reannounceTorrent, removeTorrentTags, removeTrackers } from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
 import { getTags, getTagsByNames, parseTagString } from '@/lib/tag-storage'
+import { formatBytes, formatEta } from '@/lib/utils'
 
 // Helper functions
-function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
-
-function formatEta(seconds: number) {
-  if (seconds < 0 || seconds === 8640000) return '∞'
-  if (seconds === 0) return '-'
-
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-
-  const parts = []
-  if (days > 0) parts.push(`${days}天`)
-  if (hours > 0) parts.push(`${hours}時`)
-  if (minutes > 0) parts.push(`${minutes}分`)
-  if (secs > 0 && days === 0) parts.push(`${secs}秒`)
-
-  return parts.join(' ') || '-'
-}
-
 function formatDate(timestamp: number) {
   if (timestamp <= 0) return '-'
   return new Date(timestamp * 1000).toLocaleString('zh-TW')
