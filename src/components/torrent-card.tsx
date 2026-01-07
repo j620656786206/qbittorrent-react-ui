@@ -25,35 +25,12 @@ import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2
 import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
 import type { Torrent } from '@/components/torrent-table'
 import { Checkbox } from '@/components/ui/checkbox'
+import { formatBytes, formatEta } from '@/lib/utils'
 
 // Virtual scrolling configuration for card view
 const ESTIMATED_CARD_HEIGHT = 180 // Estimated height for dynamic measurement
 const CARD_OVERSCAN = 3 // Extra cards to render above/below viewport
 const CARD_GAP = 12 // Gap between cards (matches gap-3 = 0.75rem = 12px)
-
-// Helper function to format bytes
-function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
-
-// Helper function to format ETA
-function formatEta(seconds: number) {
-  if (seconds < 0 || seconds === 8640000) return '∞'
-  if (seconds === 0) return '-'
-
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
 
 // Helper to get status color
 function getStatusColor(state: string) {
