@@ -432,13 +432,13 @@ function HomePage() {
       if (selectedHashes.size === 0) return
 
       // Get selected torrents
-      const selectedTorrents = filteredTorrents.filter((t) =>
-        selectedHashes.has(t.hash),
+      const selectedTorrents = filteredTorrents.filter((torrent) =>
+        selectedHashes.has(torrent.hash),
       )
 
       // Check if all selected torrents are paused
       const allPaused = selectedTorrents.every(
-        (t) => t.state === 'pausedUP' || t.state === 'pausedDL',
+        (torrent) => torrent.state === 'pausedUP' || torrent.state === 'pausedDL',
       )
 
       // If all are paused, resume them; otherwise pause them

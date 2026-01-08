@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { usePlatform } from '@/lib/hooks'
-import { useTranslation } from 'react-i18next'
 
 interface KeyboardHelpModalProps {
   isOpen: boolean
@@ -34,7 +34,7 @@ export function KeyboardHelpModal({ isOpen, onClose }: KeyboardHelpModalProps) {
   const modKey = isMac ? '⌘' : 'Ctrl'
 
   // Define all keyboard shortcuts
-  const shortcuts: Shortcut[] = [
+  const shortcuts: Array<Shortcut> = [
     { key: `${modKey}+A`, descriptionKey: 'keyboard.shortcuts.selectAll' },
     { key: 'Space', descriptionKey: 'keyboard.shortcuts.pauseResume' },
     { key: 'Delete', descriptionKey: 'keyboard.shortcuts.delete' },

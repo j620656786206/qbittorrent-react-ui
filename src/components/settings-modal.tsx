@@ -1,4 +1,7 @@
 import React from 'react'
+import { ChevronDownIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { Locales} from '@/locales';
 import {
   Dialog,
   DialogContent,
@@ -17,9 +20,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LOCALES, Locales, defaultLocale } from '@/locales'
-import { ChevronDownIcon } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { LOCALES, defaultLocale } from '@/locales'
 import i18n from '@/i18n'
 
 interface SettingsModalProps {
@@ -38,7 +39,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
     // Load current values from localStorage when modal opens
     setUsername(localStorage.getItem('qbit_username') || 'admin')
     setPassword(localStorage.getItem('qbit_password') || 'adminadmin')
-    setLanguage((i18n.language as Locales) || defaultLocale)
+    setLanguage(i18n.language as Locales)
   }, [isOpen])
 
   const handleSave = () => {

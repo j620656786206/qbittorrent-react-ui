@@ -60,7 +60,7 @@ vi.mock('@/lib/api', () => ({
  */
 vi.mock('@/lib/tag-storage', () => ({
   getTags: vi.fn(() => []),
-  formatTagString: vi.fn((tags: string[]) => tags.join(',')),
+  formatTagString: vi.fn((tags: Array<string>) => tags.join(',')),
 }))
 
 /**

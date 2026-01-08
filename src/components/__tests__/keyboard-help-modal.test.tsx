@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { KeyboardHelpModal } from '../keyboard-help-modal'
+
+import { usePlatform } from '@/lib/hooks'
 
 /**
  * Mock react-i18next
@@ -34,8 +36,6 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/lib/hooks', () => ({
   usePlatform: vi.fn(() => ({ isMac: false })),
 }))
-
-import { usePlatform } from '@/lib/hooks'
 
 describe('KeyboardHelpModal Component', () => {
   beforeEach(() => {
