@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useMediaQuery, type MediaQueryString } from '../hooks'
+import {  useMediaQuery } from '../hooks'
+import type {MediaQueryString} from '../hooks';
 
 // Mock matchMedia
 type MediaQueryListMock = {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import en from '../en.json'
 import zhHant from '../zh-Hant.json'
 import zhCN from '../zh-CN.json'
@@ -13,8 +13,8 @@ import ja from '../ja.json'
  * @param prefix - The prefix to prepend to keys (for nested objects)
  * @returns Array of all key paths in dot notation (e.g., ['common.pause', 'torrent.status.all'])
  */
-function getAllKeys(obj: Record<string, unknown>, prefix = ''): string[] {
-  const keys: string[] = []
+function getAllKeys(obj: Record<string, unknown>, prefix = ''): Array<string> {
+  const keys: Array<string> = []
 
   for (const key in obj) {
     const fullKey = prefix ? `${prefix}.${key}` : key
@@ -35,7 +35,7 @@ function getAllKeys(obj: Record<string, unknown>, prefix = ''): string[] {
 /**
  * Compares two sorted arrays of keys and returns missing/extra keys
  */
-function compareKeys(reference: string[], target: string[]): { missing: string[]; extra: string[] } {
+function compareKeys(reference: Array<string>, target: Array<string>): { missing: Array<string>; extra: Array<string> } {
   const refSet = new Set(reference)
   const targetSet = new Set(target)
 

@@ -3,7 +3,7 @@
   "spec": "025-add-password-visibility-toggle",
   "state": "building",
   "subtasks": {
-    "completed": 5,
+    "completed": 7,
     "total": 8,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 7,
-    "started_at": "2026-01-08T22:36:50.857026"
+    "number": 10,
+    "started_at": "2026-01-09T00:50:46.159288"
   },
-  "last_update": "2026-01-08T23:12:38.613665"
+  "last_update": "2026-01-09T00:59:35.862734"
 }

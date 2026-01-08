@@ -40,7 +40,8 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
     // Load current values from localStorage when modal opens
     setUsername(localStorage.getItem('qbit_username') || 'admin')
     setPassword(localStorage.getItem('qbit_password') || 'adminadmin')
-    setLanguage((i18n.language as Locales) || defaultLocale)
+    const currentLang = i18n.language as Locales
+    setLanguage(currentLang)
   }, [isOpen])
 
   const handleSave = () => {

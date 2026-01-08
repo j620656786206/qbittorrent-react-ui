@@ -431,13 +431,13 @@ function HomePage() {
       if (selectedHashes.size === 0) return
 
       // Get selected torrents
-      const selectedTorrents = filteredTorrents.filter((t) =>
-        selectedHashes.has(t.hash),
+      const selectedTorrents = filteredTorrents.filter((torrent) =>
+        selectedHashes.has(torrent.hash),
       )
 
       // Check if all selected torrents are paused
       const allPaused = selectedTorrents.every(
-        (t) => t.state === 'pausedUP' || t.state === 'pausedDL',
+        (torrent) => torrent.state === 'pausedUP' || torrent.state === 'pausedDL',
       )
 
       // If all are paused, resume them; otherwise pause them
@@ -499,7 +499,7 @@ function HomePage() {
     }, [focusedIndex, filteredTorrents, toggleSelection]),
 
     // Question mark: Open keyboard help
-    onQuestionMark: React.useCallback(() => {
+    onHelp: React.useCallback(() => {
       setIsKeyboardHelpOpen(true)
     }, []),
   })
@@ -574,19 +574,21 @@ function HomePage() {
                 batchRecheckMutation.mutate(Array.from(selectedHashes))
               }
               onDelete={() => setIsDeleteDialogOpen(true)}
-              onSelectCategory={(category) =>
+              onSetCategory={(category) =>
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
                 })
               }
               categories={categoryNames}
-              error={batchError}
-              isPausing={batchPauseMutation.isPending}
-              isResuming={batchResumeMutation.isPending}
-              isRechecking={batchRecheckMutation.isPending}
-              isDeleting={batchDeleteMutation.isPending}
-              isSettingCategory={batchSetCategoryMutation.isPending}
+              isPending={
+                batchPauseMutation.isPending ||
+                batchResumeMutation.isPending ||
+                batchRecheckMutation.isPending ||
+                batchDeleteMutation.isPending ||
+                batchSetCategoryMutation.isPending
+              }
+              onClearSelection={clearSelection}
             />
           )}
 
@@ -594,44 +596,23 @@ function HomePage() {
           <TorrentTable
             torrents={filteredTorrents}
             selectedHashes={selectedHashes}
-            onToggleSelection={toggleSelection}
-            onSelectAll={() => selectAll(filteredTorrents)}
-            onClearSelection={clearSelection}
-            selectedTorrent={selectedTorrent}
-            onSelectTorrent={setSelectedTorrent}
-            filter={filter}
+            toggleSelection={toggleSelection}
+            selectAll={() => selectAll(filteredTorrents)}
+            clearSelection={clearSelection}
+            onTorrentClick={setSelectedTorrent}
             focusedIndex={focusedIndex}
-            setFocusedIndex={setFocusedIndex}
           />
 
           {/* Torrent Detail Panel */}
           {selectedTorrent && (
             <TorrentDetail
               torrent={selectedTorrent}
+              isOpen={!!selectedTorrent}
               onClose={() => setSelectedTorrent(null)}
               onPause={() => pauseMutation.mutate(selectedTorrent.hash)}
               onResume={() => resumeMutation.mutate(selectedTorrent.hash)}
               onRecheck={() => recheckMutation.mutate(selectedTorrent.hash)}
-              onDelete={(deleteFiles) =>
-                deleteMutation.mutate({
-                  hash: selectedTorrent.hash,
-                  deleteFiles,
-                })
-              }
-              isPaused={
-                selectedTorrent.state === 'pausedUP' ||
-                selectedTorrent.state === 'pausedDL'
-              }
-              categories={categoryNames}
-              onSelectCategory={(category) => {
-                const hashesToUpdate = selectedHashes.has(selectedTorrent.hash)
-                  ? Array.from(selectedHashes)
-                  : [selectedTorrent.hash]
-                batchSetCategoryMutation.mutate({
-                  hashes: hashesToUpdate,
-                  category,
-                })
-              }}
+              onDelete={() => setIsDeleteDialogOpen(true)}
             />
           )}
 
@@ -697,18 +678,34 @@ function HomePage() {
       {/* Sidebar */}
       {isDesktop && (
         <Sidebar
-          filter={filter}
-          onFilterChange={setFilter}
-          categoryNames={categoryNames}
+          currentFilter={filter}
+          setFilter={setFilter}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onAddTorrent={() => setIsAddTorrentOpen(true)}
+          isMobile={false}
+          isMobileSidebarOpen={false}
+          onCloseMobileSidebar={() => {}}
+          torrents={allTorrents}
+          categories={categoriesData || {}}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
         />
       )}
 
       {/* Mobile Sidebar */}
       {!isDesktop && isMobileSidebarOpen && (
         <Sidebar
-          filter={filter}
-          onFilterChange={setFilter}
-          categoryNames={categoryNames}
+          currentFilter={filter}
+          setFilter={setFilter}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onAddTorrent={() => setIsAddTorrentOpen(true)}
+          isMobile={true}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+          torrents={allTorrents}
+          categories={categoriesData || {}}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
         />
       )}
 
@@ -744,7 +741,6 @@ function HomePage() {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         onSave={handleSettingsSave}
-        onLoginSuccess={handleLoginSuccess}
       />
 
       {/* Add Torrent Modal */}
