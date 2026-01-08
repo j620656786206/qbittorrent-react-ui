@@ -130,10 +130,12 @@
     "enterCredentials": "請輸入您的 qBittorrent 使用者名稱和密碼。"
   },
   "settings": {
-    "title": "設定",
+    "title": "qBittorrent 連線設定",
+    "description": "設定您的 qBittorrent WebUI 連線詳細資訊。",
     "baseUrl": "基礎 URL",
     "username": "使用者名稱",
-    "password": "密碼"
+    "password": "密碼",
+    "language": "語言"
   },
   "batch": {
     "selected": "已選擇 {{count}} 個",

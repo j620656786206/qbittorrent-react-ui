@@ -1,0 +1,268 @@
+{
+  "common": {
+    "pause": "一時停止",
+    "resume": "再開",
+    "continue": "続行",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "ok": "OK",
+    "close": "閉じる",
+    "save": "保存",
+    "settings": "設定",
+    "yes": "はい",
+    "no": "いいえ",
+    "refresh": "更新",
+    "retry": "再試行",
+    "forceRecheck": "強制再チェック"
+  },
+  "torrent": {
+    "status": {
+      "all": "すべて",
+      "downloading": "ダウンロード中",
+      "uploading": "シード中",
+      "pausedDL": "一時停止",
+      "pausedUP": "一時停止",
+      "stalledDL": "停止中 DL",
+      "stalledUP": "停止中 UP",
+      "checkingDL": "チェック中",
+      "checkingUP": "チェック中",
+      "queuedDL": "待機中",
+      "queuedUP": "待機中",
+      "error": "エラー",
+      "missingFiles": "ファイル不明",
+      "allocating": "割り当て中"
+    },
+    "category": "カテゴリ",
+    "uncategorized": "未分類",
+    "noTorrentsFound": "トレントが見つかりません。",
+    "search": {
+      "placeholder": "トレントを検索...",
+      "clear": "検索をクリア"
+    },
+    "table": {
+      "name": "名前",
+      "statusAndProgress": "状態と進行状況",
+      "speed": "速度",
+      "stats": "統計",
+      "actions": "操作",
+      "size": "サイズ",
+      "eta": "残り時間",
+      "ratio": "比率",
+      "peers": "ピア",
+      "selectAll": "すべてのトレントを選択",
+      "selectTorrent": "{{name}}を選択"
+    },
+    "details": {
+      "progress": "進行状況",
+      "downloadSpeed": "ダウンロード速度",
+      "uploadSpeed": "アップロード速度",
+      "remainingTime": "残り時間",
+      "size": "サイズ",
+      "status": "状態",
+      "downloaded": "ダウンロード済み",
+      "uploaded": "アップロード済み",
+      "ratio": "比率",
+      "addedOn": "追加日時",
+      "completedOn": "完了日時",
+      "savePath": "保存先",
+      "hash": "ハッシュ",
+      "peers": "ピア",
+      "seeds": "シード",
+      "leechers": "リーチャー",
+      "connected": "接続中",
+      "totalSwarm": "合計（スワーム）",
+      "thisSession": "このセッション",
+      "files": "ファイル",
+      "tags": "タグ",
+      "addTag": "タグを追加"
+    },
+    "actions": {
+      "delete": "削除",
+      "deleteKeepFiles": "削除（ファイルを保持）",
+      "deleteRemoveFiles": "削除（ファイルを削除）",
+      "confirmDelete": "削除してもよろしいですか？",
+      "confirmDeleteMessage": "この操作は元に戻せません。トレント<strong>{{name}}</strong>を完全に削除します。関連ファイルを削除するかどうかを選択できます。",
+      "deleteWithFiles": "ファイルも削除しますか？"
+    }
+  },
+  "sidebar": {
+    "title": "qB-React",
+    "status": "状態",
+    "categories": "カテゴリ",
+    "tags": "タグ",
+    "searchPlaceholder": "トレントを検索...",
+    "clearSearch": "検索をクリア"
+  },
+  "tags": {
+    "sidebar": {
+      "noTags": "タグがありません",
+      "manageTags": "タグを管理"
+    },
+    "manager": {
+      "title": "タグマネージャー",
+      "description": "トレントを整理するためのタグを作成および管理します。",
+      "createNew": "新しいタグを作成",
+      "namePlaceholder": "タグ名を入力...",
+      "addTag": "タグを追加",
+      "noColor": "色なし",
+      "existingTags": "既存のタグ",
+      "noTags": "タグが作成されていません",
+      "clickToEdit": "クリックして編集"
+    },
+    "delete": {
+      "title": "タグを削除",
+      "description": "タグ「{{name}}」を削除してもよろしいですか？すべてのトレントから削除されます。"
+    },
+    "error": {
+      "emptyName": "タグ名を空にすることはできません",
+      "nameTooLong": "タグ名は50文字を超えることはできません",
+      "invalidName": "タグ名に無効な文字が含まれています",
+      "duplicate": "タグ「{{name}}」はすでに存在します",
+      "createFailed": "タグの作成に失敗しました",
+      "updateFailed": "タグの更新に失敗しました"
+    }
+  },
+  "login": {
+    "username": "ユーザー名",
+    "password": "パスワード",
+    "login": "ログイン",
+    "failed": "ログイン失敗",
+    "enterCredentials": "qBittorrentのユーザー名とパスワードを入力してください。"
+  },
+  "settings": {
+    "title": "qBittorrent 接続設定",
+    "description": "qBittorrent WebUI の接続詳細を設定します。",
+    "baseUrl": "ベース URL",
+    "username": "ユーザー名",
+    "password": "パスワード",
+    "language": "言語"
+  },
+  "batch": {
+    "selected": "{{count}}件選択中",
+    "clearSelection": "クリア",
+    "setCategory": "カテゴリ",
+    "selectCategory": "カテゴリを設定",
+    "confirmDelete": "{{count}}個のトレントを削除しますか？",
+    "confirmDeleteMessage": "この操作は元に戻せません。<strong>{{count}}個のトレント</strong>を完全に削除します。関連ファイルも削除するかどうかを選択してください。",
+    "processing": "処理中...",
+    "error": {
+      "pause": "トレントの一時停止に失敗しました：{{message}}",
+      "resume": "トレントの再開に失敗しました：{{message}}",
+      "recheck": "トレントの再チェックに失敗しました：{{message}}",
+      "delete": "トレントの削除に失敗しました：{{message}}",
+      "category": "カテゴリの設定に失敗しました：{{message}}"
+    }
+  },
+  "addTorrent": {
+    "title": "トレントを追加",
+    "description": "マグネットリンクまたはファイルアップロードで新しいトレントを追加します。",
+    "tabs": {
+      "magnetLink": "マグネットリンク",
+      "file": "ファイル"
+    },
+    "magnetLink": {
+      "label": "マグネットリンク",
+      "placeholder": "magnet:?xt=urn:btih:..."
+    },
+    "file": {
+      "label": "トレントファイル",
+      "placeholder": ".torrentファイルを選択",
+      "browse": "参照",
+      "noFile": "ファイルが選択されていません"
+    },
+    "savePath": {
+      "label": "保存先",
+      "placeholder": "空欄でデフォルト"
+    },
+    "category": {
+      "label": "カテゴリ",
+      "none": "なし",
+      "placeholder": "カテゴリを選択"
+    },
+    "tags": {
+      "label": "タグ",
+      "placeholder": "タグを選択..."
+    },
+    "startPaused": "一時停止状態で開始",
+    "add": "追加",
+    "adding": "追加中...",
+    "success": "トレントが正常に追加されました",
+    "error": {
+      "invalidMagnet": "無効なマグネットリンクです。「magnet:?」で始まる必要があります",
+      "noFile": "トレントファイルを選択してください",
+      "failed": "トレントの追加に失敗しました",
+      "network": "ネットワークエラーです。もう一度お試しください。"
+    }
+  },
+  "fileList": {
+    "loading": "ファイルを読み込み中...",
+    "metadataPending": "ファイルリストは利用できません",
+    "metadataPendingHint": "トレントのメタデータをまだダウンロード中です。お待ちください。",
+    "error": "ファイルの読み込みに失敗しました",
+    "noFiles": "このトレントのファイルが見つかりません",
+    "fileCount": "{{count}}個のファイル",
+    "updatingPriority": "優先度を更新中...",
+    "priorityError": "優先度の更新に失敗しました"
+  },
+  "fileTree": {
+    "noFiles": "ファイルがありません"
+  },
+  "priority": {
+    "doNotDownload": "ダウンロードしない",
+    "normal": "通常",
+    "high": "高",
+    "maximum": "最大"
+  },
+  "trackers": {
+    "title": "トラッカー",
+    "loading": "トラッカーを読み込み中...",
+    "error": "トラッカーの読み込みに失敗しました",
+    "noTrackers": "トラッカーが見つかりません",
+    "count": "{{count}}個のトラッカー",
+    "table": {
+      "status": "状態",
+      "url": "URL",
+      "seeds": "シード",
+      "peers": "ピア"
+    },
+    "status": {
+      "disabled": "無効",
+      "notContacted": "未接続",
+      "working": "動作中",
+      "updating": "更新中",
+      "notWorking": "動作していません",
+      "unknown": "不明"
+    },
+    "add": {
+      "button": "トラッカーを追加",
+      "title": "トラッカーを追加",
+      "description": "1つ以上のトラッカーURLを入力してください（1行に1つ）",
+      "label": "トラッカーURL",
+      "placeholder": "http://tracker.example.com:6969/announce\nudp://tracker.example.org:1337/announce",
+      "submit": "追加",
+      "adding": "追加中...",
+      "success": "トラッカーが正常に追加されました",
+      "error": {
+        "empty": "少なくとも1つのトラッカーURLを入力してください",
+        "invalid": "無効なトラッカーURL：{{url}}",
+        "failed": "トラッカーの追加に失敗しました"
+      }
+    },
+    "remove": {
+      "button": "削除",
+      "title": "トラッカーを削除",
+      "description": "このトラッカーを削除してもよろしいですか？",
+      "url": "トラッカーURL：",
+      "confirm": "削除",
+      "removing": "削除中...",
+      "success": "トラッカーが正常に削除されました",
+      "error": {
+        "failed": "トラッカーの削除に失敗しました"
+      }
+    },
+    "reannounce": {
+      "button": "再アナウンス",
+      "tooltip": "すべてのトラッカーに強制的にアナウンス"
+    }
+  }
+}

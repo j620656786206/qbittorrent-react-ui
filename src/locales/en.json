@@ -130,10 +130,12 @@
     "enterCredentials": "Please enter your qBittorrent username and password."
   },
   "settings": {
-    "title": "Settings",
+    "title": "qBittorrent Connection Settings",
+    "description": "Configure your qBittorrent WebUI connection details.",
     "baseUrl": "Base URL",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "language": "Language"
   },
   "batch": {
     "selected": "{{count}} selected",

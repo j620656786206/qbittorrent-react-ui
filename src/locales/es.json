@@ -1,0 +1,268 @@
+{
+  "common": {
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "continue": "Continuar",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "ok": "Aceptar",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "settings": "Configuración",
+    "yes": "Sí",
+    "no": "No",
+    "refresh": "Actualizar",
+    "retry": "Reintentar",
+    "forceRecheck": "Forzar Reverificación"
+  },
+  "torrent": {
+    "status": {
+      "all": "Todos",
+      "downloading": "Descargando",
+      "uploading": "Sembrando",
+      "pausedDL": "Pausado",
+      "pausedUP": "Pausado",
+      "stalledDL": "Detenido DL",
+      "stalledUP": "Detenido UP",
+      "checkingDL": "Verificando",
+      "checkingUP": "Verificando",
+      "queuedDL": "En Cola",
+      "queuedUP": "En Cola",
+      "error": "Error",
+      "missingFiles": "Archivos Faltantes",
+      "allocating": "Asignando"
+    },
+    "category": "Categoría",
+    "uncategorized": "Sin Categoría",
+    "noTorrentsFound": "No se encontraron torrents.",
+    "search": {
+      "placeholder": "Buscar torrents...",
+      "clear": "Limpiar búsqueda"
+    },
+    "table": {
+      "name": "Nombre",
+      "statusAndProgress": "Estado y Progreso",
+      "speed": "Velocidad",
+      "stats": "Estadísticas",
+      "actions": "Acciones",
+      "size": "Tamaño",
+      "eta": "Tiempo Restante",
+      "ratio": "Ratio",
+      "peers": "Pares",
+      "selectAll": "Seleccionar todos los torrents",
+      "selectTorrent": "Seleccionar {{name}}"
+    },
+    "details": {
+      "progress": "Progreso",
+      "downloadSpeed": "Velocidad de Descarga",
+      "uploadSpeed": "Velocidad de Subida",
+      "remainingTime": "Tiempo Restante",
+      "size": "Tamaño",
+      "status": "Estado",
+      "downloaded": "Descargado",
+      "uploaded": "Subido",
+      "ratio": "Ratio",
+      "addedOn": "Añadido El",
+      "completedOn": "Completado El",
+      "savePath": "Ruta de Guardado",
+      "hash": "Hash",
+      "peers": "Pares",
+      "seeds": "Semillas",
+      "leechers": "Sanguijuelas",
+      "connected": "Conectado",
+      "totalSwarm": "Total (Enjambre)",
+      "thisSession": "esta sesión",
+      "files": "Archivos",
+      "tags": "Etiquetas",
+      "addTag": "Añadir Etiqueta"
+    },
+    "actions": {
+      "delete": "Eliminar",
+      "deleteKeepFiles": "Eliminar (Mantener Archivos)",
+      "deleteRemoveFiles": "Eliminar (Borrar Archivos)",
+      "confirmDelete": "¿Está seguro de que desea eliminar?",
+      "confirmDeleteMessage": "Esta acción no se puede deshacer. Esto eliminará permanentemente el torrent <strong>{{name}}</strong>. Puede elegir si desea eliminar los archivos asociados.",
+      "deleteWithFiles": "¿Eliminar también los archivos?"
+    }
+  },
+  "sidebar": {
+    "title": "qB-React",
+    "status": "Estado",
+    "categories": "Categorías",
+    "tags": "Etiquetas",
+    "searchPlaceholder": "Buscar torrents...",
+    "clearSearch": "Limpiar búsqueda"
+  },
+  "tags": {
+    "sidebar": {
+      "noTags": "Sin etiquetas aún",
+      "manageTags": "Administrar Etiquetas"
+    },
+    "manager": {
+      "title": "Administrador de Etiquetas",
+      "description": "Crear y administrar etiquetas para organizar sus torrents.",
+      "createNew": "Crear Nueva Etiqueta",
+      "namePlaceholder": "Ingrese el nombre de la etiqueta...",
+      "addTag": "Añadir Etiqueta",
+      "noColor": "Sin color",
+      "existingTags": "Etiquetas Existentes",
+      "noTags": "Aún no se han creado etiquetas",
+      "clickToEdit": "Clic para editar"
+    },
+    "delete": {
+      "title": "Eliminar Etiqueta",
+      "description": "¿Está seguro de que desea eliminar la etiqueta \"{{name}}\"? Esto la eliminará de todos los torrents."
+    },
+    "error": {
+      "emptyName": "El nombre de la etiqueta no puede estar vacío",
+      "nameTooLong": "El nombre de la etiqueta no puede exceder 50 caracteres",
+      "invalidName": "El nombre de la etiqueta contiene caracteres no válidos",
+      "duplicate": "La etiqueta \"{{name}}\" ya existe",
+      "createFailed": "Error al crear la etiqueta",
+      "updateFailed": "Error al actualizar la etiqueta"
+    }
+  },
+  "login": {
+    "username": "Nombre de Usuario",
+    "password": "Contraseña",
+    "login": "Iniciar Sesión",
+    "failed": "Inicio de Sesión Fallido",
+    "enterCredentials": "Por favor, ingrese su nombre de usuario y contraseña de qBittorrent."
+  },
+  "settings": {
+    "title": "Configuración de Conexión de qBittorrent",
+    "description": "Configure los detalles de conexión de su WebUI de qBittorrent.",
+    "baseUrl": "URL Base",
+    "username": "Nombre de Usuario",
+    "password": "Contraseña",
+    "language": "Idioma"
+  },
+  "batch": {
+    "selected": "{{count}} seleccionados",
+    "clearSelection": "Limpiar",
+    "setCategory": "Categoría",
+    "selectCategory": "Establecer Categoría",
+    "confirmDelete": "¿Eliminar {{count}} Torrents?",
+    "confirmDeleteMessage": "Esta acción no se puede deshacer. Esto eliminará permanentemente <strong>{{count}} torrents</strong>. Elija si desea eliminar también los archivos asociados.",
+    "processing": "Procesando...",
+    "error": {
+      "pause": "Error al pausar torrents: {{message}}",
+      "resume": "Error al reanudar torrents: {{message}}",
+      "recheck": "Error al reverificar torrents: {{message}}",
+      "delete": "Error al eliminar torrents: {{message}}",
+      "category": "Error al establecer categoría: {{message}}"
+    }
+  },
+  "addTorrent": {
+    "title": "Añadir Torrent",
+    "description": "Añadir un nuevo torrent mediante enlace magnet o carga de archivo.",
+    "tabs": {
+      "magnetLink": "Enlace Magnet",
+      "file": "Archivo"
+    },
+    "magnetLink": {
+      "label": "Enlace Magnet",
+      "placeholder": "magnet:?xt=urn:btih:..."
+    },
+    "file": {
+      "label": "Archivo Torrent",
+      "placeholder": "Seleccione un archivo .torrent",
+      "browse": "Examinar",
+      "noFile": "Ningún archivo seleccionado"
+    },
+    "savePath": {
+      "label": "Ruta de Guardado",
+      "placeholder": "Dejar vacío para usar la predeterminada"
+    },
+    "category": {
+      "label": "Categoría",
+      "none": "Ninguna",
+      "placeholder": "Seleccione una categoría"
+    },
+    "tags": {
+      "label": "Etiquetas",
+      "placeholder": "Seleccione etiquetas..."
+    },
+    "startPaused": "Iniciar Pausado",
+    "add": "Añadir",
+    "adding": "Añadiendo...",
+    "success": "Torrent añadido exitosamente",
+    "error": {
+      "invalidMagnet": "Enlace magnet no válido. Debe comenzar con \"magnet:?\"",
+      "noFile": "Por favor, seleccione un archivo torrent",
+      "failed": "Error al añadir torrent",
+      "network": "Error de red. Por favor, inténtelo de nuevo."
+    }
+  },
+  "fileList": {
+    "loading": "Cargando archivos...",
+    "metadataPending": "Lista de archivos no disponible",
+    "metadataPendingHint": "Los metadatos del torrent aún se están descargando. Por favor, espere y actualice.",
+    "error": "Error al cargar archivos",
+    "noFiles": "No se encontraron archivos para este torrent",
+    "fileCount": "{{count}} archivo(s)",
+    "updatingPriority": "Actualizando prioridad...",
+    "priorityError": "Error al actualizar prioridad"
+  },
+  "fileTree": {
+    "noFiles": "Sin archivos"
+  },
+  "priority": {
+    "doNotDownload": "No Descargar",
+    "normal": "Normal",
+    "high": "Alta",
+    "maximum": "Máxima"
+  },
+  "trackers": {
+    "title": "Rastreadores",
+    "loading": "Cargando rastreadores...",
+    "error": "Error al cargar rastreadores",
+    "noTrackers": "No se encontraron rastreadores",
+    "count": "{{count}} rastreador(es)",
+    "table": {
+      "status": "Estado",
+      "url": "URL",
+      "seeds": "Semillas",
+      "peers": "Pares"
+    },
+    "status": {
+      "disabled": "Deshabilitado",
+      "notContacted": "No Contactado",
+      "working": "Funcionando",
+      "updating": "Actualizando",
+      "notWorking": "No Funcionando",
+      "unknown": "Desconocido"
+    },
+    "add": {
+      "button": "Añadir Rastreador",
+      "title": "Añadir Rastreadores",
+      "description": "Ingrese una o más URLs de rastreadores (una por línea)",
+      "label": "URLs de Rastreadores",
+      "placeholder": "http://tracker.example.com:6969/announce\nudp://tracker.example.org:1337/announce",
+      "submit": "Añadir",
+      "adding": "Añadiendo...",
+      "success": "Rastreador(es) añadido(s) exitosamente",
+      "error": {
+        "empty": "Por favor, ingrese al menos una URL de rastreador",
+        "invalid": "URL de rastreador no válida: {{url}}",
+        "failed": "Error al añadir rastreador(es)"
+      }
+    },
+    "remove": {
+      "button": "Eliminar",
+      "title": "Eliminar Rastreador",
+      "description": "¿Está seguro de que desea eliminar este rastreador?",
+      "url": "URL del Rastreador:",
+      "confirm": "Eliminar",
+      "removing": "Eliminando...",
+      "success": "Rastreador eliminado exitosamente",
+      "error": {
+        "failed": "Error al eliminar rastreador"
+      }
+    },
+    "reannounce": {
+      "button": "Reanunciar",
+      "tooltip": "Forzar anuncio a todos los rastreadores"
+    }
+  }
+}

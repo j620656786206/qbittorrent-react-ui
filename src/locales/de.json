@@ -1,0 +1,268 @@
+{
+  "common": {
+    "pause": "Pausieren",
+    "resume": "Fortsetzen",
+    "continue": "Weiter",
+    "delete": "Löschen",
+    "cancel": "Abbrechen",
+    "ok": "OK",
+    "close": "Schließen",
+    "save": "Speichern",
+    "settings": "Einstellungen",
+    "yes": "Ja",
+    "no": "Nein",
+    "refresh": "Aktualisieren",
+    "retry": "Wiederholen",
+    "forceRecheck": "Neuprüfung erzwingen"
+  },
+  "torrent": {
+    "status": {
+      "all": "Alle",
+      "downloading": "Herunterladen",
+      "uploading": "Verteilen",
+      "pausedDL": "Pausiert",
+      "pausedUP": "Pausiert",
+      "stalledDL": "Blockiert DL",
+      "stalledUP": "Blockiert UP",
+      "checkingDL": "Prüfe",
+      "checkingUP": "Prüfe",
+      "queuedDL": "In Warteschlange",
+      "queuedUP": "In Warteschlange",
+      "error": "Fehler",
+      "missingFiles": "Fehlende Dateien",
+      "allocating": "Zuweisen"
+    },
+    "category": "Kategorie",
+    "uncategorized": "Ohne Kategorie",
+    "noTorrentsFound": "Keine Torrents gefunden.",
+    "search": {
+      "placeholder": "Torrents durchsuchen...",
+      "clear": "Suche löschen"
+    },
+    "table": {
+      "name": "Name",
+      "statusAndProgress": "Status & Fortschritt",
+      "speed": "Geschwindigkeit",
+      "stats": "Statistiken",
+      "actions": "Aktionen",
+      "size": "Größe",
+      "eta": "Verbleibend",
+      "ratio": "Verhältnis",
+      "peers": "Peers",
+      "selectAll": "Alle Torrents auswählen",
+      "selectTorrent": "{{name}} auswählen"
+    },
+    "details": {
+      "progress": "Fortschritt",
+      "downloadSpeed": "Download-Geschwindigkeit",
+      "uploadSpeed": "Upload-Geschwindigkeit",
+      "remainingTime": "Verbleibende Zeit",
+      "size": "Größe",
+      "status": "Status",
+      "downloaded": "Heruntergeladen",
+      "uploaded": "Hochgeladen",
+      "ratio": "Verhältnis",
+      "addedOn": "Hinzugefügt am",
+      "completedOn": "Abgeschlossen am",
+      "savePath": "Speicherpfad",
+      "hash": "Hash",
+      "peers": "Peers",
+      "seeds": "Seeds",
+      "leechers": "Leechers",
+      "connected": "Verbunden",
+      "totalSwarm": "Gesamt (Schwarm)",
+      "thisSession": "diese Sitzung",
+      "files": "Dateien",
+      "tags": "Tags",
+      "addTag": "Tag hinzufügen"
+    },
+    "actions": {
+      "delete": "Löschen",
+      "deleteKeepFiles": "Löschen (Dateien behalten)",
+      "deleteRemoveFiles": "Löschen (Dateien entfernen)",
+      "confirmDelete": "Möchten Sie wirklich löschen?",
+      "confirmDeleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden. Der Torrent <strong>{{name}}</strong> wird dauerhaft gelöscht. Sie können wählen, ob die zugehörigen Dateien gelöscht werden sollen.",
+      "deleteWithFiles": "Dateien auch löschen?"
+    }
+  },
+  "sidebar": {
+    "title": "qB-React",
+    "status": "Status",
+    "categories": "Kategorien",
+    "tags": "Tags",
+    "searchPlaceholder": "Torrents durchsuchen...",
+    "clearSearch": "Suche löschen"
+  },
+  "tags": {
+    "sidebar": {
+      "noTags": "Noch keine Tags",
+      "manageTags": "Tags verwalten"
+    },
+    "manager": {
+      "title": "Tag-Verwaltung",
+      "description": "Erstellen und verwalten Sie Tags, um Ihre Torrents zu organisieren.",
+      "createNew": "Neues Tag erstellen",
+      "namePlaceholder": "Tag-Name eingeben...",
+      "addTag": "Tag hinzufügen",
+      "noColor": "Keine Farbe",
+      "existingTags": "Vorhandene Tags",
+      "noTags": "Noch keine Tags erstellt",
+      "clickToEdit": "Zum Bearbeiten klicken"
+    },
+    "delete": {
+      "title": "Tag löschen",
+      "description": "Möchten Sie das Tag \"{{name}}\" wirklich löschen? Es wird von allen Torrents entfernt."
+    },
+    "error": {
+      "emptyName": "Tag-Name darf nicht leer sein",
+      "nameTooLong": "Tag-Name darf 50 Zeichen nicht überschreiten",
+      "invalidName": "Tag-Name enthält ungültige Zeichen",
+      "duplicate": "Tag \"{{name}}\" existiert bereits",
+      "createFailed": "Fehler beim Erstellen des Tags",
+      "updateFailed": "Fehler beim Aktualisieren des Tags"
+    }
+  },
+  "login": {
+    "username": "Benutzername",
+    "password": "Passwort",
+    "login": "Anmelden",
+    "failed": "Anmeldung fehlgeschlagen",
+    "enterCredentials": "Bitte geben Sie Ihren qBittorrent-Benutzernamen und Ihr Passwort ein."
+  },
+  "settings": {
+    "title": "qBittorrent Verbindungseinstellungen",
+    "description": "Konfigurieren Sie Ihre qBittorrent WebUI-Verbindungsdetails.",
+    "baseUrl": "Basis-URL",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "language": "Sprache"
+  },
+  "batch": {
+    "selected": "{{count}} ausgewählt",
+    "clearSelection": "Löschen",
+    "setCategory": "Kategorie",
+    "selectCategory": "Kategorie festlegen",
+    "confirmDelete": "{{count}} Torrents löschen?",
+    "confirmDeleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden. Es werden <strong>{{count}} Torrents</strong> dauerhaft gelöscht. Wählen Sie, ob die zugehörigen Dateien auch gelöscht werden sollen.",
+    "processing": "Wird verarbeitet...",
+    "error": {
+      "pause": "Fehler beim Pausieren der Torrents: {{message}}",
+      "resume": "Fehler beim Fortsetzen der Torrents: {{message}}",
+      "recheck": "Fehler beim Neuprüfen der Torrents: {{message}}",
+      "delete": "Fehler beim Löschen der Torrents: {{message}}",
+      "category": "Fehler beim Festlegen der Kategorie: {{message}}"
+    }
+  },
+  "addTorrent": {
+    "title": "Torrent hinzufügen",
+    "description": "Fügen Sie einen neuen Torrent über Magnet-Link oder Datei-Upload hinzu.",
+    "tabs": {
+      "magnetLink": "Magnet-Link",
+      "file": "Datei"
+    },
+    "magnetLink": {
+      "label": "Magnet-Link",
+      "placeholder": "magnet:?xt=urn:btih:..."
+    },
+    "file": {
+      "label": "Torrent-Datei",
+      "placeholder": "Wählen Sie eine .torrent-Datei aus",
+      "browse": "Durchsuchen",
+      "noFile": "Keine Datei ausgewählt"
+    },
+    "savePath": {
+      "label": "Speicherpfad",
+      "placeholder": "Leer lassen für Standardpfad"
+    },
+    "category": {
+      "label": "Kategorie",
+      "none": "Keine",
+      "placeholder": "Kategorie auswählen"
+    },
+    "tags": {
+      "label": "Tags",
+      "placeholder": "Tags auswählen..."
+    },
+    "startPaused": "Pausiert starten",
+    "add": "Hinzufügen",
+    "adding": "Wird hinzugefügt...",
+    "success": "Torrent erfolgreich hinzugefügt",
+    "error": {
+      "invalidMagnet": "Ungültiger Magnet-Link. Muss mit \"magnet:?\" beginnen",
+      "noFile": "Bitte wählen Sie eine Torrent-Datei aus",
+      "failed": "Fehler beim Hinzufügen des Torrents",
+      "network": "Netzwerkfehler. Bitte versuchen Sie es erneut."
+    }
+  },
+  "fileList": {
+    "loading": "Lade Dateien...",
+    "metadataPending": "Dateiliste nicht verfügbar",
+    "metadataPendingHint": "Torrent-Metadaten werden noch heruntergeladen. Bitte warten Sie und aktualisieren Sie.",
+    "error": "Fehler beim Laden der Dateien",
+    "noFiles": "Keine Dateien für diesen Torrent gefunden",
+    "fileCount": "{{count}} Datei(en)",
+    "updatingPriority": "Aktualisiere Priorität...",
+    "priorityError": "Fehler beim Aktualisieren der Priorität"
+  },
+  "fileTree": {
+    "noFiles": "Keine Dateien"
+  },
+  "priority": {
+    "doNotDownload": "Nicht herunterladen",
+    "normal": "Normal",
+    "high": "Hoch",
+    "maximum": "Maximum"
+  },
+  "trackers": {
+    "title": "Tracker",
+    "loading": "Lade Tracker...",
+    "error": "Fehler beim Laden der Tracker",
+    "noTrackers": "Keine Tracker gefunden",
+    "count": "{{count}} Tracker",
+    "table": {
+      "status": "Status",
+      "url": "URL",
+      "seeds": "Seeds",
+      "peers": "Peers"
+    },
+    "status": {
+      "disabled": "Deaktiviert",
+      "notContacted": "Nicht kontaktiert",
+      "working": "Funktioniert",
+      "updating": "Aktualisiert",
+      "notWorking": "Funktioniert nicht",
+      "unknown": "Unbekannt"
+    },
+    "add": {
+      "button": "Tracker hinzufügen",
+      "title": "Tracker hinzufügen",
+      "description": "Geben Sie eine oder mehrere Tracker-URLs ein (eine pro Zeile)",
+      "label": "Tracker-URLs",
+      "placeholder": "http://tracker.example.com:6969/announce\nudp://tracker.example.org:1337/announce",
+      "submit": "Hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "success": "Tracker erfolgreich hinzugefügt",
+      "error": {
+        "empty": "Bitte geben Sie mindestens eine Tracker-URL ein",
+        "invalid": "Ungültige Tracker-URL: {{url}}",
+        "failed": "Fehler beim Hinzufügen der Tracker"
+      }
+    },
+    "remove": {
+      "button": "Entfernen",
+      "title": "Tracker entfernen",
+      "description": "Möchten Sie diesen Tracker wirklich entfernen?",
+      "url": "Tracker-URL:",
+      "confirm": "Entfernen",
+      "removing": "Wird entfernt...",
+      "success": "Tracker erfolgreich entfernt",
+      "error": {
+        "failed": "Fehler beim Entfernen des Trackers"
+      }
+    },
+    "reannounce": {
+      "button": "Neu ankündigen",
+      "tooltip": "Ankündigung an alle Tracker erzwingen"
+    }
+  }
+}

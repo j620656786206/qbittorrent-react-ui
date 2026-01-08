@@ -1,8 +1,8 @@
-import { clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-import type { ClassValue } from 'clsx'
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+import i18n from '@/i18n'
 
-export function cn(...inputs: Array<ClassValue>) {
+export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
@@ -13,7 +13,13 @@ export function formatBytes(bytes: number, decimals = 2) {
   const dm = decimals < 0 ? 0 : decimals
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+  const num = bytes / Math.pow(k, i)
+  const fmt = new Intl.NumberFormat(i18n.language || 'en', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: dm,
+    useGrouping: false
+  }).format(num)
+  return fmt + ' ' + sizes[i]
 }
 
 // Helper function to format ETA
@@ -25,7 +31,9 @@ export function formatEta(seconds: number) {
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
 
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
+  const fmt = new Intl.NumberFormat(i18n.language || 'en').format
+
+  if (days > 0) return `${fmt(days)}d ${fmt(hours)}h`
+  if (hours > 0) return `${fmt(hours)}h ${fmt(minutes)}m`
+  return `${fmt(minutes)}m`
 }
