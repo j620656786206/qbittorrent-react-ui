@@ -504,4 +504,96 @@ describe('LoginForm Component', () => {
       expect(passwordInput).toHaveAttribute('placeholder', 'adminadmin')
     })
   })
+
+  describe('Password Visibility Toggle', () => {
+    it('renders password visibility toggle button', () => {
+      const mockOnSuccess = vi.fn()
+      renderLoginForm({ onLoginSuccess: mockOnSuccess })
+
+      const toggleButton = screen.getByRole('button', { name: 'Show password' })
+      expect(toggleButton).toBeInTheDocument()
+    })
+
+    it('password is hidden by default', () => {
+      const mockOnSuccess = vi.fn()
+      renderLoginForm({ onLoginSuccess: mockOnSuccess })
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
+      expect(passwordInput.type).toBe('password')
+    })
+
+    it('clicking toggle changes password input type to text', async () => {
+      const user = userEvent.setup()
+      const mockOnSuccess = vi.fn()
+      renderLoginForm({ onLoginSuccess: mockOnSuccess })
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
+      const toggleButton = screen.getByRole('button', { name: 'Show password' })
+
+      // Initially password type
+      expect(passwordInput.type).toBe('password')
+
+      // Click toggle to show password
+      await user.click(toggleButton)
+
+      // Now text type
+      expect(passwordInput.type).toBe('text')
+    })
+
+    it('clicking toggle again changes password input type back to password', async () => {
+      const user = userEvent.setup()
+      const mockOnSuccess = vi.fn()
+      renderLoginForm({ onLoginSuccess: mockOnSuccess })
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
+      const toggleButton = screen.getByRole('button', { name: 'Show password' })
+
+      // Initially password type
+      expect(passwordInput.type).toBe('password')
+
+      // Click toggle to show password
+      await user.click(toggleButton)
+      expect(passwordInput.type).toBe('text')
+
+      // Click toggle again to hide password
+      const hideButton = screen.getByRole('button', { name: 'Hide password' })
+      await user.click(hideButton)
+
+      // Back to password type
+      expect(passwordInput.type).toBe('password')
+    })
+
+    it('aria-label updates correctly based on visibility state', async () => {
+      const user = userEvent.setup()
+      const mockOnSuccess = vi.fn()
+      renderLoginForm({ onLoginSuccess: mockOnSuccess })
+
+      // Initially shows "Show password"
+      let toggleButton = screen.getByRole('button', { name: 'Show password' })
+      expect(toggleButton).toHaveAttribute('aria-label', 'Show password')
+
+      // Click to show password
+      await user.click(toggleButton)
+
+      // Now shows "Hide password"
+      toggleButton = screen.getByRole('button', { name: 'Hide password' })
+      expect(toggleButton).toHaveAttribute('aria-label', 'Hide password')
+
+      // Click to hide password again
+      await user.click(toggleButton)
+
+      // Back to "Show password"
+      toggleButton = screen.getByRole('button', { name: 'Show password' })
+      expect(toggleButton).toHaveAttribute('aria-label', 'Show password')
+    })
+  })
 })
