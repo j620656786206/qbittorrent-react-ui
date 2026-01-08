@@ -1,5 +1,7 @@
 import React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,9 +19,11 @@ export function LoginForm({
   initialPassword = '',
   error,
 }: LoginFormProps) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [username, setUsername] = React.useState(initialUsername)
   const [password, setPassword] = React.useState(initialPassword)
+  const [showPassword, setShowPassword] = React.useState(false)
 
   React.useEffect(() => {
     // Load current values from localStorage or initial props when component mounts
@@ -68,14 +72,30 @@ export function LoginForm({
             <Label htmlFor="login-password" className="text-right">
               Password
             </Label>
-            <Input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="col-span-3"
-              placeholder="adminadmin"
-            />
+            <div className="col-span-3 relative">
+              <Input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pr-10"
+                placeholder="adminadmin"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
         <Button className="w-full mt-6" onClick={handleLogin}>
