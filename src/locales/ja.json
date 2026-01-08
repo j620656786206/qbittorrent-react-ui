@@ -188,6 +188,7 @@
     "startPaused": "一時停止状態で開始",
     "add": "追加",
     "adding": "追加中...",
+    "queueOf": "/",
     "success": "トレントが正常に追加されました",
     "error": {
       "invalidMagnet": "無効なマグネットリンクです。「magnet:?」で始まる必要があります",
@@ -266,5 +267,26 @@
       "button": "再アナウンス",
       "tooltip": "すべてのトラッカーに強制的にアナウンス"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "キーボードショートカット",
+      "description": "これらのキーボードショートカットを使用してトレントを素早く管理",
+      "keyColumn": "キー",
+      "actionColumn": "アクション"
+    },
+    "shortcuts": {
+      "selectAll": "表示中のすべてのトレントを選択",
+      "pauseResume": "選択したトレントを一時停止または再開",
+      "delete": "選択したトレントを削除",
+      "navigate": "トレント間を移動",
+      "toggleSelect": "フォーカス中のトレントを選択または選択解除",
+      "clearSelection": "選択をクリア",
+      "help": "キーボードショートカットのヘルプを表示"
+    }
+  },
+  "dropZone": {
+    "title": "Torrent ファイルをここにドロップ",
+    "subtitle": "ドロップして Torrent ファイルを追加"
   }
 }
