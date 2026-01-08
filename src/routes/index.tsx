@@ -64,7 +64,7 @@ function HomePage() {
     new Set(),
   )
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
-  const [batchError, setBatchError] = React.useState<string | null>(null)
+  const [_batchError, setBatchError] = React.useState<string | null>(null)
 
   // --- Keyboard Navigation State ---
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null)
@@ -415,20 +415,6 @@ function HomePage() {
     mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: ({
-      hash,
-      deleteFiles,
-    }: {
-      hash: string
-      deleteFiles: boolean
-    }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maindata'] })
-      setSelectedTorrent(null)
     },
   })
 
