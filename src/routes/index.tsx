@@ -10,6 +10,7 @@ import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
+import { LoadingSkeleton } from '@/components/loading-skeleton'
 import {
   deleteTorrent,
   getCategories,
@@ -522,7 +523,14 @@ function HomePage() {
     }
 
     if (isLoggingIn || isLoadingTorrents) {
-      return <p>Attempting to log in or loading torrent data...</p>
+      return (
+        <>
+          <span className="sr-only">
+            {t('loading.torrents', 'Loading torrent data...')}
+          </span>
+          <LoadingSkeleton />
+        </>
+      )
     }
 
     // Check for maindata errors separately
