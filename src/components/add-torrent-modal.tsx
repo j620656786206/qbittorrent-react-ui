@@ -23,9 +23,16 @@ type TabType = 'magnet' | 'file'
 interface AddTorrentModalProps {
   isOpen: boolean
   onClose: () => void
+  initialFile?: File
+  initialMagnet?: string
 }
 
-export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
+export function AddTorrentModal({
+  isOpen,
+  onClose,
+  initialFile,
+  initialMagnet,
+}: AddTorrentModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
@@ -48,6 +55,21 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       setAvailableTags(getTags())
     }
   }, [isOpen])
+
+  // Handle initial file/magnet pre-fill
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialFile) {
+        setActiveTab('file')
+        setSelectedFile(initialFile)
+        setError('')
+      } else if (initialMagnet) {
+        setActiveTab('magnet')
+        setMagnetLink(initialMagnet)
+        setError('')
+      }
+    }
+  }, [isOpen, initialFile, initialMagnet])
 
   // File input ref
   const fileInputRef = React.useRef<HTMLInputElement>(null)
