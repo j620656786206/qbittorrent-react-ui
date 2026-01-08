@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface UseDragAndDropOptions {
-  onDrop: (files: File[]) => void
+  onDrop: (files: Array<File>) => void
 }
 
 export interface UseDragAndDropReturn {
@@ -40,7 +40,7 @@ export function useDragAndDrop(
   /**
    * Filter dropped files to only include .torrent files
    */
-  const filterTorrentFiles = useCallback((files: FileList | null): File[] => {
+  const filterTorrentFiles = useCallback((files: FileList | null): Array<File> => {
     if (!files) return []
 
     const fileArray = Array.from(files)

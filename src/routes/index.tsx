@@ -71,7 +71,7 @@ function HomePage() {
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = React.useState(false)
 
   // --- Drag and Drop State ---
-  const [droppedFiles, setDroppedFiles] = React.useState<File[]>([])
+  const [droppedFiles, setDroppedFiles] = React.useState<Array<File>>([])
   const [pastedMagnet, setPastedMagnet] = React.useState<string | null>(null)
   const [initialQueueSize, setInitialQueueSize] = React.useState(0)
 
