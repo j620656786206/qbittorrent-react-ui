@@ -1,4 +1,7 @@
 import React from 'react'
+import { ChevronDownIcon, Eye, EyeOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { Locales} from '@/locales';
 import {
   Dialog,
   DialogContent,
@@ -17,9 +20,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LOCALES, Locales, defaultLocale } from '@/locales'
-import { ChevronDownIcon, Eye, EyeOff } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { LOCALES, defaultLocale } from '@/locales'
 import i18n from '@/i18n'
 
 interface SettingsModalProps {
