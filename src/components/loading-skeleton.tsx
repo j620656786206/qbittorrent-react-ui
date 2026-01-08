@@ -1,4 +1,3 @@
-import React from 'react'
 import { useMediaQuery } from '@/lib/hooks'
 import { TorrentTableSkeleton } from '@/components/torrent-table-skeleton'
 import { TorrentCardSkeleton } from '@/components/torrent-card-skeleton'
