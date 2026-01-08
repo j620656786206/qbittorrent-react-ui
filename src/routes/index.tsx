@@ -72,6 +72,7 @@ function HomePage() {
 
   // --- Drag and Drop State ---
   const [droppedFiles, setDroppedFiles] = React.useState<File[]>([])
+  const [pastedMagnet, setPastedMagnet] = React.useState<string | null>(null)
 
   // Handle drag-and-drop file uploads
   const { isDragging } = useDragAndDrop({
@@ -81,20 +82,59 @@ function HomePage() {
     },
   })
 
-  // Auto-open AddTorrentModal when files are dropped
+  // Handle paste events for magnet links
   React.useEffect(() => {
-    if (droppedFiles.length > 0 && !isAddTorrentOpen) {
+    const handlePaste = (event: ClipboardEvent) => {
+      // Don't interfere when focus is on input/textarea/contenteditable elements
+      const target = event.target as HTMLElement
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return
+      }
+
+      // Get clipboard text
+      const clipboardText = event.clipboardData?.getData('text/plain')
+      if (!clipboardText) return
+
+      // Check if it's a magnet link
+      const trimmedText = clipboardText.trim()
+      if (trimmedText.startsWith('magnet:?')) {
+        event.preventDefault()
+        setPastedMagnet(trimmedText)
+      }
+    }
+
+    // Add paste event listener
+    document.addEventListener('paste', handlePaste)
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('paste', handlePaste)
+    }
+  }, [])
+
+  // Auto-open AddTorrentModal when files are dropped or magnet pasted
+  React.useEffect(() => {
+    if ((droppedFiles.length > 0 || pastedMagnet) && !isAddTorrentOpen) {
       setIsAddTorrentOpen(true)
     }
-  }, [droppedFiles, isAddTorrentOpen])
+  }, [droppedFiles, pastedMagnet, isAddTorrentOpen])
 
-  // Handle AddTorrentModal close - process next file in queue
+  // Handle AddTorrentModal close - process next file in queue or clear magnet
   const handleAddTorrentClose = React.useCallback(() => {
     setIsAddTorrentOpen(false)
 
+    // Clear pasted magnet link if present
+    if (pastedMagnet) {
+      setPastedMagnet(null)
+    }
+
     // Remove the first file from the queue (the one we just processed)
     setDroppedFiles((prev) => prev.slice(1))
-  }, [])
+  }, [pastedMagnet])
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
@@ -776,6 +816,7 @@ function HomePage() {
         isOpen={isAddTorrentOpen}
         onClose={handleAddTorrentClose}
         initialFile={droppedFiles[0]} // Pass the first file from the queue
+        initialMagnet={pastedMagnet || undefined} // Pass pasted magnet link
       />
 
       {/* Drop Zone Overlay */}
