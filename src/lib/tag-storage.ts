@@ -1,26 +1,29 @@
-import type { Tag, TagColor } from '@/types/tag';
-import { TagColors } from '@/types/tag';
+import type { Tag, TagColor } from '@/types/tag'
+import { TagColors } from '@/types/tag'
 
 /**
  * localStorage key for persisting tag metadata
  * Follows existing pattern (e.g., 'qbit_baseUrl')
  */
-const STORAGE_KEY = 'qbit_tags';
+const STORAGE_KEY = 'qbit_tags'
 
 /**
  * Generates a UUID v4 for tag IDs
  * Uses crypto.randomUUID when available, fallback for older browsers
  */
 function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID()
   }
   // Fallback for older browsers
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 /**
@@ -29,24 +32,24 @@ function generateId(): string {
  * @returns True if valid Tailwind color, false otherwise
  */
 export function isValidTagColor(color: string | undefined): color is TagColor {
-  if (!color) return false;
-  return TagColors.includes(color as TagColor);
+  if (!color) return false
+  return TagColors.includes(color as TagColor)
 }
 
 /**
  * Retrieves all tags from localStorage
  * @returns Array of Tag objects, empty array if none exist or on parse error
  */
-export function getTags(): Tag[] {
+export function getTags(): Array<Tag> {
   try {
-    const storedTags = localStorage.getItem(STORAGE_KEY);
+    const storedTags = localStorage.getItem(STORAGE_KEY)
     if (!storedTags) {
-      return [];
+      return []
     }
-    const parsed = JSON.parse(storedTags);
+    const parsed = JSON.parse(storedTags)
     // Validate that parsed data is an array of tags
     if (!Array.isArray(parsed)) {
-      return [];
+      return []
     }
     // Filter out any invalid entries
     return parsed.filter(
@@ -55,10 +58,10 @@ export function getTags(): Tag[] {
         tag !== null &&
         typeof tag.id === 'string' &&
         typeof tag.name === 'string' &&
-        typeof tag.createdAt === 'number'
-    );
+        typeof tag.createdAt === 'number',
+    )
   } catch {
-    return [];
+    return []
   }
 }
 
@@ -66,8 +69,8 @@ export function getTags(): Tag[] {
  * Persists tags array to localStorage
  * @param tags - Array of Tag objects to store
  */
-function saveTags(tags: Tag[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tags));
+function saveTags(tags: Array<Tag>): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tags))
 }
 
 /**
@@ -76,8 +79,8 @@ function saveTags(tags: Tag[]): void {
  * @returns The Tag if found, undefined otherwise
  */
 export function getTagById(id: string): Tag | undefined {
-  const tags = getTags();
-  return tags.find((tag) => tag.id === id);
+  const tags = getTags()
+  return tags.find((tag) => tag.id === id)
 }
 
 /**
@@ -86,9 +89,9 @@ export function getTagById(id: string): Tag | undefined {
  * @returns The Tag if found, undefined otherwise
  */
 export function getTagByName(name: string): Tag | undefined {
-  const tags = getTags();
-  const normalizedName = name.toLowerCase().trim();
-  return tags.find((tag) => tag.name.toLowerCase() === normalizedName);
+  const tags = getTags()
+  const normalizedName = name.toLowerCase().trim()
+  return tags.find((tag) => tag.name.toLowerCase() === normalizedName)
 }
 
 /**
@@ -98,11 +101,11 @@ export function getTagByName(name: string): Tag | undefined {
  * @returns True if name exists, false otherwise
  */
 export function tagNameExists(name: string, excludeId?: string): boolean {
-  const tags = getTags();
-  const normalizedName = name.toLowerCase().trim();
+  const tags = getTags()
+  const normalizedName = name.toLowerCase().trim()
   return tags.some(
-    (tag) => tag.name.toLowerCase() === normalizedName && tag.id !== excludeId
-  );
+    (tag) => tag.name.toLowerCase() === normalizedName && tag.id !== excludeId,
+  )
 }
 
 /**
@@ -111,22 +114,22 @@ export function tagNameExists(name: string, excludeId?: string): boolean {
  * @returns Error message if invalid, undefined if valid
  */
 export function validateTagName(name: string): string | undefined {
-  const trimmedName = name.trim();
+  const trimmedName = name.trim()
 
   if (!trimmedName) {
-    return 'Tag name cannot be empty';
+    return 'Tag name cannot be empty'
   }
 
   if (trimmedName.length > 50) {
-    return 'Tag name cannot exceed 50 characters';
+    return 'Tag name cannot exceed 50 characters'
   }
 
   // Prevent commas in tag names since qBittorrent uses comma-separated tags
   if (trimmedName.includes(',')) {
-    return 'Tag name cannot contain commas';
+    return 'Tag name cannot contain commas'
   }
 
-  return undefined;
+  return undefined
 }
 
 /**
@@ -137,15 +140,15 @@ export function validateTagName(name: string): string | undefined {
  * @throws Error if tag name is empty or already exists
  */
 export function createTag(name: string, color?: string): Tag {
-  const trimmedName = name.trim();
+  const trimmedName = name.trim()
 
-  const validationError = validateTagName(trimmedName);
+  const validationError = validateTagName(trimmedName)
   if (validationError) {
-    throw new Error(validationError);
+    throw new Error(validationError)
   }
 
   if (tagNameExists(trimmedName)) {
-    throw new Error(`Tag "${trimmedName}" already exists`);
+    throw new Error(`Tag "${trimmedName}" already exists`)
   }
 
   const newTag: Tag = {
@@ -153,13 +156,13 @@ export function createTag(name: string, color?: string): Tag {
     name: trimmedName,
     color: isValidTagColor(color) ? color : undefined,
     createdAt: Date.now(),
-  };
+  }
 
-  const tags = getTags();
-  tags.push(newTag);
-  saveTags(tags);
+  const tags = getTags()
+  tags.push(newTag)
+  saveTags(tags)
 
-  return newTag;
+  return newTag
 }
 
 /**
@@ -171,42 +174,44 @@ export function createTag(name: string, color?: string): Tag {
  */
 export function updateTag(
   id: string,
-  updates: Partial<Pick<Tag, 'name' | 'color'>>
+  updates: Partial<Pick<Tag, 'name' | 'color'>>,
 ): Tag {
-  const tags = getTags();
-  const index = tags.findIndex((tag) => tag.id === id);
+  const tags = getTags()
+  const index = tags.findIndex((tag) => tag.id === id)
 
   if (index === -1) {
-    throw new Error(`Tag with ID "${id}" not found`);
+    throw new Error(`Tag with ID "${id}" not found`)
   }
 
-  const existingTag = tags[index];
+  const existingTag = tags[index]
 
   // Validate new name if provided
   if (updates.name !== undefined) {
-    const trimmedName = updates.name.trim();
+    const trimmedName = updates.name.trim()
 
-    const validationError = validateTagName(trimmedName);
+    const validationError = validateTagName(trimmedName)
     if (validationError) {
-      throw new Error(validationError);
+      throw new Error(validationError)
     }
 
     if (tagNameExists(trimmedName, id)) {
-      throw new Error(`Tag "${trimmedName}" already exists`);
+      throw new Error(`Tag "${trimmedName}" already exists`)
     }
 
-    existingTag.name = trimmedName;
+    existingTag.name = trimmedName
   }
 
   // Validate and update color if provided
   if (updates.color !== undefined) {
-    existingTag.color = isValidTagColor(updates.color) ? updates.color : undefined;
+    existingTag.color = isValidTagColor(updates.color)
+      ? updates.color
+      : undefined
   }
 
-  tags[index] = existingTag;
-  saveTags(tags);
+  tags[index] = existingTag
+  saveTags(tags)
 
-  return existingTag;
+  return existingTag
 }
 
 /**
@@ -217,15 +222,15 @@ export function updateTag(
  * @returns True if deleted, false if tag not found
  */
 export function deleteTag(id: string): boolean {
-  const tags = getTags();
-  const filteredTags = tags.filter((tag) => tag.id !== id);
+  const tags = getTags()
+  const filteredTags = tags.filter((tag) => tag.id !== id)
 
   if (filteredTags.length === tags.length) {
-    return false;
+    return false
   }
 
-  saveTags(filteredTags);
-  return true;
+  saveTags(filteredTags)
+  return true
 }
 
 /**
@@ -233,7 +238,7 @@ export function deleteTag(id: string): boolean {
  * Use with caution - primarily for testing or reset functionality
  */
 export function clearAllTags(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY)
 }
 
 /**
@@ -242,12 +247,10 @@ export function clearAllTags(): void {
  * @param names - Array of tag names to look up
  * @returns Array of matching Tag objects (may be shorter if some names don't exist)
  */
-export function getTagsByNames(names: string[]): Tag[] {
-  const tags = getTags();
-  const normalizedNames = names.map((n) => n.toLowerCase().trim());
-  return tags.filter((tag) =>
-    normalizedNames.includes(tag.name.toLowerCase())
-  );
+export function getTagsByNames(names: Array<string>): Array<Tag> {
+  const tags = getTags()
+  const normalizedNames = names.map((n) => n.toLowerCase().trim())
+  return tags.filter((tag) => normalizedNames.includes(tag.name.toLowerCase()))
 }
 
 /**
@@ -255,14 +258,14 @@ export function getTagsByNames(names: string[]): Tag[] {
  * @param tagString - Comma-separated string of tag names (e.g., "Movies,HD,4K")
  * @returns Array of tag names
  */
-export function parseTagString(tagString: string): string[] {
+export function parseTagString(tagString: string): Array<string> {
   if (!tagString || !tagString.trim()) {
-    return [];
+    return []
   }
   return tagString
     .split(',')
     .map((t) => t.trim())
-    .filter((t) => t.length > 0);
+    .filter((t) => t.length > 0)
 }
 
 /**
@@ -270,6 +273,6 @@ export function parseTagString(tagString: string): string[] {
  * @param tags - Array of tag names
  * @returns Comma-separated string
  */
-export function formatTagString(tags: string[]): string {
-  return tags.filter((t) => t.trim().length > 0).join(',');
+export function formatTagString(tags: Array<string>): string {
+  return tags.filter((t) => t.trim().length > 0).join(',')
 }

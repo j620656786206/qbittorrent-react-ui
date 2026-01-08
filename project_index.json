@@ -3,7 +3,16 @@
   "services": {
     "main": {
       "path": ".",
-      "tech_stack": ["typescript", "react", "vite", "tanstack-query", "tanstack-router", "radix-ui", "tailwindcss", "i18next"],
+      "tech_stack": [
+        "typescript",
+        "react",
+        "vite",
+        "tanstack-query",
+        "tanstack-router",
+        "radix-ui",
+        "tailwindcss",
+        "i18next"
+      ],
       "port": 3000,
       "dev_command": "npm run dev",
       "test_command": "npm run test",

@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AddTorrentModal } from '../add-torrent-modal'
+
+import { addTorrentFile, addTorrentMagnet, getCategories } from '@/lib/api'
+import { getTags } from '@/lib/tag-storage'
 
 /**
  * Mock react-i18next
@@ -53,16 +56,15 @@ vi.mock('@/lib/api', () => ({
  */
 vi.mock('@/lib/tag-storage', () => ({
   getTags: vi.fn(() => []),
-  formatTagString: vi.fn((tags: string[]) => tags.join(',')),
+  formatTagString: vi.fn((tags: Array<string>) => tags.join(',')),
 }))
-
-import { addTorrentMagnet, addTorrentFile, getCategories } from '@/lib/api'
-import { getTags } from '@/lib/tag-storage'
 
 /**
  * Helper to wrap component with QueryClientProvider
  */
-function renderAddTorrentModal(props: React.ComponentProps<typeof AddTorrentModal>) {
+function renderAddTorrentModal(
+  props: React.ComponentProps<typeof AddTorrentModal>,
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -74,7 +76,7 @@ function renderAddTorrentModal(props: React.ComponentProps<typeof AddTorrentModa
     ...render(
       <QueryClientProvider client={queryClient}>
         <AddTorrentModal {...props} />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     ),
   }
 }
@@ -89,9 +91,9 @@ describe('AddTorrentModal Component', () => {
     vi.clearAllMocks()
     // Mock getCategories to return some categories
     vi.mocked(getCategories).mockResolvedValue({
-      'Movies': {},
-      'TV Shows': {},
-      'Music': {},
+      Movies: { name: 'Movies', savePath: '/downloads/movies' },
+      'TV Shows': { name: 'TV Shows', savePath: '/downloads/tv' },
+      Music: { name: 'Music', savePath: '/downloads/music' },
     })
   })
 
@@ -108,7 +110,9 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       expect(screen.getByText('Add Torrent')).toBeInTheDocument()
-      expect(screen.getByText('Add a new torrent from magnet link or file')).toBeInTheDocument()
+      expect(
+        screen.getByText('Add a new torrent from magnet link or file'),
+      ).toBeInTheDocument()
     })
 
     it('calls onClose when cancel button is clicked', async () => {
@@ -132,7 +136,9 @@ describe('AddTorrentModal Component', () => {
       expect(magnetInput).toBeInTheDocument()
 
       // File input should not be visible
-      expect(screen.queryByPlaceholderText('No file selected')).not.toBeInTheDocument()
+      expect(
+        screen.queryByPlaceholderText('No file selected'),
+      ).not.toBeInTheDocument()
     })
 
     it('switches to file tab when file tab button is clicked', async () => {
@@ -140,10 +146,14 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
-      expect(screen.getByPlaceholderText('No file selected')).toBeInTheDocument()
+      expect(
+        screen.getByPlaceholderText('No file selected'),
+      ).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Browse' })).toBeInTheDocument()
     })
 
@@ -153,12 +163,18 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
-      expect(screen.getByPlaceholderText('No file selected')).toBeInTheDocument()
+      expect(
+        screen.getByPlaceholderText('No file selected'),
+      ).toBeInTheDocument()
 
       // Switch back to magnet tab
-      const magnetTabButton = screen.getByRole('button', { name: /Magnet Link/i })
+      const magnetTabButton = screen.getByRole('button', {
+        name: /Magnet Link/i,
+      })
       await user.click(magnetTabButton)
       expect(screen.getByLabelText('Magnet Link')).toBeInTheDocument()
     })
@@ -170,7 +186,10 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const magnetInput = screen.getByLabelText('Magnet Link') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const magnetInput = screen.getByLabelText(
+        'Magnet Link',
+      ) as HTMLInputElement
       await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
 
       expect(magnetInput.value).toBe('magnet:?xt=urn:btih:test123')
@@ -203,12 +222,18 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Create a mock file
-      const file = new File(['torrent content'], 'ubuntu.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'ubuntu.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
 
       await user.upload(fileInput, file)
 
@@ -223,7 +248,9 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Try to submit without file to trigger error
@@ -233,8 +260,12 @@ describe('AddTorrentModal Component', () => {
       expect(screen.getByText('Please select a file')).toBeInTheDocument()
 
       // Select a file
-      const file = new File(['torrent content'], 'test.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       // Error should be cleared
@@ -248,7 +279,10 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
-      const savePathInput = screen.getByLabelText('Save Path') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const savePathInput = screen.getByLabelText(
+        'Save Path',
+      ) as HTMLInputElement
       await user.type(savePathInput, '/downloads/torrents')
 
       expect(savePathInput.value).toBe('/downloads/torrents')
@@ -261,10 +295,15 @@ describe('AddTorrentModal Component', () => {
 
       // Wait for categories to load
       await waitFor(() => {
-        expect(screen.getByRole('option', { name: 'Movies' })).toBeInTheDocument()
+        expect(
+          screen.getByRole('option', { name: 'Movies' }),
+        ).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category') as HTMLSelectElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const categorySelect = screen.getByLabelText(
+        'Category',
+      ) as HTMLSelectElement
       await user.selectOptions(categorySelect, 'Movies')
 
       expect(categorySelect.value).toBe('Movies')
@@ -275,10 +314,14 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       await waitFor(() => {
-        expect(screen.getByRole('option', { name: 'Movies' })).toBeInTheDocument()
+        expect(
+          screen.getByRole('option', { name: 'Movies' }),
+        ).toBeInTheDocument()
       })
 
-      expect(screen.getByRole('option', { name: 'TV Shows' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'TV Shows' }),
+      ).toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'Music' })).toBeInTheDocument()
     })
 
@@ -287,6 +330,7 @@ describe('AddTorrentModal Component', () => {
       const mockOnClose = vi.fn()
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const checkbox = screen.getByLabelText('Start paused') as HTMLInputElement
       expect(checkbox.checked).toBe(false)
 
@@ -341,7 +385,7 @@ describe('AddTorrentModal Component', () => {
     it('accepts valid magnet link starting with "magnet:?"', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -359,7 +403,7 @@ describe('AddTorrentModal Component', () => {
     it('trims whitespace from magnet link', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -373,7 +417,7 @@ describe('AddTorrentModal Component', () => {
         expect(addTorrentMagnet).toHaveBeenCalledWith(
           'http://localhost:8080',
           'magnet:?xt=urn:btih:test',
-          expect.any(Object)
+          expect.any(Object),
         )
       })
     })
@@ -386,7 +430,9 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -398,17 +444,23 @@ describe('AddTorrentModal Component', () => {
     it('does not show error when file is selected', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Select a file
-      const file = new File(['torrent content'], 'test.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -424,7 +476,7 @@ describe('AddTorrentModal Component', () => {
     it('calls addTorrentMagnet with correct parameters', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -443,7 +495,7 @@ describe('AddTorrentModal Component', () => {
             category: undefined,
             tags: undefined,
             paused: false,
-          }
+          },
         )
       })
     })
@@ -451,7 +503,7 @@ describe('AddTorrentModal Component', () => {
     it('includes savepath when provided', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -469,7 +521,7 @@ describe('AddTorrentModal Component', () => {
           'magnet:?xt=urn:btih:test123',
           expect.objectContaining({
             savepath: '/downloads/movies',
-          })
+          }),
         )
       })
     })
@@ -477,7 +529,7 @@ describe('AddTorrentModal Component', () => {
     it('includes category when selected', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -485,9 +537,14 @@ describe('AddTorrentModal Component', () => {
       await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
 
       // Wait for categories to load
-      await waitFor(() => {
-        expect(screen.getByRole('option', { name: 'Movies' })).toBeInTheDocument()
-      }, { timeout: 3000 })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByRole('option', { name: 'Movies' }),
+          ).toBeInTheDocument()
+        },
+        { timeout: 3000 },
+      )
 
       const categorySelect = screen.getByLabelText('Category')
       await user.selectOptions(categorySelect, 'Movies')
@@ -501,7 +558,7 @@ describe('AddTorrentModal Component', () => {
           'magnet:?xt=urn:btih:test123',
           expect.objectContaining({
             category: 'Movies',
-          })
+          }),
         )
       })
     })
@@ -509,7 +566,7 @@ describe('AddTorrentModal Component', () => {
     it('includes paused flag when checked', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -528,7 +585,7 @@ describe('AddTorrentModal Component', () => {
           'magnet:?xt=urn:btih:test123',
           expect.objectContaining({
             paused: true,
-          })
+          }),
         )
       })
     })
@@ -536,7 +593,7 @@ describe('AddTorrentModal Component', () => {
     it('closes modal after successful submission', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -556,17 +613,23 @@ describe('AddTorrentModal Component', () => {
     it('calls addTorrentFile with correct parameters', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Select a file
-      const file = new File(['torrent content'], 'ubuntu.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'ubuntu.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -581,7 +644,7 @@ describe('AddTorrentModal Component', () => {
             category: undefined,
             tags: undefined,
             paused: false,
-          }
+          },
         )
       })
     })
@@ -589,22 +652,33 @@ describe('AddTorrentModal Component', () => {
     it('includes savepath, category, and paused flag', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Wait for categories to load first
-      await waitFor(() => {
-        expect(screen.getByRole('option', { name: 'TV Shows' })).toBeInTheDocument()
-      }, { timeout: 3000 })
+      await waitFor(
+        () => {
+          expect(
+            screen.getByRole('option', { name: 'TV Shows' }),
+          ).toBeInTheDocument()
+        },
+        { timeout: 3000 },
+      )
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Select a file
-      const file = new File(['torrent content'], 'test.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       // Fill other fields
@@ -628,7 +702,7 @@ describe('AddTorrentModal Component', () => {
             savepath: '/downloads/tv',
             category: 'TV Shows',
             paused: true,
-          })
+          }),
         )
       })
     })
@@ -636,17 +710,23 @@ describe('AddTorrentModal Component', () => {
     it('closes modal after successful submission', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Select a file
-      const file = new File(['torrent content'], 'test.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -685,12 +765,18 @@ describe('AddTorrentModal Component', () => {
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
       // Select a file
-      const file = new File(['torrent content'], 'test.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
       await user.upload(fileInput, file)
 
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -744,7 +830,10 @@ describe('AddTorrentModal Component', () => {
     it('resets form when modal closes', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      const { rerender } = renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+      const { rerender } = renderAddTorrentModal({
+        isOpen: true,
+        onClose: mockOnClose,
+      })
 
       // Fill in form
       const magnetInput = screen.getByLabelText('Magnet Link')
@@ -760,12 +849,18 @@ describe('AddTorrentModal Component', () => {
       rerender(
         <QueryClientProvider client={new QueryClient()}>
           <AddTorrentModal isOpen={true} onClose={mockOnClose} />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       // Form should be reset
-      const resetMagnetInput = screen.getByLabelText('Magnet Link') as HTMLInputElement
-      const resetSavePathInput = screen.getByLabelText('Save Path') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const resetMagnetInput = screen.getByLabelText(
+        'Magnet Link',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const resetSavePathInput = screen.getByLabelText(
+        'Save Path',
+      ) as HTMLInputElement
       expect(resetMagnetInput.value).toBe('')
       expect(resetSavePathInput.value).toBe('')
     })
@@ -773,12 +868,19 @@ describe('AddTorrentModal Component', () => {
     it('resets to magnet tab when modal closes', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      const { rerender } = renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+      const { rerender } = renderAddTorrentModal({
+        isOpen: true,
+        onClose: mockOnClose,
+      })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
-      expect(screen.getByPlaceholderText('No file selected')).toBeInTheDocument()
+      expect(
+        screen.getByPlaceholderText('No file selected'),
+      ).toBeInTheDocument()
 
       // Close modal
       const cancelButton = screen.getByRole('button', { name: 'Cancel' })
@@ -788,7 +890,7 @@ describe('AddTorrentModal Component', () => {
       rerender(
         <QueryClientProvider client={new QueryClient()}>
           <AddTorrentModal isOpen={true} onClose={mockOnClose} />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       // Should be back on magnet tab
@@ -798,7 +900,10 @@ describe('AddTorrentModal Component', () => {
     it('clears error message when modal closes', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      const { rerender } = renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+      const { rerender } = renderAddTorrentModal({
+        isOpen: true,
+        onClose: mockOnClose,
+      })
 
       // Trigger error
       const addButton = screen.getByRole('button', { name: 'Add' })
@@ -813,7 +918,7 @@ describe('AddTorrentModal Component', () => {
       rerender(
         <QueryClientProvider client={new QueryClient()}>
           <AddTorrentModal isOpen={true} onClose={mockOnClose} />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
       // Error should be cleared
@@ -825,8 +930,8 @@ describe('AddTorrentModal Component', () => {
     it('disables buttons while submitting magnet link', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      let resolvePromise: (value: Response) => void
-      const promise = new Promise<Response>((resolve) => {
+      let resolvePromise: (value: boolean) => void
+      const promise = new Promise<boolean>((resolve) => {
         resolvePromise = resolve
       })
       vi.mocked(addTorrentMagnet).mockReturnValue(promise)
@@ -847,15 +952,15 @@ describe('AddTorrentModal Component', () => {
 
       // Resolve promise to clean up
       await waitFor(() => {
-        resolvePromise!(new Response('OK', { status: 200 }))
+        resolvePromise!(true)
       })
     })
 
     it('shows "Adding..." text while submitting', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      let resolvePromise: (value: Response) => void
-      const promise = new Promise<Response>((resolve) => {
+      let resolvePromise: (value: boolean) => void
+      const promise = new Promise<boolean>((resolve) => {
         resolvePromise = resolve
       })
       vi.mocked(addTorrentMagnet).mockReturnValue(promise)
@@ -869,12 +974,14 @@ describe('AddTorrentModal Component', () => {
       await user.click(addButton)
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Adding/i })).toBeInTheDocument()
+        expect(
+          screen.getByRole('button', { name: /Adding/i }),
+        ).toBeInTheDocument()
       })
 
       // Resolve promise to clean up
       await waitFor(() => {
-        resolvePromise!(new Response('OK', { status: 200 }))
+        resolvePromise!(true)
       })
     })
   })
@@ -884,7 +991,7 @@ describe('AddTorrentModal Component', () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
       localStorage.setItem('qbit_baseUrl', 'http://custom-server:9090')
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -898,7 +1005,7 @@ describe('AddTorrentModal Component', () => {
         expect(addTorrentMagnet).toHaveBeenCalledWith(
           'http://custom-server:9090',
           'magnet:?xt=urn:btih:test123',
-          expect.any(Object)
+          expect.any(Object),
         )
       })
     })
@@ -907,7 +1014,7 @@ describe('AddTorrentModal Component', () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
       localStorage.removeItem('qbit_baseUrl')
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -921,7 +1028,7 @@ describe('AddTorrentModal Component', () => {
         expect(addTorrentMagnet).toHaveBeenCalledWith(
           'http://localhost:8080',
           'magnet:?xt=urn:btih:test123',
-          expect.any(Object)
+          expect.any(Object),
         )
       })
     })
@@ -951,7 +1058,10 @@ describe('AddTorrentModal Component', () => {
         expect(screen.getByLabelText('Category')).toBeInTheDocument()
       })
 
-      const categorySelect = screen.getByLabelText('Category') as HTMLSelectElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const categorySelect = screen.getByLabelText(
+        'Category',
+      ) as HTMLSelectElement
       // Should only have "None" option
       expect(categorySelect.options.length).toBe(1)
       expect(categorySelect.options[0].value).toBe('')
@@ -960,20 +1070,25 @@ describe('AddTorrentModal Component', () => {
     it('handles file input with multiple files (only uses first)', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
       // Switch to file tab
-      const fileTabButton = screen.getByRole('button', { name: /Torrent File/i })
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
       await user.click(fileTabButton)
 
-      // Create multiple files but only first should be used
-      const file1 = new File(['torrent 1'], 'first.torrent', { type: 'application/x-bittorrent' })
-      const file2 = new File(['torrent 2'], 'second.torrent', { type: 'application/x-bittorrent' })
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+      // Create file to upload
+      const file1 = new File(['torrent 1'], 'first.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
 
-      // Simulate selecting first file
+      // Simulate selecting file
       await user.upload(fileInput, file1)
 
       // Should display first file name
@@ -983,7 +1098,7 @@ describe('AddTorrentModal Component', () => {
     it('handles very long save path', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(new Response('OK', { status: 200 }))
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -1006,7 +1121,7 @@ describe('AddTorrentModal Component', () => {
           'magnet:?xt=urn:btih:test123',
           expect.objectContaining({
             savepath: longPath,
-          })
+          }),
         )
       })
     })

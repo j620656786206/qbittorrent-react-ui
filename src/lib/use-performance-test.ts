@@ -10,14 +10,17 @@
  * - window.__getPerformanceReport()    // Get performance metrics
  */
 
-import { useState, useCallback, useEffect } from 'react'
-import type { Torrent } from '@/components/torrent-table'
-import { generateMockTorrents, PerformanceMetrics } from './performance-test-utils'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  PerformanceMetrics,
+  generateMockTorrents,
+} from './performance-test-utils'
+import type { Torrent } from '@/types/torrent'
 
 // Global state for mock torrents (persists across component re-renders)
-let globalMockTorrents: Torrent[] = []
+let globalMockTorrents: Array<Torrent> = []
 let globalIsTestMode = false
-let listeners: Set<() => void> = new Set()
+const listeners: Set<() => void> = new Set()
 
 function notifyListeners() {
   listeners.forEach((listener) => listener())
@@ -44,7 +47,7 @@ export function usePerformanceTest() {
     const endTime = performance.now()
 
     console.info(
-      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`
+      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`,
     )
 
     notifyListeners()
@@ -79,10 +82,10 @@ export function usePerformanceTest() {
 // Expose methods globally in development mode
 if (import.meta.env.DEV) {
   const windowWithTest = window as unknown as {
-    __injectMockTorrents: (count?: number) => Torrent[]
+    __injectMockTorrents: (count?: number) => Array<Torrent>
     __clearMockTorrents: () => void
     __getPerformanceReport: () => object
-    __getMockTorrents: () => Torrent[]
+    __getMockTorrents: () => Array<Torrent>
   }
 
   windowWithTest.__injectMockTorrents = (count: number = 1000) => {
@@ -92,10 +95,14 @@ if (import.meta.env.DEV) {
     const endTime = performance.now()
 
     console.info(
-      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`
+      `[Performance Test] Injected ${count} mock torrents in ${(endTime - startTime).toFixed(2)}ms`,
     )
-    console.info('[Performance Test] Mock torrents available via window.__getMockTorrents()')
-    console.info('[Performance Test] To use in the app, see the Performance Testing Guide')
+    console.info(
+      '[Performance Test] Mock torrents available via window.__getMockTorrents()',
+    )
+    console.info(
+      '[Performance Test] To use in the app, see the Performance Testing Guide',
+    )
 
     notifyListeners()
     return globalMockTorrents

@@ -20,17 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
-import { cn } from '@/lib/utils'
-
-// Helper function to format bytes
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
+import { cn, formatBytes } from '@/lib/utils'
 
 // Get priority icon based on priority value
 function getPriorityIcon(priority: FilePriority): React.ReactNode {
@@ -105,12 +95,14 @@ export function FileTreeNode({
         className={cn(
           'flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors focus:outline-none',
           getPriorityButtonStyles(node.priority ?? FilePriority.NORMAL),
-          isPriorityChanging && 'opacity-50 cursor-not-allowed'
+          isPriorityChanging && 'opacity-50 cursor-not-allowed',
         )}
         disabled={isPriorityChanging}
       >
         {getPriorityIcon(node.priority ?? FilePriority.NORMAL)}
-        <span>{t(FilePriorityLabels[node.priority ?? FilePriority.NORMAL])}</span>
+        <span>
+          {t(FilePriorityLabels[node.priority ?? FilePriority.NORMAL])}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[160px]">
         <DropdownMenuRadioGroup
@@ -139,7 +131,7 @@ export function FileTreeNode({
       <div
         className={cn(
           'flex items-center gap-2 py-1.5 px-2 rounded-sm hover:bg-slate-800/50 transition-colors',
-          node.isFolder && 'cursor-pointer'
+          node.isFolder && 'cursor-pointer',
         )}
         style={indentStyle}
         onClick={handleToggleExpand}
@@ -170,7 +162,7 @@ export function FileTreeNode({
             'flex-1 min-w-0 text-sm truncate',
             node.priority === FilePriority.DO_NOT_DOWNLOAD
               ? 'text-slate-500'
-              : 'text-white'
+              : 'text-white',
           )}
           title={node.name}
         >
@@ -191,7 +183,7 @@ export function FileTreeNode({
             value={node.progress * 100}
             className={cn(
               'h-1.5 flex-1',
-              node.priority === FilePriority.DO_NOT_DOWNLOAD && 'opacity-50'
+              node.priority === FilePriority.DO_NOT_DOWNLOAD && 'opacity-50',
             )}
           />
           <span className="text-xs text-slate-400 w-10 text-right">
@@ -200,10 +192,7 @@ export function FileTreeNode({
         </div>
 
         {/* Priority Control (files only) */}
-        <div
-          className="flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {!node.isFolder && priorityDropdown}
         </div>
       </div>

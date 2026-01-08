@@ -1,21 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react'
 
-type MediaQueryString = `(min-width: ${number}px)` | `(max-width: ${number}px)`;
+export type MediaQueryString =
+  | `(min-width: ${number}px)`
+  | `(max-width: ${number}px)`
 
 export function useMediaQuery(query: MediaQueryString): boolean {
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const mediaQuery = window.matchMedia(query);
-      setMatches(mediaQuery.matches);
+      const mediaQuery = window.matchMedia(query)
+      setMatches(mediaQuery.matches)
 
-      const handler = (event: MediaQueryListEvent) => setMatches(event.matches);
-      mediaQuery.addEventListener('change', handler);
+      const handler = (event: MediaQueryListEvent) => setMatches(event.matches)
+      mediaQuery.addEventListener('change', handler)
 
-      return () => mediaQuery.removeEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler)
     }
-  }, [query]);
+  }, [query])
 
-  return matches;
+  return matches
 }

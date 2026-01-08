@@ -1,23 +1,31 @@
 import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
-import type { Torrent } from '@/components/torrent-table'
+import { useTranslation } from 'react-i18next'
+import type { Torrent } from '@/types/torrent'
 import { parseTagString } from '@/lib/tag-storage'
 import { Sidebar } from '@/components/sidebar'
 import { TorrentTable } from '@/components/torrent-table'
 import { TorrentDetail } from '@/components/torrent-detail'
 import { BatchActionsToolbar } from '@/components/batch-actions-toolbar'
-import { getMaindata, login, pauseTorrent, resumeTorrent, deleteTorrent, recheckTorrent, getCategories, setTorrentCategory } from '@/lib/api'
+import {
+  deleteTorrent,
+  getCategories,
+  getMaindata,
+  login,
+  pauseTorrent,
+  recheckTorrent,
+  resumeTorrent,
+  setTorrentCategory,
+} from '@/lib/api'
 import { SettingsModal } from '@/components/settings-modal'
 import { AddTorrentModal } from '@/components/add-torrent-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
-import { useMutation } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,19 +48,23 @@ function HomePage() {
   const [searchQuery, setSearchQuery] = React.useState('')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
   const [isAddTorrentOpen, setIsAddTorrentOpen] = React.useState(false)
-  const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(null)
+  const [selectedTorrent, setSelectedTorrent] = React.useState<Torrent | null>(
+    null,
+  )
 
   const isDesktop = useMediaQuery('(min-width: 768px)') // md breakpoint
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false)
 
   // --- Selection State for Bulk Operations ---
-  const [selectedHashes, setSelectedHashes] = React.useState<Set<string>>(new Set())
+  const [selectedHashes, setSelectedHashes] = React.useState<Set<string>>(
+    new Set(),
+  )
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
   const [batchError, setBatchError] = React.useState<string | null>(null)
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
-    setSelectedHashes(prev => {
+    setSelectedHashes((prev) => {
       const next = new Set(prev)
       if (next.has(hash)) {
         next.delete(hash)
@@ -63,8 +75,8 @@ function HomePage() {
     })
   }, [])
 
-  const selectAll = React.useCallback((torrents: Torrent[]) => {
-    setSelectedHashes(new Set(torrents.map(t => t.hash)))
+  const selectAll = React.useCallback((torrents: Array<Torrent>) => {
+    setSelectedHashes(new Set(torrents.map((torrent) => torrent.hash)))
   }, [])
 
   const clearSelection = React.useCallback(() => {
@@ -72,10 +84,12 @@ function HomePage() {
   }, [])
 
   const getBaseUrl = () =>
-    credentials.baseUrl || localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
+    credentials.baseUrl ||
+    localStorage.getItem('qbit_baseUrl') ||
+    'http://localhost:8080'
 
   // --- State for sync/maindata ---
-  const [rid, setRid] = React.useState<number | undefined>(undefined)
+  const [_rid, setRid] = React.useState<number | undefined>(undefined)
   const [allTorrentsMap, setAllTorrentsMap] = React.useState<
     Map<string, Torrent>
   >(new Map()) // Store torrents as a Map for efficient updates
@@ -132,9 +146,9 @@ function HomePage() {
   } = useQuery({
     queryKey: ['maindata'], // Single query key, rid is managed internally
     queryFn: async () => {
-      const maindata = await getMaindata(credentials.baseUrl, ridRef.current)
-      ridRef.current = maindata.rid // Update ref immediately
-      return maindata
+      const response = await getMaindata(credentials.baseUrl, ridRef.current)
+      ridRef.current = response.rid // Update ref immediately
+      return response
     },
     refetchInterval: 5000,
     enabled: loginSuccess, // Only enabled if logged in
@@ -209,8 +223,8 @@ function HomePage() {
     let result = allTorrents
 
     if (trimmedSearch) {
-      result = result.filter((t: Torrent) =>
-        t.name?.toLowerCase().includes(trimmedSearch)
+      result = result.filter((torrent: Torrent) =>
+        torrent.name.toLowerCase().includes(trimmedSearch),
       )
     }
 
@@ -220,24 +234,29 @@ function HomePage() {
     // Category filter
     if (filter.startsWith('category:')) {
       const category = filter.substring(9) // Remove 'category:' prefix
-      return result.filter((t: Torrent) => {
-        const torrentCategory = t.category || '未分類'
+      return result.filter((torrent: Torrent) => {
+        const torrentCategory = torrent.category || '未分類'
         return torrentCategory === category
       })
     }
 
     // Tag filter (supports multi-tag with OR logic)
     if (filter.startsWith('tag:')) {
-      const tagNames = filter.substring(4).split(',').map(t => t.trim().toLowerCase())
-      return result.filter((t: Torrent) => {
-        const torrentTags = parseTagString(t.tags || '').map(tag => tag.toLowerCase())
+      const tagNames = filter
+        .substring(4)
+        .split(',')
+        .map((tagStr) => tagStr.trim().toLowerCase())
+      return result.filter((torrent: Torrent) => {
+        const torrentTags = parseTagString(torrent.tags || '').map((tag) =>
+          tag.toLowerCase(),
+        )
         // OR logic: show torrents with ANY of the selected tags
-        return tagNames.some(tagName => torrentTags.includes(tagName))
+        return tagNames.some((tagName) => torrentTags.includes(tagName))
       })
     }
 
     // Status filter
-    return result.filter((t: Torrent) => t.state === filter)
+    return result.filter((torrent: Torrent) => torrent.state === filter)
   }, [allTorrents, filter, searchQuery])
 
   // --- Clear selections that are no longer visible when filter/search changes ---
@@ -246,16 +265,21 @@ function HomePage() {
 
   React.useEffect(() => {
     // Only run when filter or search actually changes
-    if (prevFilterRef.current !== filter || prevSearchRef.current !== searchQuery) {
+    if (
+      prevFilterRef.current !== filter ||
+      prevSearchRef.current !== searchQuery
+    ) {
       prevFilterRef.current = filter
       prevSearchRef.current = searchQuery
 
       // Clear selections for torrents that are no longer visible
       if (selectedHashes.size > 0) {
-        const visibleHashes = new Set(filteredTorrents.map(t => t.hash))
+        const visibleHashes = new Set(
+          filteredTorrents.map((torrent) => torrent.hash),
+        )
         const newSelectedHashes = new Set<string>()
 
-        selectedHashes.forEach(hash => {
+        selectedHashes.forEach((hash) => {
           if (visibleHashes.has(hash)) {
             newSelectedHashes.add(hash)
           }
@@ -306,8 +330,13 @@ function HomePage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
-      deleteTorrent(getBaseUrl(), hash, deleteFiles),
+    mutationFn: ({
+      hash,
+      deleteFiles,
+    }: {
+      hash: string
+      deleteFiles: boolean
+    }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       setSelectedTorrent(null)
@@ -316,7 +345,7 @@ function HomePage() {
 
   // --- Batch Mutations for Bulk Operations ---
   const batchPauseMutation = useMutation({
-    mutationFn: (hashes: string[]) => pauseTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => pauseTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -328,7 +357,7 @@ function HomePage() {
   })
 
   const batchResumeMutation = useMutation({
-    mutationFn: (hashes: string[]) => resumeTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => resumeTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -340,7 +369,7 @@ function HomePage() {
   })
 
   const batchRecheckMutation = useMutation({
-    mutationFn: (hashes: string[]) => recheckTorrent(getBaseUrl(), hashes),
+    mutationFn: (hashes: Array<string>) => recheckTorrent(getBaseUrl(), hashes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -352,8 +381,13 @@ function HomePage() {
   })
 
   const batchDeleteMutation = useMutation({
-    mutationFn: ({ hashes, deleteFiles }: { hashes: string[]; deleteFiles: boolean }) =>
-      deleteTorrent(getBaseUrl(), hashes, deleteFiles),
+    mutationFn: ({
+      hashes,
+      deleteFiles,
+    }: {
+      hashes: Array<string>
+      deleteFiles: boolean
+    }) => deleteTorrent(getBaseUrl(), hashes, deleteFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -367,8 +401,13 @@ function HomePage() {
   })
 
   const batchSetCategoryMutation = useMutation({
-    mutationFn: ({ hashes, category }: { hashes: string[]; category: string }) =>
-      setTorrentCategory(getBaseUrl(), hashes, category),
+    mutationFn: ({
+      hashes,
+      category,
+    }: {
+      hashes: Array<string>
+      category: string
+    }) => setTorrentCategory(getBaseUrl(), hashes, category),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
@@ -404,7 +443,7 @@ function HomePage() {
     if (isMaindataError) {
       return (
         <p className="text-red-400">
-          Error fetching torrent data: {maindataError?.message}
+          Error fetching torrent data: {maindataError.message}
         </p>
       )
     }
@@ -417,7 +456,10 @@ function HomePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder={t('torrent.search.placeholder', 'Search torrents...')}
+              placeholder={t(
+                'torrent.search.placeholder',
+                'Search torrents...',
+              )}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-9"
@@ -451,32 +493,49 @@ function HomePage() {
           {/* Batch Actions Toolbar */}
           {selectedHashes.size > 0 && (
             <BatchActionsToolbar
-selectedCount={selectedHashes.size}
-              onPause={() => batchPauseMutation.mutate(Array.from(selectedHashes))}
-              onResume={() => batchResumeMutation.mutate(Array.from(selectedHashes))}
-              onRecheck={() => batchRecheckMutation.mutate(Array.from(selectedHashes))}
+              selectedCount={selectedHashes.size}
+              onPause={() =>
+                batchPauseMutation.mutate(Array.from(selectedHashes))
+              }
+              onResume={() =>
+                batchResumeMutation.mutate(Array.from(selectedHashes))
+              }
+              onRecheck={() =>
+                batchRecheckMutation.mutate(Array.from(selectedHashes))
+              }
               onDelete={() => setIsDeleteDialogOpen(true)}
-              onCategory={(category) =>
+              onSetCategory={(category: string) =>
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
                 })
               }
+              onClearSelection={clearSelection}
               categories={categoryNames}
             />
           )}
 
           {/* Delete Confirmation Dialog */}
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+          >
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t('batch.delete.title', 'Delete torrents?')}</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {t('batch.delete.title', 'Delete torrents?')}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t('batch.delete.description', 'This action cannot be undone.')}
+                  {t(
+                    'batch.delete.description',
+                    'This action cannot be undone.',
+                  )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+                <AlertDialogCancel>
+                  {t('common.cancel', 'Cancel')}
+                </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
                     const deleteFiles = window.confirm(
@@ -501,9 +560,9 @@ selectedCount={selectedHashes.size}
               torrents={filteredTorrents}
               selectedHashes={selectedHashes}
               onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
-              onSelectionChange={toggleSelection}
-              onSelectAll={() => selectAll(filteredTorrents)}
-              onClearSelection={clearSelection}
+              toggleSelection={toggleSelection}
+              selectAll={() => selectAll(filteredTorrents)}
+              clearSelection={clearSelection}
             />
           ) : (
             <p>{t('torrent.noTorrentsFound')}</p>
@@ -537,6 +596,7 @@ selectedCount={selectedHashes.size}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onAddTorrent={() => setIsAddTorrentOpen(true)}
         isMobile={!isDesktop}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
@@ -557,13 +617,21 @@ selectedCount={selectedHashes.size}
         torrent={selectedTorrent}
         isOpen={!!selectedTorrent}
         onClose={() => setSelectedTorrent(null)}
-        onPause={() => selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)}
-        onResume={() => selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)}
-        onRecheck={() => selectedTorrent && recheckMutation.mutate(selectedTorrent.hash)}
+        onPause={() =>
+          selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)
+        }
+        onResume={() =>
+          selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)
+        }
+        onRecheck={() =>
+          selectedTorrent && recheckMutation.mutate(selectedTorrent.hash)
+        }
         onDelete={() => {
           if (selectedTorrent) {
             if (window.confirm(t('torrent.actions.confirmDelete'))) {
-              const deleteFiles = window.confirm(t('torrent.actions.deleteWithFiles'))
+              const deleteFiles = window.confirm(
+                t('torrent.actions.deleteWithFiles'),
+              )
               deleteMutation.mutate({ hash: selectedTorrent.hash, deleteFiles })
             }
           }

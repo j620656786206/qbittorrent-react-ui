@@ -3,9 +3,6 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Import the generated route tree
-import { routeTree } from './routeTree.gen'
-
 // Import main CSS
 import './styles.css'
 
@@ -15,6 +12,9 @@ import './i18n'
 // Import TanStack Devtools
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+
+// Import the generated route tree
+import { routeTree } from './routeTree.gen'
 
 // Create a new router instance
 const router = createRouter({ routeTree })
@@ -36,19 +36,18 @@ if (!rootElement.innerHTML) {
   root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router}>
-          <TanStackDevtools
-            config={{
-              position: 'bottom-right',
-            }}
-            plugins={[
-              {
-                name: 'Tanstack Router',
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-            ]}
-          />
-        </RouterProvider>
+        <RouterProvider router={router} />
+        <TanStackDevtools
+          config={{
+            position: 'bottom-right',
+          }}
+          plugins={[
+            {
+              name: 'Tanstack Router',
+              render: <TanStackRouterDevtoolsPanel />,
+            },
+          ]}
+        />
       </QueryClientProvider>
     </React.StrictMode>,
   )

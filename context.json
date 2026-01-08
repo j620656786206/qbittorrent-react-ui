@@ -10,9 +10,7 @@
     ]
   },
   "files_to_create": {
-    "main": [
-      "src/components/add-torrent-modal.tsx"
-    ]
+    "main": ["src/components/add-torrent-modal.tsx"]
   },
   "files_to_reference": [
     "src/components/settings-modal.tsx",

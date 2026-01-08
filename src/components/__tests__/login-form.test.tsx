@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -20,7 +20,7 @@ function renderLoginForm(props: React.ComponentProps<typeof LoginForm>) {
     ...render(
       <QueryClientProvider client={queryClient}>
         <LoginForm {...props} />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     ),
   }
 }
@@ -80,8 +80,14 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       expect(usernameInput.value).toBe('admin')
       expect(passwordInput.value).toBe('adminadmin')
@@ -95,8 +101,14 @@ describe('LoginForm Component', () => {
         initialPassword: 'testpass',
       })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       expect(usernameInput.value).toBe('testuser')
       expect(passwordInput.value).toBe('testpass')
@@ -109,8 +121,14 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       expect(usernameInput.value).toBe('stored_user')
       expect(passwordInput.value).toBe('stored_pass')
@@ -127,8 +145,14 @@ describe('LoginForm Component', () => {
         initialPassword: 'prop_pass',
       })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       expect(usernameInput.value).toBe('prop_user')
       expect(passwordInput.value).toBe('prop_pass')
@@ -141,7 +165,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
 
       await user.clear(usernameInput)
       await user.type(usernameInput, 'newuser')
@@ -154,7 +181,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       await user.clear(passwordInput)
       await user.type(passwordInput, 'newpassword')
@@ -166,7 +196,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
       expect(passwordInput.type).toBe('password')
     })
 
@@ -175,8 +208,14 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
 
       await user.clear(usernameInput)
       await user.type(usernameInput, 'customuser')
@@ -235,8 +274,8 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      const usernameInput = screen.getByLabelText('Username')
+      const passwordInput = screen.getByLabelText('Password')
       const loginButton = screen.getByRole('button', { name: 'Login' })
 
       await user.clear(usernameInput)
@@ -270,7 +309,7 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
+      const usernameInput = screen.getByLabelText('Username')
       const loginButton = screen.getByRole('button', { name: 'Login' })
 
       await user.clear(usernameInput)
@@ -285,7 +324,7 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      const passwordInput = screen.getByLabelText('Password')
       const loginButton = screen.getByRole('button', { name: 'Login' })
 
       await user.clear(passwordInput)
@@ -300,7 +339,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
       const loginButton = screen.getByRole('button', { name: 'Login' })
 
       await user.clear(usernameInput)
@@ -316,7 +358,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const passwordInput = screen.getByLabelText('Password') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const passwordInput = screen.getByLabelText(
+        'Password',
+      ) as HTMLInputElement
       const loginButton = screen.getByRole('button', { name: 'Login' })
 
       await user.clear(passwordInput)
@@ -332,7 +377,10 @@ describe('LoginForm Component', () => {
       const mockOnSuccess = vi.fn()
       renderLoginForm({ onLoginSuccess: mockOnSuccess })
 
-      const usernameInput = screen.getByLabelText('Username') as HTMLInputElement
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const usernameInput = screen.getByLabelText(
+        'Username',
+      ) as HTMLInputElement
       const loginButton = screen.getByRole('button', { name: 'Login' })
       const longUsername = 'a'.repeat(100)
 
@@ -369,9 +417,10 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       let usernameInput = screen.getByLabelText('Username') as HTMLInputElement
       expect(usernameInput.value).toBe('user1')
 
@@ -382,9 +431,10 @@ describe('LoginForm Component', () => {
             initialUsername="user2"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       usernameInput = screen.getByLabelText('Username') as HTMLInputElement
       expect(usernameInput.value).toBe('user2')
     })
@@ -398,9 +448,10 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass1"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       let passwordInput = screen.getByLabelText('Password') as HTMLInputElement
       expect(passwordInput.value).toBe('pass1')
 
@@ -411,9 +462,10 @@ describe('LoginForm Component', () => {
             initialUsername="user1"
             initialPassword="pass2"
           />
-        </QueryClientProvider>
+        </QueryClientProvider>,
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       passwordInput = screen.getByLabelText('Password') as HTMLInputElement
       expect(passwordInput.value).toBe('pass2')
     })

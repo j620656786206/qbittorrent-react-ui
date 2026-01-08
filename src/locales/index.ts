@@ -6,7 +6,7 @@ export enum Locales {
   ZH_HANT = 'zh-Hant',
 }
 
-export const LOCALES: { title: string; value: Locales }[] = [
+export const LOCALES: Array<{ title: string; value: Locales }> = [
   { title: 'English', value: Locales.EN },
   { title: '繁體中文', value: Locales.ZH_HANT },
 ]

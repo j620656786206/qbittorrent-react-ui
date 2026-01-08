@@ -2,6 +2,17 @@ import React, { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import {
+  Clock,
+  Download,
+  HardDrive,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import type { Torrent } from '@/types/torrent'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,11 +30,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Download, Upload, Clock, HardDrive, Pause, Play, Trash2 } from 'lucide-react'
-import { pauseTorrent, resumeTorrent, deleteTorrent } from '@/lib/api'
-import type { Torrent } from '@/components/torrent-table'
+import { deleteTorrent, pauseTorrent, resumeTorrent } from '@/lib/api'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatBytes, formatEta } from '@/lib/utils'
 
@@ -64,12 +72,19 @@ interface TorrentCardProps {
   isBatchPending?: boolean
 }
 
-export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, isBatchPending = false }: TorrentCardProps) {
+export function TorrentCard({
+  torrent,
+  onClick,
+  isSelected,
+  onToggleSelection,
+  isBatchPending = false,
+}: TorrentCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
 
-  const getBaseUrl = () => localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
+  const getBaseUrl = () =>
+    localStorage.getItem('qbit_baseUrl') || 'http://localhost:8080'
 
   const pauseMutation = useMutation({
     mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
@@ -86,8 +101,13 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
   })
 
   const deleteMutation = useMutation({
-    mutationFn: ({ hash, deleteFiles }: { hash: string; deleteFiles: boolean }) =>
-      deleteTorrent(getBaseUrl(), hash, deleteFiles),
+    mutationFn: ({
+      hash,
+      deleteFiles,
+    }: {
+      hash: string
+      deleteFiles: boolean
+    }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       setIsDeleteDialogOpen(false)
@@ -116,7 +136,9 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
             checked={isSelected ?? false}
             onCheckedChange={() => onToggleSelection?.()}
             disabled={isBatchPending}
-            aria-label={t('torrent.table.selectTorrent', { name: torrent.name })}
+            aria-label={t('torrent.table.selectTorrent', {
+              name: torrent.name,
+            })}
           />
         </div>
         {/* Name */}
@@ -126,24 +148,32 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
         {/* Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0"
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {isPaused ? (
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation()
-                resumeMutation.mutate(torrent.hash)
-              }}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  resumeMutation.mutate(torrent.hash)
+                }}
+              >
                 <Play className="h-4 w-4 mr-2" />
                 {t('common.resume')}
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem onClick={(e) => {
-                e.stopPropagation()
-                pauseMutation.mutate(torrent.hash)
-              }}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  pauseMutation.mutate(torrent.hash)
+                }}
+              >
                 <Pause className="h-4 w-4 mr-2" />
                 {t('common.pause')}
               </DropdownMenuItem>
@@ -165,7 +195,9 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
       {/* Progress Bar */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
-          <span className={`text-xs font-medium ${getStatusColor(torrent.state)}`}>
+          <span
+            className={`text-xs font-medium ${getStatusColor(torrent.state)}`}
+          >
             {t(getStateKey(torrent.state))}
           </span>
           <span className="text-xs text-slate-400">
@@ -205,13 +237,20 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('torrent.actions.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t('torrent.actions.confirmDelete')}
+            </AlertDialogTitle>
             <AlertDialogDescription
               dangerouslySetInnerHTML={{
-                __html: t('torrent.actions.confirmDeleteMessage', { name: torrent.name })
+                __html: t('torrent.actions.confirmDeleteMessage', {
+                  name: torrent.name,
+                }),
               }}
             />
           </AlertDialogHeader>
@@ -220,7 +259,10 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
             <AlertDialogAction
               onClick={(e) => {
                 e.stopPropagation()
-                deleteMutation.mutate({ hash: torrent.hash, deleteFiles: false })
+                deleteMutation.mutate({
+                  hash: torrent.hash,
+                  deleteFiles: false,
+                })
               }}
             >
               {t('torrent.actions.deleteKeepFiles')}
@@ -243,7 +285,7 @@ export function TorrentCard({ torrent, onClick, isSelected, onToggleSelection, i
 
 // Virtualized card list component for mobile view
 interface VirtualizedTorrentCardListProps {
-  torrents: Torrent[]
+  torrents: Array<Torrent>
   onTorrentClick?: (torrent: Torrent) => void
   selectedHashes?: Set<string>
   toggleSelection?: (hash: string) => void

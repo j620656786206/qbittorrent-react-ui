@@ -11,7 +11,7 @@
  * Or use the global performance test utilities exposed in development mode.
  */
 
-import type { Torrent } from '@/components/torrent-table'
+import type { Torrent } from '@/types/torrent'
 
 // Random torrent names for realistic testing
 const TORRENT_NAME_PREFIXES = [
@@ -105,9 +105,13 @@ function generateHash(): string {
  */
 function generateTorrentName(index: number): string {
   const prefix =
-    TORRENT_NAME_PREFIXES[Math.floor(Math.random() * TORRENT_NAME_PREFIXES.length)]
+    TORRENT_NAME_PREFIXES[
+      Math.floor(Math.random() * TORRENT_NAME_PREFIXES.length)
+    ]
   const suffix =
-    TORRENT_NAME_SUFFIXES[Math.floor(Math.random() * TORRENT_NAME_SUFFIXES.length)]
+    TORRENT_NAME_SUFFIXES[
+      Math.floor(Math.random() * TORRENT_NAME_SUFFIXES.length)
+    ]
   const version = `${Math.floor(Math.random() * 30) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`
   return `${prefix} ${version} ${suffix} [#${index + 1}]`
 }
@@ -117,7 +121,8 @@ function generateTorrentName(index: number): string {
  */
 function generateMockTorrent(index: number): Torrent {
   const hash = generateHash()
-  const size = Math.floor(Math.random() * 50 * 1024 * 1024 * 1024) + 100 * 1024 * 1024 // 100MB to 50GB
+  const size =
+    Math.floor(Math.random() * 50 * 1024 * 1024 * 1024) + 100 * 1024 * 1024 // 100MB to 50GB
   const progress = Math.random()
   const downloaded = Math.floor(size * progress)
   const state = STATES[Math.floor(Math.random() * STATES.length)]
@@ -127,28 +132,39 @@ function generateMockTorrent(index: number): Torrent {
   return {
     hash,
     name: generateTorrentName(index),
-    added_on: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 30 * 24 * 60 * 60),
+    added_on:
+      Math.floor(Date.now() / 1000) -
+      Math.floor(Math.random() * 30 * 24 * 60 * 60),
     amount_left: size - downloaded,
     auto_tmm: Math.random() > 0.5,
     availability: Math.random(),
     category: CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)],
     comment: '',
     completed: downloaded,
-    completion_on: progress >= 1 ? Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 7 * 24 * 60 * 60) : 0,
+    completion_on:
+      progress >= 1
+        ? Math.floor(Date.now() / 1000) -
+          Math.floor(Math.random() * 7 * 24 * 60 * 60)
+        : 0,
     content_path: `/downloads/${hash}`,
     dl_limit: 0,
     dlspeed: isDownloading ? Math.floor(Math.random() * 50 * 1024 * 1024) : 0,
     download_path: '',
     downloaded,
     downloaded_session: Math.floor(downloaded * Math.random()),
-    eta: isDownloading ? Math.floor(Math.random() * 24 * 60 * 60) : progress >= 1 ? 0 : 8640000,
+    eta: isDownloading
+      ? Math.floor(Math.random() * 24 * 60 * 60)
+      : progress >= 1
+        ? 0
+        : 8640000,
     f_l_piece_prio: false,
     force_start: false,
     has_metadata: true,
     inactive_seeding_time_limit: -2,
     infohash_v1: hash,
     infohash_v2: '',
-    last_activity: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 60 * 60),
+    last_activity:
+      Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 60 * 60),
     magnet_uri: `magnet:?xt=urn:btih:${hash}`,
     max_inactive_seeding_time: -1,
     max_ratio: -1,
@@ -166,9 +182,11 @@ function generateMockTorrent(index: number): Torrent {
     reannounce: Math.floor(Math.random() * 3600),
     root_path: `/downloads/${hash}`,
     save_path: '/downloads',
-    seeding_time: progress >= 1 ? Math.floor(Math.random() * 7 * 24 * 60 * 60) : 0,
+    seeding_time:
+      progress >= 1 ? Math.floor(Math.random() * 7 * 24 * 60 * 60) : 0,
     seeding_time_limit: -2,
-    seen_complete: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 24 * 60 * 60),
+    seen_complete:
+      Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 24 * 60 * 60),
     seq_dl: false,
     size,
     state,
@@ -189,9 +207,9 @@ function generateMockTorrent(index: number): Torrent {
  * Generates an array of mock torrents for performance testing
  * @param count Number of mock torrents to generate (default: 1000)
  */
-export function generateMockTorrents(count: number = 1000): Torrent[] {
+export function generateMockTorrents(count: number = 1000): Array<Torrent> {
   const startTime = performance.now()
-  const torrents: Torrent[] = []
+  const torrents: Array<Torrent> = []
 
   for (let i = 0; i < count; i++) {
     torrents.push(generateMockTorrent(i))
@@ -202,7 +220,9 @@ export function generateMockTorrents(count: number = 1000): Torrent[] {
 
   // Log generation stats (development only)
   if (import.meta.env.DEV) {
-    console.info(`[Performance Test] Generated ${count} mock torrents in ${generationTime}ms`)
+    console.info(
+      `[Performance Test] Generated ${count} mock torrents in ${generationTime}ms`,
+    )
   }
 
   return torrents
@@ -233,7 +253,11 @@ export const PerformanceMetrics = {
    */
   getMemoryUsage(): { usedJSHeapSize: number; totalJSHeapSize: number } | null {
     if ('memory' in performance) {
-      const memory = (performance as unknown as { memory: { usedJSHeapSize: number; totalJSHeapSize: number } }).memory
+      const memory = (
+        performance as unknown as {
+          memory: { usedJSHeapSize: number; totalJSHeapSize: number }
+        }
+      ).memory
       return {
         usedJSHeapSize: memory.usedJSHeapSize,
         totalJSHeapSize: memory.totalJSHeapSize,
@@ -249,7 +273,7 @@ export const PerformanceMetrics = {
     const memory = this.getMemoryUsage()
     if (memory) {
       console.info(
-        `[Performance Test] ${label} - Memory: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB / ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)}MB`
+        `[Performance Test] ${label} - Memory: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB / ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)}MB`,
       )
     }
   },
@@ -276,7 +300,7 @@ export const PerformanceMetrics = {
     const memory = this.getMemoryUsage()
     if (memory) {
       console.info(
-        `Memory usage: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`
+        `Memory usage: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`,
       )
     }
 

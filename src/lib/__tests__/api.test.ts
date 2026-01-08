@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  login,
-  getMaindata,
-  pauseTorrent,
-  resumeTorrent,
+  addTorrentFile,
+  addTorrentMagnet,
   deleteTorrent,
   getCategories,
-  setTorrentCategory,
-  addTorrentMagnet,
-  addTorrentFile,
+  getMaindata,
   getTorrentFiles,
-  type MaindataResponse,
+  login,
+  pauseTorrent,
+  resumeTorrent,
+  setTorrentCategory,
 } from '../api'
+import type { MaindataResponse } from '../api'
 
 // Mock fetch
 const mockFetch = vi.fn()
@@ -46,7 +46,7 @@ describe('API Functions', () => {
     it('should login successfully with valid credentials', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       const result = await login(baseUrl, 'admin', 'password123')
@@ -59,7 +59,7 @@ describe('API Functions', () => {
           headers: expect.objectContaining({
             'Content-Type': 'application/x-www-form-urlencoded',
           }),
-        })
+        }),
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -71,7 +71,7 @@ describe('API Functions', () => {
     it('should login successfully with empty credentials', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       const result = await login(baseUrl)
@@ -87,13 +87,13 @@ describe('API Functions', () => {
       import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Ok.',
+        text: () => Promise.resolve('Ok.'),
       })
 
       await login(baseUrl, 'admin', 'password123')
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v2/auth/login',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -101,29 +101,29 @@ describe('API Functions', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        text: async () => 'Unauthorized',
+        text: () => Promise.resolve('Unauthorized'),
       })
 
       await expect(login(baseUrl, 'admin', 'wrong')).rejects.toThrow(
-        'Login failed with status: 401'
+        'Login failed with status: 401',
       )
     })
 
     it('should throw error when response is ok but text is not "Ok."', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => 'Fails.',
+        text: () => Promise.resolve('Fails.'),
       })
 
       await expect(login(baseUrl, 'admin', 'password')).rejects.toThrow(
-        'Login failed: Invalid credentials or other issue'
+        'Login failed: Invalid credentials or other issue',
       )
     })
 
     it('should handle response with whitespace around "Ok."', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        text: async () => '  Ok.  ',
+        text: () => Promise.resolve('  Ok.  '),
       })
 
       const result = await login(baseUrl, 'admin', 'password123')
@@ -134,11 +134,11 @@ describe('API Functions', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => '',
+        text: () => Promise.resolve(''),
       })
 
       await expect(login(baseUrl, 'admin', 'password')).rejects.toThrow(
-        'No response body'
+        'No response body',
       )
     })
   })
@@ -164,7 +164,7 @@ describe('API Functions', () => {
     it('should fetch maindata without rid', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       const result = await getMaindata(baseUrl)
@@ -173,14 +173,14 @@ describe('API Functions', () => {
         `${baseUrl}/api/v2/sync/maindata`,
         expect.objectContaining({
           credentials: 'include',
-        })
+        }),
       )
     })
 
     it('should fetch maindata with rid parameter', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl, 100)
@@ -191,7 +191,7 @@ describe('API Functions', () => {
     it('should fetch maindata with rid=0', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl, 0)
@@ -203,7 +203,7 @@ describe('API Functions', () => {
       import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockMaindataResponse,
+        json: () => Promise.resolve(mockMaindataResponse),
       })
 
       await getMaindata(baseUrl)
@@ -218,7 +218,7 @@ describe('API Functions', () => {
       })
 
       await expect(getMaindata(baseUrl)).rejects.toThrow(
-        'Failed to fetch maindata with status: 403'
+        'Failed to fetch maindata with status: 403',
       )
     })
 
@@ -242,7 +242,7 @@ describe('API Functions', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => incrementalResponse,
+        json: () => Promise.resolve(incrementalResponse),
       })
 
       const result = await getMaindata(baseUrl, 123)
@@ -264,7 +264,7 @@ describe('API Functions', () => {
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
-        })
+        }),
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -307,7 +307,7 @@ describe('API Functions', () => {
       await pauseTorrent(baseUrl, 'abc123')
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v2/torrents/pause',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -318,7 +318,7 @@ describe('API Functions', () => {
       })
 
       await expect(pauseTorrent(baseUrl, 'abc123')).rejects.toThrow(
-        'Failed to pause torrent(s) with status: 404'
+        'Failed to pause torrent(s) with status: 404',
       )
     })
   })
@@ -336,7 +336,7 @@ describe('API Functions', () => {
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
-        })
+        }),
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -379,7 +379,7 @@ describe('API Functions', () => {
       await resumeTorrent(baseUrl, 'abc123')
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v2/torrents/resume',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -390,7 +390,7 @@ describe('API Functions', () => {
       })
 
       await expect(resumeTorrent(baseUrl, 'abc123')).rejects.toThrow(
-        'Failed to resume torrent(s) with status: 500'
+        'Failed to resume torrent(s) with status: 500',
       )
     })
   })
@@ -408,7 +408,7 @@ describe('API Functions', () => {
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
-        })
+        }),
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -436,7 +436,11 @@ describe('API Functions', () => {
         ok: true,
       })
 
-      const result = await deleteTorrent(baseUrl, ['abc123', 'def456', 'ghi789'], false)
+      const result = await deleteTorrent(
+        baseUrl,
+        ['abc123', 'def456', 'ghi789'],
+        false,
+      )
       expect(result).toBe(true)
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -481,7 +485,7 @@ describe('API Functions', () => {
       await deleteTorrent(baseUrl, 'abc123')
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v2/torrents/delete',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -492,7 +496,7 @@ describe('API Functions', () => {
       })
 
       await expect(deleteTorrent(baseUrl, 'abc123')).rejects.toThrow(
-        'Failed to delete torrent(s) with status: 403'
+        'Failed to delete torrent(s) with status: 403',
       )
     })
 
@@ -517,7 +521,7 @@ describe('API Functions', () => {
       }
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockCategories,
+        json: () => Promise.resolve(mockCategories),
       })
 
       const result = await getCategories(baseUrl)
@@ -526,7 +530,7 @@ describe('API Functions', () => {
         expect.stringContaining('/api/v2/torrents/categories'),
         expect.objectContaining({
           credentials: 'include',
-        })
+        }),
       )
       expect(result).toEqual(mockCategories)
     })
@@ -538,7 +542,7 @@ describe('API Functions', () => {
       })
 
       await expect(getCategories(baseUrl)).rejects.toThrow(
-        'Failed to fetch categories with status: 401'
+        'Failed to fetch categories with status: 401',
       )
     })
   })
@@ -588,8 +592,10 @@ describe('API Functions', () => {
         status: 400,
       })
 
-      await expect(setTorrentCategory(baseUrl, 'abc123', 'test')).rejects.toThrow(
-        'Failed to set category for torrent(s) with status: 400'
+      await expect(
+        setTorrentCategory(baseUrl, 'abc123', 'test'),
+      ).rejects.toThrow(
+        'Failed to set category for torrent(s) with status: 400',
       )
     })
   })
@@ -689,7 +695,7 @@ describe('API Functions', () => {
 
       const magnetLink = 'magnet:?xt=urn:btih:test123'
       await expect(addTorrentMagnet(baseUrl, magnetLink)).rejects.toThrow(
-        'Failed to add torrent via magnet link with status: 415'
+        'Failed to add torrent via magnet link with status: 415',
       )
     })
   })
@@ -700,7 +706,9 @@ describe('API Functions', () => {
         ok: true,
       })
 
-      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      const file = new File(['test'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
       await addTorrentFile(baseUrl, file)
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -708,7 +716,7 @@ describe('API Functions', () => {
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
-        })
+        }),
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
@@ -721,7 +729,9 @@ describe('API Functions', () => {
         ok: true,
       })
 
-      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      const file = new File(['test'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
       await addTorrentFile(baseUrl, file, {
         savepath: '/downloads',
         category: 'movies',
@@ -743,9 +753,11 @@ describe('API Functions', () => {
         status: 415,
       })
 
-      const file = new File(['test'], 'test.torrent', { type: 'application/x-bittorrent' })
+      const file = new File(['test'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
       await expect(addTorrentFile(baseUrl, file)).rejects.toThrow(
-        'Failed to add torrent via file with status: 415'
+        'Failed to add torrent via file with status: 415',
       )
     })
   })
@@ -758,7 +770,7 @@ describe('API Functions', () => {
       ]
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockFiles,
+        json: () => Promise.resolve(mockFiles),
       })
 
       const result = await getTorrentFiles(baseUrl, 'abc123')
@@ -767,7 +779,7 @@ describe('API Functions', () => {
         expect.stringContaining('/api/v2/torrents/files?hash=abc123'),
         expect.objectContaining({
           credentials: 'include',
-        })
+        }),
       )
       expect(result).toEqual(mockFiles)
     })
@@ -779,7 +791,7 @@ describe('API Functions', () => {
       })
 
       await expect(getTorrentFiles(baseUrl, 'abc123')).rejects.toThrow(
-        'Failed to fetch torrent files with status: 409'
+        'Failed to fetch torrent files with status: 409',
       )
     })
   })

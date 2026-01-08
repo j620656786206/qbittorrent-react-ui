@@ -1,41 +1,5 @@
-import { describe, it, expect } from 'vitest'
-
-/**
- * Helper function to format bytes into KB, MB, GB, etc.
- * Mirrors the function in src/components/torrent-table.tsx
- *
- * @param bytes - Number of bytes to format
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted string with unit (e.g., "1.50 MB")
- */
-function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
-}
-
-/**
- * Helper function to format ETA (Estimated Time of Arrival)
- * Mirrors the function in src/components/torrent-table.tsx
- *
- * @param seconds - Number of seconds remaining
- * @returns Formatted time string (e.g., "2h 30m", "5d 3h", "∞")
- */
-function formatEta(seconds: number) {
-  if (seconds < 0 || seconds === 8640000) return '∞'
-  if (seconds === 0) return '-'
-
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
+import { describe, expect, it } from 'vitest'
+import { formatBytes, formatEta } from '@/lib/utils'
 
 /**
  * Helper to get state translation key
@@ -445,14 +409,18 @@ describe('TorrentTable Helper Functions', () => {
           { seconds: 30, expected: '0m', description: '30 seconds left' },
           { seconds: 180, expected: '3m', description: '3 minutes left' },
           { seconds: 3600, expected: '1h 0m', description: '1 hour left' },
-          { seconds: 7260, expected: '2h 1m', description: '2 hours 1 minute left' },
+          {
+            seconds: 7260,
+            expected: '2h 1m',
+            description: '2 hours 1 minute left',
+          },
           { seconds: 86400, expected: '1d 0h', description: '1 day left' },
           { seconds: 172800, expected: '2d 0h', description: '2 days left' },
           { seconds: -1, expected: '∞', description: 'infinite/unknown' },
           { seconds: 0, expected: '-', description: 'completed/paused' },
         ]
 
-        scenarios.forEach(({ seconds, expected, description }) => {
+        scenarios.forEach(({ seconds, expected }) => {
           expect(formatEta(seconds)).toBe(expected)
         })
       })
