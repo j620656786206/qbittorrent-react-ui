@@ -283,5 +283,9 @@
       "clearSelection": "清除選擇",
       "help": "顯示鍵盤快速鍵說明"
     }
+  },
+  "dropZone": {
+    "title": "拖放 Torrent 檔案至此",
+    "subtitle": "鬆開以新增 Torrent 檔案"
   }
 }

@@ -283,5 +283,9 @@
       "clearSelection": "Clear selection",
       "help": "Show keyboard shortcuts help"
     }
+  },
+  "dropZone": {
+    "title": "Drop Torrent Files Here",
+    "subtitle": "Release to add torrent files"
   }
 }
