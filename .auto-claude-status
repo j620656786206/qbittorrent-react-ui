@@ -3,23 +3,23 @@
   "spec": "033-drag-and-drop-torrent-upload",
   "state": "building",
   "subtasks": {
-    "completed": 5,
+    "completed": 7,
     "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integrate Drag-Drop into Layout",
-    "id": 4,
-    "total": 2
+    "current": "Multiple Files Queue System",
+    "id": 6,
+    "total": 1
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 417,
+    "number": 419,
     "started_at": "2026-01-09T01:19:14.026899"
   },
-  "last_update": "2026-01-09T06:00:02.023887"
+  "last_update": "2026-01-09T06:06:25.432352"
 }

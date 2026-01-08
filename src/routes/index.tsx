@@ -73,12 +73,20 @@ function HomePage() {
   // --- Drag and Drop State ---
   const [droppedFiles, setDroppedFiles] = React.useState<File[]>([])
   const [pastedMagnet, setPastedMagnet] = React.useState<string | null>(null)
+  const [initialQueueSize, setInitialQueueSize] = React.useState(0)
 
   // Handle drag-and-drop file uploads
   const { isDragging } = useDragAndDrop({
     onDrop: (files) => {
       // Add dropped files to the queue
-      setDroppedFiles((prev) => [...prev, ...files])
+      setDroppedFiles((prev) => {
+        const newQueue = [...prev, ...files]
+        // Set initial queue size if this is the first batch of files
+        if (prev.length === 0) {
+          setInitialQueueSize(newQueue.length)
+        }
+        return newQueue
+      })
     },
   })
 
@@ -133,7 +141,14 @@ function HomePage() {
     }
 
     // Remove the first file from the queue (the one we just processed)
-    setDroppedFiles((prev) => prev.slice(1))
+    setDroppedFiles((prev) => {
+      const newQueue = prev.slice(1)
+      // Reset initial queue size when queue is empty
+      if (newQueue.length === 0) {
+        setInitialQueueSize(0)
+      }
+      return newQueue
+    })
   }, [pastedMagnet])
 
   // Selection helper functions
@@ -817,6 +832,8 @@ function HomePage() {
         onClose={handleAddTorrentClose}
         initialFile={droppedFiles[0]} // Pass the first file from the queue
         initialMagnet={pastedMagnet || undefined} // Pass pasted magnet link
+        queueCount={droppedFiles.length > 0 ? initialQueueSize - droppedFiles.length + 1 : undefined}
+        queueTotal={droppedFiles.length > 0 ? initialQueueSize : undefined}
       />
 
       {/* Drop Zone Overlay */}

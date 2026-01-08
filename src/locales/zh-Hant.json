@@ -158,6 +158,7 @@
   "addTorrent": {
     "title": "新增 Torrent",
     "description": "透過磁力連結或檔案上傳新增 Torrent。",
+    "queueOf": "/",
     "tabs": {
       "magnetLink": "磁力連結",
       "file": "檔案"

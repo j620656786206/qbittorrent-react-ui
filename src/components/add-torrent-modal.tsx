@@ -25,6 +25,8 @@ interface AddTorrentModalProps {
   onClose: () => void
   initialFile?: File
   initialMagnet?: string
+  queueCount?: number
+  queueTotal?: number
 }
 
 export function AddTorrentModal({
@@ -32,6 +34,8 @@ export function AddTorrentModal({
   onClose,
   initialFile,
   initialMagnet,
+  queueCount,
+  queueTotal,
 }: AddTorrentModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -188,7 +192,14 @@ export function AddTorrentModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{t('addTorrent.title')}</DialogTitle>
+          <DialogTitle>
+            {t('addTorrent.title')}
+            {queueCount !== undefined && queueTotal !== undefined && queueTotal > 1 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({queueCount} {t('addTorrent.queueOf')} {queueTotal})
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>{t('addTorrent.description')}</DialogDescription>
         </DialogHeader>
 

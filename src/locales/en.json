@@ -158,6 +158,7 @@
   "addTorrent": {
     "title": "Add Torrent",
     "description": "Add a new torrent via magnet link or file upload.",
+    "queueOf": "of",
     "tabs": {
       "magnetLink": "Magnet Link",
       "file": "File"
