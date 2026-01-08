@@ -13,7 +13,9 @@
     "no": "否",
     "refresh": "重新整理",
     "retry": "重試",
-    "forceRecheck": "強制重新檢查"
+    "forceRecheck": "強制重新檢查",
+    "showPassword": "顯示密碼",
+    "hidePassword": "隱藏密碼"
   },
   "torrent": {
     "status": {

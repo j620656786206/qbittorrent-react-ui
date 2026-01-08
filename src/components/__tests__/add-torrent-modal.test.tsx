@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AddTorrentModal } from '../add-torrent-modal'
 
 import { addTorrentFile, addTorrentMagnet, getCategories } from '@/lib/api'
-import { getTags } from '@/lib/tag-storage'
 
 /**
  * Mock react-i18next
@@ -60,7 +59,7 @@ vi.mock('@/lib/api', () => ({
  */
 vi.mock('@/lib/tag-storage', () => ({
   getTags: vi.fn(() => []),
-  formatTagString: vi.fn((tags: string[]) => tags.join(',')),
+  formatTagString: vi.fn((tags: Array<string>) => tags.join(',')),
 }))
 
 /**
@@ -389,9 +388,7 @@ describe('AddTorrentModal Component', () => {
     it('accepts valid magnet link starting with "magnet:?"', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(
-        new Response('OK', { status: 200 }),
-      )
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -409,9 +406,7 @@ describe('AddTorrentModal Component', () => {
     it('trims whitespace from magnet link', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentMagnet).mockResolvedValue(
-        new Response('OK', { status: 200 }),
-      )
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 
@@ -452,9 +447,7 @@ describe('AddTorrentModal Component', () => {
     it('does not show error when file is selected', async () => {
       const user = userEvent.setup()
       const mockOnClose = vi.fn()
-      vi.mocked(addTorrentFile).mockResolvedValue(
-        new Response('OK', { status: 200 }),
-      )
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
 
       renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
 

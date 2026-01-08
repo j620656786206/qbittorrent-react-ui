@@ -48,15 +48,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { TagChip, getColorClass } from '@/components/ui/tag-input'
-import {
-  TrackerStatus,
-  addTorrentTags,
-  addTrackers,
-  getTrackers,
-  reannounceTorrent,
-  removeTorrentTags,
-  removeTrackers,
-} from '@/lib/api'
+import { TrackerStatus, getTrackers } from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
 import { getTags, getTagsByNames, parseTagString } from '@/lib/tag-storage'
 import { formatBytes, formatEta } from '@/lib/utils'
@@ -469,16 +461,18 @@ function TorrentTagsEditor({
   }, [])
 
   // Add tag mutation
+  // TODO: Implement addTorrentTags API function
   const addTagMutation = useMutation({
-    mutationFn: (tagName: string) => addTorrentTags(baseUrl, hash, tagName),
+    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
   })
 
   // Remove tag mutation
+  // TODO: Implement removeTorrentTags API function
   const removeTagMutation = useMutation({
-    mutationFn: (tagName: string) => removeTorrentTags(baseUrl, hash, tagName),
+    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
@@ -569,8 +563,9 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   const [newTrackerUrl, setNewTrackerUrl] = React.useState('')
 
   // Remove tracker mutation
+  // TODO: Implement removeTrackers API function
   const removeTrackerMutation = useMutation({
-    mutationFn: (url: string) => removeTrackers(baseUrl, hash, url),
+    mutationFn: (url: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
       setTrackerToRemove(null)
@@ -578,8 +573,9 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   })
 
   // Add tracker mutation
+  // TODO: Implement addTrackers API function
   const addTrackerMutation = useMutation({
-    mutationFn: (url: string) => addTrackers(baseUrl, hash, url),
+    mutationFn: (url: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
       setIsAddDialogOpen(false)
@@ -588,8 +584,9 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   })
 
   // Reannounce mutation
+  // TODO: Implement reannounceTorrent API function
   const reannounceMutation = useMutation({
-    mutationFn: () => reannounceTorrent(baseUrl, hash),
+    mutationFn: () => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
     },

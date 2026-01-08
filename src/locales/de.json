@@ -13,7 +13,9 @@
     "no": "Nein",
     "refresh": "Aktualisieren",
     "retry": "Wiederholen",
-    "forceRecheck": "Neuprüfung erzwingen"
+    "forceRecheck": "Neuprüfung erzwingen",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen"
   },
   "torrent": {
     "status": {

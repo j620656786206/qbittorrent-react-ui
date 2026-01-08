@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useKeyboardShortcuts, isMac } from '../use-keyboard-shortcuts'
+import { isMac, useKeyboardShortcuts } from '../use-keyboard-shortcuts'
 
 describe('isMac', () => {
   let originalNavigator: typeof navigator

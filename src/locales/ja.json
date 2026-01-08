@@ -13,7 +13,9 @@
     "no": "いいえ",
     "refresh": "更新",
     "retry": "再試行",
-    "forceRecheck": "強制再チェック"
+    "forceRecheck": "強制再チェック",
+    "showPassword": "パスワードを表示",
+    "hidePassword": "パスワードを非表示"
   },
   "torrent": {
     "status": {

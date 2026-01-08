@@ -1,15 +1,15 @@
 {
   "active": true,
-  "spec": "017-keyboard-shortcuts",
+  "spec": "025-add-password-visibility-toggle",
   "state": "building",
   "subtasks": {
-    "completed": 16,
-    "total": 17,
+    "completed": 7,
+    "total": 8,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Final Validation",
+    "current": "Verification",
     "id": null,
     "total": 3
   },
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 19,
-    "started_at": "2026-01-08T01:01:42.544105"
+    "number": 10,
+    "started_at": "2026-01-09T00:50:46.159288"
   },
-  "last_update": "2026-01-08T02:54:58.456639"
+  "last_update": "2026-01-09T00:59:35.862734"
 }
