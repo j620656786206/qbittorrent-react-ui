@@ -411,9 +411,9 @@ type TorrentTagsEditorProps = {
 }
 
 function TorrentTagsEditor({
-  hash,
+  hash: _hash,
   currentTags,
-  baseUrl,
+  baseUrl: _baseUrl,
 }: TorrentTagsEditorProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -463,7 +463,7 @@ function TorrentTagsEditor({
   // Add tag mutation
   // TODO: Implement addTorrentTags API function
   const addTagMutation = useMutation({
-    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
@@ -472,7 +472,7 @@ function TorrentTagsEditor({
   // Remove tag mutation
   // TODO: Implement removeTorrentTags API function
   const removeTagMutation = useMutation({
-    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
     },
@@ -565,7 +565,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   // Remove tracker mutation
   // TODO: Implement removeTrackers API function
   const removeTrackerMutation = useMutation({
-    mutationFn: (url: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_url: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
       setTrackerToRemove(null)
@@ -575,7 +575,7 @@ function TrackerList({ hash, baseUrl }: TrackerListProps) {
   // Add tracker mutation
   // TODO: Implement addTrackers API function
   const addTrackerMutation = useMutation({
-    mutationFn: (url: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_url: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackers', hash] })
       setIsAddDialogOpen(false)

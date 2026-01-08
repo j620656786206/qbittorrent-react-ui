@@ -188,6 +188,7 @@
     "startPaused": "Pausiert starten",
     "add": "Hinzufügen",
     "adding": "Wird hinzugefügt...",
+    "queueOf": "von",
     "success": "Torrent erfolgreich hinzugefügt",
     "error": {
       "invalidMagnet": "Ungültiger Magnet-Link. Muss mit \"magnet:?\" beginnen",
@@ -266,5 +267,26 @@
       "button": "Neu ankündigen",
       "tooltip": "Ankündigung an alle Tracker erzwingen"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "Tastaturkürzel",
+      "description": "Verwenden Sie diese Tastaturkürzel, um Ihre Torrents schnell zu verwalten",
+      "keyColumn": "Taste",
+      "actionColumn": "Aktion"
+    },
+    "shortcuts": {
+      "selectAll": "Alle sichtbaren Torrents auswählen",
+      "pauseResume": "Ausgewählte Torrents pausieren oder fortsetzen",
+      "delete": "Ausgewählte Torrents löschen",
+      "navigate": "Zwischen Torrents navigieren",
+      "toggleSelect": "Fokussierten Torrent auswählen oder abwählen",
+      "clearSelection": "Auswahl löschen",
+      "help": "Tastaturkürzel-Hilfe anzeigen"
+    }
+  },
+  "dropZone": {
+    "title": "Torrent-Dateien hier ablegen",
+    "subtitle": "Loslassen, um Torrent-Dateien hinzuzufügen"
   }
 }

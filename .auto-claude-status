@@ -1,16 +1,16 @@
 {
   "active": true,
-  "spec": "025-add-password-visibility-toggle",
+  "spec": "033-drag-and-drop-torrent-upload",
   "state": "building",
   "subtasks": {
-    "completed": 7,
-    "total": 8,
+    "completed": 9,
+    "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Verification",
-    "id": null,
+    "current": "Testing and Polish",
+    "id": 7,
     "total": 3
   },
   "workers": {
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 10,
-    "started_at": "2026-01-09T00:50:46.159288"
+    "number": 421,
+    "started_at": "2026-01-09T01:19:14.026899"
   },
-  "last_update": "2026-01-09T00:59:35.862734"
+  "last_update": "2026-01-09T06:18:35.656722"
 }

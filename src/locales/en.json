@@ -158,6 +158,7 @@
   "addTorrent": {
     "title": "Add Torrent",
     "description": "Add a new torrent via magnet link or file upload.",
+    "queueOf": "of",
     "tabs": {
       "magnetLink": "Magnet Link",
       "file": "File"
@@ -283,5 +284,9 @@
       "clearSelection": "Clear selection",
       "help": "Show keyboard shortcuts help"
     }
+  },
+  "dropZone": {
+    "title": "Drop Torrent Files Here",
+    "subtitle": "Release to add torrent files"
   }
 }

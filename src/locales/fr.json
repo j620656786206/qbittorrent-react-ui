@@ -188,6 +188,7 @@
     "startPaused": "Démarrer en pause",
     "add": "Ajouter",
     "adding": "Ajout en cours...",
+    "queueOf": "de",
     "success": "Torrent ajouté avec succès",
     "error": {
       "invalidMagnet": "Lien magnet invalide. Doit commencer par \"magnet:?\"",
@@ -266,5 +267,26 @@
       "button": "Réannoncer",
       "tooltip": "Forcer l'annonce à tous les trackers"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "Raccourcis Clavier",
+      "description": "Utilisez ces raccourcis clavier pour gérer rapidement vos torrents",
+      "keyColumn": "Touche",
+      "actionColumn": "Action"
+    },
+    "shortcuts": {
+      "selectAll": "Sélectionner tous les torrents visibles",
+      "pauseResume": "Mettre en pause ou reprendre les torrents sélectionnés",
+      "delete": "Supprimer les torrents sélectionnés",
+      "navigate": "Naviguer entre les torrents",
+      "toggleSelect": "Sélectionner ou désélectionner le torrent ciblé",
+      "clearSelection": "Effacer la sélection",
+      "help": "Afficher l'aide des raccourcis clavier"
+    }
+  },
+  "dropZone": {
+    "title": "Déposer les fichiers Torrent ici",
+    "subtitle": "Relâchez pour ajouter des fichiers torrent"
   }
 }

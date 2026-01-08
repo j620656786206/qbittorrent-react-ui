@@ -23,9 +23,20 @@ type TabType = 'magnet' | 'file'
 interface AddTorrentModalProps {
   isOpen: boolean
   onClose: () => void
+  initialFile?: File
+  initialMagnet?: string
+  queueCount?: number
+  queueTotal?: number
 }
 
-export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
+export function AddTorrentModal({
+  isOpen,
+  onClose,
+  initialFile,
+  initialMagnet,
+  queueCount,
+  queueTotal,
+}: AddTorrentModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
@@ -48,6 +59,21 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
       setAvailableTags(getTags())
     }
   }, [isOpen])
+
+  // Handle initial file/magnet pre-fill
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialFile) {
+        setActiveTab('file')
+        setSelectedFile(initialFile)
+        setError('')
+      } else if (initialMagnet) {
+        setActiveTab('magnet')
+        setMagnetLink(initialMagnet)
+        setError('')
+      }
+    }
+  }, [isOpen, initialFile, initialMagnet])
 
   // File input ref
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -166,7 +192,14 @@ export function AddTorrentModal({ isOpen, onClose }: AddTorrentModalProps) {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{t('addTorrent.title')}</DialogTitle>
+          <DialogTitle>
+            {t('addTorrent.title')}
+            {queueCount !== undefined && queueTotal !== undefined && queueTotal > 1 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({queueCount} {t('addTorrent.queueOf')} {queueTotal})
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>{t('addTorrent.description')}</DialogDescription>
         </DialogHeader>
 

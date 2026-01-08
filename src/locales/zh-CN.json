@@ -188,6 +188,7 @@
     "startPaused": "添加后暂停",
     "add": "添加",
     "adding": "添加中...",
+    "queueOf": "/",
     "success": "Torrent 添加成功",
     "error": {
       "invalidMagnet": "无效的磁力链接，必须以\"magnet:?\"开头",
@@ -266,5 +267,26 @@
       "button": "重新宣告",
       "tooltip": "强制向所有 Tracker 重新宣告"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "键盘快捷键",
+      "description": "使用这些键盘快捷键快速管理您的 Torrent",
+      "keyColumn": "按键",
+      "actionColumn": "操作"
+    },
+    "shortcuts": {
+      "selectAll": "全选所有可见的 Torrent",
+      "pauseResume": "暂停或继续选中的 Torrent",
+      "delete": "删除选中的 Torrent",
+      "navigate": "在 Torrent 之间导航",
+      "toggleSelect": "选择或取消选择焦点 Torrent",
+      "clearSelection": "清除选择",
+      "help": "显示键盘快捷键帮助"
+    }
+  },
+  "dropZone": {
+    "title": "拖放 Torrent 文件至此",
+    "subtitle": "松开以添加 Torrent 文件"
   }
 }

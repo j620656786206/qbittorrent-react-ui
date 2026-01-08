@@ -188,6 +188,7 @@
     "startPaused": "Iniciar Pausado",
     "add": "Añadir",
     "adding": "Añadiendo...",
+    "queueOf": "de",
     "success": "Torrent añadido exitosamente",
     "error": {
       "invalidMagnet": "Enlace magnet no válido. Debe comenzar con \"magnet:?\"",
@@ -266,5 +267,26 @@
       "button": "Reanunciar",
       "tooltip": "Forzar anuncio a todos los rastreadores"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "Atajos de Teclado",
+      "description": "Use estos atajos de teclado para gestionar rápidamente sus torrents",
+      "keyColumn": "Tecla",
+      "actionColumn": "Acción"
+    },
+    "shortcuts": {
+      "selectAll": "Seleccionar todos los torrents visibles",
+      "pauseResume": "Pausar o reanudar torrents seleccionados",
+      "delete": "Eliminar torrents seleccionados",
+      "navigate": "Navegar entre torrents",
+      "toggleSelect": "Seleccionar o deseleccionar torrent enfocado",
+      "clearSelection": "Limpiar selección",
+      "help": "Mostrar ayuda de atajos de teclado"
+    }
+  },
+  "dropZone": {
+    "title": "Suelta archivos Torrent aquí",
+    "subtitle": "Suelta para agregar archivos torrent"
   }
 }
