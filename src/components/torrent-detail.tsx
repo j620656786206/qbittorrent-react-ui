@@ -63,6 +63,24 @@ function getStateKey(state: string): string {
   return `torrent.status.${state}`
 }
 
+// Helper to get progress bar color based on torrent state
+function getProgressColor(state: string): string {
+  // Green: seeding/uploading/complete
+  if (['uploading', 'forcedUP', 'queuedUP', 'pausedUP', 'stalledUP'].includes(state)) {
+    return 'bg-green-500'
+  }
+  // Red: errors
+  if (['error', 'missingFiles'].includes(state)) {
+    return 'bg-red-500'
+  }
+  // Yellow: stalled downloading
+  if (state === 'stalledDL') {
+    return 'bg-yellow-500'
+  }
+  // Blue: downloading (default active)
+  return 'bg-blue-500'
+}
+
 // Tracker status helper functions
 function getTrackerStatusIcon(status: TrackerStatusType): React.ReactNode {
   switch (status) {
@@ -138,7 +156,7 @@ export function TorrentDetail({
             {(torrent.progress * 100).toFixed(2)}%
           </span>
         </div>
-        <Progress value={torrent.progress * 100} className="h-3" />
+        <Progress value={torrent.progress * 100} className="h-3" indicatorClassName={getProgressColor(torrent.state)} />
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span>{formatBytes(torrent.completed)}</span>
           <span>{formatBytes(torrent.size)}</span>
