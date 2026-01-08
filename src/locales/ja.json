@@ -265,6 +265,23 @@
       "tooltip": "すべてのトラッカーに強制的にアナウンス"
     }
   },
+  "keyboard": {
+    "help": {
+      "title": "キーボードショートカット",
+      "description": "これらのキーボードショートカットを使用してトレントを素早く管理します",
+      "keyColumn": "キー",
+      "actionColumn": "操作"
+    },
+    "shortcuts": {
+      "selectAll": "表示されているすべてのトレントを選択",
+      "pauseResume": "選択したトレントを一時停止または再開",
+      "delete": "選択したトレントを削除",
+      "navigate": "トレント間を移動",
+      "toggleSelect": "フォーカスされたトレントを選択または選択解除",
+      "clearSelection": "選択を解除",
+      "help": "キーボードショートカットのヘルプを表示"
+    }
+  },
   "loading": {
     "torrents": "トレントデータを読み込み中...",
     "loggingIn": "ログイン中..."

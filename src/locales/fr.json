@@ -265,6 +265,23 @@
       "tooltip": "Forcer l'annonce à tous les trackers"
     }
   },
+  "keyboard": {
+    "help": {
+      "title": "Raccourcis Clavier",
+      "description": "Utilisez ces raccourcis clavier pour gérer rapidement vos torrents",
+      "keyColumn": "Touche",
+      "actionColumn": "Action"
+    },
+    "shortcuts": {
+      "selectAll": "Sélectionner tous les torrents visibles",
+      "pauseResume": "Mettre en pause ou reprendre les torrents sélectionnés",
+      "delete": "Supprimer les torrents sélectionnés",
+      "navigate": "Naviguer entre les torrents",
+      "toggleSelect": "Sélectionner ou désélectionner le torrent ciblé",
+      "clearSelection": "Effacer la sélection",
+      "help": "Afficher l'aide des raccourcis clavier"
+    }
+  },
   "loading": {
     "torrents": "Chargement des données des torrents...",
     "loggingIn": "Connexion en cours..."

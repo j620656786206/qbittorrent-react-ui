@@ -265,6 +265,23 @@
       "tooltip": "Forzar anuncio a todos los rastreadores"
     }
   },
+  "keyboard": {
+    "help": {
+      "title": "Atajos de Teclado",
+      "description": "Usa estos atajos de teclado para gestionar tus torrents rápidamente",
+      "keyColumn": "Tecla",
+      "actionColumn": "Acción"
+    },
+    "shortcuts": {
+      "selectAll": "Seleccionar todos los torrents visibles",
+      "pauseResume": "Pausar o reanudar torrents seleccionados",
+      "delete": "Eliminar torrents seleccionados",
+      "navigate": "Navegar entre torrents",
+      "toggleSelect": "Seleccionar o deseleccionar torrent enfocado",
+      "clearSelection": "Limpiar selección",
+      "help": "Mostrar ayuda de atajos de teclado"
+    }
+  },
   "loading": {
     "torrents": "Cargando datos de torrents...",
     "loggingIn": "Iniciando sesión..."

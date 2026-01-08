@@ -265,6 +265,23 @@
       "tooltip": "强制向所有 Tracker 重新宣告"
     }
   },
+  "keyboard": {
+    "help": {
+      "title": "键盘快捷键",
+      "description": "使用这些键盘快捷键快速管理您的种子",
+      "keyColumn": "按键",
+      "actionColumn": "操作"
+    },
+    "shortcuts": {
+      "selectAll": "选择所有可见的种子",
+      "pauseResume": "暂停或继续所选种子",
+      "delete": "删除所选种子",
+      "navigate": "在种子之间导航",
+      "toggleSelect": "选择或取消选择聚焦的种子",
+      "clearSelection": "清除选择",
+      "help": "显示键盘快捷键帮助"
+    }
+  },
   "loading": {
     "torrents": "加载 Torrent 数据中...",
     "loggingIn": "登录中..."

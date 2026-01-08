@@ -157,6 +157,8 @@ describe('Translation Files', () => {
         'fileTree',
         'priority',
         'trackers',
+        'keyboard',
+        'loading',
       ]
 
       languages.forEach((lang) => {

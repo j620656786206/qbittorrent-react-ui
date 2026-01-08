@@ -265,6 +265,23 @@
       "tooltip": "Ankündigung an alle Tracker erzwingen"
     }
   },
+  "keyboard": {
+    "help": {
+      "title": "Tastenkombinationen",
+      "description": "Verwenden Sie diese Tastenkombinationen, um Ihre Torrents schnell zu verwalten",
+      "keyColumn": "Taste",
+      "actionColumn": "Aktion"
+    },
+    "shortcuts": {
+      "selectAll": "Alle sichtbaren Torrents auswählen",
+      "pauseResume": "Ausgewählte Torrents pausieren oder fortsetzen",
+      "delete": "Ausgewählte Torrents löschen",
+      "navigate": "Zwischen Torrents navigieren",
+      "toggleSelect": "Fokussierten Torrent auswählen oder abwählen",
+      "clearSelection": "Auswahl aufheben",
+      "help": "Hilfe zu Tastenkombinationen anzeigen"
+    }
+  },
   "loading": {
     "torrents": "Lade Torrent-Daten...",
     "loggingIn": "Anmeldung läuft..."
