@@ -185,7 +185,7 @@ export function TorrentCard({
               }}
               className="text-red-400"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+<Trash2 className="h-4 w-4 mr-2" />
               {t('common.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>

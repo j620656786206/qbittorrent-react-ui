@@ -264,5 +264,22 @@
       "button": "Reannounce",
       "tooltip": "Force announce to all trackers"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "Keyboard Shortcuts",
+      "description": "Use these keyboard shortcuts to quickly manage your torrents",
+      "keyColumn": "Key",
+      "actionColumn": "Action"
+    },
+    "shortcuts": {
+      "selectAll": "Select all visible torrents",
+      "pauseResume": "Pause or resume selected torrents",
+      "delete": "Delete selected torrents",
+      "navigate": "Navigate between torrents",
+      "toggleSelect": "Select or deselect focused torrent",
+      "clearSelection": "Clear selection",
+      "help": "Show keyboard shortcuts help"
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useMediaQuery } from '../hooks'
+import { useMediaQuery, type MediaQueryString } from '../hooks'
 
 // Mock matchMedia
 type MediaQueryListMock = {
@@ -219,13 +219,11 @@ describe('useMediaQuery', () => {
   describe('Query Parameter Changes', () => {
     it('should update when query parameter changes', async () => {
       const { result, rerender } = renderHook(
-        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) =>
+        ({ query }: { query: MediaQueryString }) =>
           useMediaQuery(query),
         {
           initialProps: {
-            query: '(min-width: 768px)' as
-              | '(min-width: 768px)'
-              | '(min-width: 1024px)',
+            query: '(min-width: 768px)' as MediaQueryString,
           },
         },
       )
@@ -254,13 +252,11 @@ describe('useMediaQuery', () => {
       )
 
       const { rerender } = renderHook(
-        ({ query }: { query: '(min-width: 768px)' | '(min-width: 1024px)' }) =>
+        ({ query }: { query: MediaQueryString }) =>
           useMediaQuery(query),
         {
           initialProps: {
-            query: '(min-width: 768px)' as
-              | '(min-width: 768px)'
-              | '(min-width: 1024px)',
+            query: '(min-width: 768px)' as MediaQueryString,
           },
         },
       )
@@ -290,7 +286,9 @@ describe('useMediaQuery', () => {
         () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
       )
 
-      const { result } = renderHook(() => useMediaQuery('(min-width: 768px)'))
+      const { result } = renderHook(() =>
+        useMediaQuery('(min-width: 768px)'),
+      )
 
       await waitFor(() => {
         expect(result.current).toBe(true)
@@ -303,7 +301,9 @@ describe('useMediaQuery', () => {
         () => matchMediaMock.mediaQueryList as unknown as MediaQueryList,
       )
 
-      const { result } = renderHook(() => useMediaQuery('(max-width: 768px)'))
+      const { result } = renderHook(() =>
+        useMediaQuery('(max-width: 768px)'),
+      )
 
       await waitFor(() => {
         expect(result.current).toBe(true)

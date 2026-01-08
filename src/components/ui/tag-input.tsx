@@ -1,14 +1,14 @@
-import * as React from 'react'
-import { ChevronDown, Tag as TagIcon, X } from 'lucide-react'
+import * as React from "react"
+import { X, ChevronDown, Tag as TagIcon } from "lucide-react"
 
-import type { Tag, TagColor } from '@/types/tag'
-import { cn } from '@/lib/utils'
+import { cn } from "@/lib/utils"
+import type { Tag, TagColor } from "@/types/tag"
 
 /**
  * Get Tailwind background class for a tag color
  */
 function getColorClass(color: TagColor | string | undefined): string {
-  if (!color) return 'bg-slate-500'
+  if (!color) return "bg-slate-500"
   return `bg-${color}-500`
 }
 
@@ -19,25 +19,26 @@ interface TagChipProps {
   tag: Tag
   onRemove?: () => void
   className?: string
+  disabled?: boolean
 }
 
 /**
  * A single tag chip with color indicator and optional remove button
  */
-function TagChip({ tag, onRemove, className }: TagChipProps) {
+function TagChip({ tag, onRemove, className, disabled }: TagChipProps) {
   return (
     <span
       data-slot="tag-chip"
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-        'bg-slate-700/50 text-slate-200',
-        className,
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+        "bg-slate-700/50 text-slate-200",
+        className
       )}
     >
       <span
         className={cn(
-          'size-2 rounded-full shrink-0',
-          getColorClass(tag.color as TagColor | undefined),
+          "size-2 rounded-full shrink-0",
+          getColorClass(tag.color as TagColor | undefined)
         )}
       />
       <span className="truncate max-w-[100px]" title={tag.name}>
@@ -50,7 +51,8 @@ function TagChip({ tag, onRemove, className }: TagChipProps) {
             e.stopPropagation()
             onRemove()
           }}
-          className="ml-0.5 rounded-full p-0.5 hover:bg-slate-600/50 transition-colors"
+          disabled={disabled}
+          className="ml-0.5 rounded-full p-0.5 hover:bg-slate-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <X className="size-3" />
         </button>
@@ -64,11 +66,11 @@ function TagChip({ tag, onRemove, className }: TagChipProps) {
  */
 interface TagInputProps {
   /** Available tags to select from */
-  availableTags: Array<Tag>
+  availableTags: Tag[]
   /** Currently selected tag names */
-  value: Array<string>
+  value: string[]
   /** Callback when selection changes */
-  onChange: (selectedTagNames: Array<string>) => void
+  onChange: (selectedTagNames: string[]) => void
   /** Placeholder text when no tags selected */
   placeholder?: string
   /** Additional CSS classes */
@@ -85,7 +87,7 @@ function TagInput({
   availableTags,
   value,
   onChange,
-  placeholder = 'Select tags...',
+  placeholder = "Select tags...",
   className,
   disabled = false,
 }: TagInputProps) {
@@ -103,14 +105,14 @@ function TagInput({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
   // Get selected tags as Tag objects
   const selectedTags = React.useMemo(() => {
     return availableTags.filter((tag) =>
-      value.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+      value.some((name) => name.toLowerCase() === tag.name.toLowerCase())
     )
   }, [availableTags, value])
 
@@ -118,7 +120,7 @@ function TagInput({
   const unselectedTags = React.useMemo(() => {
     return availableTags.filter(
       (tag) =>
-        !value.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+        !value.some((name) => name.toLowerCase() === tag.name.toLowerCase())
     )
   }, [availableTags, value])
 
@@ -137,7 +139,7 @@ function TagInput({
   // Handle toggling a tag
   const handleToggleTag = (tag: Tag) => {
     const isSelected = value.some(
-      (name) => name.toLowerCase() === tag.name.toLowerCase(),
+      (name) => name.toLowerCase() === tag.name.toLowerCase()
     )
     if (isSelected) {
       handleRemoveTag(tag.name)
@@ -148,10 +150,10 @@ function TagInput({
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()
       setIsOpen(!isOpen)
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setIsOpen(false)
     }
   }
@@ -160,7 +162,7 @@ function TagInput({
     <div
       ref={containerRef}
       data-slot="tag-input"
-      className={cn('relative', className)}
+      className={cn("relative", className)}
     >
       {/* Trigger Button */}
       <button
@@ -169,12 +171,12 @@ function TagInput({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         className={cn(
-          'flex min-h-9 w-full items-center justify-between rounded-md border px-3 py-1.5',
-          'bg-transparent text-sm shadow-xs transition-[color,box-shadow]',
-          'border-input dark:bg-input/30',
-          'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'outline-none',
+          "flex min-h-9 w-full items-center justify-between rounded-md border px-3 py-1.5",
+          "bg-transparent text-sm shadow-xs transition-[color,box-shadow]",
+          "border-input dark:bg-input/30",
+          "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "outline-none"
         )}
       >
         <div className="flex flex-wrap gap-1 flex-1 min-w-0">
@@ -183,9 +185,8 @@ function TagInput({
               <TagChip
                 key={tag.id}
                 tag={tag}
-                onRemove={
-                  disabled ? undefined : () => handleRemoveTag(tag.name)
-                }
+                onRemove={disabled ? undefined : () => handleRemoveTag(tag.name)}
+                disabled={disabled}
               />
             ))
           ) : (
@@ -194,8 +195,8 @@ function TagInput({
         </div>
         <ChevronDown
           className={cn(
-            'size-4 shrink-0 ml-2 text-muted-foreground transition-transform',
-            isOpen && 'rotate-180',
+            "size-4 shrink-0 ml-2 text-muted-foreground transition-transform",
+            isOpen && "rotate-180"
           )}
         />
       </button>
@@ -205,8 +206,8 @@ function TagInput({
         <div
           data-slot="tag-input-dropdown"
           className={cn(
-            'absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md',
-            'animate-in fade-in-0 zoom-in-95',
+            "absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md",
+            "animate-in fade-in-0 zoom-in-95"
           )}
         >
           {availableTags.length === 0 ? (
@@ -218,7 +219,7 @@ function TagInput({
             <div className="max-h-[200px] overflow-y-auto">
               {availableTags.map((tag) => {
                 const isSelected = value.some(
-                  (name) => name.toLowerCase() === tag.name.toLowerCase(),
+                  (name) => name.toLowerCase() === tag.name.toLowerCase()
                 )
                 return (
                   <button
@@ -226,22 +227,20 @@ function TagInput({
                     type="button"
                     onClick={() => handleToggleTag(tag)}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm',
-                      'outline-none cursor-default select-none',
-                      'hover:bg-accent hover:text-accent-foreground',
-                      'focus:bg-accent focus:text-accent-foreground',
-                      isSelected && 'bg-accent/50',
+                      "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                      "outline-none cursor-default select-none",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      "focus:bg-accent focus:text-accent-foreground",
+                      isSelected && "bg-accent/50"
                     )}
                   >
                     <span
                       className={cn(
-                        'size-3 rounded-full shrink-0',
-                        getColorClass(tag.color as TagColor | undefined),
+                        "size-3 rounded-full shrink-0",
+                        getColorClass(tag.color as TagColor | undefined)
                       )}
                     />
-                    <span className="flex-1 truncate text-left">
-                      {tag.name}
-                    </span>
+                    <span className="flex-1 truncate text-left">{tag.name}</span>
                     {isSelected && (
                       <span className="text-xs text-muted-foreground">✓</span>
                     )}

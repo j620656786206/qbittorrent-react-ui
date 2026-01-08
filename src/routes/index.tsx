@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
+import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts'
+import { KeyboardHelpModal } from '@/components/keyboard-help-modal'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +63,10 @@ function HomePage() {
   )
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
   const [batchError, setBatchError] = React.useState<string | null>(null)
+
+  // --- Keyboard Navigation State ---
+  const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null)
+  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = React.useState(false)
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
@@ -418,6 +424,86 @@ function HomePage() {
     },
   })
 
+  // --- Keyboard Shortcuts Integration ---
+  useKeyboardShortcuts({
+    // Space: Toggle pause/resume on selected torrents
+    onSpace: React.useCallback(() => {
+      if (selectedHashes.size === 0) return
+
+      // Get selected torrents
+      const selectedTorrents = filteredTorrents.filter((t) =>
+        selectedHashes.has(t.hash),
+      )
+
+      // Check if all selected torrents are paused
+      const allPaused = selectedTorrents.every(
+        (t) => t.state === 'pausedUP' || t.state === 'pausedDL',
+      )
+
+      // If all are paused, resume them; otherwise pause them
+      if (allPaused) {
+        batchResumeMutation.mutate(Array.from(selectedHashes))
+      } else {
+        batchPauseMutation.mutate(Array.from(selectedHashes))
+      }
+    }, [selectedHashes, filteredTorrents, batchResumeMutation, batchPauseMutation]),
+
+    // Delete: Open delete confirmation dialog
+    onDelete: React.useCallback(() => {
+      if (selectedHashes.size > 0) {
+        setIsDeleteDialogOpen(true)
+      }
+    }, [selectedHashes]),
+
+    // Ctrl/Cmd+A: Select all visible torrents
+    onSelectAll: React.useCallback(() => {
+      selectAll(filteredTorrents)
+    }, [selectAll, filteredTorrents]),
+
+    // Escape: Clear selection
+    onEscape: React.useCallback(() => {
+      clearSelection()
+    }, [clearSelection]),
+
+    // Arrow Up: Navigate to previous torrent
+    onArrowUp: React.useCallback(() => {
+      if (filteredTorrents.length === 0) return
+
+      setFocusedIndex((prev) => {
+        if (prev === null || prev === 0) {
+          // Wrap to last item
+          return filteredTorrents.length - 1
+        }
+        return prev - 1
+      })
+    }, [filteredTorrents]),
+
+    // Arrow Down: Navigate to next torrent
+    onArrowDown: React.useCallback(() => {
+      if (filteredTorrents.length === 0) return
+
+      setFocusedIndex((prev) => {
+        if (prev === null || prev === filteredTorrents.length - 1) {
+          // Wrap to first item
+          return 0
+        }
+        return prev + 1
+      })
+    }, [filteredTorrents]),
+
+    // Enter: Toggle selection of focused torrent
+    onEnter: React.useCallback(() => {
+      if (focusedIndex !== null && filteredTorrents[focusedIndex]) {
+        toggleSelection(filteredTorrents[focusedIndex].hash)
+      }
+    }, [focusedIndex, filteredTorrents, toggleSelection]),
+
+    // Question mark: Open keyboard help
+    onQuestionMark: React.useCallback(() => {
+      setIsKeyboardHelpOpen(true)
+    }, []),
+  })
+
   // --- Step 5: Render UI based on state ---
   const renderContent = () => {
     if (!areCredentialsSet || isLoginError) {
@@ -476,27 +562,11 @@ function HomePage() {
             )}
           </div>
 
-          {/* Batch Error Alert */}
-          {batchError && (
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3 mb-4 text-red-400">
-              <span className="text-sm">{batchError}</span>
-              <button
-                type="button"
-                onClick={() => setBatchError(null)}
-                className="text-red-400 hover:text-red-300"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
           {/* Batch Actions Toolbar */}
           {selectedHashes.size > 0 && (
             <BatchActionsToolbar
               selectedCount={selectedHashes.size}
-              onPause={() =>
-                batchPauseMutation.mutate(Array.from(selectedHashes))
-              }
+              onPause={() => batchPauseMutation.mutate(Array.from(selectedHashes))}
               onResume={() =>
                 batchResumeMutation.mutate(Array.from(selectedHashes))
               }
@@ -504,138 +574,183 @@ function HomePage() {
                 batchRecheckMutation.mutate(Array.from(selectedHashes))
               }
               onDelete={() => setIsDeleteDialogOpen(true)}
-              onSetCategory={(category: string) =>
+              onSelectCategory={(category) =>
                 batchSetCategoryMutation.mutate({
                   hashes: Array.from(selectedHashes),
                   category,
                 })
               }
-              onClearSelection={clearSelection}
               categories={categoryNames}
+              error={batchError}
+              isPausing={batchPauseMutation.isPending}
+              isResuming={batchResumeMutation.isPending}
+              isRechecking={batchRecheckMutation.isPending}
+              isDeleting={batchDeleteMutation.isPending}
+              isSettingCategory={batchSetCategoryMutation.isPending}
+            />
+          )}
+
+          {/* Torrent Table */}
+          <TorrentTable
+            torrents={filteredTorrents}
+            selectedHashes={selectedHashes}
+            onToggleSelection={toggleSelection}
+            onSelectAll={() => selectAll(filteredTorrents)}
+            onClearSelection={clearSelection}
+            selectedTorrent={selectedTorrent}
+            onSelectTorrent={setSelectedTorrent}
+            filter={filter}
+            focusedIndex={focusedIndex}
+            setFocusedIndex={setFocusedIndex}
+          />
+
+          {/* Torrent Detail Panel */}
+          {selectedTorrent && (
+            <TorrentDetail
+              torrent={selectedTorrent}
+              onClose={() => setSelectedTorrent(null)}
+              onPause={() => pauseMutation.mutate(selectedTorrent.hash)}
+              onResume={() => resumeMutation.mutate(selectedTorrent.hash)}
+              onRecheck={() => recheckMutation.mutate(selectedTorrent.hash)}
+              onDelete={(deleteFiles) =>
+                deleteMutation.mutate({
+                  hash: selectedTorrent.hash,
+                  deleteFiles,
+                })
+              }
+              isPaused={
+                selectedTorrent.state === 'pausedUP' ||
+                selectedTorrent.state === 'pausedDL'
+              }
+              categories={categoryNames}
+              onSelectCategory={(category) => {
+                const hashesToUpdate = selectedHashes.has(selectedTorrent.hash)
+                  ? Array.from(selectedHashes)
+                  : [selectedTorrent.hash]
+                batchSetCategoryMutation.mutate({
+                  hashes: hashesToUpdate,
+                  category,
+                })
+              }}
             />
           )}
 
           {/* Delete Confirmation Dialog */}
-          <AlertDialog
-            open={isDeleteDialogOpen}
-            onOpenChange={setIsDeleteDialogOpen}
-          >
+          <AlertDialog open={isDeleteDialogOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  {t('batch.delete.title', 'Delete torrents?')}
+                  {t('torrent.delete.title', 'Delete Torrents')}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {t(
-                    'batch.delete.description',
-                    'This action cannot be undone.',
+                    'torrent.delete.description',
+                    'Are you sure you want to delete the selected torrents?',
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>
+                <AlertDialogCancel
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                >
                   {t('common.cancel', 'Cancel')}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
-                    const deleteFiles = window.confirm(
-                      t('batch.delete.withFiles', 'Delete files as well?'),
-                    )
                     batchDeleteMutation.mutate({
                       hashes: Array.from(selectedHashes),
-                      deleteFiles,
+                      deleteFiles: false,
+                    })
+                  }}
+                >
+                  {t('torrent.delete.keepFiles', 'Delete (Keep Files)')}
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => {
+                    batchDeleteMutation.mutate({
+                      hashes: Array.from(selectedHashes),
+                      deleteFiles: true,
                     })
                   }}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {t('common.delete', 'Delete')}
+                  {t('torrent.delete.deleteFiles', 'Delete (Remove Files)')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Torrents Table */}
-          {filteredTorrents.length > 0 ? (
-            <TorrentTable
-              torrents={filteredTorrents}
-              selectedHashes={selectedHashes}
-              onTorrentClick={(torrent) => setSelectedTorrent(torrent)}
-              toggleSelection={toggleSelection}
-              selectAll={() => selectAll(filteredTorrents)}
-              clearSelection={clearSelection}
-            />
-          ) : (
-            <p>{t('torrent.noTorrentsFound')}</p>
-          )}
+          {/* Keyboard Help Modal */}
+          <KeyboardHelpModal
+            isOpen={isKeyboardHelpOpen}
+            onClose={() => setIsKeyboardHelpOpen(false)}
+          />
         </>
       )
     }
 
-    return <p>Loading application...</p> // Fallback if no specific state matches
+    return null
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-full">
-      {' '}
-      {/* Responsive flex container */}
-      {!isDesktop && ( // Mobile menu button
-        <div className="p-4 bg-slate-800 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">qB-React</h1>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      {isDesktop && (
+        <Sidebar
+          filter={filter}
+          onFilterChange={setFilter}
+          categoryNames={categoryNames}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      {!isDesktop && isMobileSidebarOpen && (
+        <Sidebar
+          filter={filter}
+          onFilterChange={setFilter}
+          categoryNames={categoryNames}
+        />
+      )}
+
+      {/* Main Content */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Header */}
+        <div className="border-b bg-card p-4 md:hidden flex items-center justify-between">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsMobileSidebarOpen(true)}
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-xl font-semibold text-foreground">qBittorrent</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSettingsModalOpen(true)}
+          >
+            {/* Settings Icon */}
           </Button>
         </div>
-      )}
-      <Sidebar
-        currentFilter={filter}
-        setFilter={setFilter}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onAddTorrent={() => setIsAddTorrentOpen(true)}
-        isMobile={!isDesktop}
-        isMobileSidebarOpen={isMobileSidebarOpen}
-        onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-        torrents={allTorrents}
-        categories={categoriesData || {}}
-      />
-      <div className="flex-1 p-6 overflow-auto">{renderContent()}</div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-4 md:p-6">
+          {renderContent()}
+        </div>
+      </div>
+
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         onSave={handleSettingsSave}
+        onLoginSuccess={handleLoginSuccess}
       />
+
+      {/* Add Torrent Modal */}
       <AddTorrentModal
         isOpen={isAddTorrentOpen}
         onClose={() => setIsAddTorrentOpen(false)}
-      />
-      <TorrentDetail
-        torrent={selectedTorrent}
-        isOpen={!!selectedTorrent}
-        onClose={() => setSelectedTorrent(null)}
-        onPause={() =>
-          selectedTorrent && pauseMutation.mutate(selectedTorrent.hash)
-        }
-        onResume={() =>
-          selectedTorrent && resumeMutation.mutate(selectedTorrent.hash)
-        }
-        onRecheck={() =>
-          selectedTorrent && recheckMutation.mutate(selectedTorrent.hash)
-        }
-        onDelete={() => {
-          if (selectedTorrent) {
-            if (window.confirm(t('torrent.actions.confirmDelete'))) {
-              const deleteFiles = window.confirm(
-                t('torrent.actions.deleteWithFiles'),
-              )
-              deleteMutation.mutate({ hash: selectedTorrent.hash, deleteFiles })
-            }
-          }
-        }}
       />
     </div>
   )

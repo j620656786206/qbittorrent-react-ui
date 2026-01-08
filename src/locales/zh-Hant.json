@@ -264,5 +264,22 @@
       "button": "重新宣告",
       "tooltip": "強制向所有 Tracker 重新宣告"
     }
+  },
+  "keyboard": {
+    "help": {
+      "title": "鍵盤快速鍵",
+      "description": "使用這些鍵盤快速鍵快速管理您的 Torrent",
+      "keyColumn": "按鍵",
+      "actionColumn": "動作"
+    },
+    "shortcuts": {
+      "selectAll": "全選所有可見的 Torrent",
+      "pauseResume": "暫停或繼續選中的 Torrent",
+      "delete": "刪除選中的 Torrent",
+      "navigate": "在 Torrent 之間導航",
+      "toggleSelect": "選擇或取消選擇焦點 Torrent",
+      "clearSelection": "清除選擇",
+      "help": "顯示鍵盤快速鍵說明"
+    }
   }
 }
