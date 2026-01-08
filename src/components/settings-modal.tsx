@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LOCALES, Locales, defaultLocale } from '@/locales'
-import { ChevronDownIcon } from 'lucide-react'
+import { ChevronDownIcon, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 
@@ -32,6 +32,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
   const { t } = useTranslation()
   const [username, setUsername] = React.useState('')
   const [password, setPassword] = React.useState('')
+  const [showPassword, setShowPassword] = React.useState(false)
   const [language, setLanguage] = React.useState<Locales>(defaultLocale)
 
   React.useEffect(() => {
@@ -76,13 +77,29 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
             <Label htmlFor="password" className="text-right">
               {t('settings.password')}
             </Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="col-span-3"
-            />
+            <div className="col-span-3 relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="language" className="text-right">
