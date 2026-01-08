@@ -28,6 +28,8 @@ import { LoginForm } from '@/components/login-form'
 import { useMediaQuery } from '@/lib/hooks' // Import the new hook
 import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts'
 import { KeyboardHelpModal } from '@/components/keyboard-help-modal'
+import { useDragAndDrop } from '@/lib/use-drag-drop'
+import { DropZoneOverlay } from '@/components/drop-zone-overlay'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +69,32 @@ function HomePage() {
   // --- Keyboard Navigation State ---
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null)
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = React.useState(false)
+
+  // --- Drag and Drop State ---
+  const [droppedFiles, setDroppedFiles] = React.useState<File[]>([])
+
+  // Handle drag-and-drop file uploads
+  const { isDragging } = useDragAndDrop({
+    onDrop: (files) => {
+      // Add dropped files to the queue
+      setDroppedFiles((prev) => [...prev, ...files])
+    },
+  })
+
+  // Auto-open AddTorrentModal when files are dropped
+  React.useEffect(() => {
+    if (droppedFiles.length > 0 && !isAddTorrentOpen) {
+      setIsAddTorrentOpen(true)
+    }
+  }, [droppedFiles, isAddTorrentOpen])
+
+  // Handle AddTorrentModal close - process next file in queue
+  const handleAddTorrentClose = React.useCallback(() => {
+    setIsAddTorrentOpen(false)
+
+    // Remove the first file from the queue (the one we just processed)
+    setDroppedFiles((prev) => prev.slice(1))
+  }, [])
 
   // Selection helper functions
   const toggleSelection = React.useCallback((hash: string) => {
@@ -746,8 +774,12 @@ function HomePage() {
       {/* Add Torrent Modal */}
       <AddTorrentModal
         isOpen={isAddTorrentOpen}
-        onClose={() => setIsAddTorrentOpen(false)}
+        onClose={handleAddTorrentClose}
+        initialFile={droppedFiles[0]} // Pass the first file from the queue
       />
+
+      {/* Drop Zone Overlay */}
+      <DropZoneOverlay visible={isDragging} />
     </div>
   )
 }

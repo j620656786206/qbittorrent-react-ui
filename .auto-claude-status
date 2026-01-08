@@ -3,14 +3,14 @@
   "spec": "033-drag-and-drop-torrent-upload",
   "state": "building",
   "subtasks": {
-    "completed": 1,
+    "completed": 4,
     "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Drop Zone Overlay Component",
-    "id": 2,
+    "current": "Integrate Drag-Drop into Layout",
+    "id": 4,
     "total": 2
   },
   "workers": {
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 3,
+    "number": 6,
     "started_at": "2026-01-09T01:19:14.026899"
   },
-  "last_update": "2026-01-09T01:32:32.688208"
+  "last_update": "2026-01-09T01:55:03.910296"
 }
