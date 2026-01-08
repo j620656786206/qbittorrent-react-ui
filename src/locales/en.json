@@ -281,5 +281,9 @@
       "clearSelection": "Clear selection",
       "help": "Show keyboard shortcuts help"
     }
+  },
+  "loading": {
+    "torrents": "Loading torrent data...",
+    "loggingIn": "Logging in..."
   }
 }

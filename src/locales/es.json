@@ -264,5 +264,9 @@
       "button": "Reanunciar",
       "tooltip": "Forzar anuncio a todos los rastreadores"
     }
+  },
+  "loading": {
+    "torrents": "Cargando datos de torrents...",
+    "loggingIn": "Iniciando sesión..."
   }
 }

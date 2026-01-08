@@ -264,5 +264,9 @@
       "button": "Neu ankündigen",
       "tooltip": "Ankündigung an alle Tracker erzwingen"
     }
+  },
+  "loading": {
+    "torrents": "Lade Torrent-Daten...",
+    "loggingIn": "Anmeldung läuft..."
   }
 }

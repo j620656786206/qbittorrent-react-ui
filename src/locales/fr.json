@@ -264,5 +264,9 @@
       "button": "Réannoncer",
       "tooltip": "Forcer l'annonce à tous les trackers"
     }
+  },
+  "loading": {
+    "torrents": "Chargement des données des torrents...",
+    "loggingIn": "Connexion en cours..."
   }
 }

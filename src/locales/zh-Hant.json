@@ -281,5 +281,9 @@
       "clearSelection": "清除選擇",
       "help": "顯示鍵盤快速鍵說明"
     }
+  },
+  "loading": {
+    "torrents": "載入 Torrent 資料中...",
+    "loggingIn": "登入中..."
   }
 }

@@ -264,5 +264,9 @@
       "button": "重新宣告",
       "tooltip": "强制向所有 Tracker 重新宣告"
     }
+  },
+  "loading": {
+    "torrents": "加载 Torrent 数据中...",
+    "loggingIn": "登录中..."
   }
 }
