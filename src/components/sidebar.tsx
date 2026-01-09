@@ -1,5 +1,6 @@
 import React from 'react'
 import {
+  FileText,
   Folder,
   Hash,
   Plus,
@@ -42,6 +43,7 @@ type SidebarProps = {
   setFilter: (filter: Filter) => void
   onOpenSettings: () => void
   onAddTorrent: () => void
+  onOpenLogs: () => void
   isMobile: boolean
   isMobileSidebarOpen: boolean
   onCloseMobileSidebar: () => void
@@ -56,6 +58,7 @@ export function Sidebar({
   setFilter,
   onOpenSettings,
   onAddTorrent,
+  onOpenLogs,
   isMobile,
   isMobileSidebarOpen,
   onCloseMobileSidebar,
@@ -303,6 +306,17 @@ export function Sidebar({
         >
           <Plus className="mr-2 h-4 w-4" />
           {t('addTorrent.title')}
+        </Button>
+        <Button
+          variant="ghost"
+          className="justify-start w-full text-sm"
+          onClick={() => {
+            onOpenLogs()
+            if (isMobile) onCloseMobileSidebar()
+          }}
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          {t('logViewer.viewLogs')}
         </Button>
         <Button
           variant="ghost"

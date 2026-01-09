@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "033-drag-and-drop-torrent-upload",
+  "spec": "036-log-viewer",
   "state": "building",
   "subtasks": {
-    "completed": 9,
-    "total": 11,
+    "completed": 7,
+    "total": 8,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Testing and Polish",
-    "id": 7,
-    "total": 3
+    "current": "Testing and Verification",
+    "id": null,
+    "total": 2
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 421,
-    "started_at": "2026-01-09T01:19:14.026899"
+    "number": 8,
+    "started_at": "2026-01-09T11:40:48.660863"
   },
-  "last_update": "2026-01-09T06:18:35.656722"
+  "last_update": "2026-01-09T12:04:52.668979"
 }

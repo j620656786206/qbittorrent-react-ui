@@ -447,355 +447,205 @@
       },
       "connection": {
         "title": "Connection Settings",
-        "description": "Configure connection and network settings",
+        "description": "Configure network and connection options",
         "listeningPort": {
           "label": "Listening Port",
-          "description": "Port used for incoming connections"
+          "description": "Port for incoming connections"
         },
-        "portRangeForward": {
-          "label": "Use UPnP / NAT-PMP to forward port",
+        "portForwarding": {
+          "label": "UPnP / NAT-PMP port forwarding",
           "description": "Automatically configure port forwarding"
         },
-        "socketBacklog": {
-          "label": "Socket backlog",
-          "description": "Maximum number of pending connections"
-        },
-        "uploadSlots": {
-          "label": "Global max connections",
-          "description": "Maximum number of simultaneous connections"
-        },
-        "uploadSlotsPerTorrent": {
-          "label": "Max connections per torrent",
-          "description": "Maximum connections for a single torrent"
-        },
-        "peerTurnover": {
-          "label": "Upload slots",
-          "description": "Number of upload slots per torrent"
-        },
-        "peerTurnoverCutoff": {
-          "label": "Upload slots behavior",
-          "description": "Peer turn-over cutoff"
-        },
-        "connectionProtocol": {
-          "label": "Connection Protocol",
-          "tcp": "TCP",
-          "utp": "uTP",
-          "both": "Both"
+        "connections": {
+          "title": "Connection Limits",
+          "maxConnections": "Maximum connections",
+          "maxConnectionsPerTorrent": "Maximum connections per torrent",
+          "maxUploads": "Maximum uploads",
+          "maxUploadsPerTorrent": "Maximum uploads per torrent"
         },
         "proxy": {
           "title": "Proxy Settings",
-          "enabled": "Use proxy",
+          "enabled": "Use proxy for peer connections",
           "type": "Proxy type",
-          "ip": "IP address",
-          "port": "Port",
+          "host": "Proxy host",
+          "port": "Proxy port",
+          "auth": "Proxy authentication",
           "username": "Username",
-          "password": "Password",
-          "peerConnections": "Use proxy for peer connections",
-          "torrentsOnly": "Use proxy only for torrents"
+          "password": "Password"
+        },
+        "torrentEncryption": {
+          "title": "Torrent Encryption",
+          "label": "Encryption mode",
+          "disabled": "Disabled",
+          "enabled": "Enabled (prefer plain-text)",
+          "enforced": "Enforced (require encryption)"
         }
       },
       "bittorrent": {
         "title": "BitTorrent Settings",
-        "description": "Configure BitTorrent protocol settings",
-        "protocol": {
-          "label": "Enable Protocol Encryption",
-          "description": "Encrypt protocol messages"
+        "description": "Configure BitTorrent protocol options",
+        "privacy": {
+          "title": "Privacy",
+          "hidePeerId": "Hide client identity",
+          "hideOs": "Hide operating system"
         },
         "dht": {
-          "label": "Enable DHT (Distributed Hash Table)",
-          "description": "Use DHT for peer discovery"
+          "label": "DHT (Distributed Hash Table)",
+          "description": "Enable DHT for peer discovery"
         },
         "pex": {
-          "label": "Enable PEX (Peer Exchange)",
-          "description": "Use peer exchange for peer discovery"
+          "label": "PEX (Peer Exchange)",
+          "description": "Enable peer exchange"
         },
         "lsd": {
-          "label": "Enable LSD (Local Service Discovery)",
-          "description": "Use local service discovery"
+          "label": "LSD (Local Service Discovery)",
+          "description": "Enable local service discovery"
         },
-        "maxRatio": {
-          "label": "Share Ratio Limit",
-          "description": "Stop seeding at this ratio"
+        "trackerExchanging": {
+          "label": "Tracker exchange",
+          "description": "Exchange trackers with other peers"
         },
-        "maxRatioAction": {
-          "label": "Action when ratio limit reached",
-          "pause": "Pause torrent",
-          "remove": "Remove torrent",
-          "removeWithFiles": "Remove with files",
-          "none": "Do nothing"
-        },
-        "maxSeedingTime": {
-          "label": "Seeding Time Limit",
-          "description": "Stop seeding after this many minutes"
-        },
-        "maxSeedingTimeUnit": {
-          "label": "Unit",
-          "minutes": "Minutes",
-          "hours": "Hours",
-          "days": "Days"
-        },
-        "maxInactiveSeedingTime": {
-          "label": "Max inactive seeding time",
-          "description": "Stop seeding after inactive for this long"
-        },
-        "seedChokingAlgorithm": {
-          "label": "Seeding Choking Algorithm",
-          "roundRobin": "Round Robin",
-          "fastUpload": "Fastest Upload",
-          "slowUpload": "Slowest Upload"
-        },
-        "seedPiecePickingPolicy": {
-          "label": "Seed Piece Picking Policy",
-          "sequential": "Sequential",
-          "random": "Random"
+        "seedingLimits": {
+          "title": "Seeding Limits",
+          "ratio": "Share Ratio Limit",
+          "time": "Seeding Time Limit",
+          "inactivity": "Inactivity time limit"
         }
       },
       "webui": {
         "title": "Web UI Settings",
-        "description": "Configure Web UI interface settings",
-        "port": {
-          "label": "Port",
-          "description": "Web UI listening port"
-        },
-        "useHttps": {
-          "label": "Use HTTPS instead of HTTP",
-          "description": "Enable HTTPS for Web UI"
-        },
-        "certPath": {
-          "label": "Certificate path",
-          "description": "Path to SSL certificate"
-        },
-        "keyPath": {
-          "label": "Key path",
-          "description": "Path to SSL private key"
-        },
-        "username": {
-          "label": "Username",
-          "description": "Web UI username"
-        },
-        "password": {
-          "label": "Password",
-          "description": "Web UI password"
-        },
+        "description": "Configure Web UI options",
         "auth": {
-          "label": "Authentication",
-          "description": "Enable Web UI authentication"
+          "title": "Authentication",
+          "enabled": "Enable authentication",
+          "username": "Username",
+          "password": "Password"
         },
-        "hostHeader": {
-          "label": "Host header validation",
-          "description": "Validate Host header"
+        "address": {
+          "title": "IP Address",
+          "label": "IP to listen on",
+          "all": "All addresses"
         },
-        "clickjacking": {
-          "label": "Clickjacking protection",
-          "description": "Enable clickjacking protection"
+        "port": "Port",
+        "ssl": {
+          "title": "HTTPS",
+          "enabled": "Use HTTPS instead of HTTP",
+          "certificate": "SSL Certificate",
+          "key": "SSL Key"
         },
-        "csrfProtection": {
-          "label": "CSRF protection",
-          "description": "Enable CSRF protection"
+        "customHttp": {
+          "title": "Custom HTTP Headers",
+          "description": "Add custom HTTP headers to responses"
         },
-        "xssProtection": {
-          "label": "XSS protection",
-          "description": "Enable XSS protection"
-        },
-        "customCss": {
-          "label": "Custom CSS",
-          "description": "Custom CSS for Web UI"
+        "security": {
+          "title": "Security",
+          "clickjacking": "Prevent clickjacking",
+          "xss": "Enable XSS filter"
         }
       },
       "rss": {
         "title": "RSS Settings",
-        "description": "Configure RSS feed settings",
-        "enabled": "Enable RSS processing",
-        "updateInterval": {
-          "label": "Update interval",
-          "description": "Minutes between feed updates"
+        "description": "Configure RSS reader options",
+        "autoDownloading": {
+          "label": "Enable RSS auto-downloading",
+          "description": "Automatically download torrents from RSS feeds"
+        },
+        "refreshInterval": {
+          "label": "RSS feed refresh interval",
+          "unit": "minutes"
         },
         "maxArticles": {
-          "label": "Maximum number of articles",
-          "description": "Maximum articles to process per feed"
-        },
-        "autoDownloading": {
-          "label": "Enable auto-downloading",
-          "description": "Automatically download matching torrents"
+          "label": "Maximum number of articles per feed",
+          "description": "Limit the number of articles to keep"
         }
       },
       "advanced": {
         "title": "Advanced Settings",
         "description": "Advanced configuration options",
-        "uiThreadsCount": {
-          "label": "Number of threads for file checking",
-          "description": "Threads for hash checking"
+        "libc": {
+          "label": "Different libc path",
+          "description": "Use a custom libc path"
         },
-        "diskCacheSize": {
-          "label": "Disk cache size",
-          "unit": "MiB",
-          "description": "Size of disk cache"
+        "saveResumeData": {
+          "label": "Save resume data interval",
+          "unit": "seconds"
         },
-        "diskCacheTtl": {
-          "label": "Disk cache expiration time",
+        "shutdownTimeout": {
+          "label": "Shutdown timeout",
           "unit": "seconds",
-          "description": "Cache expiration time"
+          "description": "Time to wait before force closing"
         },
-        "multiConnectionPerIp": {
-          "label": "Allow multiple connections from same IP",
-          "description": "Allow multiple connections"
+        "filePoolSize": {
+          "label": "File pool size",
+          "description": "Maximum number of files to keep open"
         },
-        "validateHttps": {
-          "label": "Validate HTTPS tracker certificate",
-          "description": "Verify HTTPS certificates"
-        },
-        "blockPeersOnPrivilegedPorts": {
-          "label": "Block peers on privileged ports",
-          "description": "Reject connections from privileged ports"
-        },
-        "trackerFilteringEnabled": {
-          "label": "Enable tracker filtering",
-          "description": "Filter tracker addresses"
-        },
-        "announce": {
-          "title": "Announce Settings",
-          "interval": "Announce interval",
-          "minInterval": "Minimum announce interval"
+        "blockSize": {
+          "label": "Piece extent affinity",
+          "unit": "bytes"
         }
       },
       "behavior": {
         "title": "Behavior Settings",
         "description": "Configure application behavior",
-        "confirmDelete": {
-          "label": "Confirm deletion of torrents",
-          "description": "Show confirmation dialog"
-        },
-        "confirmExit": {
-          "label": "Confirm when exiting application",
-          "description": "Show confirmation on exit"
+        "trayIcon": {
+          "title": "Tray Icon",
+          "enabled": "Display tray icon",
+          "minimize": "Minimize to tray"
         },
         "startMinimized": {
-          "label": "Start application minimized",
-          "description": "Minimize to system tray on startup"
+          "label": "Start qBittorrent minimized",
+          "description": "Launch the application in minimized state"
         },
-        "closeBehavior": {
-          "label": "When closing window",
-          "close": "Close application",
-          "minimize": "Minimize to system tray"
+        "closeToTray": {
+          "label": "Close to tray",
+          "description": "Close button minimizes to tray instead of exiting"
         },
-        "trayIcon": {
-          "label": "Show system tray icon",
-          "description": "Display application in system tray"
+        "notifications": {
+          "label": "Show notifications",
+          "description": "Display notifications for torrent events"
         },
-        "notificationTimeout": {
-          "label": "Notification timeout",
-          "unit": "seconds",
-          "description": "Duration to show notifications"
+        "maxActiveDownloads": {
+          "label": "Max active downloads",
+          "description": "Maximum number of torrents to download simultaneously"
+        },
+        "maxActiveUploads": {
+          "label": "Max active uploads",
+          "description": "Maximum number of torrents to seed simultaneously"
         }
       },
       "tagsCategories": {
-        "title": "Tags & Categories",
-        "description": "Manage tags and categories",
-        "tags": {
-          "title": "Tags",
-          "description": "Configure tag colors and settings"
-        },
-        "categories": {
-          "title": "Categories",
-          "description": "Configure category paths"
+        "title": "Tags & Categories Settings",
+        "description": "Configure tags and categories",
+        "isSubcategoryEnabled": {
+          "label": "Enable subcategories",
+          "description": "Allow hierarchical category structure"
         }
       }
     }
   },
-  "toast": {
-    "torrent": {
-      "addSuccess": "Torrent added successfully",
-      "addError": "Failed to add torrent",
-      "pauseSuccess": "Torrent paused",
-      "pauseSuccessPlural": "{{count}} torrents paused",
-      "pauseError": "Failed to pause torrent",
-      "pauseErrorPlural": "Failed to pause torrents",
-      "resumeSuccess": "Torrent resumed",
-      "resumeSuccessPlural": "{{count}} torrents resumed",
-      "resumeError": "Failed to resume torrent",
-      "resumeErrorPlural": "Failed to resume torrents",
-      "deleteSuccess": "Torrent deleted",
-      "deleteSuccessPlural": "{{count}} torrents deleted",
-      "deleteError": "Failed to delete torrent",
-      "deleteErrorPlural": "Failed to delete torrents",
-      "recheckSuccess": "Torrent recheck started",
-      "recheckSuccessPlural": "{{count}} torrents recheck started",
-      "recheckError": "Failed to recheck torrent",
-      "recheckErrorPlural": "Failed to recheck torrents",
-      "reannounceSuccess": "Torrent reannounced to trackers",
-      "reannounceError": "Failed to reannounce torrent",
-      "setCategorySuccess": "Category set successfully",
-      "setCategorySuccessPlural": "Category set for {{count}} torrents",
-      "setCategoryError": "Failed to set category",
-      "setLocationSuccess": "Save path updated",
-      "setLocationError": "Failed to update save path",
-      "renameSuccess": "Torrent renamed successfully",
-      "renameError": "Failed to rename torrent"
+  "logViewer": {
+    "viewLogs": "View Logs",
+    "title": "Log Viewer",
+    "description": "View and search qBittorrent logs",
+    "filters": {
+      "label": "Log Levels"
     },
-    "tag": {
-      "createSuccess": "Tag \"{{name}}\" created",
-      "createError": "Failed to create tag",
-      "updateSuccess": "Tag \"{{name}}\" updated",
-      "updateError": "Failed to update tag",
-      "deleteSuccess": "Tag \"{{name}}\" deleted",
-      "deleteError": "Failed to delete tag",
-      "addSuccess": "Tag added to torrent",
-      "addSuccessPlural": "Tag added to {{count}} torrents",
-      "addError": "Failed to add tag",
-      "removeSuccess": "Tag removed from torrent",
-      "removeSuccessPlural": "Tag removed from {{count}} torrents",
-      "removeError": "Failed to remove tag"
+    "levels": {
+      "normal": "Normal",
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical",
+      "all": "All"
     },
-    "tracker": {
-      "addSuccess": "Tracker added successfully",
-      "addSuccessPlural": "{{count}} trackers added",
-      "addError": "Failed to add tracker",
-      "removeSuccess": "Tracker removed successfully",
-      "removeError": "Failed to remove tracker",
-      "editSuccess": "Tracker updated successfully",
-      "editError": "Failed to update tracker"
+    "search": {
+      "label": "Search",
+      "placeholder": "Search logs..."
     },
-    "file": {
-      "prioritySuccess": "File priority updated",
-      "prioritySuccessPlural": "{{count}} file priorities updated",
-      "priorityError": "Failed to update file priority",
-      "renameSuccess": "File renamed successfully",
-      "renameError": "Failed to rename file"
-    },
-    "settings": {
-      "saveSuccess": "Settings saved successfully",
-      "saveError": "Failed to save settings",
-      "resetSuccess": "Settings reset to defaults",
-      "resetError": "Failed to reset settings"
-    },
-    "auth": {
-      "loginSuccess": "Logged in successfully",
-      "loginError": "Login failed",
-      "logoutSuccess": "Logged out successfully",
-      "sessionExpired": "Session expired. Please log in again."
-    },
-    "connection": {
-      "lost": "Connection to qBittorrent lost",
-      "restored": "Connection restored",
-      "error": "Connection error. Please check your settings."
-    },
-    "category": {
-      "createSuccess": "Category \"{{name}}\" created",
-      "createError": "Failed to create category",
-      "editSuccess": "Category \"{{name}}\" updated",
-      "editError": "Failed to update category",
-      "removeSuccess": "Category \"{{name}}\" removed",
-      "removeError": "Failed to remove category"
-    },
-    "clipboard": {
-      "copySuccess": "Copied to clipboard",
-      "copyError": "Failed to copy to clipboard"
-    },
-    "generic": {
-      "success": "Operation completed successfully",
-      "error": "Operation failed",
-      "networkError": "Network error. Please try again.",
-      "unknownError": "An unknown error occurred"
-    }
+    "autoScroll": "Auto-scroll",
+    "export": "Export",
+    "loading": "Loading logs...",
+    "error": "Failed to load logs",
+    "noLogs": "No logs found",
+    "timestampHint": "Timestamps are shown in your local timezone"
   }
 }

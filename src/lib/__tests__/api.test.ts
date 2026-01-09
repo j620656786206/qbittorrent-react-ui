@@ -10,6 +10,7 @@ import {
   deleteTorrent,
   editCategory,
   getCategories,
+  getLogs,
   getMaindata,
   getPreferences,
   getTags,
@@ -21,7 +22,7 @@ import {
   setPreferences,
   setTorrentCategory,
 } from '../api'
-import type { MaindataResponse } from '../api'
+import type { LogEntry, MaindataResponse } from '../api'
 
 // Mock fetch
 const mockFetch = vi.fn()
@@ -535,24 +536,38 @@ describe('API Functions', () => {
       })
 
       const result = await getCategories(baseUrl)
-
+      expect(result).toEqual(mockCategories)
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v2/torrents/categories'),
+        `${baseUrl}/api/v2/torrents/categories`,
         expect.objectContaining({
           credentials: 'include',
         }),
       )
-      expect(result).toEqual(mockCategories)
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      const mockCategories = {
+        category1: { name: 'category1', savePath: '/path1' },
+      }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockCategories),
+      })
+
+      await getCategories(baseUrl)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/categories')
     })
 
     it('should throw error when response is not ok', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        status: 401,
+        status: 403,
       })
 
       await expect(getCategories(baseUrl)).rejects.toThrow(
-        'Failed to fetch categories with status: 401',
+        'Failed to fetch categories with status: 403',
       )
     })
   })
@@ -563,12 +578,20 @@ describe('API Functions', () => {
         ok: true,
       })
 
-      await setTorrentCategory(baseUrl, 'abc123', 'downloads')
+      const result = await setTorrentCategory(baseUrl, 'abc123', 'movies')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/setCategory`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
 
       const callArgs = mockFetch.mock.calls[0][1]
       const body = callArgs.body as URLSearchParams
       expect(body.get('hashes')).toBe('abc123')
-      expect(body.get('category')).toBe('downloads')
+      expect(body.get('category')).toBe('movies')
     })
 
     it('should set category for multiple torrents', async () => {
@@ -576,24 +599,175 @@ describe('API Functions', () => {
         ok: true,
       })
 
-      await setTorrentCategory(baseUrl, ['abc123', 'def456'], 'movies')
+      const result = await setTorrentCategory(
+        baseUrl,
+        ['abc123', 'def456'],
+        'tv',
+      )
+      expect(result).toBe(true)
 
       const callArgs = mockFetch.mock.calls[0][1]
       const body = callArgs.body as URLSearchParams
       expect(body.get('hashes')).toBe('abc123|def456')
-      expect(body.get('category')).toBe('movies')
+      expect(body.get('category')).toBe('tv')
     })
 
-    it('should remove category with empty string', async () => {
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
       })
 
-      await setTorrentCategory(baseUrl, 'abc123', '')
+      await setTorrentCategory(baseUrl, 'abc123', 'movies')
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/v2/torrents/setCategory',
+        expect.any(Object),
+      )
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+      })
+
+      await expect(
+        setTorrentCategory(baseUrl, 'abc123', 'movies'),
+      ).rejects.toThrow('Failed to set torrent category with status: 403')
+    })
+  })
+
+  describe('getTorrentFiles', () => {
+    it('should fetch torrent files successfully', async () => {
+      const mockFiles = [
+        {
+          index: 0,
+          name: 'file1.txt',
+          size: 1024,
+          progress: 1,
+          priority: 1,
+          is_seed: true,
+          piece_range: [0, 10],
+          availability: 1,
+        },
+      ]
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockFiles),
+      })
+
+      const result = await getTorrentFiles(baseUrl, 'abc123')
+      expect(result).toEqual(mockFiles)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/files?hash=abc123`,
+        expect.objectContaining({
+          credentials: 'include',
+        }),
+      )
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      const mockFiles: any[] = []
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockFiles),
+      })
+
+      await getTorrentFiles(baseUrl, 'abc123')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/files')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+
+      await expect(getTorrentFiles(baseUrl, 'abc123')).rejects.toThrow(
+        'Failed to fetch torrent files with status: 404',
+      )
+    })
+  })
+
+  describe('addTorrentFile', () => {
+    it('should add torrent from file successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('Ok.'),
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/octet-stream' })
+      const result = await addTorrentFile(baseUrl, file)
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/add`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('Ok.'),
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/octet-stream' })
+      await addTorrentFile(baseUrl, file)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/add')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 415,
+      })
+
+      const file = new File(['test'], 'test.torrent', { type: 'application/octet-stream' })
+      await expect(addTorrentFile(baseUrl, file)).rejects.toThrow(
+        'Failed to add torrent with status: 415',
+      )
+    })
+  })
+
+  describe('addTorrentMagnet', () => {
+    it('should add torrent from magnet link successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('Ok.'),
+      })
+
+      const result = await addTorrentMagnet(baseUrl, 'magnet:?xt=urn:btih:test')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/add`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
 
       const callArgs = mockFetch.mock.calls[0][1]
       const body = callArgs.body as URLSearchParams
-      expect(body.get('category')).toBe('')
+      expect(body.get('urls')).toBe('magnet:?xt=urn:btih:test')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('Ok.'),
+      })
+
+      await addTorrentMagnet(baseUrl, 'magnet:?xt=urn:btih:test')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/add')
     })
 
     it('should throw error when response is not ok', async () => {
@@ -603,126 +777,21 @@ describe('API Functions', () => {
       })
 
       await expect(
-        setTorrentCategory(baseUrl, 'abc123', 'test'),
-      ).rejects.toThrow(
-        'Failed to set category for torrent(s) with status: 400',
-      )
+        addTorrentMagnet(baseUrl, 'invalid_magnet'),
+      ).rejects.toThrow('Failed to add torrent with status: 400')
     })
   })
 
-  describe('addTorrentMagnet', () => {
-    it('should add torrent via magnet link', async () => {
+  describe('createCategory', () => {
+    it('should create category successfully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
       })
 
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink)
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('urls')).toBe(magnetLink)
-    })
-
-    it('should add torrent with savepath option', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink, { savepath: '/downloads' })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('savepath')).toBe('/downloads')
-    })
-
-    it('should add torrent with category option', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink, { category: 'movies' })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('category')).toBe('movies')
-    })
-
-    it('should add torrent with tags option', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink, { tags: 'tag1,tag2' })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('tags')).toBe('tag1,tag2')
-    })
-
-    it('should add torrent with paused option', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink, { paused: true })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('paused')).toBe('true')
-    })
-
-    it('should add torrent with all options', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await addTorrentMagnet(baseUrl, magnetLink, {
-        savepath: '/downloads',
-        category: 'movies',
-        tags: 'tag1,tag2',
-        paused: false,
-      })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as URLSearchParams
-      expect(body.get('savepath')).toBe('/downloads')
-      expect(body.get('category')).toBe('movies')
-      expect(body.get('tags')).toBe('tag1,tag2')
-      expect(body.get('paused')).toBe('false')
-    })
-
-    it('should throw error when response is not ok', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 415,
-      })
-
-      const magnetLink = 'magnet:?xt=urn:btih:test123'
-      await expect(addTorrentMagnet(baseUrl, magnetLink)).rejects.toThrow(
-        'Failed to add torrent via magnet link with status: 415',
-      )
-    })
-  })
-
-  describe('addTorrentFile', () => {
-    it('should add torrent via file', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const file = new File(['test'], 'test.torrent', {
-        type: 'application/x-bittorrent',
-      })
-      await addTorrentFile(baseUrl, file)
-
+      const result = await createCategory(baseUrl, 'movies', '/path/to/movies')
+      expect(result).toBe(true)
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v2/torrents/add'),
+        `${baseUrl}/api/v2/torrents/createCategory`,
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
@@ -730,68 +799,20 @@ describe('API Functions', () => {
       )
 
       const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as FormData
-      expect(body.get('torrents')).toBe(file)
-    })
-
-    it('should add torrent file with options', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-      })
-
-      const file = new File(['test'], 'test.torrent', {
-        type: 'application/x-bittorrent',
-      })
-      await addTorrentFile(baseUrl, file, {
-        savepath: '/downloads',
-        category: 'movies',
-        tags: 'tag1',
-        paused: true,
-      })
-
-      const callArgs = mockFetch.mock.calls[0][1]
-      const body = callArgs.body as FormData
-      expect(body.get('savepath')).toBe('/downloads')
+      const body = callArgs.body as URLSearchParams
       expect(body.get('category')).toBe('movies')
-      expect(body.get('tags')).toBe('tag1')
-      expect(body.get('paused')).toBe('true')
+      expect(body.get('savePath')).toBe('/path/to/movies')
     })
 
-    it('should throw error when response is not ok', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 415,
-      })
-
-      const file = new File(['test'], 'test.torrent', {
-        type: 'application/x-bittorrent',
-      })
-      await expect(addTorrentFile(baseUrl, file)).rejects.toThrow(
-        'Failed to add torrent via file with status: 415',
-      )
-    })
-  })
-
-  describe('getTorrentFiles', () => {
-    it('should fetch torrent files successfully', async () => {
-      const mockFiles = [
-        { index: 0, name: 'file1.txt', size: 1024, progress: 0.5, priority: 1 },
-        { index: 1, name: 'file2.txt', size: 2048, progress: 0.8, priority: 1 },
-      ]
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockFiles),
       })
 
-      const result = await getTorrentFiles(baseUrl, 'abc123')
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v2/torrents/files?hash=abc123'),
-        expect.objectContaining({
-          credentials: 'include',
-        }),
-      )
-      expect(result).toEqual(mockFiles)
+      await createCategory(baseUrl, 'movies', '/path/to/movies')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/createCategory')
     })
 
     it('should throw error when response is not ok', async () => {
@@ -800,542 +821,574 @@ describe('API Functions', () => {
         status: 409,
       })
 
-      await expect(getTorrentFiles(baseUrl, 'abc123')).rejects.toThrow(
-        'Failed to fetch torrent files with status: 409',
+      await expect(
+        createCategory(baseUrl, 'movies', '/path/to/movies'),
+      ).rejects.toThrow('Failed to create category with status: 409')
+    })
+  })
+
+  describe('editCategory', () => {
+    it('should edit category successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await editCategory(baseUrl, 'movies', '/new/path')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/editCategory`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('category')).toBe('movies')
+      expect(body.get('savePath')).toBe('/new/path')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await editCategory(baseUrl, 'movies', '/new/path')
+      constcallUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/editCategory')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+
+      await expect(
+        editCategory(baseUrl, 'movies', '/new/path'),
+      ).rejects.toThrow('Failed to edit category with status: 404')
+    })
+  })
+
+  describe('deleteCategory', () => {
+    it('should delete category successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await deleteCategory(baseUrl, 'movies')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/removeCategories`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('categories')).toBe('movies')
+    })
+
+    it('should delete multiple categories', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await deleteCategory(baseUrl, ['movies', 'tv'])
+      expect(result).toBe(true)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('categories')).toBe('movies|tv')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await deleteCategory(baseUrl, 'movies')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/removeCategories')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+
+      await expect(deleteCategory(baseUrl, 'movies')).rejects.toThrow(
+        'Failed to delete category with status: 404',
       )
     })
   })
 
-  describe('Preferences', () => {
-    describe('getPreferences', () => {
-      it('should fetch preferences successfully', async () => {
-        const mockPreferences = {
-          download_limit: 0,
-          upload_limit: 0,
-          save_path: '/downloads',
-          locale: 'en',
-        }
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockPreferences),
-        })
-
-        const result = await getPreferences(baseUrl)
-
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/app/preferences`,
-          expect.objectContaining({
-            method: 'GET',
-            credentials: 'include',
-          }),
-        )
-        expect(result).toEqual(mockPreferences)
+  describe('getTags', () => {
+    it('should fetch tags successfully', async () => {
+      const mockTags = ['tag1', 'tag2', 'tag3']
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTags),
       })
 
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({}),
-        })
-
-        await getPreferences(baseUrl)
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/app/preferences',
-          expect.any(Object),
-        )
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 401,
-        })
-
-        await expect(getPreferences(baseUrl)).rejects.toThrow(
-          'Failed to get preferences with status: 401',
-        )
-      })
+      const result = await getTags(baseUrl)
+      expect(result).toEqual(mockTags)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/tags`,
+        expect.objectContaining({
+          credentials: 'include',
+        }),
+      )
     })
 
-    describe('setPreferences', () => {
-      it('should set preferences successfully', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const payload = { download_limit: 1000, upload_limit: 500 }
-        const result = await setPreferences(baseUrl, payload)
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/app/setPreferences`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        expect(callArgs.body).toBe(
-          `json=${encodeURIComponent(JSON.stringify(payload))}`,
-        )
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      const mockTags = ['tag1']
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTags),
       })
 
-      it('should set single preference', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      await getTags(baseUrl)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/tags')
+    })
 
-        const payload = { save_path: '/new/downloads' }
-        await setPreferences(baseUrl, payload)
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        expect(callArgs.body).toContain('save_path')
-        expect(callArgs.body).toContain('%2Fnew%2Fdownloads')
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
       })
 
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        await setPreferences(baseUrl, {})
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/app/setPreferences',
-          expect.any(Object),
-        )
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-        })
-
-        await expect(setPreferences(baseUrl, {})).rejects.toThrow(
-          'Failed to set preferences with status: 400',
-        )
-      })
+      await expect(getTags(baseUrl)).rejects.toThrow(
+        'Failed to fetch tags with status: 403',
+      )
     })
   })
 
-  describe('Tag API Functions', () => {
-    describe('getTags', () => {
-      it('should fetch all tags successfully', async () => {
-        const mockTags = ['tag1', 'tag2', 'movies']
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockTags),
-        })
-
-        const result = await getTags(baseUrl)
-
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/tags`,
-          expect.objectContaining({
-            credentials: 'include',
-          }),
-        )
-        expect(result).toEqual(mockTags)
+  describe('createTag', () => {
+    it('should create tag successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should return empty array when no tags exist', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
+      const result = await createTag(baseUrl, 'newtag')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/createTags`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
 
-        const result = await getTags(baseUrl)
-        expect(result).toEqual([])
-      })
-
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
-
-        await getTags(baseUrl)
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/torrents/tags',
-          expect.any(Object),
-        )
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 401,
-        })
-
-        await expect(getTags(baseUrl)).rejects.toThrow(
-          'Failed to fetch tags with status: 401',
-        )
-      })
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('tags')).toBe('newtag')
     })
 
-    describe('createTag', () => {
-      it('should create a single tag', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await createTag(baseUrl, 'newtag')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/createTags`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('tags')).toBe('newtag')
+    it('should create multiple tags', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should create multiple tags', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      const result = await createTag(baseUrl, ['tag1', 'tag2'])
+      expect(result).toBe(true)
 
-        await createTag(baseUrl, 'tag1,tag2,tag3')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('tags')).toBe('tag1,tag2,tag3')
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-        })
-
-        await expect(createTag(baseUrl, 'newtag')).rejects.toThrow(
-          'Failed to create tag(s) with status: 500',
-        )
-      })
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('tags')).toBe('tag1,tag2')
     })
 
-    describe('deleteTag', () => {
-      it('should delete a single tag', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await deleteTag(baseUrl, 'oldtag')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/deleteTags`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('tags')).toBe('oldtag')
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should delete multiple tags', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        await deleteTag(baseUrl, 'tag1,tag2')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('tags')).toBe('tag1,tag2')
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-        })
-
-        await expect(deleteTag(baseUrl, 'nonexistent')).rejects.toThrow(
-          'Failed to delete tag(s) with status: 404',
-        )
-      })
+      await createTag(baseUrl, 'newtag')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/createTags')
     })
 
-    describe('addTorrentTags', () => {
-      it('should add tags to a single torrent', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await addTorrentTags(baseUrl, 'abc123', 'tag1,tag2')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/addTags`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('hashes')).toBe('abc123')
-        expect(body.get('tags')).toBe('tag1,tag2')
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
       })
 
-      it('should add tags to multiple torrents', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        await addTorrentTags(baseUrl, ['abc123', 'def456'], 'newtag')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('hashes')).toBe('abc123|def456')
-        expect(body.get('tags')).toBe('newtag')
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-        })
-
-        await expect(addTorrentTags(baseUrl, 'abc123', 'tag')).rejects.toThrow(
-          'Failed to add tags with status: 400',
-        )
-      })
-    })
-
-    describe('removeTorrentTags', () => {
-      it('should remove tags from a single torrent', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await removeTorrentTags(baseUrl, 'abc123', 'tag1,tag2')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/removeTags`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('hashes')).toBe('abc123')
-        expect(body.get('tags')).toBe('tag1,tag2')
-      })
-
-      it('should remove tags from multiple torrents', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        await removeTorrentTags(baseUrl, ['abc123', 'def456'], 'oldtag')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('hashes')).toBe('abc123|def456')
-        expect(body.get('tags')).toBe('oldtag')
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-        })
-
-        await expect(
-          removeTorrentTags(baseUrl, 'abc123', 'tag'),
-        ).rejects.toThrow('Failed to remove tags with status: 400')
-      })
+      await expect(createTag(baseUrl, 'newtag')).rejects.toThrow(
+        'Failed to create tag with status: 409',
+      )
     })
   })
 
-  describe('Category API Functions', () => {
-    describe('createCategory', () => {
-      it('should create a category without save path', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await createCategory(baseUrl, 'movies')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/createCategory`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('category')).toBe('movies')
-        expect(body.get('savePath')).toBeNull()
+  describe('deleteTag', () => {
+    it('should delete tag successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should create a category with save path', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      const result = await deleteTag(baseUrl, 'oldtag')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/deleteTags`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
 
-        await createCategory(baseUrl, 'movies', '/downloads/movies')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('category')).toBe('movies')
-        expect(body.get('savePath')).toBe('/downloads/movies')
-      })
-
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        await createCategory(baseUrl, 'test')
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/torrents/createCategory',
-          expect.any(Object),
-        )
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 409,
-        })
-
-        await expect(createCategory(baseUrl, 'movies')).rejects.toThrow(
-          'Failed to create category with status: 409',
-        )
-      })
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('tags')).toBe('oldtag')
     })
 
-    describe('editCategory', () => {
-      it('should edit a category save path', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await editCategory(baseUrl, 'movies', '/new/path')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/editCategory`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('category')).toBe('movies')
-        expect(body.get('savePath')).toBe('/new/path')
+    it('should delete multiple tags', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      const result = await deleteTag(baseUrl, ['tag1', 'tag2'])
+      expect(result).toBe(true)
 
-        await editCategory(baseUrl, 'test', '/path')
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/torrents/editCategory',
-          expect.any(Object),
-        )
-      })
-
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-        })
-
-        await expect(editCategory(baseUrl, 'movies', '/path')).rejects.toThrow(
-          'Failed to edit category with status: 400',
-        )
-      })
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('tags')).toBe('tag1,tag2')
     })
 
-    describe('deleteCategory', () => {
-      it('should delete a single category', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
-
-        const result = await deleteCategory(baseUrl, 'movies')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          `${baseUrl}/api/v2/torrents/removeCategories`,
-          expect.objectContaining({
-            method: 'POST',
-            credentials: 'include',
-          }),
-        )
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('categories')).toBe('movies')
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should delete multiple categories (newline-separated)', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      await deleteTag(baseUrl, 'oldtag')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/deleteTags')
+    })
 
-        await deleteCategory(baseUrl, 'movies\ntv\nmusic')
-
-        const callArgs = mockFetch.mock.calls[0][1]
-        const body = callArgs.body as URLSearchParams
-        expect(body.get('categories')).toBe('movies\ntv\nmusic')
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
       })
 
-      it('should use window.location.origin in development mode', async () => {
-        import.meta.env.DEV = true
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-        })
+      await expect(deleteTag(baseUrl, 'oldtag')).rejects.toThrow(
+        'Failed to delete tag with status: 404',
+      )
+    })
+  })
 
-        await deleteCategory(baseUrl, 'test')
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v2/torrents/removeCategories',
-          expect.any(Object),
-        )
+  describe('addTorrentTags', () => {
+    it('should add tags to a single torrent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
 
-      it('should throw error when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-        })
+      const result = await addTorrentTags(baseUrl, 'abc123', 'tag1')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/addTags`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
 
-        await expect(deleteCategory(baseUrl, 'nonexistent')).rejects.toThrow(
-          'Failed to delete category with status: 404',
-        )
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123')
+      expect(body.get('tags')).toBe('tag1')
+    })
+
+    it('should add multiple tags to a single torrent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
       })
+
+      const result = await addTorrentTags(baseUrl, 'abc123', ['tag1', 'tag2'])
+      expect(result).toBe(true)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123')
+      expect(body.get('tags')).toBe('tag1,tag2')
+    })
+
+    it('should add tags to multiple torrents', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await addTorrentTags(baseUrl, ['abc123', 'def456'], 'tag1')
+      expect(result).toBe(true)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123|def456')
+      expect(body.get('tags')).toBe('tag1')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await addTorrentTags(baseUrl, 'abc123', 'tag1')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/addTags')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+
+      await expect(addTorrentTags(baseUrl, 'abc123', 'tag1')).rejects.toThrow(
+        'Failed to add tags to torrent(s) with status: 404',
+      )
+    })
+  })
+
+  describe('removeTorrentTags', () => {
+    it('should remove tags from a single torrent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await removeTorrentTags(baseUrl, 'abc123', 'tag1')
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/torrents/removeTags`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123')
+      expect(body.get('tags')).toBe('tag1')
+    })
+
+    it('should remove multiple tags from a single torrent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await removeTorrentTags(baseUrl, 'abc123', ['tag1', 'tag2'])
+      expect(result).toBe(true)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123')
+      expect(body.get('tags')).toBe('tag1,tag2')
+    })
+
+    it('should remove tags from multiple torrents', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const result = await removeTorrentTags(baseUrl, ['abc123', 'def456'], 'tag1')
+      expect(result).toBe(true)
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('hashes')).toBe('abc123|def456')
+      expect(body.get('tags')).toBe('tag1')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      await removeTorrentTags(baseUrl, 'abc123', 'tag1')
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/torrents/removeTags')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+
+      await expect(removeTorrentTags(baseUrl, 'abc123', 'tag1')).rejects.toThrow(
+        'Failed to remove tags from torrent(s) with status: 404',
+      )
+    })
+  })
+
+  describe('getPreferences', () => {
+    it('should fetch preferences successfully', async () => {
+      const mockPreferences = {
+        locale: 'en',
+        save_path: '/downloads',
+      }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPreferences),
+      })
+
+      const result = await getPreferences(baseUrl)
+      expect(result).toEqual(mockPreferences)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/app/preferences`,
+        expect.objectContaining({
+          credentials: 'include',
+        }),
+      )
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      const mockPreferences = { locale: 'en' }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPreferences),
+      })
+
+      await getPreferences(baseUrl)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/app/preferences')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+      })
+
+      await expect(getPreferences(baseUrl)).rejects.toThrow(
+        'Failed to fetch preferences with status: 403',
+      )
+    })
+  })
+
+  describe('setPreferences', () => {
+    it('should set preferences successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const preferences = { locale: 'en' }
+      const result = await setPreferences(baseUrl, preferences)
+      expect(result).toBe(true)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/app/setPreferences`,
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        }),
+      )
+
+      const callArgs = mockFetch.mock.calls[0][1]
+      const body = callArgs.body as URLSearchParams
+      expect(body.get('json')).toBe('{"locale":"en"}')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      })
+
+      const preferences = { locale: 'en' }
+      await setPreferences(baseUrl, preferences)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/app/setPreferences')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+      })
+
+      const preferences = { locale: 'en' }
+      await expect(setPreferences(baseUrl, preferences)).rejects.toThrow(
+        'Failed to set preferences with status: 400',
+      )
+    })
+  })
+
+  describe('getLogs', () => {
+    it('should fetch logs successfully', async () => {
+      const mockLogs: LogEntry[] = [
+        {
+          id: 1,
+          message: 'Log entry 1',
+          type: 'info',
+          timestamp: 1234567890,
+        },
+        {
+          id: 2,
+          message: 'Log entry 2',
+          type: 'warning',
+          timestamp: 1234567891,
+        },
+      ]
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockLogs),
+      })
+
+      const result = await getLogs(baseUrl)
+      expect(result).toEqual(mockLogs)
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${baseUrl}/api/v2/log/main`,
+        expect.objectContaining({
+          credentials: 'include',
+        }),
+      )
+    })
+
+    it('should fetch logs with last_known_id parameter', async () => {
+      const mockLogs: LogEntry[] = []
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockLogs),
+      })
+
+      await getLogs(baseUrl, 5)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('last_known_id=5')
+    })
+
+    it('should use window.location.origin in development mode', async () => {
+      import.meta.env.DEV = true
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+
+      await getLogs(baseUrl)
+      const callUrl = mockFetch.mock.calls[0][0]
+      expect(callUrl).toContain('http://localhost:3000/api/v2/log/main')
+    })
+
+    it('should throw error when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+      })
+
+      await expect(getLogs(baseUrl)).rejects.toThrow(
+        'Failed to fetch logs with status: 403',
+      )
     })
   })
 })

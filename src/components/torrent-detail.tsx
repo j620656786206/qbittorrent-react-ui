@@ -299,7 +299,7 @@ export function TorrentDetail({
         </div>
         <div className="text-sm">
           <div className="text-slate-400 mb-1">
-            {t('torrent.details.totalSwarm')}
+{t('torrent.details.totalSwarm')}
           </div>
           <div className="font-medium">
             {torrent.num_complete} {t('torrent.details.seeds')} /{' '}
@@ -526,53 +526,42 @@ function TorrentTagsEditor({
     removeTagMutation.mutate(tagName)
   }
 
+  const isLoading = addTagMutation.isPending || removeTagMutation.isPending
+
   return (
-    <div ref={containerRef} className="relative">
-      <div className="flex items-start gap-3">
-        <div className="text-slate-400 mt-0.5">
-          <TagIcon className="h-4 w-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-slate-400 mb-2">{t('torrent.tags')}</div>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {currentTagObjects.length > 0 ? (
-              currentTagObjects.map((tag) => (
-                <TagChip
-                  key={tag.name}
-                  tag={tag}
-                  onRemove={() => handleRemoveTag(tag.name)}
-                />
-              ))
-            ) : (
-              <span className="text-xs text-slate-500">
-                {t('torrent.tags.noTags')}
-              </span>
-            )}
-          </div>
-
-          {/* Add tag dropdown */}
+    <div className="flex items-start gap-3" ref={containerRef}>
+      <div className="text-slate-400 mt-0.5">
+        <TagIcon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-400 mb-0.5">{t('torrent.tags')}</div>
+        <div className="flex flex-wrap gap-2 items-center relative">
+          {currentTagObjects.map((tag) => (
+            <TagChip
+              key={tag.name}
+              tag={tag}
+              onRemove={() => handleRemoveTag(tag.name)}
+              disabled={isLoading}
+            />
+          ))}
           <div className="relative">
-            <Button
-              size="sm"
-              variant="outline"
+            <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-xs"
+              disabled={isLoading}
+              className="text-slate-400 hover:text-slate-200 disabled:opacity-50"
             >
-              <Plus className="h-3 w-3 mr-1" />
-              {t('torrent.tags.add')}
-            </Button>
-
+              <Plus className="h-4 w-4" />
+            </button>
             {isDropdownOpen && unassignedTags.length > 0 && (
-              <div className="absolute z-10 mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg max-h-48 overflow-y-auto w-48">
+              <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 w-max">
                 {unassignedTags.map((tag) => (
                   <button
                     key={tag.name}
                     onClick={() => handleAddTag(tag)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-700 flex items-center gap-2"
+                    disabled={isLoading}
+                    className="block w-full text-left px-3 py-2 hover:bg-slate-700 disabled:opacity-50 text-sm"
                   >
-                    <div
-                      className={`w-2 h-2 rounded-full ${getColorClass(tag.color)}`}
-                    />
+                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(tag.color)}`} />
                     {tag.name}
                   </button>
                 ))}
@@ -585,50 +574,27 @@ function TorrentTagsEditor({
   )
 }
 
-// TrackerList component - displays trackers for a torrent
-type TrackerListProps = {
-  hash: string
-  baseUrl: string
-}
-
-function TrackerList({ hash, baseUrl }: TrackerListProps) {
+// TrackerList component
+function TrackerList({ hash, baseUrl }: { hash: string; baseUrl: string }) {
   const { t } = useTranslation()
-  const { data: trackers, isLoading } = useQuery({
+  const { data: trackers = [] } = useQuery({
     queryKey: ['trackers', hash],
     queryFn: () => getTrackers(baseUrl, hash),
   })
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-      </div>
-    )
-  }
-
-  if (!trackers || trackers.length === 0) {
-    return (
-      <div className="text-sm text-slate-400">
-        {t('torrent.details.noTrackers')}
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-2">
       {trackers.map((tracker, index) => (
         <div
-          key={`${tracker.url}-${index}`}
-          className="flex items-start gap-3 p-2 bg-slate-800/30 rounded text-sm"
+          key={index}
+          className="flex items-start gap-3 p-2 rounded-lg bg-slate-800/30"
         >
-          <div className="mt-0.5">
-            {getTrackerStatusIcon(tracker.status)}
-          </div>
+          <div className="mt-0.5">{getTrackerStatusIcon(tracker.status)}</div>
           <div className="flex-1 min-w-0">
-            <div className="text-slate-300 break-all">{tracker.url}</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-400 mb-0.5">
               {t(getTrackerStatusKey(tracker.status))}
             </div>
+            <div className="text-sm text-white break-all">{tracker.url}</div>
           </div>
         </div>
       ))}
