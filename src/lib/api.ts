@@ -488,9 +488,9 @@ export async function recheckTorrent(
 }
 
 /**
- * Add tags to one or more torrents.
+ * Adds tags to one or more torrents.
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
- * @param {string | string[]} hashes - Single hash or array of hashes of torrents.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to update.
  * @param {string} tags - Comma-separated list of tags to add.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
@@ -511,15 +511,15 @@ export async function addTorrentTags(
   })
 
   if (!res.ok) {
-    throw new Error(`Failed to add tags with status: ${res.status}`)
+    throw new Error(`Failed to add tags to torrent(s) with status: ${res.status}`)
   }
   return true
 }
 
 /**
- * Remove tags from one or more torrents.
+ * Removes tags from one or more torrents.
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
- * @param {string | string[]} hashes - Single hash or array of hashes of torrents.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to update.
  * @param {string} tags - Comma-separated list of tags to remove.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
@@ -540,15 +540,15 @@ export async function removeTorrentTags(
   })
 
   if (!res.ok) {
-    throw new Error(`Failed to remove tags with status: ${res.status}`)
+    throw new Error(`Failed to remove tags from torrent(s) with status: ${res.status}`)
   }
   return true
 }
 
 /**
- * Add trackers to a torrent.
+ * Adds trackers to a torrent.
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
- * @param {string} hash - Hash of the torrent.
+ * @param {string} hash - The hash of the torrent to add trackers to.
  * @param {string} urls - Newline-separated list of tracker URLs to add.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
@@ -575,9 +575,9 @@ export async function addTrackers(
 }
 
 /**
- * Remove trackers from a torrent.
+ * Removes trackers from a torrent.
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
- * @param {string} hash - Hash of the torrent.
+ * @param {string} hash - The hash of the torrent to remove trackers from.
  * @param {string} urls - Pipe-separated list of tracker URLs to remove.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
@@ -591,14 +591,11 @@ export async function removeTrackers(
   formData.append('hash', hash)
   formData.append('urls', urls)
 
-  const res = await fetch(
-    `${effectiveBaseUrl}/api/v2/torrents/removeTrackers`,
-    {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    },
-  )
+  const res = await fetch(`${effectiveBaseUrl}/api/v2/torrents/removeTrackers`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  })
 
   if (!res.ok) {
     throw new Error(`Failed to remove trackers with status: ${res.status}`)
@@ -607,9 +604,9 @@ export async function removeTrackers(
 }
 
 /**
- * Reannounce a torrent to all trackers.
+ * Reannounces one or more torrents to their trackers.
  * @param {string} baseUrl - The base URL of the qBittorrent WebUI.
- * @param {string | string[]} hashes - Single hash or array of hashes of torrents.
+ * @param {string | string[]} hashes - Single hash or array of hashes of torrents to reannounce.
  * @returns {Promise<boolean>} - True if successful, throws error otherwise.
  */
 export async function reannounceTorrent(
