@@ -66,6 +66,24 @@ function getStatusColor(state: string) {
   return stateColors[state] || 'text-gray-400'
 }
 
+// Helper to get progress bar color based on torrent state
+function getProgressColor(state: string): string {
+  // Green: seeding/uploading/complete
+  if (['uploading', 'forcedUP', 'queuedUP', 'pausedUP', 'stalledUP'].includes(state)) {
+    return 'bg-green-500'
+  }
+  // Red: errors
+  if (['error', 'missingFiles'].includes(state)) {
+    return 'bg-red-500'
+  }
+  // Yellow: stalled downloading
+  if (state === 'stalledDL') {
+    return 'bg-yellow-500'
+  }
+  // Blue: downloading (default active)
+  return 'bg-blue-500'
+}
+
 // Grid column template for consistent layout (mimics table column widths)
 // Columns: checkbox(40px) | name(35%) | status(20%) | speed(15%) | stats(22%) | actions(8%)
 const gridTemplateColumns =
@@ -425,6 +443,7 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
                         <Progress
                           value={torrent.progress * 100}
                           className="h-1.5"
+                          indicatorClassName={getProgressColor(torrent.state)}
                         />
                       </div>
                     </DivTableCell>

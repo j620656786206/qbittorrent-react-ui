@@ -59,6 +59,24 @@ function getStatusColor(state: string) {
   return stateColors[state] || 'text-gray-400'
 }
 
+// Helper to get progress bar color based on torrent state
+function getProgressColor(state: string): string {
+  // Green: seeding/uploading/complete
+  if (['uploading', 'forcedUP', 'queuedUP', 'pausedUP', 'stalledUP'].includes(state)) {
+    return 'bg-green-500'
+  }
+  // Red: errors
+  if (['error', 'missingFiles'].includes(state)) {
+    return 'bg-red-500'
+  }
+  // Yellow: stalled downloading
+  if (state === 'stalledDL') {
+    return 'bg-yellow-500'
+  }
+  // Blue: downloading (default active)
+  return 'bg-blue-500'
+}
+
 // Helper to get state translation key
 function getStateKey(state: string): string {
   return `torrent.status.${state}`
@@ -204,7 +222,7 @@ export function TorrentCard({
             {(torrent.progress * 100).toFixed(1)}%
           </span>
         </div>
-        <Progress value={torrent.progress * 100} className="h-2" />
+        <Progress value={torrent.progress * 100} className="h-2" indicatorClassName={getProgressColor(torrent.state)} />
       </div>
 
       {/* Stats Grid */}
