@@ -271,16 +271,16 @@
   "keyboard": {
     "help": {
       "title": "键盘快捷键",
-      "description": "使用这些键盘快捷键快速管理您的 Torrent",
+      "description": "使用这些键盘快捷键快速管理您的种子",
       "keyColumn": "按键",
       "actionColumn": "操作"
     },
     "shortcuts": {
-      "selectAll": "全选所有可见的 Torrent",
-      "pauseResume": "暂停或继续选中的 Torrent",
-      "delete": "删除选中的 Torrent",
-      "navigate": "在 Torrent 之间导航",
-      "toggleSelect": "选择或取消选择焦点 Torrent",
+      "selectAll": "选择所有可见的种子",
+      "pauseResume": "暂停或继续选定的种子",
+      "delete": "删除选定的种子",
+      "navigate": "在种子之间导航",
+      "toggleSelect": "选择或取消选择聚焦的种子",
       "clearSelection": "清除选择",
       "help": "显示键盘快捷键帮助"
     }
@@ -288,5 +288,72 @@
   "dropZone": {
     "title": "拖放 Torrent 文件至此",
     "subtitle": "松开以添加 Torrent 文件"
+  },
+  "toast": {
+    "success": {
+      "pause": "种子已暂停",
+      "resume": "种子已继续",
+      "delete": "种子已删除",
+      "deleteKeepFiles": "种子已删除（文件保留）",
+      "deleteRemoveFiles": "种子已删除（文件已移除）",
+      "recheck": "已开始重新检查",
+      "setCategory": "分类更新成功",
+      "addMagnet": "已通过磁力链接添加种子",
+      "addFile": "种子文件上传成功",
+      "setFilePriority": "文件优先级已更新",
+      "addTag": "标签添加成功",
+      "removeTag": "标签移除成功",
+      "addTracker": "Tracker 添加成功",
+      "removeTracker": "Tracker 移除成功",
+      "reannounce": "已向 Tracker 发送重新宣告",
+      "batchPause": "已暂停 {{count}} 个种子",
+      "batchResume": "已继续 {{count}} 个种子",
+      "batchDelete": "已删除 {{count}} 个种子",
+      "batchRecheck": "正在重新检查 {{count}} 个种子",
+      "batchSetCategory": "已为 {{count}} 个种子设置分类"
+    },
+    "error": {
+      "pause": "暂停种子失败",
+      "resume": "继续种子失败",
+      "delete": "删除种子失败",
+      "recheck": "开始重新检查失败",
+      "setCategory": "更新分类失败",
+      "addMagnet": "添加磁力链接失败",
+      "addFile": "上传种子文件失败",
+      "setFilePriority": "更新文件优先级失败",
+      "addTag": "添加标签失败",
+      "removeTag": "移除标签失败",
+      "addTracker": "添加 Tracker 失败",
+      "removeTracker": "移除 Tracker 失败",
+      "reannounce": "重新宣告失败",
+      "batchPause": "暂停种子失败",
+      "batchResume": "继续种子失败",
+      "batchDelete": "删除种子失败",
+      "batchRecheck": "重新检查种子失败",
+      "batchSetCategory": "设置分类失败",
+      "network": "网络错误 - 请检查您的连接",
+      "networkRetry": "无法连接至 qBittorrent。请检查它是否正在运行且可访问。",
+      "unknown": "发生未预期的错误"
+    },
+    "loading": {
+      "pause": "正在暂停种子...",
+      "resume": "正在继续种子...",
+      "delete": "正在删除种子...",
+      "recheck": "正在开始重新检查...",
+      "setCategory": "正在更新分类...",
+      "addMagnet": "正在添加种子...",
+      "addFile": "正在上传种子...",
+      "setFilePriority": "正在更新优先级...",
+      "addTag": "正在添加标签...",
+      "removeTag": "正在移除标签...",
+      "addTracker": "正在添加 Tracker...",
+      "removeTracker": "正在移除 Tracker...",
+      "reannounce": "正在重新宣告...",
+      "batchPause": "正在暂停 {{count}} 个种子...",
+      "batchResume": "正在继续 {{count}} 个种子...",
+      "batchDelete": "正在删除 {{count}} 个种子...",
+      "batchRecheck": "正在重新检查 {{count}} 个种子...",
+      "batchSetCategory": "正在为 {{count}} 个种子设置分类..."
+    }
   }
 }

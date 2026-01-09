@@ -34,6 +34,7 @@ import {
 import { deleteTorrent, pauseTorrent, resumeTorrent } from '@/lib/api'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatBytes, formatEta } from '@/lib/utils'
+import { useToast } from '@/lib/use-toast'
 
 // Virtual scrolling configuration for card view
 const ESTIMATED_CARD_HEIGHT = 180 // Estimated height for dynamic measurement
@@ -99,6 +100,7 @@ export function TorrentCard({
 }: TorrentCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { showSuccess, showError } = useToast()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
 
   const getBaseUrl = () =>
@@ -108,6 +110,13 @@ export function TorrentCard({
     mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.pause')
+    },
+    onError: (error: Error, hash: string) => {
+      showError('toast.error.pause', {
+        description: error.message,
+        onRetry: () => pauseMutation.mutate(hash),
+      })
     },
   })
 
@@ -115,6 +124,13 @@ export function TorrentCard({
     mutationFn: (hash: string) => resumeTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.resume')
+    },
+    onError: (error: Error, hash: string) => {
+      showError('toast.error.resume', {
+        description: error.message,
+        onRetry: () => resumeMutation.mutate(hash),
+      })
     },
   })
 
@@ -126,9 +142,20 @@ export function TorrentCard({
       hash: string
       deleteFiles: boolean
     }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       setIsDeleteDialogOpen(false)
+      showSuccess(
+        variables.deleteFiles
+          ? 'toast.success.deleteRemoveFiles'
+          : 'toast.success.deleteKeepFiles',
+      )
+    },
+    onError: (error: Error, variables) => {
+      showError('toast.error.delete', {
+        description: error.message,
+        onRetry: () => deleteMutation.mutate(variables),
+      })
     },
   })
 

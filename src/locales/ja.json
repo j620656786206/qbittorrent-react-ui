@@ -271,16 +271,16 @@
   "keyboard": {
     "help": {
       "title": "キーボードショートカット",
-      "description": "これらのキーボードショートカットを使用してトレントを素早く管理",
+      "description": "これらのキーボードショートカットを使用してトレントを素早く管理できます",
       "keyColumn": "キー",
-      "actionColumn": "アクション"
+      "actionColumn": "操作"
     },
     "shortcuts": {
-      "selectAll": "表示中のすべてのトレントを選択",
+      "selectAll": "表示されているすべてのトレントを選択",
       "pauseResume": "選択したトレントを一時停止または再開",
       "delete": "選択したトレントを削除",
       "navigate": "トレント間を移動",
-      "toggleSelect": "フォーカス中のトレントを選択または選択解除",
+      "toggleSelect": "フォーカスされたトレントを選択または選択解除",
       "clearSelection": "選択をクリア",
       "help": "キーボードショートカットのヘルプを表示"
     }
@@ -288,5 +288,72 @@
   "dropZone": {
     "title": "Torrent ファイルをここにドロップ",
     "subtitle": "ドロップして Torrent ファイルを追加"
+  },
+  "toast": {
+    "success": {
+      "pause": "トレントを一時停止しました",
+      "resume": "トレントを再開しました",
+      "delete": "トレントを削除しました",
+      "deleteKeepFiles": "トレントを削除しました（ファイルは保持）",
+      "deleteRemoveFiles": "トレントを削除しました（ファイルも削除）",
+      "recheck": "トレントの再チェックを開始しました",
+      "setCategory": "カテゴリーを更新しました",
+      "addMagnet": "マグネットリンクからトレントを追加しました",
+      "addFile": "トレントファイルをアップロードしました",
+      "setFilePriority": "ファイルの優先度を更新しました",
+      "addTag": "タグを追加しました",
+      "removeTag": "タグを削除しました",
+      "addTracker": "トラッカーを追加しました",
+      "removeTracker": "トラッカーを削除しました",
+      "reannounce": "トラッカーに再アナウンスを送信しました",
+      "batchPause": "{{count}}個のトレントを一時停止しました",
+      "batchResume": "{{count}}個のトレントを再開しました",
+      "batchDelete": "{{count}}個のトレントを削除しました",
+      "batchRecheck": "{{count}}個のトレントを再チェック中です",
+      "batchSetCategory": "{{count}}個のトレントにカテゴリーを設定しました"
+    },
+    "error": {
+      "pause": "トレントの一時停止に失敗しました",
+      "resume": "トレントの再開に失敗しました",
+      "delete": "トレントの削除に失敗しました",
+      "recheck": "再チェックの開始に失敗しました",
+      "setCategory": "カテゴリーの更新に失敗しました",
+      "addMagnet": "マグネットリンクの追加に失敗しました",
+      "addFile": "トレントファイルのアップロードに失敗しました",
+      "setFilePriority": "ファイル優先度の更新に失敗しました",
+      "addTag": "タグの追加に失敗しました",
+      "removeTag": "タグの削除に失敗しました",
+      "addTracker": "トラッカーの追加に失敗しました",
+      "removeTracker": "トラッカーの削除に失敗しました",
+      "reannounce": "再アナウンスに失敗しました",
+      "batchPause": "トレントの一時停止に失敗しました",
+      "batchResume": "トレントの再開に失敗しました",
+      "batchDelete": "トレントの削除に失敗しました",
+      "batchRecheck": "トレントの再チェックに失敗しました",
+      "batchSetCategory": "カテゴリーの設定に失敗しました",
+      "network": "ネットワークエラー - 接続を確認してください",
+      "networkRetry": "qBittorrentに接続できません。実行中でアクセス可能か確認してください。",
+      "unknown": "予期しないエラーが発生しました"
+    },
+    "loading": {
+      "pause": "トレントを一時停止中...",
+      "resume": "トレントを再開中...",
+      "delete": "トレントを削除中...",
+      "recheck": "再チェックを開始中...",
+      "setCategory": "カテゴリーを更新中...",
+      "addMagnet": "トレントを追加中...",
+      "addFile": "トレントをアップロード中...",
+      "setFilePriority": "優先度を更新中...",
+      "addTag": "タグを追加中...",
+      "removeTag": "タグを削除中...",
+      "addTracker": "トラッカーを追加中...",
+      "removeTracker": "トラッカーを削除中...",
+      "reannounce": "再アナウンス中...",
+      "batchPause": "{{count}}個のトレントを一時停止中...",
+      "batchResume": "{{count}}個のトレントを再開中...",
+      "batchDelete": "{{count}}個のトレントを削除中...",
+      "batchRecheck": "{{count}}個のトレントを再チェック中...",
+      "batchSetCategory": "{{count}}個のトレントにカテゴリーを設定中..."
+    }
   }
 }

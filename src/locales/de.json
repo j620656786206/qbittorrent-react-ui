@@ -271,7 +271,7 @@
   "keyboard": {
     "help": {
       "title": "Tastaturkürzel",
-      "description": "Verwenden Sie diese Tastaturkürzel, um Ihre Torrents schnell zu verwalten",
+      "description": "Verwenden Sie diese Tastaturkürzel zur schnellen Verwaltung Ihrer Torrents",
       "keyColumn": "Taste",
       "actionColumn": "Aktion"
     },
@@ -281,12 +281,79 @@
       "delete": "Ausgewählte Torrents löschen",
       "navigate": "Zwischen Torrents navigieren",
       "toggleSelect": "Fokussierten Torrent auswählen oder abwählen",
-      "clearSelection": "Auswahl löschen",
+      "clearSelection": "Auswahl aufheben",
       "help": "Tastaturkürzel-Hilfe anzeigen"
     }
   },
   "dropZone": {
     "title": "Torrent-Dateien hier ablegen",
     "subtitle": "Loslassen, um Torrent-Dateien hinzuzufügen"
+  },
+  "toast": {
+    "success": {
+      "pause": "Torrent erfolgreich pausiert",
+      "resume": "Torrent erfolgreich fortgesetzt",
+      "delete": "Torrent erfolgreich gelöscht",
+      "deleteKeepFiles": "Torrent gelöscht (Dateien behalten)",
+      "deleteRemoveFiles": "Torrent gelöscht (Dateien entfernt)",
+      "recheck": "Torrent-Überprüfung gestartet",
+      "setCategory": "Kategorie erfolgreich aktualisiert",
+      "addMagnet": "Torrent über Magnet-Link hinzugefügt",
+      "addFile": "Torrent-Datei erfolgreich hochgeladen",
+      "setFilePriority": "Dateipriorität aktualisiert",
+      "addTag": "Tag erfolgreich hinzugefügt",
+      "removeTag": "Tag erfolgreich entfernt",
+      "addTracker": "Tracker erfolgreich hinzugefügt",
+      "removeTracker": "Tracker erfolgreich entfernt",
+      "reannounce": "Neuankündigung an Tracker gesendet",
+      "batchPause": "{{count}} Torrents pausiert",
+      "batchResume": "{{count}} Torrents fortgesetzt",
+      "batchDelete": "{{count}} Torrents gelöscht",
+      "batchRecheck": "{{count}} Torrents werden überprüft",
+      "batchSetCategory": "Kategorie für {{count}} Torrents gesetzt"
+    },
+    "error": {
+      "pause": "Fehler beim Pausieren des Torrents",
+      "resume": "Fehler beim Fortsetzen des Torrents",
+      "delete": "Fehler beim Löschen des Torrents",
+      "recheck": "Fehler beim Starten der Überprüfung",
+      "setCategory": "Fehler beim Aktualisieren der Kategorie",
+      "addMagnet": "Fehler beim Hinzufügen des Magnet-Links",
+      "addFile": "Fehler beim Hochladen der Torrent-Datei",
+      "setFilePriority": "Fehler beim Aktualisieren der Dateipriorität",
+      "addTag": "Fehler beim Hinzufügen des Tags",
+      "removeTag": "Fehler beim Entfernen des Tags",
+      "addTracker": "Fehler beim Hinzufügen des Trackers",
+      "removeTracker": "Fehler beim Entfernen des Trackers",
+      "reannounce": "Fehler bei der Neuankündigung",
+      "batchPause": "Fehler beim Pausieren der Torrents",
+      "batchResume": "Fehler beim Fortsetzen der Torrents",
+      "batchDelete": "Fehler beim Löschen der Torrents",
+      "batchRecheck": "Fehler beim Überprüfen der Torrents",
+      "batchSetCategory": "Fehler beim Setzen der Kategorie",
+      "network": "Netzwerkfehler - bitte überprüfen Sie Ihre Verbindung",
+      "networkRetry": "Verbindung zu qBittorrent nicht möglich. Prüfen Sie, ob es läuft und erreichbar ist.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten"
+    },
+    "loading": {
+      "pause": "Torrent wird pausiert...",
+      "resume": "Torrent wird fortgesetzt...",
+      "delete": "Torrent wird gelöscht...",
+      "recheck": "Überprüfung wird gestartet...",
+      "setCategory": "Kategorie wird aktualisiert...",
+      "addMagnet": "Torrent wird hinzugefügt...",
+      "addFile": "Torrent wird hochgeladen...",
+      "setFilePriority": "Priorität wird aktualisiert...",
+      "addTag": "Tag wird hinzugefügt...",
+      "removeTag": "Tag wird entfernt...",
+      "addTracker": "Tracker wird hinzugefügt...",
+      "removeTracker": "Tracker wird entfernt...",
+      "reannounce": "Wird neu angekündigt...",
+      "batchPause": "{{count}} Torrents werden pausiert...",
+      "batchResume": "{{count}} Torrents werden fortgesetzt...",
+      "batchDelete": "{{count}} Torrents werden gelöscht...",
+      "batchRecheck": "{{count}} Torrents werden überprüft...",
+      "batchSetCategory": "Kategorie wird für {{count}} Torrents gesetzt..."
+    }
   }
 }

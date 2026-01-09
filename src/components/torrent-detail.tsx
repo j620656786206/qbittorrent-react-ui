@@ -52,6 +52,7 @@ import { TrackerStatus, getTrackers } from '@/lib/api'
 import { useMediaQuery } from '@/lib/hooks'
 import { getTags, getTagsByNames, parseTagString } from '@/lib/tag-storage'
 import { formatBytes, formatEta } from '@/lib/utils'
+import { useToast } from '@/lib/use-toast'
 
 // Helper functions
 function formatDate(timestamp: number) {
@@ -429,12 +430,13 @@ type TorrentTagsEditorProps = {
 }
 
 function TorrentTagsEditor({
-  hash,
+  hash: _hash,
   currentTags,
-  baseUrl,
+  baseUrl: _baseUrl,
 }: TorrentTagsEditorProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { showSuccess, showError } = useToast()
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
@@ -481,18 +483,32 @@ function TorrentTagsEditor({
   // Add tag mutation
   // TODO: Implement addTorrentTags API function
   const addTagMutation = useMutation({
-    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.addTag')
+    },
+    onError: (error: Error, tagName: string) => {
+      showError('toast.error.addTag', {
+        description: error.message,
+        onRetry: () => addTagMutation.mutate(tagName),
+      })
     },
   })
 
   // Remove tag mutation
   // TODO: Implement removeTorrentTags API function
   const removeTagMutation = useMutation({
-    mutationFn: (tagName: string) => Promise.reject(new Error('Not implemented')),
+    mutationFn: (_tagName: string) => Promise.reject(new Error('Not implemented')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.removeTag')
+    },
+    onError: (error: Error, tagName: string) => {
+      showError('toast.error.removeTag', {
+        description: error.message,
+        onRetry: () => removeTagMutation.mutate(tagName),
+      })
     },
   })
 
@@ -505,98 +521,90 @@ function TorrentTagsEditor({
     removeTagMutation.mutate(tagName)
   }
 
-  const isLoading = addTagMutation.isPending || removeTagMutation.isPending
-
   return (
-    <div className="flex items-start gap-3" ref={containerRef}>
-      <div className="text-slate-400 mt-0.5">
-        <TagIcon className="h-4 w-4" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-slate-400 mb-0.5">{t('torrent.tags')}</div>
-        <div className="flex flex-wrap gap-2 items-center relative">
-          {currentTagObjects.map((tag) => (
-            <TagChip
-              key={tag.name}
-              tag={tag}
-              onRemove={() => handleRemoveTag(tag.name)}
-              disabled={isLoading}
-            />
-          ))}
-          <div className="relative">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              disabled={isLoading}
-              className="h-6 px-2 text-xs"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            {isDropdownOpen && unassignedTags.length > 0 && (
-              <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-50 min-w-max">
-                {unassignedTags.map((tag) => (
-                  <button
-                    key={tag.name}
-                    onClick={() => handleAddTag(tag)}
-                    disabled={isLoading}
-                    className="w-full text-left px-3 py-2 text-xs text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(
-                        tag.color,
-                      )}`}
-                    />
-                    {tag.name}
-                  </button>
-                ))}
-              </div>
-            )}
+    <div className="relative" ref={containerRef}>
+      <div className="flex items-start gap-3">
+        <div className="text-slate-400 mt-0.5">
+          <TagIcon className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-slate-400 mb-2">
+            {t('torrent.tags')}
           </div>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {currentTagObjects.map((tag) => (
+              <TagChip
+                key={tag.name}
+                tag={tag}
+                onRemove={() => handleRemoveTag(tag.name)}
+              />
+            ))}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="h-7 text-xs"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            {t('common.add')}
+          </Button>
+
+          {/* Dropdown for unassigned tags */}
+          {isDropdownOpen && unassignedTags.length > 0 && (
+            <div className="absolute top-full mt-1 left-0 bg-slate-700 border border-slate-600 rounded-md shadow-lg z-10 w-48 max-h-48 overflow-y-auto">
+              {unassignedTags.map((tag) => (
+                <button
+                  key={tag.name}
+                  onClick={() => handleAddTag(tag)}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-600 text-sm text-white flex items-center gap-2 border-b border-slate-600 last:border-b-0"
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${getColorClass(tag.color)}`}
+                  />
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// TrackerList component
 function TrackerList({ hash, baseUrl }: { hash: string; baseUrl: string }) {
   const { t } = useTranslation()
-  const { data: trackers, isLoading, error } = useQuery({
+  const { data: trackers, isLoading } = useQuery({
     queryKey: ['trackers', hash],
-    queryFn: () => getTrackers(baseUrl, hash),
-    enabled: !!hash && !!baseUrl,
+    queryFn: () => getTrackers(hash, baseUrl),
   })
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+      <div className="flex justify-center py-4">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
       </div>
     )
   }
 
-  if (error || !trackers) {
+  if (!trackers || trackers.length === 0) {
     return (
-      <div className="flex items-center gap-2 text-red-400 text-sm">
-        <AlertCircle className="h-4 w-4" />
-        {t('common.error')}
+      <div className="text-center py-4 text-slate-400 text-sm">
+        {t('common.noData')}
       </div>
     )
   }
 
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto">
-      {trackers.map((tracker, idx) => (
-        <div
-          key={idx}
-          className="bg-slate-800/30 rounded p-2 text-xs space-y-1"
-        >
-          <div className="flex items-center gap-2">
+    <div className="space-y-2">
+      {trackers.map((tracker, index) => (
+        <div key={index} className="bg-slate-800/30 rounded p-2 text-sm">
+          <div className="flex items-center gap-2 mb-1">
             {getTrackerStatusIcon(tracker.status)}
-            <span className="text-slate-300 break-all">{tracker.url}</span>
+            <span className="text-slate-300 flex-1">{tracker.url}</span>
           </div>
-          <div className="text-slate-400 ml-6">
+          <div className="text-xs text-slate-400 ml-6">
             {t(getTrackerStatusKey(tracker.status))}
           </div>
         </div>

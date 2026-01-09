@@ -12,6 +12,7 @@ import {
 } from '@/lib/fileTree'
 import { FileTree } from '@/components/FileTreeNode'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/lib/use-toast'
 
 type TorrentFileListProps = {
   hash: string
@@ -32,6 +33,7 @@ type TorrentFileListProps = {
 export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { showSuccess, showError } = useToast()
 
   // Query for fetching torrent files
   const {
@@ -75,6 +77,16 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
     onSuccess: () => {
       // Invalidate the files query to refresh the list
       queryClient.invalidateQueries({ queryKey: ['torrent-files', hash] })
+      showSuccess('toast.success.setFilePriority')
+    },
+    onError: (
+      mutationError: Error,
+      variables: { fileIds: number | Array<number>; priority: FilePriority },
+    ) => {
+      showError('toast.error.setFilePriority', {
+        description: mutationError.message,
+        onRetry: () => priorityMutation.mutate(variables),
+      })
     },
     retry: 3, // Retry failed mutations up to 3 times
   })
@@ -217,16 +229,6 @@ export function TorrentFileList({ hash, baseUrl }: TorrentFileListProps) {
           </span>
         )}
       </div>
-
-      {/* Mutation error message */}
-      {priorityMutation.isError && (
-        <div className="bg-red-900/20 border border-red-700/50 rounded-md px-3 py-2 text-xs text-red-300">
-          {t('fileList.priorityError')}:{' '}
-          {priorityMutation.error instanceof Error
-            ? priorityMutation.error.message
-            : String(priorityMutation.error)}
-        </div>
-      )}
 
       {/* File Tree */}
       <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 p-2 max-h-[400px] overflow-y-auto">

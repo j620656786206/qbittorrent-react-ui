@@ -270,8 +270,8 @@
   },
   "keyboard": {
     "help": {
-      "title": "Atajos de Teclado",
-      "description": "Use estos atajos de teclado para gestionar rápidamente sus torrents",
+      "title": "Atajos de teclado",
+      "description": "Use estos atajos de teclado para administrar rápidamente sus torrents",
       "keyColumn": "Tecla",
       "actionColumn": "Acción"
     },
@@ -280,7 +280,7 @@
       "pauseResume": "Pausar o reanudar torrents seleccionados",
       "delete": "Eliminar torrents seleccionados",
       "navigate": "Navegar entre torrents",
-      "toggleSelect": "Seleccionar o deseleccionar torrent enfocado",
+      "toggleSelect": "Seleccionar o deseleccionar el torrent enfocado",
       "clearSelection": "Limpiar selección",
       "help": "Mostrar ayuda de atajos de teclado"
     }
@@ -288,5 +288,72 @@
   "dropZone": {
     "title": "Suelta archivos Torrent aquí",
     "subtitle": "Suelta para agregar archivos torrent"
+  },
+  "toast": {
+    "success": {
+      "pause": "Torrent pausado con éxito",
+      "resume": "Torrent reanudado con éxito",
+      "delete": "Torrent eliminado con éxito",
+      "deleteKeepFiles": "Torrent eliminado (archivos conservados)",
+      "deleteRemoveFiles": "Torrent eliminado (archivos eliminados)",
+      "recheck": "Verificación de torrent iniciada",
+      "setCategory": "Categoría actualizada con éxito",
+      "addMagnet": "Torrent añadido por enlace magnético",
+      "addFile": "Archivo torrent subido con éxito",
+      "setFilePriority": "Prioridad de archivo actualizada",
+      "addTag": "Etiqueta añadida con éxito",
+      "removeTag": "Etiqueta eliminada con éxito",
+      "addTracker": "Rastreador añadido con éxito",
+      "removeTracker": "Rastreador eliminado con éxito",
+      "reannounce": "Reanuncio enviado a rastreadores",
+      "batchPause": "{{count}} torrents pausados",
+      "batchResume": "{{count}} torrents reanudados",
+      "batchDelete": "{{count}} torrents eliminados",
+      "batchRecheck": "{{count}} torrents verificando",
+      "batchSetCategory": "Categoría establecida para {{count}} torrents"
+    },
+    "error": {
+      "pause": "Error al pausar torrent",
+      "resume": "Error al reanudar torrent",
+      "delete": "Error al eliminar torrent",
+      "recheck": "Error al iniciar verificación",
+      "setCategory": "Error al actualizar categoría",
+      "addMagnet": "Error al añadir enlace magnético",
+      "addFile": "Error al subir archivo torrent",
+      "setFilePriority": "Error al actualizar prioridad de archivo",
+      "addTag": "Error al añadir etiqueta",
+      "removeTag": "Error al eliminar etiqueta",
+      "addTracker": "Error al añadir rastreador",
+      "removeTracker": "Error al eliminar rastreador",
+      "reannounce": "Error al reanunciar",
+      "batchPause": "Error al pausar torrents",
+      "batchResume": "Error al reanudar torrents",
+      "batchDelete": "Error al eliminar torrents",
+      "batchRecheck": "Error al verificar torrents",
+      "batchSetCategory": "Error al establecer categoría",
+      "network": "Error de red - por favor verifique su conexión",
+      "networkRetry": "No se puede conectar a qBittorrent. Verifique que esté ejecutándose y sea accesible.",
+      "unknown": "Ocurrió un error inesperado"
+    },
+    "loading": {
+      "pause": "Pausando torrent...",
+      "resume": "Reanudando torrent...",
+      "delete": "Eliminando torrent...",
+      "recheck": "Iniciando verificación...",
+      "setCategory": "Actualizando categoría...",
+      "addMagnet": "Añadiendo torrent...",
+      "addFile": "Subiendo torrent...",
+      "setFilePriority": "Actualizando prioridad...",
+      "addTag": "Añadiendo etiqueta...",
+      "removeTag": "Eliminando etiqueta...",
+      "addTracker": "Añadiendo rastreador...",
+      "removeTracker": "Eliminando rastreador...",
+      "reannounce": "Reanunciando...",
+      "batchPause": "Pausando {{count}} torrents...",
+      "batchResume": "Reanudando {{count}} torrents...",
+      "batchDelete": "Eliminando {{count}} torrents...",
+      "batchRecheck": "Verificando {{count}} torrents...",
+      "batchSetCategory": "Estableciendo categoría para {{count}} torrents..."
+    }
   }
 }

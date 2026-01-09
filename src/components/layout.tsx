@@ -1,4 +1,5 @@
 import React from 'react'
+import { Toaster } from './ui/toast'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -6,6 +7,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="h-full">
         {children}
       </main>
+      <Toaster />
     </div>
   )
 }

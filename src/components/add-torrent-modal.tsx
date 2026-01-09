@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { addTorrentFile, addTorrentMagnet, getCategories } from '@/lib/api'
 import { TagInput } from '@/components/ui/tag-input'
 import { formatTagString, getTags } from '@/lib/tag-storage'
+import { useToast } from '@/lib/use-toast'
 
 type TabType = 'magnet' | 'file'
 
@@ -39,6 +40,7 @@ export function AddTorrentModal({
 }: AddTorrentModalProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { showSuccess, showError } = useToast()
 
   // Form state
   const [activeTab, setActiveTab] = React.useState<TabType>('magnet')
@@ -101,10 +103,14 @@ export function AddTorrentModal({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.addMagnet')
       handleClose()
     },
-    onError: (err: Error) => {
-      setError(err.message || t('addTorrent.error.failed'))
+    onError: (mutationError: Error, magnet: string) => {
+      showError('toast.error.addMagnet', {
+        description: mutationError.message,
+        onRetry: () => addMagnetMutation.mutate(magnet),
+      })
     },
   })
 
@@ -120,10 +126,14 @@ export function AddTorrentModal({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      showSuccess('toast.success.addFile')
       handleClose()
     },
-    onError: (err: Error) => {
-      setError(err.message || t('addTorrent.error.failed'))
+    onError: (mutationError: Error, file: File) => {
+      showError('toast.error.addFile', {
+        description: mutationError.message,
+        onRetry: () => addFileMutation.mutate(file),
+      })
     },
   })
 

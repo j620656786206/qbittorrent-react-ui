@@ -270,7 +270,7 @@
   },
   "keyboard": {
     "help": {
-      "title": "Raccourcis Clavier",
+      "title": "Raccourcis clavier",
       "description": "Utilisez ces raccourcis clavier pour gérer rapidement vos torrents",
       "keyColumn": "Touche",
       "actionColumn": "Action"
@@ -283,6 +283,73 @@
       "toggleSelect": "Sélectionner ou désélectionner le torrent ciblé",
       "clearSelection": "Effacer la sélection",
       "help": "Afficher l'aide des raccourcis clavier"
+    }
+  },
+  "toast": {
+    "success": {
+      "pause": "Torrent mis en pause avec succès",
+      "resume": "Torrent repris avec succès",
+      "delete": "Torrent supprimé avec succès",
+      "deleteKeepFiles": "Torrent supprimé (fichiers conservés)",
+      "deleteRemoveFiles": "Torrent supprimé (fichiers supprimés)",
+      "recheck": "Vérification du torrent démarrée",
+      "setCategory": "Catégorie mise à jour avec succès",
+      "addMagnet": "Torrent ajouté via lien magnétique",
+      "addFile": "Fichier torrent téléchargé avec succès",
+      "setFilePriority": "Priorité du fichier mise à jour",
+      "addTag": "Étiquette ajoutée avec succès",
+      "removeTag": "Étiquette supprimée avec succès",
+      "addTracker": "Tracker ajouté avec succès",
+      "removeTracker": "Tracker supprimé avec succès",
+      "reannounce": "Réannonce envoyée aux trackers",
+      "batchPause": "{{count}} torrents mis en pause",
+      "batchResume": "{{count}} torrents repris",
+      "batchDelete": "{{count}} torrents supprimés",
+      "batchRecheck": "{{count}} torrents en cours de vérification",
+      "batchSetCategory": "Catégorie définie pour {{count}} torrents"
+    },
+    "error": {
+      "pause": "Échec de la mise en pause du torrent",
+      "resume": "Échec de la reprise du torrent",
+      "delete": "Échec de la suppression du torrent",
+      "recheck": "Échec du démarrage de la vérification",
+      "setCategory": "Échec de la mise à jour de la catégorie",
+      "addMagnet": "Échec de l'ajout du lien magnétique",
+      "addFile": "Échec du téléchargement du fichier torrent",
+      "setFilePriority": "Échec de la mise à jour de la priorité du fichier",
+      "addTag": "Échec de l'ajout de l'étiquette",
+      "removeTag": "Échec de la suppression de l'étiquette",
+      "addTracker": "Échec de l'ajout du tracker",
+      "removeTracker": "Échec de la suppression du tracker",
+      "reannounce": "Échec de la réannonce",
+      "batchPause": "Échec de la mise en pause des torrents",
+      "batchResume": "Échec de la reprise des torrents",
+      "batchDelete": "Échec de la suppression des torrents",
+      "batchRecheck": "Échec de la vérification des torrents",
+      "batchSetCategory": "Échec de la définition de la catégorie",
+      "network": "Erreur réseau - veuillez vérifier votre connexion",
+      "networkRetry": "Impossible de se connecter à qBittorrent. Vérifiez qu'il est en cours d'exécution et accessible.",
+      "unknown": "Une erreur inattendue s'est produite"
+    },
+    "loading": {
+      "pause": "Mise en pause du torrent...",
+      "resume": "Reprise du torrent...",
+      "delete": "Suppression du torrent...",
+      "recheck": "Démarrage de la vérification...",
+      "setCategory": "Mise à jour de la catégorie...",
+      "addMagnet": "Ajout du torrent...",
+      "addFile": "Téléchargement du torrent...",
+      "setFilePriority": "Mise à jour de la priorité...",
+      "addTag": "Ajout de l'étiquette...",
+      "removeTag": "Suppression de l'étiquette...",
+      "addTracker": "Ajout du tracker...",
+      "removeTracker": "Suppression du tracker...",
+      "reannounce": "Réannonce en cours...",
+      "batchPause": "Mise en pause de {{count}} torrents...",
+      "batchResume": "Reprise de {{count}} torrents...",
+      "batchDelete": "Suppression de {{count}} torrents...",
+      "batchRecheck": "Vérification de {{count}} torrents...",
+      "batchSetCategory": "Définition de la catégorie pour {{count}} torrents..."
     }
   },
   "dropZone": {

@@ -41,6 +41,7 @@ import { VirtualizedTorrentCardList } from '@/components/torrent-card'
 import { useMediaQuery } from '@/lib/hooks'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatBytes, formatEta } from '@/lib/utils'
+import { useToast } from '@/lib/use-toast'
 
 // Helper to get state translation key
 function getStateKey(state: string): string {
@@ -239,6 +240,7 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
   }, ref) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
+    const { showSuccess, showError } = useToast()
     const isMobile = !useMediaQuery('(min-width: 768px)') // md breakpoint
 
     // Helper to get baseUrl from localStorage
@@ -249,6 +251,13 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
       mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['maindata'] })
+        showSuccess('toast.success.pause')
+      },
+      onError: (error: Error, hash: string) => {
+        showError('toast.error.pause', {
+          description: error.message,
+          onRetry: () => pauseMutation.mutate(hash),
+        })
       },
     })
 
@@ -256,6 +265,13 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
       mutationFn: (hash: string) => resumeTorrent(getBaseUrl(), hash),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['maindata'] })
+        showSuccess('toast.success.resume')
+      },
+      onError: (error: Error, hash: string) => {
+        showError('toast.error.resume', {
+          description: error.message,
+          onRetry: () => resumeMutation.mutate(hash),
+        })
       },
     })
 
@@ -263,6 +279,13 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
       mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['maindata'] })
+        showSuccess('toast.success.recheck')
+      },
+      onError: (error: Error, hash: string) => {
+        showError('toast.error.recheck', {
+          description: error.message,
+          onRetry: () => recheckMutation.mutate(hash),
+        })
       },
     })
 
@@ -274,8 +297,19 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
         hash: string
         deleteFiles: boolean
       }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['maindata'] })
+        showSuccess(
+          variables.deleteFiles
+            ? 'toast.success.deleteRemoveFiles'
+            : 'toast.success.deleteKeepFiles',
+        )
+      },
+      onError: (error: Error, variables) => {
+        showError('toast.error.delete', {
+          description: error.message,
+          onRetry: () => deleteMutation.mutate(variables),
+        })
       },
     })
 
@@ -464,132 +498,118 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
 
                     {/* Stats: Size, ETA, Ratio, Peers */}
                     <DivTableCell>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <span className="text-slate-500">
-                            {t('torrent.table.size')}:
-                          </span>
-                          <span>{formatBytes(torrent.size)}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <span className="text-slate-500">
-                            {t('torrent.table.eta')}:
-                          </span>
-                          <span>{formatEta(torrent.eta)}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <span className="text-slate-500">
-                            {t('torrent.table.ratio')}:
-                          </span>
-                          <span
-                            className={torrent.ratio >= 1 ? 'text-green-400' : ''}
-                          >
-                            {torrent.ratio.toFixed(2)}
+                      <div className="flex flex-col gap-0.5 text-xs">
+                        <div>
+                          <span className="text-slate-400">
+                            {formatBytes(torrent.total_downloaded)} /
+                          </span>{' '}
+                          <span className="text-slate-300">
+                            {formatBytes(torrent.total_size)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <span className="text-slate-500">
-                            {t('torrent.table.peers')}:
+                        <div className="text-slate-400">
+                          ETA: {formatEta(torrent.eta)}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400">
+                            Ratio: {torrent.ratio.toFixed(2)}
                           </span>
-                          <span>
-                            {torrent.num_seeds}↑ / {torrent.num_leechs}↓
+                          <span className="text-slate-400">
+                            {torrent.nb_connections}/{torrent.nb_connections_limit}
                           </span>
                         </div>
                       </div>
                     </DivTableCell>
+
+                    {/* Actions */}
                     <DivTableCell className="justify-end">
                       <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 p-0"
                             disabled={isBatchPending}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">
-                              {t('torrent.table.actions')}
+                              {t('torrent.table.openMenu')}
                             </span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <DropdownMenuContent align="end">
                           {isPaused ? (
                             <DropdownMenuItem
                               onClick={() => resumeMutation.mutate(torrent.hash)}
                               disabled={resumeMutation.isPending}
                             >
-                              <Play className="h-4 w-4 mr-2" />
-                              {t('torrent.actions.resume')}
+                              <Play className="mr-2 h-4 w-4" />
+                              <span>{t('torrent.actions.resume')}</span>
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
                               onClick={() => pauseMutation.mutate(torrent.hash)}
                               disabled={pauseMutation.isPending}
                             >
-                              <Pause className="h-4 w-4 mr-2" />
-                              {t('torrent.actions.pause')}
+                              <Pause className="mr-2 h-4 w-4" />
+                              <span>{t('torrent.actions.pause')}</span>
                             </DropdownMenuItem>
                           )}
+
                           <DropdownMenuItem
                             onClick={() => recheckMutation.mutate(torrent.hash)}
                             disabled={recheckMutation.isPending}
                           >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            {t('torrent.actions.recheck')}
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            <span>{t('torrent.actions.recheck')}</span>
                           </DropdownMenuItem>
+
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <DropdownMenuItem
                                 onSelect={(e) => e.preventDefault()}
-                                className="text-red-400"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                {t('torrent.actions.delete')}
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>{t('torrent.actions.delete')}</span>
                               </DropdownMenuItem>
                             </AlertDialogTrigger>
-                            <AlertDialogContent
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>
-                                  {t('torrent.deleteDialog.title')}
+                                  {t('torrent.delete.confirmTitle')}
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  {t('torrent.deleteDialog.description')}
+                                  {t('torrent.delete.confirmDescription', {
+                                    name: torrent.name,
+                                  })}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>
-                                  {t('torrent.deleteDialog.cancel')}
+                                  {t('common.cancel')}
                                 </AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() =>
+                                  onClick={() => {
                                     deleteMutation.mutate({
                                       hash: torrent.hash,
                                       deleteFiles: false,
                                     })
-                                  }
+                                  }}
                                   disabled={deleteMutation.isPending}
                                 >
-                                  {t('torrent.deleteDialog.deleteMetadata')}
+                                  {t('torrent.delete.keepFiles')}
                                 </AlertDialogAction>
                                 <AlertDialogAction
-                                  onClick={() =>
+                                  onClick={() => {
                                     deleteMutation.mutate({
                                       hash: torrent.hash,
                                       deleteFiles: true,
                                     })
-                                  }
+                                  }}
                                   disabled={deleteMutation.isPending}
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
-                                  {t('torrent.deleteDialog.deleteFiles')}
+                                  {t('torrent.delete.removeFiles')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -607,3 +627,5 @@ export const TorrentTable = React.forwardRef<TorrentTableRef, TorrentTableProps>
     )
   },
 )
+
+TorrentTable.displayName = 'TorrentTable'
