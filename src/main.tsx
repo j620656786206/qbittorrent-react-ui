@@ -13,6 +13,9 @@ import './i18n'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
+// Import toast components
+import { Toaster } from './components/ui/toaster'
+
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
 
@@ -37,6 +40,7 @@ if (!rootElement.innerHTML) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
+        <Toaster />
         <TanStackDevtools
           config={{
             position: 'bottom-right',

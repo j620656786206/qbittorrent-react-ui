@@ -1,6 +1,7 @@
 import React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 import { Menu, Search, X } from 'lucide-react' // Import Menu, Search, X icons
 import { useTranslation } from 'react-i18next'
@@ -402,6 +403,12 @@ function HomePage() {
     mutationFn: (hash: string) => pauseTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      toast.success(t('toast.torrent.pauseSuccess'))
+    },
+    onError: (error: Error) => {
+      toast.error(t('toast.torrent.pauseError'), {
+        description: error.message,
+      })
     },
   })
 
@@ -409,6 +416,12 @@ function HomePage() {
     mutationFn: (hash: string) => resumeTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      toast.success(t('toast.torrent.resumeSuccess'))
+    },
+    onError: (error: Error) => {
+      toast.error(t('toast.torrent.resumeError'), {
+        description: error.message,
+      })
     },
   })
 
@@ -416,43 +429,81 @@ function HomePage() {
     mutationFn: (hash: string) => recheckTorrent(getBaseUrl(), hash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      toast.success(t('toast.torrent.recheckSuccess'))
+    },
+    onError: (error: Error) => {
+      toast.error(t('toast.torrent.recheckError'), {
+        description: error.message,
+      })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: ({
+      hash,
+      deleteFiles,
+    }: {
+      hash: string
+      deleteFiles: boolean
+    }) => deleteTorrent(getBaseUrl(), hash, deleteFiles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maindata'] })
+      setSelectedTorrent(null)
+      toast.success(t('toast.torrent.deleteSuccess'))
+    },
+    onError: (error: Error) => {
+      toast.error(t('toast.torrent.deleteError'), {
+        description: error.message,
+      })
     },
   })
 
   // --- Batch Mutations for Bulk Operations ---
   const batchPauseMutation = useMutation({
     mutationFn: (hashes: Array<string>) => pauseTorrent(getBaseUrl(), hashes),
-    onSuccess: () => {
+    onSuccess: (_data, hashes) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
       setBatchError(null)
+      toast.success(t('toast.torrent.pauseSuccessPlural', { count: hashes.length }))
     },
     onError: (error: Error) => {
       setBatchError(t('batch.error.pause', { message: error.message }))
+      toast.error(t('toast.torrent.pauseErrorPlural'), {
+        description: error.message,
+      })
     },
   })
 
   const batchResumeMutation = useMutation({
     mutationFn: (hashes: Array<string>) => resumeTorrent(getBaseUrl(), hashes),
-    onSuccess: () => {
+    onSuccess: (_data, hashes) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
       setBatchError(null)
+      toast.success(t('toast.torrent.resumeSuccessPlural', { count: hashes.length }))
     },
     onError: (error: Error) => {
       setBatchError(t('batch.error.resume', { message: error.message }))
+      toast.error(t('toast.torrent.resumeErrorPlural'), {
+        description: error.message,
+      })
     },
   })
 
   const batchRecheckMutation = useMutation({
     mutationFn: (hashes: Array<string>) => recheckTorrent(getBaseUrl(), hashes),
-    onSuccess: () => {
+    onSuccess: (_data, hashes) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
       setBatchError(null)
+      toast.success(t('toast.torrent.recheckSuccessPlural', { count: hashes.length }))
     },
     onError: (error: Error) => {
       setBatchError(t('batch.error.recheck', { message: error.message }))
+      toast.error(t('toast.torrent.recheckErrorPlural'), {
+        description: error.message,
+      })
     },
   })
 
@@ -464,13 +515,19 @@ function HomePage() {
       hashes: Array<string>
       deleteFiles: boolean
     }) => deleteTorrent(getBaseUrl(), hashes, deleteFiles),
-    onSuccess: () => {
+    onSuccess: (_data, { hashes }) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
       setIsDeleteDialogOpen(false)
+      setBatchError(null)
+      toast.success(t('toast.torrent.deleteSuccessPlural', { count: hashes.length }))
     },
-    onError: () => {
+    onError: (error: Error) => {
       setIsDeleteDialogOpen(false)
+      setBatchError(t('batch.error.delete', { message: error.message }))
+      toast.error(t('toast.torrent.deleteErrorPlural'), {
+        description: error.message,
+      })
     },
   })
 
@@ -482,345 +539,340 @@ function HomePage() {
       hashes: Array<string>
       category: string
     }) => setTorrentCategory(getBaseUrl(), hashes, category),
-    onSuccess: () => {
+    onSuccess: (_data, { hashes }) => {
       queryClient.invalidateQueries({ queryKey: ['maindata'] })
       clearSelection()
+      setBatchError(null)
+      toast.success(t('toast.torrent.setCategorySuccess', { count: hashes.length }))
+    },
+    onError: (error: Error) => {
+      setBatchError(t('batch.error.setCategory', { message: error.message }))
+      toast.error(t('toast.torrent.setCategoryError'), {
+        description: error.message,
+      })
     },
   })
 
-  // --- Keyboard Shortcuts Integration ---
+  // --- Mutation Handlers ---
+  const handlePauseTorrent = (hash: string) => pauseMutation.mutate(hash)
+  const handleResumeTorrent = (hash: string) => resumeMutation.mutate(hash)
+  const handleRecheckTorrent = (hash: string) => recheckMutation.mutate(hash)
+  const handleDeleteTorrent = (deleteFiles: boolean) => {
+    if (!selectedTorrent) return
+    deleteMutation.mutate({
+      hash: selectedTorrent.hash,
+      deleteFiles,
+    })
+  }
+
+  const handleBatchPause = () => {
+    batchPauseMutation.mutate(Array.from(selectedHashes))
+  }
+
+  const handleBatchResume = () => {
+    batchResumeMutation.mutate(Array.from(selectedHashes))
+  }
+
+  const handleBatchRecheck = () => {
+    batchRecheckMutation.mutate(Array.from(selectedHashes))
+  }
+
+  const handleBatchDelete = (deleteFiles: boolean) => {
+    batchDeleteMutation.mutate({
+      hashes: Array.from(selectedHashes),
+      deleteFiles,
+    })
+  }
+
+  const handleBatchSetCategory = (category: string) => {
+    batchSetCategoryMutation.mutate({
+      hashes: Array.from(selectedHashes),
+      category,
+    })
+  }
+
+  // --- Keyboard Shortcuts ---
   useKeyboardShortcuts({
-    // Space: Toggle pause/resume on selected torrents
-    onSpace: React.useCallback(() => {
-      if (selectedHashes.size === 0) return
-
-      // Get selected torrents
-      const selectedTorrents = filteredTorrents.filter((torrent) =>
-        selectedHashes.has(torrent.hash),
-      )
-
-      // Check if all selected torrents are paused
-      const allPaused = selectedTorrents.every(
-        (torrent) => torrent.state === 'pausedUP' || torrent.state === 'pausedDL',
-      )
-
-      // If all are paused, resume them; otherwise pause them
-      if (allPaused) {
-        batchResumeMutation.mutate(Array.from(selectedHashes))
-      } else {
-        batchPauseMutation.mutate(Array.from(selectedHashes))
-      }
-    }, [selectedHashes, filteredTorrents, batchResumeMutation, batchPauseMutation]),
-
-    // Delete: Open delete confirmation dialog
-    onDelete: React.useCallback(() => {
-      if (selectedHashes.size > 0) {
-        setIsDeleteDialogOpen(true)
-      }
-    }, [selectedHashes]),
-
-    // Ctrl/Cmd+A: Select all visible torrents
-    onSelectAll: React.useCallback(() => {
-      selectAll(filteredTorrents)
-    }, [selectAll, filteredTorrents]),
-
-    // Escape: Clear selection
-    onEscape: React.useCallback(() => {
-      clearSelection()
-    }, [clearSelection]),
-
-    // Arrow Up: Navigate to previous torrent
-    onArrowUp: React.useCallback(() => {
-      if (filteredTorrents.length === 0) return
-
-      setFocusedIndex((prev) => {
-        if (prev === null || prev === 0) {
-          // Wrap to last item
-          return filteredTorrents.length - 1
-        }
-        return prev - 1
-      })
-    }, [filteredTorrents]),
-
-    // Arrow Down: Navigate to next torrent
-    onArrowDown: React.useCallback(() => {
-      if (filteredTorrents.length === 0) return
-
-      setFocusedIndex((prev) => {
-        if (prev === null || prev === filteredTorrents.length - 1) {
-          // Wrap to first item
-          return 0
-        }
-        return prev + 1
-      })
-    }, [filteredTorrents]),
-
-    // Enter: Toggle selection of focused torrent
-    onEnter: React.useCallback(() => {
-      if (focusedIndex !== null && filteredTorrents[focusedIndex]) {
-        toggleSelection(filteredTorrents[focusedIndex].hash)
-      }
-    }, [focusedIndex, filteredTorrents, toggleSelection]),
-
-    // Question mark: Open keyboard help
-    onHelp: React.useCallback(() => {
-      setIsKeyboardHelpOpen(true)
-    }, []),
+    onSelectAll: () => selectAll(filteredTorrents),
+    onClearSelection: () => clearSelection(),
+    onToggleSelection: (hash) => toggleSelection(hash),
+    onHelp: () => setIsKeyboardHelpOpen(true),
+    onAddTorrent: () => setIsAddTorrentOpen(true),
   })
 
-  // --- Step 5: Render UI based on state ---
-  const renderContent = () => {
-    if (!areCredentialsSet || isLoggingIn) {
-      return <LoginForm onSuccess={handleLoginSuccess} />
-    }
+  // --- Error State Display ---
+  const loginErrorMessage =
+    isLoginError && loginError instanceof Error ? loginError.message : null
+  const maindataErrorMessage =
+    isMaindataError && maindataError instanceof Error ? maindataError.message : null
 
-    if (isLoginError) {
-      return (
-        <div className="flex h-screen items-center justify-center">
-          <div className="space-y-4 text-center">
-            <h1 className="text-2xl font-bold text-red-600">
-              {t('login.error.title')}
-            </h1>
-            <p className="text-gray-600">
-              {loginError?.message || t('login.error.message')}
-            </p>
-            <Button onClick={() => setIsSettingsModalOpen(true)}>
-              {t('settings.title')}
-            </Button>
-          </div>
-        </div>
-      )
-    }
+  // --- Render ---
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/* Login Form Overlay */}
+      {!loginSuccess && (
+        <LoginForm
+          onSuccess={handleLoginSuccess}
+          isLoading={isLoggingIn}
+          error={loginErrorMessage}
+        />
+      )}
 
-    // Show loading state
-    if (isLoadingTorrents) {
-      return (
-        <div className="space-y-4">
-          <LoadingSkeleton count={5} />
-        </div>
-      )
-    }
-
-    // Show error state
-    if (isMaindataError) {
-      return (
-        <div className="flex h-screen items-center justify-center">
-          <div className="space-y-4 text-center">
-            <h1 className="text-2xl font-bold text-red-600">
-              {t('error.title')}
-            </h1>
-            <p className="text-gray-600">
-              {maindataError?.message || t('error.message')}
-            </p>
-            <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['maindata'] })}>
-              {t('error.retry')}
-            </Button>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex h-screen flex-col">
-        <div className="flex flex-1 overflow-hidden">
+      {/* Main Content */}
+      {loginSuccess && (
+        <>
           {/* Sidebar */}
           {isDesktop && (
             <Sidebar
-              filter={filter}
+              categories={categoryNames}
+              onCategoryClick={(category) => setFilter(`category:${category}`)}
               onFilterChange={setFilter}
-              categoryNames={categoryNames}
-              torrents={allTorrents}
+              currentFilter={filter}
             />
           )}
 
-          {/* Main Content */}
+          {/* Main Area */}
           <div className="flex flex-1 flex-col overflow-hidden">
-            {/* Top Bar */}
-            <div className="border-b border-gray-200 bg-white p-4">
-              <div className="flex items-center gap-4">
-                {!isDesktop && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                )}
+            {/* Header */}
+            <div className="flex items-center justify-between border-b bg-background px-4 py-3">
+              {/* Mobile Sidebar Toggle */}
+              {!isDesktop && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+              )}
 
-                <Search className="h-5 w-5 text-gray-400" />
+              {/* Search Bar */}
+              <div className="flex flex-1 items-center px-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder={t('search.placeholder')}
+                  placeholder={t('common.search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
+                  className="ml-2 border-0 bg-transparent focus-visible:ring-0"
                 />
+              </div>
 
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                )}
-
+              {/* Header Buttons */}
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setIsAddTorrentOpen(true)}
                 >
                   {t('torrent.add')}
                 </Button>
-
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={() => setIsSettingsModalOpen(true)}
                 >
-                  ⚙️
+                  {t('common.settings')}
                 </Button>
-
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={() => setIsKeyboardHelpOpen(true)}
                 >
-                  ?
+                  {t('common.help')}
                 </Button>
               </div>
             </div>
 
-            {/* Batch Actions Toolbar */}
-            {selectedHashes.size > 0 && (
-              <BatchActionsToolbar
-                selectedCount={selectedHashes.size}
-                onPause={() => batchPauseMutation.mutate(Array.from(selectedHashes))}
-                onResume={() => batchResumeMutation.mutate(Array.from(selectedHashes))}
-                onRecheck={() => batchRecheckMutation.mutate(Array.from(selectedHashes))}
-                onDelete={() => setIsDeleteDialogOpen(true)}
-                categoryNames={categoryNames}
-                onCategorySelect={(category) =>
-                  batchSetCategoryMutation.mutate({
-                    hashes: Array.from(selectedHashes),
-                    category,
-                  })
-                }
-                isPausing={batchPauseMutation.isPending}
-                isResuming={batchResumeMutation.isPending}
-                isRechecking={batchRecheckMutation.isPending}
-                isDeleting={batchDeleteMutation.isPending}
-                isSettingCategory={batchSetCategoryMutation.isPending}
-              />
-            )}
+            {/* Content Area */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Mobile Sidebar */}
+              {!isDesktop && isMobileSidebarOpen && (
+                <div className="w-48 border-r bg-background">
+                  <Sidebar
+                    categories={categoryNames}
+                    onCategoryClick={(category) => {
+                      setFilter(`category:${category}`)
+                      setIsMobileSidebarOpen(false)
+                    }}
+                    onFilterChange={(f) => {
+                      setFilter(f)
+                      setIsMobileSidebarOpen(false)
+                    }}
+                    currentFilter={filter}
+                  />
+                </div>
+              )}
 
-            {/* Torrent Table */}
-            <div className="flex-1 overflow-hidden">
-              <TorrentTable
-                torrents={filteredTorrents}
-                selectedHashes={selectedHashes}
-                onToggleSelection={toggleSelection}
-                onSelectAll={() => selectAll(filteredTorrents)}
-                onTorrentClick={setSelectedTorrent}
-                focusedIndex={focusedIndex}
-              />
+              {/* Torrents Area */}
+              <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Batch Actions Toolbar */}
+                {selectedHashes.size > 0 && (
+                  <BatchActionsToolbar
+                    selectedCount={selectedHashes.size}
+                    onPause={handleBatchPause}
+                    onResume={handleBatchResume}
+                    onRecheck={handleBatchRecheck}
+                    onDelete={() => setIsDeleteDialogOpen(true)}
+                    onSetCategory={handleBatchSetCategory}
+                    categories={categoryNames}
+                    error={_batchError}
+                  />
+                )}
+
+                {/* Torrent Table / Detail View */}
+                {isDesktop ? (
+                  <div className="flex flex-1 overflow-hidden">
+                    {/* Table */}
+                    <div className="flex-1 overflow-auto">
+                      {isLoadingTorrents ? (
+                        <LoadingSkeleton />
+                      ) : maindataErrorMessage ? (
+                        <div className="flex items-center justify-center p-4">
+                          <p className="text-red-500">{maindataErrorMessage}</p>
+                        </div>
+                      ) : (
+                        <TorrentTable
+                          torrents={filteredTorrents}
+                          selectedHashes={selectedHashes}
+                          onSelectionChange={toggleSelection}
+                          onSelectAll={() => selectAll(filteredTorrents)}
+                          onTorrentClick={setSelectedTorrent}
+                          selectedTorrent={selectedTorrent}
+                          onPause={handlePauseTorrent}
+                          onResume={handleResumeTorrent}
+                          onRecheck={handleRecheckTorrent}
+                          onDelete={() => setIsDeleteDialogOpen(true)}
+                          focusedIndex={focusedIndex}
+                          onFocusedIndexChange={setFocusedIndex}
+                        />
+                      )}
+                    </div>
+
+                    {/* Detail Panel */}
+                    {selectedTorrent && (
+                      <div className="w-96 border-l bg-background p-4">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-semibold">
+                            {t('common.details')}
+                          </h2>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTorrent(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <TorrentDetail
+                          torrent={selectedTorrent}
+                          categories={categoryNames}
+                          onDelete={() => setIsDeleteDialogOpen(true)}
+                          onPause={() => handlePauseTorrent(selectedTorrent.hash)}
+                          onResume={() => handleResumeTorrent(selectedTorrent.hash)}
+                          onRecheck={() =>
+                            handleRecheckTorrent(selectedTorrent.hash)
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Mobile View
+                  <>
+                    {isLoadingTorrents ? (
+                      <LoadingSkeleton />
+                    ) : maindataErrorMessage ? (
+                      <div className="flex items-center justify-center p-4">
+                        <p className="text-red-500">{maindataErrorMessage}</p>
+                      </div>
+                    ) : selectedTorrent ? (
+                      <TorrentDetail
+                        torrent={selectedTorrent}
+                        categories={categoryNames}
+                        onDelete={() => setIsDeleteDialogOpen(true)}
+                        onPause={() => handlePauseTorrent(selectedTorrent.hash)}
+                        onResume={() => handleResumeTorrent(selectedTorrent.hash)}
+                        onRecheck={() =>
+                          handleRecheckTorrent(selectedTorrent.hash)
+                        }
+                      />
+                    ) : (
+                      <TorrentTable
+                        torrents={filteredTorrents}
+                        selectedHashes={selectedHashes}
+                        onSelectionChange={toggleSelection}
+                        onSelectAll={() => selectAll(filteredTorrents)}
+                        onTorrentClick={setSelectedTorrent}
+                        selectedTorrent={selectedTorrent}
+                        onPause={handlePauseTorrent}
+                        onResume={handleResumeTorrent}
+                        onRecheck={handleRecheckTorrent}
+                        onDelete={() => setIsDeleteDialogOpen(true)}
+                        focusedIndex={focusedIndex}
+                        onFocusedIndexChange={setFocusedIndex}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Mobile Sidebar */}
-        {!isDesktop && isMobileSidebarOpen && (
-          <div className="border-t border-gray-200 bg-white">
-            <Sidebar
-              filter={filter}
-              onFilterChange={(newFilter) => {
-                setFilter(newFilter)
-                setIsMobileSidebarOpen(false)
-              }}
-              categoryNames={categoryNames}
-              torrents={allTorrents}
-            />
-          </div>
-        )}
+          {/* Drop Zone Overlay */}
+          <DropZoneOverlay isDragging={isDragging} />
 
-        {/* Detail Panel - Mobile */}
-        {!isDesktop && selectedTorrent && (
-          <div className="border-t border-gray-200 bg-white p-4">
-            <TorrentDetail torrent={selectedTorrent} />
-          </div>
-        )}
+          {/* Modals */}
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            onSave={handleSettingsSave}
+          />
 
-        {/* Detail Panel - Desktop */}
-        {isDesktop && selectedTorrent && (
-          <div className="w-80 border-l border-gray-200 bg-white p-4 overflow-y-auto">
-            <TorrentDetail torrent={selectedTorrent} />
-          </div>
-        )}
-      </div>
-    )
-  }
+          <AddTorrentModal
+            isOpen={isAddTorrentOpen}
+            onClose={handleAddTorrentClose}
+            droppedFiles={droppedFiles}
+            pastedMagnet={pastedMagnet}
+            initialQueueSize={initialQueueSize}
+          />
 
-  return (
-    <>
-      {/* Drop Zone Overlay */}
-      {isDragging && <DropZoneOverlay />}
+          <KeyboardHelpModal
+            isOpen={isKeyboardHelpOpen}
+            onClose={() => setIsKeyboardHelpOpen(false)}
+          />
 
-      {/* Main Content */}
-      {renderContent()}
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        onSave={handleSettingsSave}
-      />
-
-      {/* Add Torrent Modal */}
-      <AddTorrentModal
-        isOpen={isAddTorrentOpen}
-        onClose={handleAddTorrentClose}
-        droppedFiles={droppedFiles}
-        pastedMagnet={pastedMagnet}
-        initialQueueSize={initialQueueSize}
-      />
-
-      {/* Keyboard Help Modal */}
-      <KeyboardHelpModal
-        isOpen={isKeyboardHelpOpen}
-        onClose={() => setIsKeyboardHelpOpen(false)}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('torrent.delete.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('torrent.delete.description', { count: selectedHashes.size })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                batchDeleteMutation.mutate({
-                  hashes: Array.from(selectedHashes),
-                  deleteFiles: true,
-                })
-              }}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {t('torrent.delete.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Error Toast */}
-      {_batchError && (
-        <div className="fixed bottom-4 right-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-          {_batchError}
-        </div>
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('torrent.delete')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {selectedHashes.size > 0
+                    ? t('torrent.deleteConfirmPlural', {
+                        count: selectedHashes.size,
+                      })
+                    : t('torrent.deleteConfirm')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => handleBatchDelete(false)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {t('torrent.deleteTorrent')}
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => handleBatchDelete(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {t('torrent.deleteWithFiles')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       )}
-    </>
+    </div>
   )
 }

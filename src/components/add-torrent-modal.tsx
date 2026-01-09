@@ -107,8 +107,10 @@ export function AddTorrentModal({
       handleClose()
     },
     onError: (mutationError: Error, magnet: string) => {
+      const errorMessage = mutationError.message || t('addTorrent.error.failed')
+      setError(errorMessage)
       showError('toast.error.addMagnet', {
-        description: mutationError.message,
+        description: errorMessage,
         onRetry: () => addMagnetMutation.mutate(magnet),
       })
     },
@@ -130,8 +132,10 @@ export function AddTorrentModal({
       handleClose()
     },
     onError: (mutationError: Error, file: File) => {
+      const errorMessage = mutationError.message || t('addTorrent.error.failed')
+      setError(errorMessage)
       showError('toast.error.addFile', {
-        description: mutationError.message,
+        description: errorMessage,
         onRetry: () => addFileMutation.mutate(file),
       })
     },
@@ -242,7 +246,7 @@ export function AddTorrentModal({
               <Label htmlFor="magnetLink">
                 {t('addTorrent.magnetLink.label')}
               </Label>
-              <Input
+<Input
                 id="magnetLink"
                 value={magnetLink}
                 onChange={(e) => {

@@ -59,7 +59,7 @@ vi.mock('@/lib/api', () => ({
  */
 vi.mock('@/lib/tag-storage', () => ({
   getTags: vi.fn(() => []),
-  formatTagString: vi.fn((tags: Array<string>) => tags.join(',')),
+  formatTagString: vi.fn((tags: string[]) => tags.join(',')),
 }))
 
 /**
@@ -226,7 +226,7 @@ describe('AddTorrentModal Component', () => {
 
       // Switch to file tab
       const fileTabButton = screen.getByRole('button', {
-        name: /Torrent File/i,
+name: /Torrent File/i,
       })
       await user.click(fileTabButton)
 
@@ -457,7 +457,6 @@ describe('AddTorrentModal Component', () => {
       })
       await user.click(fileTabButton)
 
-      // Select a file
       const file = new File(['torrent content'], 'test.torrent', {
         type: 'application/x-bittorrent',
       })
@@ -471,6 +470,238 @@ describe('AddTorrentModal Component', () => {
 
       await waitFor(() => {
         expect(addTorrentFile).toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('Form Submission', () => {
+    it('calls addTorrentMagnet when magnet link is submitted', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(addTorrentMagnet).toHaveBeenCalledWith(
+          'http://localhost:8080',
+          'magnet:?xt=urn:btih:test123',
+          expect.any(Object),
+        )
+      })
+    })
+
+    it('calls addTorrentFile when torrent file is submitted', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentFile).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      // Switch to file tab
+      const fileTabButton = screen.getByRole('button', {
+        name: /Torrent File/i,
+      })
+      await user.click(fileTabButton)
+
+      const file = new File(['torrent content'], 'test.torrent', {
+        type: 'application/x-bittorrent',
+      })
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
+      await user.upload(fileInput, file)
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(addTorrentFile).toHaveBeenCalled()
+      })
+    })
+
+    it('shows adding state while request is pending', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+
+      let resolveAddTorrent: (value: boolean) => void
+      const addTorrentPromise = new Promise<boolean>(
+        (resolve) => (resolveAddTorrent = resolve),
+      )
+      vi.mocked(addTorrentMagnet).mockReturnValue(addTorrentPromise)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled()
+      })
+
+      resolveAddTorrent!(true)
+
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Adding...' })).not
+          .toBeInTheDocument()
+      })
+    })
+
+    it('closes modal on successful submission', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled()
+      })
+    })
+
+    it('shows error message on submission failure', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockRejectedValue(
+        new Error('Network error'),
+      )
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to add torrent')).toBeInTheDocument()
+      })
+    })
+
+    it('does not close modal on submission failure', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockRejectedValue(
+        new Error('Network error'),
+      )
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to add torrent')).toBeInTheDocument()
+      })
+
+      expect(mockOnClose).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Additional Form Options', () => {
+    it('includes save path when submitting magnet link', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const savePathInput = screen.getByLabelText('Save Path')
+      await user.type(savePathInput, '/custom/path')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(addTorrentMagnet).toHaveBeenCalledWith(
+          'http://localhost:8080',
+          'magnet:?xt=urn:btih:test123',
+          expect.objectContaining({
+            savePath: '/custom/path',
+          }),
+        )
+      })
+    })
+
+    it('includes category when submitting magnet link', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('option', { name: 'Movies' }),
+        ).toBeInTheDocument()
+      })
+
+      const categorySelect = screen.getByLabelText('Category')
+      await user.selectOptions(categorySelect, 'Movies')
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(addTorrentMagnet).toHaveBeenCalledWith(
+          'http://localhost:8080',
+          'magnet:?xt=urn:btih:test123',
+          expect.objectContaining({
+            category: 'Movies',
+          }),
+        )
+      })
+    })
+
+    it('includes start paused flag when submitting magnet link', async () => {
+      const user = userEvent.setup()
+      const mockOnClose = vi.fn()
+      vi.mocked(addTorrentMagnet).mockResolvedValue(true)
+
+      renderAddTorrentModal({ isOpen: true, onClose: mockOnClose })
+
+      const checkbox = screen.getByLabelText('Start paused')
+      await user.click(checkbox)
+
+      const magnetInput = screen.getByLabelText('Magnet Link')
+      await user.type(magnetInput, 'magnet:?xt=urn:btih:test123')
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      await user.click(addButton)
+
+      await waitFor(() => {
+        expect(addTorrentMagnet).toHaveBeenCalledWith(
+          'http://localhost:8080',
+          'magnet:?xt=urn:btih:test123',
+          expect.objectContaining({
+            paused: true,
+          }),
+        )
       })
     })
   })
