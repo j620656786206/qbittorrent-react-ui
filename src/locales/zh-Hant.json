@@ -289,6 +289,272 @@
     "title": "拖放 Torrent 檔案至此",
     "subtitle": "鬆開以新增 Torrent 檔案"
   },
+  "qbittorrent": {
+    "settings": {
+      "title": "qBittorrent 設定",
+      "description": "配置您的 qBittorrent 偏好設定",
+      "saving": "儲存中...",
+      "saved": "設定已成功儲存",
+      "error": "儲存設定失敗",
+      "loading": "載入設定中...",
+      "loadError": "載入設定失敗",
+      "unsavedChanges": "您有未儲存的變更",
+      "discardChanges": "放棄變更",
+      "tabs": {
+        "downloads": "下載",
+        "speed": "速度",
+        "connection": "連線",
+        "bittorrent": "BitTorrent",
+        "webui": "Web UI",
+        "rss": "RSS",
+        "advanced": "進階",
+        "behavior": "行為",
+        "tagsCategories": "標籤與分類"
+      },
+      "downloads": {
+        "title": "下載設定",
+        "description": "配置下載路徑和行為",
+        "savePath": {
+          "label": "預設儲存路徑",
+          "placeholder": "/downloads",
+          "description": "下載檔案的預設位置"
+        },
+        "tempPath": {
+          "label": "將未完成的 Torrent 保存在",
+          "enabled": "使用不同路徑保存未完成的 Torrent",
+          "placeholder": "/downloads/incomplete"
+        },
+        "autoTmm": {
+          "label": "自動 Torrent 管理",
+          "description": "根據分類自動管理 Torrent",
+          "enabled": "啟用後，Torrent 將自動移動到對應的分類路徑"
+        },
+        "relocateTorrent": {
+          "label": "重新定位受影響的 Torrent",
+          "description": "分類路徑變更時移動 Torrent"
+        },
+        "torrentContentLayout": {
+          "label": "Torrent 內容配置",
+          "original": "原始",
+          "subfolder": "建立子資料夾",
+          "noSubfolder": "不建立子資料夾"
+        },
+        "appendExtension": {
+          "label": "為未完成的檔案附加 .!qB 副檔名",
+          "description": "下載時為檔案添加 .!qB 副檔名"
+        },
+        "preallocateAll": {
+          "label": "為所有檔案預先配置磁碟空間",
+          "description": "下載前配置完整的磁碟空間"
+        },
+        "useIncompleteExtension": {
+          "label": "使用未完成檔案副檔名",
+          "description": "為未完成的檔案添加副檔名"
+        },
+        "autoDeleteMode": {
+          "label": "Torrent 完成時",
+          "never": "不執行任何操作",
+          "ratio": "達到分享率時移除",
+          "time": "超過時間限制後移除"
+        },
+        "scanDirs": {
+          "title": "監控資料夾",
+          "description": "自動從這些資料夾添加 Torrent",
+          "addFolder": "新增資料夾",
+          "folder": "資料夾路徑",
+          "saveTo": "儲存到",
+          "downloadPath": "下載路徑",
+          "defaultPath": "預設路徑",
+          "customPath": "自訂路徑",
+          "noFolders": "尚未配置監控資料夾"
+        },
+        "export": {
+          "label": "複製 .torrent 檔案到",
+          "enabled": "為已完成的下載複製 .torrent 檔案",
+          "placeholder": "/torrents/finished"
+        },
+        "exportFinished": {
+          "label": "為已完成的下載複製 .torrent 檔案到",
+          "placeholder": "/torrents/finished"
+        },
+        "mailNotification": {
+          "title": "電子郵件通知",
+          "enabled": "Torrent 完成時發送電子郵件通知",
+          "senderEmail": "寄件人電子郵件（從）",
+          "recipientEmail": "收件人電子郵件（到）",
+          "smtpServer": "SMTP 伺服器",
+          "smtpPort": "SMTP 連接埠",
+          "smtpUsername": "使用者名稱",
+          "smtpPassword": "密碼",
+          "smtpSsl": "SMTP 連線使用 SSL",
+          "smtpAuth": "需要身份驗證"
+        },
+        "autoRun": {
+          "title": "執行外部程式",
+          "enabled": "Torrent 完成時執行外部程式",
+          "program": "程式",
+          "programPlaceholder": "/path/to/program \"%N\"",
+          "parameters": "可用參數：%N（名稱）、%L（分類）、%G（標籤）、%F（內容路徑）、%R（根路徑）、%D（儲存路徑）、%C（檔案數量）、%Z（Torrent 大小）、%T（Tracker）、%I（資訊雜湊 v1）、%J（資訊雜湊 v2）、%K（Torrent ID）"
+        },
+        "excludeFileNames": {
+          "label": "排除檔案名稱",
+          "description": "符合這些模式的檔案將不會被下載",
+          "placeholder": "*.exe\n*.bat\n*.com"
+        }
+      },
+      "speed": {
+        "title": "速度限制",
+        "description": "配置上傳和下載速度限制",
+        "globalLimits": {
+          "title": "全域速率限制",
+          "download": "下載限制",
+          "upload": "上傳限制",
+          "unlimited": "無限制",
+          "unit": "KiB/s",
+          "description": "設為 0 表示無限制"
+        },
+        "altLimits": {
+          "title": "替代速率限制",
+          "description": "可排程的次要速度限制",
+          "download": "替代下載限制",
+          "upload": "替代上傳限制"
+        },
+        "scheduler": {
+          "title": "排程",
+          "enabled": "啟用排程",
+          "description": "自動切換到替代速度限制",
+          "from": "從",
+          "to": "到",
+          "days": {
+            "label": "排程日期",
+            "everyday": "每天",
+            "weekdays": "平日",
+            "weekends": "週末",
+            "monday": "週一",
+            "tuesday": "週二",
+            "wednesday": "週三",
+            "thursday": "週四",
+            "friday": "週五",
+            "saturday": "週六",
+            "sunday": "週日"
+          }
+        },
+        "perTorrent": {
+          "title": "單一 Torrent 速率限制",
+          "download": "單一 Torrent 下載限制",
+          "upload": "單一 Torrent 上傳限制"
+        },
+        "rateLimitUtp": {
+          "label": "對 uTP 協定套用速率限制",
+          "description": "在速率限制中包含 uTP 流量"
+        },
+        "rateLimitTcpOverhead": {
+          "label": "對傳輸開銷套用速率限制",
+          "description": "在速率限制中包含協定開銷"
+        },
+        "rateLimitLan": {
+          "label": "對區域網路節點套用速率限制",
+          "description": "限制區域網路節點的速度"
+        }
+      },
+      "connection": {
+        "title": "連線設定",
+        "description": "配置網路連線和代理設定",
+        "listeningPort": {
+          "title": "監聽連接埠",
+          "port": "用於傳入連線的連接埠",
+          "portPlaceholder": "6881",
+          "random": "使用隨機連接埠",
+          "upnp": "使用路由器的 UPnP / NAT-PMP 連接埠轉發",
+          "upnpDescription": "自動配置連接埠轉發"
+        },
+        "connectionLimits": {
+          "title": "連線限制",
+          "maxConnections": "全域最大連線數",
+          "maxConnectionsPerTorrent": "每個 Torrent 最大連線數",
+          "maxUploads": "全域最大上傳槽數",
+          "maxUploadsPerTorrent": "每個 Torrent 最大上傳槽數"
+        },
+        "proxy": {
+          "title": "代理伺服器",
+          "type": {
+            "label": "類型",
+            "none": "無",
+            "http": "HTTP",
+            "socks4": "SOCKS4",
+            "socks5": "SOCKS5"
+          },
+          "host": "主機",
+          "hostPlaceholder": "proxy.example.com",
+          "port": "連接埠",
+          "portPlaceholder": "1080",
+          "auth": "需要身份驗證",
+          "username": "使用者名稱",
+          "password": "密碼",
+          "proxyPeerConnections": "使用代理進行節點連線",
+          "proxyHostnameLookup": "使用代理進行主機名稱查詢",
+          "proxyBittorrent": "使用代理進行 BitTorrent 用途",
+          "proxyRss": "使用代理進行 RSS 訂閱",
+          "proxyMisc": "使用代理進行一般用途"
+        },
+        "ipFiltering": {
+          "title": "IP 過濾",
+          "enabled": "啟用 IP 過濾",
+          "filterPath": "過濾檔案路徑",
+          "filterPathPlaceholder": "/path/to/ipfilter.dat",
+          "bannedIps": "手動封鎖的 IP 位址",
+          "bannedIpsPlaceholder": "每行一個 IP",
+          "filterTrackers": "對 Tracker 套用過濾"
+        },
+        "i2p": {
+          "title": "I2P",
+          "enabled": "啟用 I2P",
+          "address": "I2P SAM 橋接器位址",
+          "port": "I2P SAM 橋接器連接埠",
+          "mixedMode": "啟用 I2P 混合模式",
+          "mixedModeDescription": "允許 I2P 和一般連線並存"
+        }
+      },
+      "bittorrent": {
+        "title": "BitTorrent 設定",
+        "description": "配置 BitTorrent 協定行為",
+        "privacy": {
+          "title": "隱私",
+          "dht": "啟用 DHT（去中心化網路）以尋找更多節點",
+          "pex": "啟用節點交換（PeX）以尋找更多節點",
+          "lsd": "啟用本地節點發現以尋找本地節點",
+          "encryption": {
+            "label": "加密模式",
+            "prefer": "偏好加密",
+            "require": "強制加密",
+            "disable": "停用加密"
+          },
+          "anonymousMode": "啟用匿名模式",
+          "anonymousModeDescription": "啟用後，qBittorrent 將不會分享您的 IP 位址和其他識別資訊"
+        },
+        "torrentQueueing": {
+          "title": "Torrent 佇列",
+          "enabled": "啟用 Torrent 佇列",
+          "maxActiveDownloads": "最大活動下載數",
+          "maxActiveUploads": "最大活動上傳數",
+          "maxActiveTorrents": "最大活動 Torrent 數",
+          "ignoreSlowTorrents": "在這些限制中不計算慢速 Torrent",
+          "slowTorrentDlThreshold": "慢速 Torrent 的下載速率閾值（KiB/s）",
+          "slowTorrentUlThreshold": "慢速 Torrent 的上傳速率閾值（KiB/s）",
+          "slowTorrentInactiveTimer": "Torrent 閒置計時器（秒）"
+        },
+        "seedingLimits": {
+          "title": "做種限制",
+          "shareRatioEnabled": "當分享率達到",
+          "shareRatio": "分享率限制",
+          "seedingTimeEnabled": "當做種時間達到",
+          "seedingTime": "做種時間限制（分鐘）",
+          "seedingInactiveEnabled": "當 Torrent 閒置時間達到",
+          "seedingInactive": "閒置時間限制（分鐘）"
+        }
+      }
+    }
+  },
   "toast": {
     "success": {
       "pause": "Torrent 已暫停",

@@ -54,7 +54,7 @@
       "selectAll": "Alle Torrents auswählen",
       "selectTorrent": "{{name}} auswählen"
     },
-    "details": {
+"details": {
       "progress": "Fortschritt",
       "downloadSpeed": "Download-Geschwindigkeit",
       "uploadSpeed": "Upload-Geschwindigkeit",
@@ -358,5 +358,259 @@
       "loggingIn": "Anmeldung läuft..."
     },
     "help": "Hilfe zu Tastenkombinationen anzeigen"
+  },
+  "qbittorrent": {
+    "settings": {
+      "title": "qBittorrent Settings",
+      "description": "Configure your qBittorrent preferences",
+      "saving": "Saving...",
+      "saved": "Settings saved successfully",
+      "error": "Failed to save settings",
+      "loading": "Loading settings...",
+      "loadError": "Failed to load settings",
+      "unsavedChanges": "You have unsaved changes",
+      "discardChanges": "Discard Changes",
+      "tabs": {
+        "downloads": "Downloads",
+        "speed": "Speed",
+        "connection": "Connection",
+        "bittorrent": "BitTorrent",
+        "webui": "Web UI",
+        "rss": "RSS",
+        "advanced": "Advanced",
+        "behavior": "Behavior",
+        "tagsCategories": "Tags & Categories"
+      },
+      "downloads": {
+        "title": "Downloads Settings",
+        "description": "Configure download paths and behavior",
+        "savePath": {
+          "label": "Default Save Path",
+          "placeholder": "/downloads",
+          "description": "Default location for downloaded files"
+        },
+        "tempPath": {
+          "label": "Keep incomplete torrents in",
+          "enabled": "Use a different path for incomplete torrents",
+          "placeholder": "/downloads/incomplete"
+        },
+        "autoTmm": {
+          "label": "Automatic Torrent Management",
+          "description": "Automatically manage torrents based on their category",
+          "enabled": "When enabled, torrents will be moved to the appropriate category path"
+        },
+        "relocateTorrent": {
+          "label": "Relocate affected torrents",
+          "description": "Move torrents when category path changes"
+        },
+        "torrentContentLayout": {
+          "label": "Torrent Content Layout",
+          "original": "Original",
+          "subfolder": "Create subfolder",
+          "noSubfolder": "Don't create subfolder"
+        },
+        "appendExtension": {
+          "label": "Append .!qB extension to incomplete files",
+          "description": "Adds .!qB extension to files while downloading"
+        },
+        "preallocateAll": {
+          "label": "Pre-allocate disk space for all files",
+          "description": "Allocates full disk space before downloading"
+        },
+        "useIncompleteExtension": {
+          "label": "Use incomplete file extension",
+          "description": "Add extension to incomplete files"
+        },
+        "autoDeleteMode": {
+          "label": "When torrent is finished",
+          "never": "Do nothing",
+          "ratio": "Remove when ratio reached",
+          "time": "Remove after time limit"
+        },
+        "scanDirs": {
+          "title": "Monitored Folders",
+          "description": "Automatically add torrents from these folders",
+          "addFolder": "Add Folder",
+          "folder": "Folder Path",
+          "saveTo": "Save to",
+          "downloadPath": "Download Path",
+          "defaultPath": "Default path",
+          "customPath": "Custom path",
+          "noFolders": "No monitored folders configured"
+        },
+        "export": {
+          "label": "Copy .torrent files to",
+          "enabled": "Copy .torrent files for finished downloads",
+          "placeholder": "/torrents/finished"
+        },
+        "exportFinished": {
+          "label": "Copy .torrent files for finished downloads to",
+          "placeholder": "/torrents/finished"
+        },
+        "mailNotification": {
+          "title": "Email Notification",
+          "enabled": "Send email notification on torrent completion",
+          "senderEmail": "Sender email (From)",
+          "recipientEmail": "Recipient email (To)",
+          "smtpServer": "SMTP server",
+          "smtpPort": "SMTP port",
+          "smtpUsername": "Username",
+          "smtpPassword": "Password",
+          "smtpSsl": "Use SSL for SMTP connection",
+          "smtpAuth": "Require authentication"
+        },
+        "autoRun": {
+          "title": "Run External Program",
+          "enabled": "Run external program on torrent completion",
+          "program": "Program",
+          "programPlaceholder": "/path/to/program \"%N\"",
+          "parameters": "Available parameters: %N (name), %L (category), %G (tags), %F (content path), %R (root path), %D (save path), %C (number of files), %Z (torrent size), %T (tracker), %I (info hash v1), %J (info hash v2), %K (torrent ID)"
+        },
+        "excludeFileNames": {
+          "label": "Exclude file names",
+          "description": "Files matching these patterns will not be downloaded",
+          "placeholder": "*.exe\n*.bat\n*.com"
+        }
+      },
+      "speed": {
+        "title": "Speed Limits",
+        "description": "Configure upload and download speed limits",
+        "globalLimits": {
+          "title": "Global Rate Limits",
+          "download": "Download limit",
+          "upload": "Upload limit",
+          "unlimited": "Unlimited",
+          "unit": "KiB/s",
+          "description": "Set to 0 for unlimited"
+        },
+        "altLimits": {
+          "title": "Alternative Rate Limits",
+          "description": "Secondary speed limits that can be scheduled",
+          "download": "Alternative download limit",
+          "upload": "Alternative upload limit"
+        },
+        "scheduler": {
+          "title": "Schedule",
+          "enabled": "Enable scheduling",
+          "description": "Use alternative rate limits during specified times",
+          "startTime": "Start time",
+          "endTime": "End time",
+          "days": "Days"
+        },
+        "connectionLimits": {
+          "title": "Connection Limits",
+          "maxConnections": "Maximum connections",
+          "maxConnectionsPerTorrent": "Maximum connections per torrent",
+          "maxUploads": "Maximum uploads per torrent",
+          "description": "Set to -1 for unlimited"
+        }
+      },
+      "connection": {
+        "title": "Connection Settings",
+        "description": "Configure network connection parameters",
+        "listeningPort": {
+          "label": "Listening Port",
+          "description": "Port used for incoming connections"
+        },
+        "upnp": {
+          "label": "UPnP/NAT-PMP port mapping",
+          "description": "Automatically map ports using UPnP/NAT-PMP"
+        },
+        "encryption": {
+          "label": "Encryption",
+          "policy": "Policy",
+          "required": "Required",
+          "preferred": "Preferred",
+          "disabled": "Disabled"
+        },
+        "proxy": {
+          "title": "Proxy Settings",
+          "enabled": "Use proxy server",
+          "type": "Proxy type",
+          "http": "HTTP",
+          "socks5": "SOCKS5",
+          "host": "Host",
+          "port": "Port",
+          "username": "Username (optional)",
+          "password": "Password (optional)"
+        }
+      },
+      "bittorrent": {
+        "title": "BitTorrent Settings",
+        "description": "Configure BitTorrent protocol parameters",
+        "dht": {
+          "label": "DHT (Distributed Hash Table)",
+          "description": "Enable DHT for trackerless operation"
+        },
+        "pex": {
+          "label": "PEX (Peer Exchange)",
+          "description": "Enable PEX for peer discovery"
+        },
+        "lsd": {
+          "label": "LSD (Local Service Discovery)",
+          "description": "Enable LSD for local network peers"
+        },
+        "maxActive": {
+          "label": "Maximum active torrents",
+          "description": "Limit of simultaneously downloading torrents"
+        },
+        "maxActiveDL": {
+          "label": "Maximum active downloads",
+          "description": "Limit of simultaneously downloading torrents"
+        },
+        "maxActiveUP": {
+          "label": "Maximum active uploads",
+          "description": "Limit of simultaneously uploading torrents"
+        }
+      },
+      "webui": {
+        "title": "Web UI Settings",
+        "description": "Configure the Web UI interface",
+        "enabled": {
+          "label": "Enable Web UI",
+          "description": "Enable or disable the web interface"
+        },
+        "port": {
+          "label": "Port",
+          "description": "Port used for web interface"
+        },
+        "username": {
+          "label": "Username",
+          "description": "Username for web UI access"
+        },
+        "password": {
+          "label": "Password",
+          "description": "Password for web UI access"
+        },
+        "ssl": {
+          "label": "Use HTTPS instead of HTTP",
+          "description": "Enable SSL/TLS for web interface"
+        },
+        "certificatePath": {
+          "label": "Certificate path",
+          "description": "Path to SSL certificate file"
+        },
+        "keyPath": {
+          "label": "Key path",
+          "description": "Path to SSL key file"
+        }
+      },
+      "rss": {
+        "title": "RSS Settings",
+        "description": "Configure RSS feed options"
+      },
+      "advanced": {
+        "title": "Advanced Settings",
+        "description": "Advanced configuration options"
+      },
+      "behavior": {
+        "title": "Behavior Settings",
+        "description": "Configure application behavior"
+      },
+      "tagsCategories": {
+        "title": "Tags & Categories",
+        "description": "Manage tags and categories"
+      }
+    }
   }
 }

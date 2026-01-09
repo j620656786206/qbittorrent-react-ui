@@ -521,91 +521,111 @@ function TorrentTagsEditor({
     removeTagMutation.mutate(tagName)
   }
 
-  return (
-    <div className="relative" ref={containerRef}>
-      <div className="flex items-start gap-3">
-        <div className="text-slate-400 mt-0.5">
-          <TagIcon className="h-4 w-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-slate-400 mb-2">
-            {t('torrent.tags')}
-          </div>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {currentTagObjects.map((tag) => (
-              <TagChip
-                key={tag.name}
-                tag={tag}
-                onRemove={() => handleRemoveTag(tag.name)}
-              />
-            ))}
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="h-7 text-xs"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            {t('common.add')}
-          </Button>
+  const isLoading = addTagMutation.isPending || removeTagMutation.isPending
 
-          {/* Dropdown for unassigned tags */}
-          {isDropdownOpen && unassignedTags.length > 0 && (
-            <div className="absolute top-full mt-1 left-0 bg-slate-700 border border-slate-600 rounded-md shadow-lg z-10 w-48 max-h-48 overflow-y-auto">
-              {unassignedTags.map((tag) => (
-                <button
-                  key={tag.name}
-                  onClick={() => handleAddTag(tag)}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-600 text-sm text-white flex items-center gap-2 border-b border-slate-600 last:border-b-0"
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full ${getColorClass(tag.color)}`}
-                  />
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-          )}
+  return (
+    <div className="flex items-start gap-3" ref={containerRef}>
+      <div className="text-slate-400 mt-0.5">
+        <TagIcon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-400 mb-0.5">{t('torrent.tags')}</div>
+        <div className="flex flex-wrap gap-2 items-center relative">
+          {currentTagObjects.map((tag) => (
+            <TagChip
+              key={tag.name}
+              tag={tag}
+              onRemove={handleRemoveTag}
+              isLoading={isLoading}
+            />
+          ))}
+
+          <div className="relative">
+            <Button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isLoading || unassignedTags.length === 0}
+              variant="outline"
+              size="sm"
+              className="h-6 px-2"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              {t('common.add')}
+            </Button>
+
+            {isDropdownOpen && unassignedTags.length > 0 && (
+              <div className="absolute top-8 left-0 z-50 mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg min-w-[150px]">
+                {unassignedTags.map((tag) => (
+                  <button
+                    key={tag.name}
+                    onClick={() => handleAddTag(tag)}
+                    disabled={isLoading}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 text-white first:rounded-t-md last:rounded-b-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full mr-2 ${getColorClass(tag.color)}`}
+                    />
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function TrackerList({ hash, baseUrl }: { hash: string; baseUrl: string }) {
+// TrackerList component
+type TrackerListProps = {
+  hash: string
+  baseUrl: string
+}
+
+function TrackerList({ hash, baseUrl }: TrackerListProps) {
   const { t } = useTranslation()
-  const { data: trackers, isLoading } = useQuery({
+  const {
+    data: trackers,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['trackers', hash],
-    queryFn: () => getTrackers(hash, baseUrl),
+    queryFn: () => getTrackers(baseUrl, hash),
   })
 
-  if (isLoading) {
+  if (isLoading)
     return (
-      <div className="flex justify-center py-4">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
       </div>
     )
-  }
 
-  if (!trackers || trackers.length === 0) {
+  if (error)
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">
-        {t('common.noData')}
+      <div className="flex items-center gap-2 text-red-500 text-sm">
+        <AlertCircle className="h-4 w-4" />
+        {t('common.error')}
       </div>
     )
-  }
+
+  if (!trackers || trackers.length === 0)
+    return <div className="text-sm text-slate-400">{t('common.empty')}</div>
 
   return (
     <div className="space-y-2">
       {trackers.map((tracker, index) => (
-        <div key={index} className="bg-slate-800/30 rounded p-2 text-sm">
-          <div className="flex items-center gap-2 mb-1">
+        <div
+          key={`${tracker.url}-${index}`}
+          className="flex items-start gap-2 p-2 bg-slate-800/30 rounded text-sm"
+        >
+          <div className="mt-0.5">
             {getTrackerStatusIcon(tracker.status)}
-            <span className="text-slate-300 flex-1">{tracker.url}</span>
           </div>
-          <div className="text-xs text-slate-400 ml-6">
-            {t(getTrackerStatusKey(tracker.status))}
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-xs break-all">{tracker.url}</div>
+            <div className="text-slate-400 text-xs">
+              {t(getTrackerStatusKey(tracker.status))}
+            </div>
           </div>
         </div>
       ))}

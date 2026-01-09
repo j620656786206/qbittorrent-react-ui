@@ -161,6 +161,7 @@ describe('Translation Files', () => {
         'dropZone',
         'toast',
         'loading',
+        'qbittorrent',
       ]
 
       languages.forEach((lang) => {

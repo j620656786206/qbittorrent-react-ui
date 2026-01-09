@@ -285,6 +285,168 @@
       "help": "Show keyboard shortcuts help"
     }
   },
+  "qbittorrent": {
+    "settings": {
+      "title": "qBittorrent Settings",
+      "description": "Configure your qBittorrent preferences",
+      "saving": "Saving...",
+      "saved": "Settings saved successfully",
+      "error": "Failed to save settings",
+      "loading": "Loading settings...",
+      "loadError": "Failed to load settings",
+      "unsavedChanges": "You have unsaved changes",
+      "discardChanges": "Discard Changes",
+      "tabs": {
+        "downloads": "Downloads",
+        "speed": "Speed",
+        "connection": "Connection",
+        "bittorrent": "BitTorrent",
+        "webui": "Web UI",
+        "rss": "RSS",
+        "advanced": "Advanced",
+        "behavior": "Behavior",
+        "tagsCategories": "Tags & Categories"
+      },
+      "downloads": {
+        "title": "Downloads Settings",
+        "description": "Configure download paths and behavior",
+        "savePath": {
+          "label": "Default Save Path",
+          "placeholder": "/downloads",
+          "description": "Default location for downloaded files"
+        },
+        "tempPath": {
+          "label": "Keep incomplete torrents in",
+          "enabled": "Use a different path for incomplete torrents",
+          "placeholder": "/downloads/incomplete"
+        },
+        "autoTmm": {
+          "label": "Automatic Torrent Management",
+          "description": "Automatically manage torrents based on their category",
+          "enabled": "When enabled, torrents will be moved to the appropriate category path"
+        },
+        "relocateTorrent": {
+          "label": "Relocate affected torrents",
+          "description": "Move torrents when category path changes"
+        },
+        "torrentContentLayout": {
+          "label": "Torrent Content Layout",
+          "original": "Original",
+          "subfolder": "Create subfolder",
+          "noSubfolder": "Don't create subfolder"
+        },
+        "appendExtension": {
+          "label": "Append .!qB extension to incomplete files",
+          "description": "Adds .!qB extension to files while downloading"
+        },
+        "preallocateAll": {
+          "label": "Pre-allocate disk space for all files",
+          "description": "Allocates full disk space before downloading"
+        },
+        "useIncompleteExtension": {
+          "label": "Use incomplete file extension",
+          "description": "Add extension to incomplete files"
+        },
+        "autoDeleteMode": {
+          "label": "When torrent is finished",
+          "never": "Do nothing",
+          "ratio": "Remove when ratio reached",
+          "time": "Remove after time limit"
+        },
+        "scanDirs": {
+          "title": "Monitored Folders",
+          "description": "Automatically add torrents from these folders",
+          "addFolder": "Add Folder",
+          "folder": "Folder Path",
+          "saveTo": "Save to",
+          "downloadPath": "Download Path",
+          "defaultPath": "Default path",
+          "customPath": "Custom path",
+          "noFolders": "No monitored folders configured"
+        },
+        "export": {
+          "label": "Copy .torrent files to",
+          "enabled": "Copy .torrent files for finished downloads",
+          "placeholder": "/torrents/finished"
+        },
+        "exportFinished": {
+          "label": "Copy .torrent files for finished downloads to",
+          "placeholder": "/torrents/finished"
+        },
+        "mailNotification": {
+          "title": "Email Notification",
+          "enabled": "Send email notification on torrent completion",
+          "senderEmail": "Sender email (From)",
+          "recipientEmail": "Recipient email (To)",
+          "smtpServer": "SMTP server",
+          "smtpPort": "SMTP port",
+          "smtpUsername": "Username",
+          "smtpPassword": "Password",
+          "smtpSsl": "Use SSL for SMTP connection",
+          "smtpAuth": "Require authentication"
+        },
+        "autoRun": {
+          "title": "Run External Program",
+          "enabled": "Run external program on torrent completion",
+          "program": "Program",
+          "programPlaceholder": "/path/to/program \"%N\"",
+          "parameters": "Available parameters: %N (name), %L (category), %G (tags), %F (content path), %R (root path), %D (save path), %C (number of files), %Z (torrent size), %T (tracker), %I (info hash v1), %J (info hash v2), %K (torrent ID)"
+        },
+        "excludeFileNames": {
+          "label": "Exclude file names",
+          "description": "Files matching these patterns will not be downloaded",
+          "placeholder": "*.exe\n*.bat\n*.com"
+        }
+      },
+      "speed": {
+        "title": "Speed Limits",
+        "description": "Configure upload and download speed limits",
+        "globalLimits": {
+          "title": "Global Rate Limits",
+          "download": "Download limit",
+          "upload": "Upload limit",
+          "unlimited": "Unlimited",
+          "unit": "KiB/s",
+          "description": "Set to 0 for unlimited"
+        },
+        "altLimits": {
+          "title": "Alternative Rate Limits",
+          "description": "Secondary speed limits that can be scheduled",
+          "download": "Alternative download limit",
+          "upload": "Alternative upload limit"
+        },
+        "scheduler": {
+          "title": "Schedule",
+          "enabled": "Enable scheduling",
+          "description": "Automatically switch to alternative speed limits",
+          "from": "From",
+          "to": "To",
+          "days": {
+            "label": "Schedule days",
+            "everyday": "Every day",
+            "weekdays": "Weekdays",
+            "weekends": "Weekends",
+            "monday": "Monday",
+            "tuesday": "Tuesday",
+            "wednesday": "Wednesday",
+            "thursday": "Thursday",
+            "friday": "Friday",
+            "saturday": "Saturday",
+            "sunday": "Sunday"
+          }
+        },
+        "perTorrent": {
+          "title": "Per-Torrent Rate Limits",
+          "download": "Per-torrent download limit",
+          "upload": "Per-torrent upload limit"
+        },
+        "rateLimitUtp": {
+          "label": "Apply rate limit to uTP protocol",
+          "description": "Include uTP traffic in rate limits"
+        }
+      }
+    }
+  },
   "toast": {
     "success": {
       "pause": "Torrent paused successfully",

@@ -271,18 +271,292 @@
   "keyboard": {
     "help": {
       "title": "键盘快捷键",
-      "description": "使用这些键盘快捷键快速管理您的种子",
+      "description": "使用这些键盘快捷键快速管理您的 Torrent",
       "keyColumn": "按键",
-      "actionColumn": "操作"
+      "actionColumn": "动作"
     },
     "shortcuts": {
-      "selectAll": "选择所有可见的种子",
-      "pauseResume": "暂停或继续所选种子",
-      "delete": "删除所选种子",
-      "navigate": "在种子之间导航",
-      "toggleSelect": "选择或取消选择聚焦的种子",
+      "selectAll": "全选所有可见的 Torrent",
+      "pauseResume": "暂停或继续选中的 Torrent",
+      "delete": "删除选中的 Torrent",
+      "navigate": "在 Torrent 之间导航",
+      "toggleSelect": "选择或取消选择焦点 Torrent",
       "clearSelection": "清除选择",
       "help": "显示键盘快捷键帮助"
+    }
+  },
+  "qbittorrent": {
+    "settings": {
+      "title": "qBittorrent 设置",
+      "description": "配置您的 qBittorrent 偏好设置",
+      "saving": "保存中...",
+      "saved": "设置已成功保存",
+      "error": "保存设置失败",
+      "loading": "加载设置中...",
+      "loadError": "加载设置失败",
+      "unsavedChanges": "您有未保存的更改",
+      "discardChanges": "放弃更改",
+      "tabs": {
+        "downloads": "下载",
+        "speed": "速度",
+        "connection": "连接",
+        "bittorrent": "BitTorrent",
+        "webui": "Web UI",
+        "rss": "RSS",
+        "advanced": "高级",
+        "behavior": "行为",
+        "tagsCategories": "标签与分类"
+      },
+      "downloads": {
+        "title": "下载设置",
+        "description": "配置下载路径和行为",
+        "savePath": {
+          "label": "默认保存路径",
+          "placeholder": "/downloads",
+          "description": "下载文件的默认位置"
+        },
+        "tempPath": {
+          "label": "将未完成的 Torrent 保存在",
+          "enabled": "使用不同路径保存未完成的 Torrent",
+          "placeholder": "/downloads/incomplete"
+        },
+        "autoTmm": {
+          "label": "自动 Torrent 管理",
+          "description": "根据分类自动管理 Torrent",
+          "enabled": "启用后，Torrent 将自动移动到对应的分类路径"
+        },
+        "relocateTorrent": {
+          "label": "重新定位受影响的 Torrent",
+          "description": "分类路径更改时移动 Torrent"
+        },
+        "torrentContentLayout": {
+          "label": "Torrent 内容布局",
+          "original": "原始",
+          "subfolder": "创建子文件夹",
+          "noSubfolder": "不创建子文件夹"
+        },
+        "appendExtension": {
+          "label": "为未完成的文件附加 .!qB 扩展名",
+          "description": "下载时为文件添加 .!qB 扩展名"
+        },
+        "preallocateAll": {
+          "label": "为所有文件预先分配磁盘空间",
+          "description": "下载前分配完整的磁盘空间"
+        },
+        "useIncompleteExtension": {
+          "label": "使用未完成文件扩展名",
+          "description": "为未完成的文件添加扩展名"
+        },
+        "autoDeleteMode": {
+          "label": "Torrent 完成时",
+          "never": "不执行任何操作",
+          "ratio": "达到分享率时移除",
+          "time": "超过时间限制后移除"
+        },
+        "scanDirs": {
+          "title": "监控文件夹",
+          "description": "自动从这些文件夹添加 Torrent",
+          "addFolder": "添加文件夹",
+          "folder": "文件夹路径",
+          "saveTo": "保存到",
+          "downloadPath": "下载路径",
+          "defaultPath": "默认路径",
+          "customPath": "自定义路径",
+          "noFolders": "尚未配置监控文件夹"
+        },
+        "export": {
+          "label": "复制 .torrent 文件到",
+          "enabled": "为已完成的下载复制 .torrent 文件",
+          "placeholder": "/torrents/finished"
+        },
+        "exportFinished": {
+          "label": "为已完成的下载复制 .torrent 文件到",
+          "placeholder": "/torrents/finished"
+        },
+        "mailNotification": {
+          "title": "邮件通知",
+          "enabled": "Torrent 完成时发送邮件通知",
+          "senderEmail": "发件人邮箱（从）",
+          "recipientEmail": "收件人邮箱（到）",
+          "smtpServer": "SMTP 服务器",
+          "smtpPort": "SMTP 端口",
+          "smtpUsername": "用户名",
+          "smtpPassword": "密码",
+          "smtpSsl": "SMTP 连接使用 SSL",
+          "smtpAuth": "需要身份验证"
+        },
+        "autoRun": {
+          "title": "运行外部程序",
+          "enabled": "Torrent 完成时运行外部程序",
+          "program": "程序",
+          "programPlaceholder": "/path/to/program \"%N\"",
+          "parameters": "可用参数：%N（名称）、%L（分类）、%G（标签）、%F（内容路径）、%R（根路径）、%D（保存路径）、%C（文件数量）、%Z（Torrent 大小）、%T（Tracker）、%I（信息哈希 v1）、%J（信息哈希 v2）、%K（Torrent ID）"
+        },
+        "excludeFileNames": {
+          "label": "排除文件名",
+          "description": "匹配这些模式的文件将不会被下载",
+          "placeholder": "*.exe\n*.bat\n*.com"
+        }
+      },
+      "speed": {
+        "title": "速度限制",
+        "description": "配置上传和下载速度限制",
+        "globalLimits": {
+          "title": "全局速率限制",
+          "download": "下载限制",
+          "upload": "上传限制",
+          "unlimited": "无限制",
+          "unit": "KiB/s",
+          "description": "设为 0 表示无限制"
+        },
+        "altLimits": {
+          "title": "备选速率限制",
+          "description": "可计划的次要速度限制",
+          "download": "备选下载限制",
+          "upload": "备选上传限制"
+        },
+        "scheduler": {
+          "title": "计划",
+          "enabled": "启用计划",
+          "description": "自动切换到备选速度限制",
+          "from": "从",
+          "to": "到",
+          "days": {
+            "label": "计划日期",
+            "everyday": "每天",
+            "weekdays": "工作日",
+            "weekends": "周末",
+            "monday": "周一",
+            "tuesday": "周二",
+            "wednesday": "周三",
+            "thursday": "周四",
+            "friday": "周五",
+            "saturday": "周六",
+            "sunday": "周日"
+          }
+        },
+        "perTorrent": {
+          "title": "单个 Torrent 速率限制",
+          "download": "单个 Torrent 下载限制",
+          "upload": "单个 Torrent 上传限制"
+        },
+        "rateLimitUtp": {
+          "label": "对 uTP 协议应用速率限制",
+          "description": "在速率限制中包含 uTP 流量"
+        },
+        "rateLimitTcpOverhead": {
+          "label": "对传输开销应用速率限制",
+          "description": "在速率限制中包含协议开销"
+        },
+        "rateLimitLan": {
+          "label": "对局域网节点应用速率限制",
+          "description": "限制局域网节点的速度"
+        }
+      },
+      "connection": {
+        "title": "连接设置",
+        "description": "配置网络连接和代理设置",
+        "listeningPort": {
+          "title": "监听端口",
+          "port": "用于传入连接的端口",
+          "portPlaceholder": "6881",
+          "random": "使用随机端口",
+          "upnp": "使用路由器的 UPnP / NAT-PMP 端口转发",
+          "upnpDescription": "自动配置端口转发"
+        },
+        "connectionLimits": {
+          "title": "连接限制",
+          "maxConnections": "全局最大连接数",
+          "maxConnectionsPerTorrent": "每个 Torrent 最大连接数",
+          "maxUploads": "全局最大上传槽数",
+          "maxUploadsPerTorrent": "每个 Torrent 最大上传槽数"
+        },
+        "proxy": {
+          "title": "代理服务器",
+          "type": {
+            "label": "类型",
+            "none": "无",
+            "http": "HTTP",
+            "socks4": "SOCKS4",
+            "socks5": "SOCKS5"
+          },
+          "host": "主机",
+          "hostPlaceholder": "proxy.example.com",
+          "port": "端口",
+          "portPlaceholder": "1080",
+          "auth": "需要身份验证",
+          "username": "用户名",
+          "password": "密码",
+          "proxyPeerConnections": "使用代理进行节点连接",
+          "proxyHostnameLookup": "使用代理进行主机名查询",
+          "proxyBittorrent": "使用代理进行 BitTorrent 用途",
+          "proxyRss": "使用代理进行 RSS 订阅",
+          "proxyMisc": "使用代理进行一般用途"
+        },
+        "ipFiltering": {
+          "title": "IP 过滤",
+          "enabled": "启用 IP 过滤",
+          "filterPath": "过滤文件路径",
+          "filterPathPlaceholder": "/path/to/ipfilter.dat",
+          "bannedIps": "手动封禁的 IP 地址",
+          "bannedIpsPlaceholder": "每行一个 IP",
+          "filterTrackers": "对 Tracker 应用过滤"
+        },
+        "i2p": {
+          "title": "I2P",
+          "enabled": "启用 I2P",
+          "address": "I2P SAM 桥接器地址",
+          "port": "I2P SAM 桥接器端口",
+          "mixedMode": "启用 I2P 混合模式",
+          "mixedModeDescription": "允许 I2P 和普通连接并存"
+        }
+      },
+      "bittorrent": {
+        "title": "BitTorrent 设置",
+        "description": "配置 BitTorrent 协议行为",
+        "privacy": {
+          "title": "隐私",
+          "dht": "启用 DHT（去中心化网络）以寻找更多节点",
+          "pex": "启用节点交换（PeX）以寻找更多节点",
+          "lsd": "启用本地节点发现以寻找本地节点",
+          "encryption": {
+            "label": "加密模式",
+            "prefer": "偏好加密",
+            "require": "强制加密",
+            "disable": "禁用加密"
+          },
+          "anonymousMode": "启用匿名模式",
+          "anonymousModeDescription": "启用后，qBittorrent 将不会分享您的 IP 地址和其他识别信息"
+        },
+        "torrentQueueing": {
+          "title": "Torrent 队列",
+          "enabled": "启用 Torrent 队列",
+          "maxActiveDownloads": "最大活动下载数",
+          "maxActiveUploads": "最大活动上传数",
+          "maxActiveTorrents": "最大活动 Torrent 数",
+          "ignoreSlowTorrents": "在这些限制中不计算慢速 Torrent",
+          "slowTorrentDlThreshold": "慢速 Torrent 的下载速率阈值（KiB/s）",
+          "slowTorrentUlThreshold": "慢速 Torrent 的上传速率阈值（KiB/s）",
+          "slowTorrentInactiveTimer": "Torrent 空闲计时器（秒）"
+        },
+        "seedingLimits": {
+          "title": "做种限制",
+          "shareRatioEnabled": "当分享率达到",
+          "shareRatio": "分享率",
+          "shareRatioDescription": "当达到此分享率时停止做种",
+          "seedingTimeEnabled": "当做种时间达到",
+          "seedingTime": "做种时间（分钟）",
+          "seedingTimeDescription": "当做种时间超过此值时停止做种",
+          "seedingInactiveEnabled": "Torrent 长期不活跃时停止做种",
+          "seedingInactiveTimer": "不活跃超过（分钟）",
+          "seedingInactiveDescription": "当 Torrent 空闲超过此时间时停止做种"
+        },
+        "addTrackers": {
+          "label": "添加 Tracker",
+          "description": "向新 Torrent 添加这些 Tracker",
+          "placeholder": "每行一个 Tracker 网址"
+        }
+      }
     }
   },
   "dropZone": {
