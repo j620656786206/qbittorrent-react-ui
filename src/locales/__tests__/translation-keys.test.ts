@@ -160,6 +160,7 @@ describe('Translation Files', () => {
         'keyboard',
         'dropZone',
         'toast',
+        'loading',
       ]
 
       languages.forEach((lang) => {

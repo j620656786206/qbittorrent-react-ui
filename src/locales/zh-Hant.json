@@ -353,7 +353,9 @@
       "batchResume": "繼續 {{count}} 個 Torrent 中...",
       "batchDelete": "刪除 {{count}} 個 Torrent 中...",
       "batchRecheck": "重新檢查 {{count}} 個 Torrent 中...",
-      "batchSetCategory": "為 {{count}} 個 Torrent 設定分類中..."
+      "batchSetCategory": "為 {{count}} 個 Torrent 設定分類中...",
+      "torrents": "載入 Torrent 資料中...",
+      "loggingIn": "登入中..."
     }
   }
 }

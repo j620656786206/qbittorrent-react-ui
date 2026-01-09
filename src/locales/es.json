@@ -270,8 +270,8 @@
   },
   "keyboard": {
     "help": {
-      "title": "Atajos de teclado",
-      "description": "Use estos atajos de teclado para administrar rápidamente sus torrents",
+      "title": "Atajos de Teclado",
+      "description": "Usa estos atajos de teclado para gestionar tus torrents rápidamente",
       "keyColumn": "Tecla",
       "actionColumn": "Acción"
     },
@@ -280,7 +280,7 @@
       "pauseResume": "Pausar o reanudar torrents seleccionados",
       "delete": "Eliminar torrents seleccionados",
       "navigate": "Navegar entre torrents",
-      "toggleSelect": "Seleccionar o deseleccionar el torrent enfocado",
+      "toggleSelect": "Seleccionar o deseleccionar torrent enfocado",
       "clearSelection": "Limpiar selección",
       "help": "Mostrar ayuda de atajos de teclado"
     }
@@ -353,7 +353,9 @@
       "batchResume": "Reanudando {{count}} torrents...",
       "batchDelete": "Eliminando {{count}} torrents...",
       "batchRecheck": "Verificando {{count}} torrents...",
-      "batchSetCategory": "Estableciendo categoría para {{count}} torrents..."
+      "batchSetCategory": "Estableciendo categoría para {{count}} torrents...",
+      "torrents": "Cargando datos de torrents...",
+      "loggingIn": "Iniciando sesión..."
     }
   }
 }

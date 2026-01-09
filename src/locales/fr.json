@@ -270,7 +270,7 @@
   },
   "keyboard": {
     "help": {
-      "title": "Raccourcis clavier",
+      "title": "Raccourcis Clavier",
       "description": "Utilisez ces raccourcis clavier pour gérer rapidement vos torrents",
       "keyColumn": "Touche",
       "actionColumn": "Action"
@@ -349,7 +349,9 @@
       "batchResume": "Reprise de {{count}} torrents...",
       "batchDelete": "Suppression de {{count}} torrents...",
       "batchRecheck": "Vérification de {{count}} torrents...",
-      "batchSetCategory": "Définition de la catégorie pour {{count}} torrents..."
+      "batchSetCategory": "Définition de la catégorie pour {{count}} torrents...",
+      "torrents": "Chargement des données des torrents...",
+      "loggingIn": "Connexion en cours..."
     }
   },
   "dropZone": {

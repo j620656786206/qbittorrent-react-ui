@@ -1,7 +1,7 @@
 import React from 'react'
 import { ChevronDownIcon, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Locales} from '@/locales';
+import type { Locales } from '@/locales'
 import {
   Dialog,
   DialogContent,
@@ -40,8 +40,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
     // Load current values from localStorage when modal opens
     setUsername(localStorage.getItem('qbit_username') || 'admin')
     setPassword(localStorage.getItem('qbit_password') || 'adminadmin')
-    const currentLang = i18n.language as Locales
-    setLanguage(currentLang)
+    setLanguage(i18n.language as Locales)
   }, [isOpen])
 
   const handleSave = () => {
@@ -59,9 +58,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{t('settings.title')}</DialogTitle>
-          <DialogDescription>
-            {t('settings.description')}
-          </DialogDescription>
+          <DialogDescription>{t('settings.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -93,7 +90,9 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 size="icon-sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2"
                 onClick={() => setShowPassword(!showPassword)}
-                aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
+                aria-label={t(
+                  showPassword ? 'common.hidePassword' : 'common.showPassword',
+                )}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -119,9 +118,15 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[200px]">
-                <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as Locales)}>
+                <DropdownMenuRadioGroup
+                  value={language}
+                  onValueChange={(value) => setLanguage(value as Locales)}
+                >
                   {LOCALES.map((locale) => (
-                    <DropdownMenuRadioItem key={locale.value} value={locale.value}>
+                    <DropdownMenuRadioItem
+                      key={locale.value}
+                      value={locale.value}
+                    >
                       {locale.title}
                     </DropdownMenuRadioItem>
                   ))}

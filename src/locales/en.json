@@ -349,7 +349,9 @@
       "batchResume": "Resuming {{count}} torrents...",
       "batchDelete": "Deleting {{count}} torrents...",
       "batchRecheck": "Rechecking {{count}} torrents...",
-      "batchSetCategory": "Setting category for {{count}} torrents..."
+      "batchSetCategory": "Setting category for {{count}} torrents...",
+      "torrents": "Loading torrent data...",
+      "loggingIn": "Logging in..."
     }
   },
   "dropZone": {

@@ -271,7 +271,7 @@
   "keyboard": {
     "help": {
       "title": "キーボードショートカット",
-      "description": "これらのキーボードショートカットを使用してトレントを素早く管理できます",
+      "description": "これらのキーボードショートカットを使用してトレントを素早く管理します",
       "keyColumn": "キー",
       "actionColumn": "操作"
     },
@@ -353,7 +353,11 @@
       "batchResume": "{{count}}個のトレントを再開中...",
       "batchDelete": "{{count}}個のトレントを削除中...",
       "batchRecheck": "{{count}}個のトレントを再チェック中...",
-      "batchSetCategory": "{{count}}個のトレントにカテゴリーを設定中..."
+      "batchSetCategory": "{{count}}個のトレントにカテゴリーを設定中...",
+      "torrents": "トレントデータを読み込み中...",
+      "loggingIn": "ログイン中...",
+      "clearSelection": "選択を解除",
+      "help": "キーボードショートカットのヘルプを表示"
     }
   }
 }

@@ -270,8 +270,8 @@
   },
   "keyboard": {
     "help": {
-      "title": "Tastaturkürzel",
-      "description": "Verwenden Sie diese Tastaturkürzel zur schnellen Verwaltung Ihrer Torrents",
+      "title": "Tastenkombinationen",
+      "description": "Verwenden Sie diese Tastenkombinationen, um Ihre Torrents schnell zu verwalten",
       "keyColumn": "Taste",
       "actionColumn": "Aktion"
     },
@@ -353,7 +353,10 @@
       "batchResume": "{{count}} Torrents werden fortgesetzt...",
       "batchDelete": "{{count}} Torrents werden gelöscht...",
       "batchRecheck": "{{count}} Torrents werden überprüft...",
-      "batchSetCategory": "Kategorie wird für {{count}} Torrents gesetzt..."
-    }
+      "batchSetCategory": "Kategorie wird für {{count}} Torrents gesetzt...",
+      "torrents": "Lade Torrent-Daten...",
+      "loggingIn": "Anmeldung läuft..."
+    },
+    "help": "Hilfe zu Tastenkombinationen anzeigen"
   }
 }

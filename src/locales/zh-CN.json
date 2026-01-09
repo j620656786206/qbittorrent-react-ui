@@ -277,8 +277,8 @@
     },
     "shortcuts": {
       "selectAll": "选择所有可见的种子",
-      "pauseResume": "暂停或继续选定的种子",
-      "delete": "删除选定的种子",
+      "pauseResume": "暂停或继续所选种子",
+      "delete": "删除所选种子",
       "navigate": "在种子之间导航",
       "toggleSelect": "选择或取消选择聚焦的种子",
       "clearSelection": "清除选择",
@@ -353,7 +353,9 @@
       "batchResume": "正在继续 {{count}} 个种子...",
       "batchDelete": "正在删除 {{count}} 个种子...",
       "batchRecheck": "正在重新检查 {{count}} 个种子...",
-      "batchSetCategory": "正在为 {{count}} 个种子设置分类..."
+      "batchSetCategory": "正在为 {{count}} 个种子设置分类...",
+      "torrents": "加载 Torrent 数据中...",
+      "loggingIn": "登录中..."
     }
   }
 }
