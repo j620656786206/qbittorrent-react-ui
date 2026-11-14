@@ -1,0 +1,9 @@
+# react-torrent 專屬設定（練設計專案）
+[workflow]
+persistent_facts = [
+  "file:{project-root}/DESIGN.md",
+  "Stakes: hobby. Solo practice project for Alex to train his own design taste. Not a product, never integrate with Vido.",
+  "Screen cap: only the 10 screens listed in the root DESIGN.md (login added 2026-11-14); total mockups must stay at or under 15 (ai-context/core/gates.md). Any extra screen must map to one of the 7 daily tasks (temp download path dropped 2026-11-14).",
+  "Coaching path by default: Alex picks, Claude never volunteers colors or directions. Record Alex's reasons in his own words.",
+  "No em dash in any human-facing text.",
+]

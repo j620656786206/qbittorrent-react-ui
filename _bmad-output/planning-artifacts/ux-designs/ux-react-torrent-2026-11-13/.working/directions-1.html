@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>種子列表視覺方向</title>
+<style>
+/* ================= page shell (not part of any direction) ================= */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: #e7e7ea; color: #1f1f23;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.page { max-width: 1760px; margin: 0 auto; padding: 40px 16px 80px; overflow-x: hidden; }
+.intro { max-width: 900px; margin-bottom: 40px; }
+.intro h1 { font-size: 28px; margin: 0 0 12px; }
+.intro p { font-size: 15px; line-height: 1.75; margin: 0 0 8px; color: #3b3b42; }
+.intro .note { font-size: 13px; color: #6b6b75; }
+.dir { margin: 0 0 72px; padding-top: 32px; border-top: 1px solid #cfcfd5; }
+.dir-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.dir-h .key { font-size: 13px; font-weight: 600; color: #6b6b75; letter-spacing: .04em; }
+.dir-h h2 { font-size: 26px; margin: 0; }
+.dir-h .tag { font-size: 14px; color: #55555e; }
+.why { max-width: 900px; font-size: 15px; line-height: 1.8; color: #33333a; margin: 10px 0 24px; }
+.stage > div { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
+figure { margin: 0; }
+figcaption { font-size: 12px; color: #6b6b75; margin: 0 0 8px; }
+.desk-wrap { max-width: 100%; overflow-x: auto; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+.browser { width: 1280px; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 40px rgba(0,0,0,.12); flex: none; }
+.browser .chrome { height: 40px; background: #dcdce0; display: flex; align-items: center; gap: 16px; padding: 0 14px; }
+.browser .dots { display: flex; gap: 8px; }
+.browser .dots span { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+.browser .dots span:nth-child(2) { background: #febc2e; }
+.browser .dots span:nth-child(3) { background: #28c840; }
+.browser .url { flex: 1; max-width: 520px; height: 26px; border-radius: 7px; background: #f4f4f6; font-size: 12px; color: #55555e; display: flex; align-items: center; padding: 0 12px; }
+.browser .vp { height: 800px; overflow: hidden; position: relative; }
+
+.phone { width: 410px; height: 820px; border: 10px solid #121214; border-radius: 52px; overflow: hidden; position: relative; flex: none; box-shadow: 0 12px 40px rgba(0,0,0,.18); }
+.phone .sb { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 28px; font-size: 14px; font-weight: 600; }
+
+/* ============================================================
+   方向 A 平靜工具
+   page bg     #ffffff   sidebar  #fafafa
+   text        #18181b   muted    #71717a   border  #e4e4e7
+   accent      #2563eb   selected row #eff6ff  bulk bar #dbeafe
+   danger      #dc2626
+   chips  下載中 #dbeafe / #1e40af   做種中 #dcfce7 / #166534
+          已完成 #f1f5f9 / #334155   已暫停 #fef3c7 / #92400e
+          錯誤   #fee2e2 / #991b1b   停滯   #ffedd5 / #9a3412
+   radius 6px, chip 999px; row 40px; base 13px
+   ============================================================ */
+.A { --bg:#ffffff; --side:#fafafa; --tx:#18181b; --mu:#71717a; --bd:#e4e4e7; --ac:#2563eb; }
+.A .vp, .A .phone { background: var(--bg); color: var(--tx); font-size: 13px; }
+.A .app { display: grid; grid-template-columns: 220px 1fr; }
+.A .side { background: var(--side); border-right: 1px solid var(--bd); padding: 18px 14px; display: flex; flex-direction: column; height: 800px; }
+.A .brand { font-weight: 700; font-size: 15px; margin: 0 6px 22px; }
+.A .lbl { font-size: 11px; font-weight: 600; color: var(--mu); margin: 0 6px 6px; }
+.A .cats { list-style: none; margin: 0; padding: 0; }
+.A .cats li { display: flex; justify-content: space-between; padding: 7px 8px; border-radius: 6px; color: #3f3f46; }
+.A .cats li span { color: var(--mu); font-variant-numeric: tabular-nums; }
+.A .cats li.on { background: #e4e4e7; color: var(--tx); font-weight: 600; }
+.A .speed { margin-top: auto; border: 1px solid var(--bd); background: #fff; border-radius: 8px; padding: 12px; }
+.A .sp { margin: 8px 0 12px; }
+.A .sp-h { display: flex; justify-content: space-between; align-items: baseline; }
+.A .sp-h span { color: var(--mu); }
+.A .sp-h b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.A .lim { font-size: 12px; color: #3f3f46; margin-top: 3px; }
+.A .meter { height: 6px; border-radius: 3px; background: #f4f4f5; margin-top: 6px; overflow: hidden; }
+.A .meter i { display: block; height: 100%; background: var(--ac); }
+.A .alt { font-size: 11px; color: var(--mu); line-height: 1.5; border-top: 1px solid var(--bd); padding-top: 8px; }
+.A .main { padding: 18px 24px; min-width: 0; }
+.A .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.A .ttl { display: flex; align-items: baseline; gap: 10px; }
+.A h1 { font-size: 20px; margin: 0; font-weight: 650; }
+.A .count { color: var(--mu); }
+.A .acts { display: flex; gap: 10px; align-items: center; }
+.A .sort { border: 1px solid var(--bd); border-radius: 6px; padding: 5px 12px; display: flex; flex-direction: column; line-height: 1.35; }
+.A .sort small { font-size: 11px; color: var(--mu); }
+.A .btn { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 6px; font-weight: 500; border: 1px solid var(--bd); background: #fff; }
+.A .btn.primary { background: #18181b; color: #fff; border-color: #18181b; }
+.A .btn.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+.A .btn.ghost { border-color: transparent; background: transparent; color: #1e40af; }
+.A .btn.sm { height: 30px; padding: 0 10px; font-size: 13px; }
+.A .bulk { display: flex; align-items: center; gap: 12px; background: #dbeafe; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 8px 6px 14px; margin-bottom: 8px; color: #1e3a8a; }
+.A .bulk b { margin-right: 4px; }
+.A table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.A th { text-align: left; font-weight: 500; color: var(--mu); font-size: 12px; height: 36px; border-bottom: 1px solid var(--bd); padding: 0 8px; }
+.A td { height: 40px; border-bottom: 1px solid #f0f0f2; padding: 0 8px; color: #52525b; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.A tr.sel td { background: #eff6ff; }
+.A td .nm { color: var(--tx); }
+.A td.warn { color: #b91c1c; }
+.A .cb { display: inline-block; width: 16px; height: 16px; border: 1.5px solid #a1a1aa; border-radius: 4px; vertical-align: middle; position: relative; background: #fff; }
+.A .cb.on { background: var(--ac); border-color: var(--ac); }
+.A .cb.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.A .cb.mixed { background: var(--ac); border-color: var(--ac); }
+.A .cb.mixed::after { content: ""; position: absolute; left: 3px; top: 6px; width: 7px; height: 2px; background: #fff; }
+.A .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 13px; font-weight: 650; }
+.A .chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.A .chip.dl { background: #dbeafe; color: #1e40af; }
+.A .chip.seed { background: #dcfce7; color: #166534; }
+.A .chip.done { background: #f1f5f9; color: #334155; }
+.A .chip.paused { background: #fef3c7; color: #92400e; }
+.A .chip.err { background: #fee2e2; color: #991b1b; }
+.A .chip.stall { background: #ffedd5; color: #9a3412; }
+.A .prog { display: flex; align-items: center; gap: 8px; }
+.A .prog .bar { width: 64px; height: 4px; border-radius: 2px; background: #f0f0f2; overflow: hidden; }
+.A .prog .bar i { display: block; height: 100%; background: #a1a1aa; }
+.A .foot { color: var(--mu); font-size: 12px; padding: 12px 8px; }
+.A .phone .sb { color: var(--tx); }
+.A .ph-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 16px 12px; font-size: 16px; }
+.A .ph-speed { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+.A .ph-speed div { border: 1px solid var(--bd); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
+.A .ph-speed span { font-size: 11px; color: var(--mu); }
+.A .ph-speed b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.A .ph-speed small { font-size: 11px; color: #3f3f46; }
+.A .ph-filter { display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+.A .select { border: 1px solid var(--bd); border-radius: 6px; padding: 6px 12px; font-weight: 600; }
+.A .ph-sort { padding: 8px 16px 10px; font-size: 12px; color: var(--mu); border-bottom: 1px solid var(--bd); }
+.A .pr { padding: 11px 16px; border-bottom: 1px solid #f0f0f2; }
+.A .pr-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.A .pr .pct { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.A .pr .fin { font-size: 13px; font-weight: 650; color: #166534; }
+.A .pr-nm { font-size: 14px; color: var(--tx); }
+.A .pr-bar { height: 4px; background: #f0f0f2; border-radius: 2px; margin: 6px 0 4px; overflow: hidden; }
+.A .pr-bar i { display: block; height: 100%; background: #2563eb; }
+.A .pr-bar.stall i { background: #ea580c; }
+.A .pr-bar.paused i { background: #d97706; }
+.A .pr-meta { font-size: 12px; color: var(--mu); margin-top: 2px; }
+
+/* ============================================================
+   方向 B 終端機
+   bg          #0a0e0b   panel    #0f1511   line   #1c2620
+   text        #cfd8d0   dim      #66766a   dim2   #8a978d
+   accent      #4ade80 (phosphor)   selected row #13301d
+   status 下載中 #60a5fa   做種中 #4ade80   已完成 #b6c2b9
+          已暫停 #facc15   錯誤   #f87171   停滯   #fb923c
+   radius 0; row 28px; mono 12.5px
+   ============================================================ */
+.B { --bg:#0a0e0b; --pn:#0f1511; --ln:#1c2620; --tx:#cfd8d0; --dim:#66766a; --dim2:#8a978d; --ac:#4ade80; --mono: "SF Mono", ui-monospace, Menlo, Consolas, "PingFang TC", "Noto Sans TC", monospace; }
+.B .vp, .B .phone { background: var(--bg); color: var(--tx); font-family: var(--mono); font-size: 12.5px; }
+.B .app { display: flex; flex-direction: column; }
+.B .dim { color: var(--dim); } .B .dim2 { color: var(--dim2); } .B .acc { color: var(--ac); }
+.B .title { display: flex; justify-content: space-between; padding: 8px 16px; background: var(--pn); border-bottom: 1px solid var(--ln); }
+.B .speed { display: flex; gap: 32px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--ln); flex-wrap: wrap; }
+.B .sp { display: flex; gap: 10px; align-items: baseline; }
+.B .k { color: var(--dim); }
+.B .sp b { color: #e8f5ea; font-size: 15px; }
+.B .lim { color: var(--tx); border: 1px solid var(--ln); padding: 1px 6px; }
+.B .meter { color: var(--ac); letter-spacing: -1px; }
+.B .alt { color: var(--dim); margin-left: auto; }
+.B .tabs { display: flex; gap: 4px; padding: 8px 16px; border-bottom: 1px solid var(--ln); align-items: center; }
+.B .tabs span { padding: 2px 10px; color: var(--dim2); }
+.B .tabs span.dim { padding-left: 0; color: var(--dim); }
+.B .tabs .on { background: var(--ac); color: #04140a; font-weight: 700; }
+.B .head { display: flex; gap: 14px; align-items: baseline; padding: 12px 16px 8px; }
+.B .h1 { font-size: 15px; font-weight: 700; color: #e8f5ea; }
+.B .sort { color: var(--ac); }
+.B .key { margin-left: auto; color: var(--dim2); }
+.B kbd { font-family: var(--mono); border: 1px solid #2f3d33; padding: 0 5px; color: var(--tx); background: var(--pn); }
+.B .tbl { flex: 1; overflow: hidden; }
+.B .r { display: grid; grid-template-columns: 40px 104px minmax(0,1fr) 150px 84px 104px 84px 60px; gap: 12px; align-items: center; height: 28px; padding: 0 16px; border-bottom: 1px solid #111813; white-space: nowrap; }
+.B .r.th { color: var(--dim); height: 26px; border-bottom: 1px solid var(--ln); }
+.B .r.sel { background: #13301d; }
+.B .r.sel .dim { color: var(--ac); }
+.B .rt { text-align: right; }
+.B .nm { color: var(--tx); }
+.B .warn { color: #f87171; }
+.B .st { font-weight: 700; }
+.B .st.dl, .B .dlc { color: #60a5fa; }
+.B .st.seed { color: #4ade80; }
+.B .st.done { color: #b6c2b9; }
+.B .st.paused, .B .pausedc { color: #facc15; }
+.B .st.err { color: #f87171; }
+.B .st.stall, .B .stallc { color: #fb923c; }
+.B .cmd { display: flex; gap: 22px; align-items: center; padding: 8px 16px; background: var(--pn); border-top: 1px solid var(--ln); color: var(--dim2); }
+.B .selc { background: var(--ac); color: #04140a; font-weight: 700; padding: 1px 8px; }
+.B .push { margin-left: auto; }
+.B .phone .sb { color: var(--tx); font-family: var(--mono); }
+.B .ph-head { display: flex; justify-content: space-between; padding: 4px 16px 10px; font-size: 14px; border-bottom: 1px solid var(--ln); }
+.B .ph-speed { padding: 8px 16px; border-bottom: 1px solid var(--ln); }
+.B .ph-speed div { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+.B .ph-speed b { color: #e8f5ea; font-size: 15px; min-width: 120px; }
+.B .ph-filter { display: flex; justify-content: space-between; padding: 10px 16px 4px; }
+.B .ph-filter .on { color: var(--ac); font-weight: 700; }
+.B .ph-sort { padding: 0 16px 8px; color: var(--ac); font-size: 12px; border-bottom: 1px solid var(--ln); }
+.B .pr { padding: 10px 16px; border-bottom: 1px solid #111813; }
+.B .pr-top { display: flex; justify-content: space-between; align-items: baseline; }
+.B .pr .st { font-size: 15px; }
+.B .pr .pct { font-size: 17px; font-weight: 700; color: #e8f5ea; }
+.B .pr .fin { color: #4ade80; font-weight: 700; }
+.B .pr-nm { margin: 4px 0 3px; font-size: 13px; }
+.B .pr-meta { color: var(--dim2); font-size: 12px; white-space: nowrap; overflow: hidden; }
+
+/* ============================================================
+   方向 C 報紙版面
+   paper       #f6f2ea   ink      #1f1a17   muted  #7a6f66
+   rule        #d9d0c3   accent   #8c1c13 (oxblood)  selected #ece2d0
+   status 下載中 #1d4e89   做種中 #2f6b3a   已完成 #5b544d
+          已暫停 #a66a00   錯誤   #b3261e   停滯   #b85c1e
+   headings serif (Songti TC / Noto Serif TC); body sans 14px
+   radius 2px; row 76px; left status rule 4px
+   ============================================================ */
+.C { --pp:#f6f2ea; --ink:#1f1a17; --mu:#7a6f66; --ru:#d9d0c3; --ac:#8c1c13; --serif: "Songti TC", "Noto Serif TC", "Source Han Serif TC", "PMingLiU", Georgia, serif; }
+.C .vp, .C .phone { background: var(--pp); color: var(--ink); font-size: 14px; }
+.C .app { padding: 0 48px; display: flex; flex-direction: column; }
+.C .mast { display: flex; justify-content: space-between; align-items: flex-end; padding: 26px 0 18px; border-bottom: 3px double var(--ink); }
+.C .ttl h1 { font-family: var(--serif); font-size: 44px; line-height: 1; margin: 0 0 8px; font-weight: 900; letter-spacing: .06em; }
+.C .date { font-size: 12px; color: var(--mu); letter-spacing: .04em; }
+.C .stats { display: flex; gap: 48px; }
+.C .stat { min-width: 200px; }
+.C .stat .k { font-size: 12px; color: var(--mu); letter-spacing: .1em; }
+.C .num { display: flex; align-items: baseline; gap: 6px; }
+.C .num b { font-family: var(--serif); font-size: 40px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.C .num span { font-size: 13px; color: var(--mu); }
+.C .stat p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: #4a413a; }
+.C .rule { height: 3px; background: var(--ru); margin-top: 6px; }
+.C .rule i { display: block; height: 100%; background: var(--ink); }
+.C .nav { display: flex; gap: 28px; align-items: baseline; padding: 14px 0 0; border-bottom: 1px solid var(--ru); }
+.C .nav .k { font-size: 12px; color: var(--mu); letter-spacing: .1em; }
+.C .nav a { padding-bottom: 10px; color: #4a413a; }
+.C .nav a small { color: var(--mu); }
+.C .nav a.on { color: var(--ink); font-weight: 700; border-bottom: 2px solid var(--ac); }
+.C .nav .add { margin-left: auto; color: var(--ac); font-weight: 600; }
+.C .sec { display: flex; align-items: baseline; gap: 14px; padding: 22px 0 12px; }
+.C .sec h2 { font-family: var(--serif); font-size: 28px; margin: 0; font-weight: 800; }
+.C .sec .count { color: var(--mu); }
+.C .sort { margin-left: auto; text-align: right; font-size: 14px; display: flex; flex-direction: column; }
+.C .sort small { font-size: 11px; color: var(--mu); }
+.C .bulk { display: flex; align-items: center; gap: 18px; padding: 10px 14px; background: #ece2d0; border-top: 1px solid var(--ink); }
+.C .bulk .del { background: var(--ac); color: #fff; padding: 5px 16px; border-radius: 2px; font-weight: 600; }
+.C .bulk a { color: #4a413a; text-decoration: underline; text-underline-offset: 3px; }
+.C .list { flex: 1; overflow: hidden; }
+.C .row { display: grid; grid-template-columns: 22px 170px minmax(0,1fr) 72px; gap: 20px; align-items: center; height: 76px; padding: 0 14px 0 14px; border-bottom: 1px solid var(--ru); border-left: 4px solid; }
+.C .row.sel { background: #ece2d0; }
+.C .st b { font-family: var(--serif); font-size: 21px; font-weight: 800; display: block; line-height: 1.2; }
+.C .st small { font-size: 12px; color: var(--mu); }
+.C .row.dl { border-left-color: #1d4e89; } .C .row.dl .st b { color: #1d4e89; }
+.C .row.seed { border-left-color: #2f6b3a; } .C .row.seed .st b { color: #2f6b3a; }
+.C .row.done { border-left-color: #5b544d; } .C .row.done .st b { color: #5b544d; }
+.C .row.paused { border-left-color: #a66a00; } .C .row.paused .st b { color: #a66a00; }
+.C .row.err { border-left-color: #b3261e; } .C .row.err .st b, .C .row.err .st small { color: #b3261e; }
+.C .row.stall { border-left-color: #b85c1e; } .C .row.stall .st b { color: #b85c1e; }
+.C .nm { font-size: 15px; }
+.C .meta { font-size: 12.5px; color: var(--mu); margin-top: 4px; }
+.C .meta em { font-style: normal; margin-left: 18px; }
+.C .pct { text-align: right; color: var(--mu); font-variant-numeric: tabular-nums; }
+.C .cb { width: 16px; height: 16px; border: 1.5px solid #8f857c; border-radius: 2px; position: relative; }
+.C .cb.on { background: var(--ac); border-color: var(--ac); }
+.C .cb.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.C .phone .sb { color: var(--ink); }
+.C .ph-mast { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 18px 10px; border-bottom: 3px double var(--ink); margin: 0 0 0; }
+.C .ph-mast h1 { font-family: var(--serif); font-size: 30px; margin: 0; font-weight: 900; letter-spacing: .06em; }
+.C .ph-mast .add { color: var(--ac); font-weight: 600; }
+.C .ph-stats { display: grid; grid-template-columns: 1fr 1fr; padding: 10px 18px; border-bottom: 1px solid var(--ru); }
+.C .ph-stats div { display: flex; flex-direction: column; }
+.C .ph-stats .k { font-size: 11px; color: var(--mu); letter-spacing: .1em; }
+.C .ph-stats b { font-family: var(--serif); font-size: 26px; line-height: 1.15; }
+.C .ph-stats small { font-size: 11px; color: #4a413a; }
+.C .ph-nav { display: flex; gap: 18px; padding: 10px 18px 0; border-bottom: 1px solid var(--ru); white-space: nowrap; overflow: hidden; }
+.C .ph-nav a { padding-bottom: 8px; color: #4a413a; font-size: 13px; }
+.C .ph-nav a.on { color: var(--ink); font-weight: 700; border-bottom: 2px solid var(--ac); }
+.C .ph-sort { padding: 8px 18px; font-size: 12px; color: var(--mu); }
+.C .pr { display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 14px; border-top: 1px solid var(--ru); border-left: 4px solid; }
+.C .pr-l { flex: 1; min-width: 0; }
+.C .pr-l b { font-family: var(--serif); font-size: 18px; font-weight: 800; }
+.C .pr-nm { font-size: 13.5px; margin: 1px 0; }
+.C .pr-meta { font-size: 11.5px; color: var(--mu); }
+.C .pp { font-family: var(--serif); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.C .pp small { font-size: 14px; }
+.C .fin { font-family: var(--serif); font-size: 20px; font-weight: 800; color: #2f6b3a; }
+.C .pr.dl { border-left-color: #1d4e89; } .C .pr.dl b { color: #1d4e89; }
+.C .pr.seed { border-left-color: #2f6b3a; } .C .pr.seed b { color: #2f6b3a; }
+.C .pr.done { border-left-color: #5b544d; } .C .pr.done b { color: #5b544d; }
+.C .pr.paused { border-left-color: #a66a00; } .C .pr.paused b { color: #a66a00; }
+.C .pr.err { border-left-color: #b3261e; } .C .pr.err b { color: #b3261e; }
+.C .pr.stall { border-left-color: #b85c1e; } .C .pr.stall b { color: #b85c1e; }
+
+/* ============================================================
+   方向 D 糖果卡片
+   bg          #15122a   card     #201c3d   card-2 #2a2550
+   text        #f5f3ff   muted    #a7a1d1   line   #332d5e
+   accent      #ff7ab6 (pink)   accent-2 #7cf2c8 (mint)   selected card #2d2552
+   tiles  下載中 #7cc4ff   做種中 #7cf2c8   已完成 #c4b5fd
+          已暫停 #ffd166   錯誤   #ff6b6b   停滯   #ffa463   (glyph #15122a)
+   radius card 16px, tile 12px, pill 999px; card 68px; rounded system font
+   ============================================================ */
+.D { --bg:#15122a; --cd:#201c3d; --cd2:#2a2550; --tx:#f5f3ff; --mu:#a7a1d1; --ln:#332d5e; --pk:#ff7ab6; --mt:#7cf2c8; --round: ui-rounded, "SF Pro Rounded", -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; }
+.D .vp, .D .phone { background: var(--bg); color: var(--tx); font-family: var(--round); font-size: 14px; }
+.D .app { padding: 20px 32px; display: flex; flex-direction: column; }
+.D .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.D .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; }
+.D .logo i { width: 14px; height: 14px; border-radius: 50%; background: var(--pk); box-shadow: 10px 0 0 var(--mt); margin-right: 10px; }
+.D .add { background: var(--pk); color: #2a0b1c; font-weight: 800; border-radius: 999px; padding: 9px 18px; }
+.D .add.sm { padding: 4px 13px; font-size: 18px; }
+.D .speeds { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+.D .sc { background: var(--cd); border-radius: 20px; padding: 16px 20px; }
+.D .sc-h { display: flex; align-items: center; gap: 10px; color: var(--mu); font-weight: 700; }
+.D .sc-h .tile { width: 28px; height: 28px; font-size: 15px; border-radius: 9px; }
+.D .big { font-size: 34px; font-weight: 800; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
+.D .big small { font-size: 15px; color: var(--mu); font-weight: 700; }
+.D .track { height: 12px; border-radius: 999px; background: var(--cd2); overflow: hidden; }
+.D .track i { display: block; height: 100%; background: var(--pk); border-radius: 999px; min-width: 12px; }
+.D .track.nolim { background: repeating-linear-gradient(90deg, #3a3470 0 10px, transparent 10px 16px); height: 12px; position: relative; overflow: visible; }
+.D .track.nolim span { position: absolute; right: 0; top: -22px; font-size: 12px; color: var(--mt); font-weight: 800; }
+.D .cap { font-size: 12.5px; color: var(--mu); margin-top: 8px; }
+.D .pills { display: flex; gap: 8px; margin-bottom: 14px; }
+.D .pills span { background: var(--cd); color: var(--mu); border-radius: 999px; padding: 7px 16px; font-weight: 700; white-space: nowrap; }
+.D .pills .on { background: var(--pk); color: #2a0b1c; }
+.D .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+.D .head h1 { font-size: 20px; margin: 0; font-weight: 800; }
+.D .sort { background: var(--cd2); border-radius: 999px; padding: 5px 14px; font-weight: 700; color: var(--mt); }
+.D .sort small { color: var(--mu); font-weight: 600; }
+.D .cards { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+.D .card { display: grid; grid-template-columns: 24px 140px minmax(0,1fr) 190px 110px; gap: 16px; align-items: center; min-height: 68px; padding: 0 18px; background: var(--cd); border-radius: 16px; border: 2px solid transparent; }
+.D .card.sel { border-color: var(--pk); background: #2d2552; }
+.D .st { display: flex; align-items: center; gap: 10px; }
+.D .tile { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: #15122a; flex: none; }
+.D .st b { font-size: 16px; font-weight: 800; }
+.D .dl .tile, .D .tile.dl { background: #7cc4ff; } .D .st.dl b, .D .dlc { color: #7cc4ff; }
+.D .seed .tile, .D .tile.seed { background: #7cf2c8; } .D .st.seed b, .D .seedc { color: #7cf2c8; }
+.D .done .tile, .D .tile.done { background: #c4b5fd; } .D .st.done b, .D .donec { color: #c4b5fd; }
+.D .paused .tile, .D .tile.paused { background: #ffd166; } .D .st.paused b, .D .pausedc { color: #ffd166; }
+.D .err .tile, .D .tile.err { background: #ff6b6b; } .D .st.err b, .D .errc { color: #ff6b6b; }
+.D .stall .tile, .D .tile.stall { background: #ffa463; } .D .st.stall b, .D .stallc { color: #ffa463; }
+.D .nm { font-size: 14.5px; font-weight: 600; }
+.D .meta { font-size: 12px; color: var(--mu); margin-top: 3px; }
+.D .prog { display: flex; align-items: center; gap: 10px; }
+.D .prog .bar { flex: 1; height: 8px; border-radius: 999px; background: var(--cd2); overflow: hidden; }
+.D .prog .bar i { display: block; height: 100%; border-radius: 999px; background: #5d5590; }
+.D .prog.dl .bar i { background: #7cc4ff; }
+.D .prog.stall .bar i { background: #ffa463; }
+.D .prog.paused .bar i { background: #ffd166; }
+.D .prog b { font-size: 13px; width: 40px; text-align: right; color: var(--mu); }
+.D .spd { font-size: 13px; color: var(--mu); text-align: right; font-variant-numeric: tabular-nums; }
+.D .spd.warn { color: #ff8f8f; font-weight: 700; }
+.D .cb { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #5d5590; position: relative; }
+.D .cb.on { background: var(--pk); border-color: var(--pk); }
+.D .cb.on::after { content: ""; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px; border: solid #2a0b1c; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.D .float { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; background: #f5f3ff; color: #15122a; border-radius: 999px; padding: 8px 8px 8px 22px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.D .float b { font-weight: 800; }
+.D .float .del { background: #ff4f8b; color: #fff; font-weight: 800; border-radius: 999px; padding: 8px 20px; }
+.D .float .cancel { color: #4b4475; font-weight: 700; padding: 0 12px 0 2px; }
+.D .phone .sb { color: var(--tx); }
+.D .ph-top { display: flex; justify-content: space-between; align-items: center; padding: 4px 16px 12px; }
+.D .ph-speeds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+.D .msc { background: var(--cd); border-radius: 16px; padding: 10px 12px; display: flex; flex-direction: column; }
+.D .msc .k { font-size: 12px; color: var(--mu); font-weight: 700; }
+.D .msc b { font-size: 24px; font-weight: 800; line-height: 1.2; }
+.D .msc small { font-size: 11px; color: var(--mu); }
+.D .msc .track { height: 6px; margin-top: 6px; }
+.D .msc .track i { min-width: 6px; }
+.D .pills.sm { padding: 0 16px; overflow: hidden; margin-bottom: 8px; }
+.D .pills.sm span { padding: 6px 13px; font-size: 13px; }
+.D .ph-sort { padding: 0 16px 10px; font-size: 12px; color: var(--mt); font-weight: 700; }
+.D .pl { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.D .pc { display: flex; align-items: center; gap: 12px; background: var(--cd); border-radius: 16px; padding: 10px 12px; }
+.D .pc-b { flex: 1; min-width: 0; }
+.D .pc-b b { font-size: 15px; font-weight: 800; }
+.D .pc-nm { font-size: 13px; font-weight: 600; margin: 1px 0; }
+.D .pc-meta { font-size: 11.5px; color: var(--mu); }
+.D .pp { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.D .fin { font-size: 13px; font-weight: 800; color: var(--mt); text-align: center; line-height: 1.25; }
+
+</style>
+</head>
+<body>
+<div class="page">
+<header class="intro">
+<h1>種子列表：四個視覺方向</h1>
+<p>同一張畫面套四種個性。電腦畫面是 mteam-seed 分類、照做種時間排序、選了兩個準備刪除；手機畫面是「全部」分類、照狀態排序，用來看下載好了沒。每個方向都只改 shadcn/ui 的品牌層：顏色、字型、圓角、密度、間距。這裡不推薦哪一個，由 Alex 挑。</p>
+<p class="note">共同資料：下載 9.95 MB/s，現在是備用速度時段（每天 00:00 到 17:00），下載不限速；上傳 2.38 MB/s，上限 32.7 MB/s。標籤和追蹤者篩選還沒決定，四個方向都先不放。</p>
+</header>
+<section class="dir">
+<div class="dir-h"><span class="key">方向 A</span><h2>平靜工具</h2><span class="tag">淺色、緊湊表格、狀態是彩色字卡</span></div>
+<p class="why">照 shadcn 預設再收緊一點：白底、細灰線、一列 40px，狀態做成有底色的字卡，固定放在最前面一欄，眼睛往下掃先看到顏色和字。速度放在左邊側欄底下，上限直接寫成一行字，上傳另外畫一條用量條。為了一個畫面塞得下最多資訊、刪除時方便對照，放棄了記憶點：它看起來就是一個標準的管理後台，不會讓人多看一眼。</p>
+<div class="stage">
+<div class="A">
+<div class="desk-wrap"><figure><figcaption>電腦，1280 寬</figcaption>
+<div class="browser"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">nas.local:3000/?分類=mteam-seed</div></div>
+<div class="vp app">
+  <aside class="side">
+    <div class="brand">react-torrent</div>
+    <div class="lbl">分類</div>
+    <ul class="cats">
+      <li>全部<span>248</span></li>
+      <li>mteam-tv<span>203</span></li>
+      <li>mteam-movies<span>35</span></li>
+      <li class="on">mteam-seed<span>10</span></li>
+    </ul>
+    <div class="speed">
+      <div class="lbl">全部種子的速度</div>
+      <div class="sp"><div class="sp-h"><span>下載</span><b>9.95 MB/s</b></div><div class="lim">目前不限速</div></div>
+      <div class="sp"><div class="sp-h"><span>上傳</span><b>2.38 MB/s</b></div><div class="meter"><i style="width:7%"></i></div><div class="lim">上限 32.7 MB/s，用了 7%</div></div>
+      <div class="alt">現在是備用速度時段（每天 00:00 到 17:00）</div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top">
+      <div class="ttl"><h1>mteam-seed</h1><span class="count">10 個種子</span></div>
+      <div class="acts"><div class="sort"><span>排序：做種時間，久的在前</span><small>這個分類記住的</small></div><span class="btn primary">新增種子</span></div>
+    </div>
+    <div class="bulk"><b>已選 2 個</b><span class="btn danger">刪除</span><span class="btn ghost">取消選取</span></div>
+    <table>
+      <colgroup><col style="width:44px"><col style="width:118px"><col><col style="width:140px"><col style="width:92px"><col style="width:112px"><col style="width:92px"><col style="width:64px"></colgroup>
+      <thead><tr><th><span class="cb mixed"></span></th><th>狀態</th><th>名稱</th><th>進度</th><th>大小</th><th>速度</th><th>做種時間 ↓</th><th>分享率</th></tr></thead>
+      <tbody><tr class="sel">
+<td><span class="cb on"></span></td>
+<td><span class="chip seed"><i></i>做種中</span></td>
+<td><div class="ell nm" title="ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>170.2 GB</td>
+<td class="">↑ 820 KB/s</td>
+<td>41 天</td>
+<td>3.12</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip seed"><i></i>做種中</span></td>
+<td><div class="ell nm" title="重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL">重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>48.6 GB</td>
+<td class="">↑ 1.10 MB/s</td>
+<td>33 天</td>
+<td>2.47</td>
+</tr><tr class="sel">
+<td><span class="cb on"></span></td>
+<td><span class="chip done"><i></i>已完成</span></td>
+<td><div class="ell nm" title="Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>82.4 GB</td>
+<td class="">0 B/s</td>
+<td>28 天</td>
+<td>1.86</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip seed"><i></i>做種中</span></td>
+<td><div class="ell nm" title="The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam">The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>46.8 GB</td>
+<td class="">↑ 460 KB/s</td>
+<td>21 天</td>
+<td>1.03</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip err"><i></i>錯誤</span></td>
+<td><div class="ell nm" title="繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>61.3 GB</td>
+<td class="warn">找不到檔案</td>
+<td>17 天</td>
+<td>0.92</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip seed"><i></i>做種中</span></td>
+<td><div class="ell nm" title="Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam">Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:100%"></i></span>100%</div></td>
+<td>38.9 GB</td>
+<td class="">0 B/s</td>
+<td>12 天</td>
+<td>0.64</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip paused"><i></i>已暫停</span></td>
+<td><div class="ell nm" title="Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:45%"></i></span>45%</div></td>
+<td>24.7 GB</td>
+<td class="">0 B/s</td>
+<td>還沒做種</td>
+<td>0.00</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip dl"><i></i>下載中</span></td>
+<td><div class="ell nm" title="牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:64%"></i></span>64%</div></td>
+<td>35.2 GB</td>
+<td class="">↓ 6.21 MB/s</td>
+<td>還沒做種</td>
+<td>0.00</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip dl"><i></i>下載中</span></td>
+<td><div class="ell nm" title="[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</div></td>
+<td><div class="prog"><span class="bar"><i style="width:31%"></i></span>31%</div></td>
+<td>8.4 GB</td>
+<td class="">↓ 3.74 MB/s</td>
+<td>還沒做種</td>
+<td>0.00</td>
+</tr><tr class="">
+<td><span class="cb"></span></td>
+<td><span class="chip stall"><i></i>停滯</span></td>
+<td><div class="ell nm" title="Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</div></td>
+<td><div class="prog"><span class="bar"><i style="width:87%"></i></span>87%</div></td>
+<td>27.5 GB</td>
+<td class="warn">沒有來源</td>
+<td>還沒做種</td>
+<td>0.00</td>
+</tr></tbody>
+    </table>
+    <div class="foot">共 10 個，全部列出</div>
+  </main>
+</div></div></figure></div>
+<figure><figcaption>手機，390 寬</figcaption>
+<div class="phone"><div class="sb"><span>14:32</span><span>5G　82%</span></div>
+  <div class="ph-head"><b>react-torrent</b><span class="btn primary sm">＋ 新增</span></div>
+  <div class="ph-speed">
+    <div><span>下載</span><b>9.95 MB/s</b><small>不限速</small></div>
+    <div><span>上傳</span><b>2.38 MB/s</b><small>上限 32.7 MB/s</small></div>
+  </div>
+  <div class="ph-filter"><span class="select">全部 ▾</span><span class="count">248 個種子</span></div>
+  <div class="ph-sort">排序：狀態（這個分類記住的）</div>
+  <div class="pl"><div class="pr">
+<div class="pr-top"><span class="chip dl"><i></i>下載中</span><span class="pct">64%</span></div>
+<div class="ell pr-nm">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div>
+<div class="pr-bar dl"><i style="width:64%"></i></div>
+<div class="pr-meta">剩 34 分，6.21 MB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip dl"><i></i>下載中</span><span class="pct">31%</span></div>
+<div class="ell pr-nm">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</div>
+<div class="pr-bar dl"><i style="width:31%"></i></div>
+<div class="pr-meta">剩 26 分，3.74 MB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip stall"><i></i>停滯</span><span class="pct">87%</span></div>
+<div class="ell pr-nm">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</div>
+<div class="pr-bar stall"><i style="width:87%"></i></div>
+<div class="pr-meta">卡在 87%，沒有來源</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip paused"><i></i>已暫停</span><span class="pct">45%</span></div>
+<div class="ell pr-nm">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div>
+<div class="pr-bar paused"><i style="width:45%"></i></div>
+<div class="pr-meta">停在 45%，手動暫停</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip err"><i></i>錯誤</span><span class="fin">✓ 下載完了</span></div>
+<div class="ell pr-nm">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div>
+
+<div class="pr-meta">下載完了，但找不到檔案</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip seed"><i></i>做種中</span><span class="fin">✓ 下載完了</span></div>
+<div class="ell pr-nm">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div>
+
+<div class="pr-meta">做種 41 天，↑ 820 KB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="chip done"><i></i>已完成</span><span class="fin">✓ 下載完了</span></div>
+<div class="ell pr-nm">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div>
+
+<div class="pr-meta">做種 28 天後停止</div>
+</div></div>
+</div></figure>
+</div></div>
+</section><section class="dir">
+<div class="dir-h"><span class="key">方向 B</span><h2>終端機</h2><span class="tag">深色、等寬字、最密、狀態是符號加文字</span></div>
+<p class="why">黑底配磷綠，全部用等寬字，沒有圓角，一列 28px。狀態是一個符號加一個詞，只有狀態欄有顏色，其他欄位退成暗灰；底下的指令列提示 d 刪除、esc 取消，暗示可以全程用鍵盤。為了密度和鍵盤操作的速度，放棄了親切感和手機上的好點程度：中文擠在等寬字裡比較硬，看久了累，手機上的字也偏小。</p>
+<div class="stage">
+<div class="B">
+<div class="desk-wrap"><figure><figcaption>電腦，1280 寬</figcaption>
+<div class="browser"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">nas.local:3000/?分類=mteam-seed</div></div>
+<div class="vp app">
+  <div class="title"><span><span class="acc">alex@nas</span>:~/torrents　<span class="dim">qBittorrent 5.1.4</span></span><span class="dim">14:32</span></div>
+  <div class="speed">
+    <div class="sp"><span class="k">下載</span><b>↓ 9.95 MB/s</b><span class="lim">上限：不限速</span></div>
+    <div class="sp"><span class="k">上傳</span><b>↑ 2.38 MB/s</b><span class="lim">上限：32.7 MB/s</span><span class="meter">[██░░░░░░░░░░░░░░░░░░░░░░░░░░░░]</span><span class="dim2">用了 7%</span></div>
+    <div class="alt">備用速度時段 00:00 到 17:00，生效中</div>
+  </div>
+  <div class="tabs"><span class="dim">分類</span><span>全部 248</span><span>mteam-tv 203</span><span>mteam-movies 35</span><span class="on">mteam-seed 10</span></div>
+  <div class="head"><span class="h1">mteam-seed</span><span class="dim">10 個種子</span><span class="sort">排序：做種時間 ↓（這個分類記住的）</span><span class="key"><kbd>a</kbd> 新增種子</span></div>
+  <div class="tbl">
+    <div class="r th"><span>[-]</span><span>狀態</span><span>名稱</span><span>進度</span><span class="rt">大小</span><span class="rt">速度</span><span class="rt">做種時間</span><span class="rt">分享率</span></div>
+    <div class="r sel">
+<span class="dim">[x]</span>
+<span class="st seed">▲ 做種中</span>
+<span class="ell nm" title="ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">170.2 GB</span>
+<span class="dim2 rt">↑ 820 KB/s</span>
+<span class="dim2 rt">41 天</span>
+<span class="dim2 rt">3.12</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st seed">▲ 做種中</span>
+<span class="ell nm" title="重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL">重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">48.6 GB</span>
+<span class="dim2 rt">↑ 1.10 MB/s</span>
+<span class="dim2 rt">33 天</span>
+<span class="dim2 rt">2.47</span>
+</div><div class="r sel">
+<span class="dim">[x]</span>
+<span class="st done">✓ 已完成</span>
+<span class="ell nm" title="Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">82.4 GB</span>
+<span class="dim2 rt">0 B/s</span>
+<span class="dim2 rt">28 天</span>
+<span class="dim2 rt">1.86</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st seed">▲ 做種中</span>
+<span class="ell nm" title="The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam">The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">46.8 GB</span>
+<span class="dim2 rt">↑ 460 KB/s</span>
+<span class="dim2 rt">21 天</span>
+<span class="dim2 rt">1.03</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st err">✕ 錯誤</span>
+<span class="ell nm" title="繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">61.3 GB</span>
+<span class="dim2 rt warn">找不到檔案</span>
+<span class="dim2 rt">17 天</span>
+<span class="dim2 rt">0.92</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st seed">▲ 做種中</span>
+<span class="ell nm" title="Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam">Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam</span>
+<span class="dim2">██████████ 100%</span>
+<span class="dim2 rt">38.9 GB</span>
+<span class="dim2 rt">0 B/s</span>
+<span class="dim2 rt">12 天</span>
+<span class="dim2 rt">0.64</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st paused">‖ 已暫停</span>
+<span class="ell nm" title="Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</span>
+<span class="dim2">████░░░░░░  45%</span>
+<span class="dim2 rt">24.7 GB</span>
+<span class="dim2 rt">0 B/s</span>
+<span class="dim2 rt">還沒做種</span>
+<span class="dim2 rt">0.00</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st dl">▼ 下載中</span>
+<span class="ell nm" title="牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</span>
+<span class="dim2">██████░░░░  64%</span>
+<span class="dim2 rt">35.2 GB</span>
+<span class="dim2 rt">↓ 6.21 MB/s</span>
+<span class="dim2 rt">還沒做種</span>
+<span class="dim2 rt">0.00</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st dl">▼ 下載中</span>
+<span class="ell nm" title="[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</span>
+<span class="dim2">███░░░░░░░  31%</span>
+<span class="dim2 rt">8.4 GB</span>
+<span class="dim2 rt">↓ 3.74 MB/s</span>
+<span class="dim2 rt">還沒做種</span>
+<span class="dim2 rt">0.00</span>
+</div><div class="r">
+<span class="dim">[ ]</span>
+<span class="st stall">◌ 停滯</span>
+<span class="ell nm" title="Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</span>
+<span class="dim2">█████████░  87%</span>
+<span class="dim2 rt">27.5 GB</span>
+<span class="dim2 rt warn">沒有來源</span>
+<span class="dim2 rt">還沒做種</span>
+<span class="dim2 rt">0.00</span>
+</div>
+  </div>
+  <div class="cmd"><span class="selc">已選 2 個</span><span><kbd>d</kbd> 刪除</span><span><kbd>esc</kbd> 取消選取</span><span><kbd>space</kbd> 選取</span><span class="push dim">共 10 個，全部列出</span></div>
+</div></div></figure></div>
+<figure><figcaption>手機，390 寬</figcaption>
+<div class="phone"><div class="sb"><span>14:32</span><span>5G　82%</span></div>
+  <div class="ph-head"><span class="acc">alex@nas</span><span class="key"><kbd>＋</kbd> 新增</span></div>
+  <div class="ph-speed">
+    <div><span class="k">下載</span><b>↓ 9.95 MB/s</b><span class="lim">不限速</span></div>
+    <div><span class="k">上傳</span><b>↑ 2.38 MB/s</b><span class="lim">上限 32.7 MB/s</span></div>
+  </div>
+  <div class="ph-filter"><span class="on">[ 全部 ▾ ]</span><span class="dim">248 個種子</span></div>
+  <div class="ph-sort">排序：狀態（這個分類記住的）</div>
+  <div class="pl"><div class="pr">
+<div class="pr-top"><span class="st dl">▼ 下載中</span><span class="pct">64%</span></div>
+<div class="ell pr-nm">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div>
+<div class="pr-meta"><span class="dlc">█████████░░░░░</span> 剩 34 分，6.21 MB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st dl">▼ 下載中</span><span class="pct">31%</span></div>
+<div class="ell pr-nm">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</div>
+<div class="pr-meta"><span class="dlc">████░░░░░░░░░░</span> 剩 26 分，3.74 MB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st stall">◌ 停滯</span><span class="pct">87%</span></div>
+<div class="ell pr-nm">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</div>
+<div class="pr-meta"><span class="stallc">████████████░░</span> 卡在 87%，沒有來源</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st paused">‖ 已暫停</span><span class="pct">45%</span></div>
+<div class="ell pr-nm">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div>
+<div class="pr-meta"><span class="pausedc">██████░░░░░░░░</span> 停在 45%，手動暫停</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st err">✕ 錯誤</span><span class="fin">100% 下載完</span></div>
+<div class="ell pr-nm">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div>
+<div class="pr-meta">下載完了，但找不到檔案</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st seed">▲ 做種中</span><span class="fin">100% 下載完</span></div>
+<div class="ell pr-nm">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div>
+<div class="pr-meta">做種 41 天，↑ 820 KB/s</div>
+</div><div class="pr">
+<div class="pr-top"><span class="st done">✓ 已完成</span><span class="fin">100% 下載完</span></div>
+<div class="ell pr-nm">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div>
+<div class="pr-meta">做種 28 天後停止</div>
+</div></div>
+</div></figure>
+</div></div>
+</section><section class="dir">
+<div class="dir-h"><span class="key">方向 C</span><h2>報紙版面</h2><span class="tag">暖白紙色、寬鬆、左邊色線加大號狀態字</span></div>
+<p class="why">暖白紙色、宋體標題，速度像報頭的數字一樣放大寫在最上面。每列左邊一條色線，狀態用 20px 粗體字寫出來，像報紙的小標，名稱下面才放大小和做種時間。為了讓狀態最先被讀到、整頁讀起來從容，放棄了密度：同樣的視窗只看得到 6 到 7 個種子，清理 mteam-seed 的 10 個也要往下捲。</p>
+<div class="stage">
+<div class="C">
+<div class="desk-wrap"><figure><figcaption>電腦，1280 寬</figcaption>
+<div class="browser"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">nas.local:3000/?分類=mteam-seed</div></div>
+<div class="vp app">
+  <header class="mast">
+    <div class="ttl"><h1>種子</h1><span class="date">2026 年 11 月 14 日　週六　14:32</span></div>
+    <div class="stats">
+      <div class="stat"><span class="k">下載</span><div class="num"><b>9.95</b><span>MB/s</span></div><p>目前不限速<br>備用速度時段 00:00 到 17:00</p></div>
+      <div class="stat"><span class="k">上傳</span><div class="num"><b>2.38</b><span>MB/s</span></div><p>上限 32.7 MB/s，用了 7%</p><div class="rule"><i style="width:7%"></i></div></div>
+    </div>
+  </header>
+  <nav class="nav"><span class="k">分類</span><a>全部 <small>248</small></a><a>mteam-tv <small>203</small></a><a>mteam-movies <small>35</small></a><a class="on">mteam-seed <small>10</small></a><span class="add">＋ 新增種子</span></nav>
+  <div class="sec"><h2>mteam-seed</h2><span class="count">10 個種子</span><div class="sort">排序：做種時間，久的在前<small>這個分類記住的</small></div></div>
+  <div class="bulk"><b>已選 2 個種子</b><span class="del">刪除</span><a>取消選取</a></div>
+  <div class="list"><div class="row seed sel">
+<span class="cb on"></span>
+<div class="st"><b>做種中</b><small>↑ 820 KB/s</small></div>
+<div class="body"><div class="ell nm" title="ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div><div class="meta">170.2 GB<em>做種 41 天</em><em>分享率 3.12</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row seed">
+<span class="cb"></span>
+<div class="st"><b>做種中</b><small>↑ 1.10 MB/s</small></div>
+<div class="body"><div class="ell nm" title="重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL">重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL</div><div class="meta">48.6 GB<em>做種 33 天</em><em>分享率 2.47</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row done sel">
+<span class="cb on"></span>
+<div class="st"><b>已完成</b><small>已停止做種</small></div>
+<div class="body"><div class="ell nm" title="Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div><div class="meta">82.4 GB<em>做種 28 天</em><em>分享率 1.86</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row seed">
+<span class="cb"></span>
+<div class="st"><b>做種中</b><small>↑ 460 KB/s</small></div>
+<div class="body"><div class="ell nm" title="The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam">The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam</div><div class="meta">46.8 GB<em>做種 21 天</em><em>分享率 1.03</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row err">
+<span class="cb"></span>
+<div class="st"><b>錯誤</b><small>找不到檔案</small></div>
+<div class="body"><div class="ell nm" title="繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="meta">61.3 GB<em>做種 17 天</em><em>分享率 0.92</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row seed">
+<span class="cb"></span>
+<div class="st"><b>做種中</b><small>沒人在抓</small></div>
+<div class="body"><div class="ell nm" title="Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam">Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam</div><div class="meta">38.9 GB<em>做種 12 天</em><em>分享率 0.64</em></div></div>
+<div class="pct">100%</div>
+</div><div class="row paused">
+<span class="cb"></span>
+<div class="st"><b>已暫停</b><small>停在 45%</small></div>
+<div class="body"><div class="ell nm" title="Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div><div class="meta">24.7 GB<em>還沒做種</em><em>分享率 0.00</em></div></div>
+<div class="pct">45%</div>
+</div><div class="row dl">
+<span class="cb"></span>
+<div class="st"><b>下載中</b><small>↓ 6.21 MB/s，剩 34 分</small></div>
+<div class="body"><div class="ell nm" title="牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="meta">35.2 GB<em>還沒做種</em><em>分享率 0.00</em></div></div>
+<div class="pct">64%</div>
+</div></div>
+</div></div></figure></div>
+<figure><figcaption>手機，390 寬</figcaption>
+<div class="phone"><div class="sb"><span>14:32</span><span>5G　82%</span></div>
+  <div class="ph-mast"><h1>種子</h1><span class="add">＋ 新增</span></div>
+  <div class="ph-stats">
+    <div><span class="k">下載</span><b>9.95</b><small>MB/s，不限速</small></div>
+    <div><span class="k">上傳</span><b>2.38</b><small>MB/s，上限 32.7</small></div>
+  </div>
+  <div class="ph-nav"><a class="on">全部 248</a><a>mteam-tv</a><a>mteam-movies</a><a>mteam-seed</a></div>
+  <div class="ph-sort">排序：狀態（這個分類記住的）</div>
+  <div class="pl"><div class="pr dl">
+<div class="pr-l"><b>下載中</b><div class="ell pr-nm">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="pr-meta">剩 34 分，6.21 MB/s</div></div>
+<div class="pp">64<small>%</small></div>
+</div><div class="pr dl">
+<div class="pr-l"><b>下載中</b><div class="ell pr-nm">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</div><div class="pr-meta">剩 26 分，3.74 MB/s</div></div>
+<div class="pp">31<small>%</small></div>
+</div><div class="pr stall">
+<div class="pr-l"><b>停滯</b><div class="ell pr-nm">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</div><div class="pr-meta">卡在 87%，沒有來源</div></div>
+<div class="pp">87<small>%</small></div>
+</div><div class="pr paused">
+<div class="pr-l"><b>已暫停</b><div class="ell pr-nm">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div><div class="pr-meta">停在 45%，手動暫停</div></div>
+<div class="pp">45<small>%</small></div>
+</div><div class="pr err">
+<div class="pr-l"><b>錯誤</b><div class="ell pr-nm">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="pr-meta">下載完了，但找不到檔案</div></div>
+<div class="fin">完成</div>
+</div><div class="pr seed">
+<div class="pr-l"><b>做種中</b><div class="ell pr-nm">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div><div class="pr-meta">做種 41 天，↑ 820 KB/s</div></div>
+<div class="fin">完成</div>
+</div><div class="pr done">
+<div class="pr-l"><b>已完成</b><div class="ell pr-nm">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div><div class="pr-meta">做種 28 天後停止</div></div>
+<div class="fin">完成</div>
+</div></div>
+</div></figure>
+</div></div>
+</section><section class="dir">
+<div class="dir-h"><span class="key">方向 D</span><h2>糖果卡片</h2><span class="tag">深紫底、圓角卡片、狀態是大圖示方塊</span></div>
+<p class="why">深紫底配粉紅和薄荷綠，每個種子是一張圓角卡片，狀態是一個 44px 的彩色圖示方塊加上詞，速度放在最上面兩張大卡，選取後的動作列浮在畫面底部。為了好玩、手機上手指好點、狀態從很遠就看得到，放棄了效率和安靜：六種狀態顏色同時出現，畫面比較吵，卡片間距大，一頁看得少。</p>
+<div class="stage">
+<div class="D">
+<div class="desk-wrap"><figure><figcaption>電腦，1280 寬</figcaption>
+<div class="browser"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">nas.local:3000/?分類=mteam-seed</div></div>
+<div class="vp app">
+  <div class="top"><div class="logo"><i></i>種子</div><span class="add">＋ 新增種子</span></div>
+  <div class="speeds">
+    <div class="sc"><div class="sc-h"><span class="tile dl">↓</span>下載</div><div class="big">9.95 <small>MB/s</small></div><div class="track nolim"><span>沒有上限</span></div><div class="cap">備用速度時段 00:00 到 17:00，下載不限速</div></div>
+    <div class="sc"><div class="sc-h"><span class="tile seed">↑</span>上傳</div><div class="big">2.38 <small>MB/s</small></div><div class="track"><i style="width:7%"></i></div><div class="cap">上限 32.7 MB/s，現在用了 7%</div></div>
+  </div>
+  <div class="pills"><span>全部 248</span><span>mteam-tv 203</span><span>mteam-movies 35</span><span class="on">mteam-seed 10</span></div>
+  <div class="head"><h1>mteam-seed 裡有 10 個種子</h1><span class="sort">排序：做種時間，久的在前<small>（這個分類記住的）</small></span></div>
+  <div class="cards"><div class="card sel">
+<span class="cb on"></span>
+<div class="st seed"><span class="tile">↑</span><b>做種中</b></div>
+<div class="body"><div class="ell nm" title="ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div><div class="meta">170.2 GB　·　做種 41 天　·　分享率 3.12</div></div>
+<div class="prog seed"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd">↑ 820 KB/s</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st seed"><span class="tile">↑</span><b>做種中</b></div>
+<div class="body"><div class="ell nm" title="重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL">重启之极海听雷.第一季.Reunion.The.Sound.of.the.Providence.S01.2020.1080p.WEB-DL</div><div class="meta">48.6 GB　·　做種 33 天　·　分享率 2.47</div></div>
+<div class="prog seed"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd">↑ 1.10 MB/s</div>
+</div><div class="card sel">
+<span class="cb on"></span>
+<div class="st done"><span class="tile">✓</span><b>已完成</b></div>
+<div class="body"><div class="ell nm" title="Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div><div class="meta">82.4 GB　·　做種 28 天　·　分享率 1.86</div></div>
+<div class="prog done"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd">0 B/s</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st seed"><span class="tile">↑</span><b>做種中</b></div>
+<div class="body"><div class="ell nm" title="The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam">The.Bear.S03.2024.2160p.DSNP.WEB-DL.DDP5.1.H.265-MTeam</div><div class="meta">46.8 GB　·　做種 21 天　·　分享率 1.03</div></div>
+<div class="prog seed"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd">↑ 460 KB/s</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st err"><span class="tile">!</span><b>錯誤</b></div>
+<div class="body"><div class="ell nm" title="繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="meta">61.3 GB　·　做種 17 天　·　分享率 0.92</div></div>
+<div class="prog err"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd warn">找不到檔案</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st seed"><span class="tile">↑</span><b>做種中</b></div>
+<div class="body"><div class="ell nm" title="Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam">Shogun.2024.S01.1080p.DSNP.WEB-DL.DDP5.1.H.264-MTeam</div><div class="meta">38.9 GB　·　做種 12 天　·　分享率 0.64</div></div>
+<div class="prog seed"><span class="bar"><i style="width:100%"></i></span><b>100%</b></div>
+<div class="spd">0 B/s</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st paused"><span class="tile">‖</span><b>已暫停</b></div>
+<div class="body"><div class="ell nm" title="Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div><div class="meta">24.7 GB　·　還沒做種　·　分享率 0.00</div></div>
+<div class="prog paused"><span class="bar"><i style="width:45%"></i></span><b>45%</b></div>
+<div class="spd">0 B/s</div>
+</div><div class="card">
+<span class="cb"></span>
+<div class="st dl"><span class="tile">↓</span><b>下載中</b></div>
+<div class="body"><div class="ell nm" title="牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="meta">35.2 GB　·　還沒做種　·　分享率 0.00</div></div>
+<div class="prog dl"><span class="bar"><i style="width:64%"></i></span><b>64%</b></div>
+<div class="spd">↓ 6.21 MB/s</div>
+</div></div>
+  <div class="float"><b>已選 2 個</b><span class="del">刪除</span><span class="cancel">取消</span></div>
+</div></div></figure></div>
+<figure><figcaption>手機，390 寬</figcaption>
+<div class="phone"><div class="sb"><span>14:32</span><span>5G　82%</span></div>
+  <div class="ph-top"><div class="logo"><i></i>種子</div><span class="add sm">＋</span></div>
+  <div class="ph-speeds">
+    <div class="msc"><span class="k">↓ 下載</span><b>9.95</b><small>MB/s，沒有上限</small></div>
+    <div class="msc"><span class="k">↑ 上傳</span><b>2.38</b><small>MB/s，上限 32.7</small><div class="track"><i style="width:7%"></i></div></div>
+  </div>
+  <div class="pills sm"><span class="on">全部 248</span><span>mteam-tv</span><span>mteam-movies</span><span>mteam-seed</span></div>
+  <div class="ph-sort">排序：狀態（這個分類記住的）</div>
+  <div class="pl"><div class="pc">
+<span class="tile dl">↓</span>
+<div class="pc-b"><b class="dlc">下載中</b><div class="ell pc-nm">牧神记.Tales.of.Herding.Gods.S01.2024.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="pc-meta">剩 34 分，6.21 MB/s</div></div>
+<div class="pp">64%</div>
+</div><div class="pc">
+<span class="tile dl">↓</span>
+<div class="pc-b"><b class="dlc">下載中</b><div class="ell pc-nm">[躲在超市后门抽烟的两人].Super.no.Ura.de.Yani.Suu.Futari.2026.S01.1080p</div><div class="pc-meta">剩 26 分，3.74 MB/s</div></div>
+<div class="pp">31%</div>
+</div><div class="pc">
+<span class="tile stall">…</span>
+<div class="pc-b"><b class="stallc">停滯</b><div class="ell pc-nm">Frieren.Beyond.Journeys.End.S01.2023.1080p.BluRay.x265.10bit-MTeam</div><div class="pc-meta">卡在 87%，沒有來源</div></div>
+<div class="pp">87%</div>
+</div><div class="pc">
+<span class="tile paused">‖</span>
+<div class="pc-b"><b class="pausedc">已暫停</b><div class="ell pc-nm">Oppenheimer.2023.1080p.BluRay.x264.DTS-HD.MA.5.1-MTeam</div><div class="pc-meta">停在 45%，手動暫停</div></div>
+<div class="pp">45%</div>
+</div><div class="pc">
+<span class="tile err">!</span>
+<div class="pc-b"><b class="errc">錯誤</b><div class="ell pc-nm">繁花.Blossoms.Shanghai.S01.2023.2160p.WEB-DL.H.265.AAC-MTeam</div><div class="pc-meta">下載完了，但找不到檔案</div></div>
+<div class="fin">下載<br>好了</div>
+</div><div class="pc">
+<span class="tile seed">↑</span>
+<div class="pc-b"><b class="seedc">做種中</b><div class="ell pc-nm">ONE PIECE SAGA WATER SEVEN FULLDVD COFFRET FRANCAIS-DragonMax</div><div class="pc-meta">做種 41 天，↑ 820 KB/s</div></div>
+<div class="fin">下載<br>好了</div>
+</div><div class="pc">
+<span class="tile done">✓</span>
+<div class="pc-b"><b class="donec">已完成</b><div class="ell pc-nm">Dune.Part.Two.2024.UHD.BluRay.2160p.REMUX.HEVC.DV.TrueHD.Atmos-MTeam</div><div class="pc-meta">做種 28 天後停止</div></div>
+<div class="fin">下載<br>好了</div>
+</div></div>
+</div></figure>
+</div></div>
+</section>
+</div>
+</body>
+</html>
