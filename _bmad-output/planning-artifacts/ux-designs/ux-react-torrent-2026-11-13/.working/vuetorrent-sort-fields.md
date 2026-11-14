@@ -2,6 +2,8 @@
 
 共 54 個。分組是 Claude 分的，不是 VueTorrent 的。
 
+2026-11-14 react-torrent 拿掉 3 個（Claude 代決，`.memlog.md` #124 的 F99）：`download_path`、`basename_download_path`、`tags`，下面標「（不做）」。理由：暫存路徑沒在用，標籤一個都沒有。react-torrent 剩 51 個。
+
 ## 時間（7）
 - `added_on`：Added On
 - `completed_on`：Completed On
@@ -45,7 +47,7 @@
 ## 名稱和分類（7）
 - `name`：Torrent Title
 - `category`：Category
-- `tags`：Tags
+- `tags`：Tags（不做）
 - `trackerDomain`：Tracker 網域（en.json 裡沒有對應字串）
 - `trackers_count`：Trackers Count
 - `private`：Is Private
@@ -53,11 +55,11 @@
 
 ## 路徑（7）
 - `savePath`：Save Path
-- `download_path`：DL Path
+- `download_path`：DL Path（不做）
 - `content_path`：Content Path
 - `rootPath`：Root path
 - `basename_content_path`：Content Path (basename)
-- `basename_download_path`：Download Path (basename)
+- `basename_download_path`：Download Path (basename)（不做）
 - `basename_save_path`：Save Path (basename)
 
 ## 限制和設定（7）
