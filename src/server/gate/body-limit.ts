@@ -1,0 +1,63 @@
+import { createMiddleware } from '@tanstack/react-start'
+import { failureResponse } from '#/server/gate/respond'
+
+// AD-12 / AR-27. Start reads the body after middleware and the function id is
+// opaque here, so this enforces a request-level ceiling and passes the
+// measured size on; `guard()` compares it with each function's own limit.
+
+export const DEFAULT_BODY_LIMIT = 65_536
+/** Request-level ceiling. Later stories raise it for uploads and hash lists. */
+export const MAX_REQUEST_BODY = DEFAULT_BODY_LIMIT
+
+export function tooLargeResponse(): Response {
+  return failureResponse('invalid_input', 413)
+}
+
+/** Body size in bytes, or `null` once it passes `limit` or cannot be read. */
+export async function measureBody(
+  request: Request,
+  limit: number,
+): Promise<number | null> {
+  const method = request.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || request.body === null) return 0
+
+  const declared = request.headers.get('content-length')
+  if (declared !== null && /^\d+$/.test(declared.trim())) {
+    const length = Number(declared.trim())
+    return length > limit ? null : length
+  }
+
+  // No Content-Length: count a clone so Start can still read the original.
+  const clone = request.clone()
+  if (!clone.body) return 0
+  const reader = clone.body.getReader()
+  // Both tee branches must cancel for the source stream to stop.
+  const stop = () =>
+    Promise.allSettled([reader.cancel(), request.body?.cancel()])
+  let total = 0
+  for (;;) {
+    let chunk: ReadableStreamReadResult<Uint8Array>
+    try {
+      chunk = await reader.read()
+    } catch {
+      // Client abort or a broken stream: answer in the contract, not a 500.
+      await stop()
+      return null
+    }
+    if (chunk.done) return total
+    total += chunk.value.byteLength
+    if (total > limit) {
+      await stop()
+      return null
+    }
+  }
+}
+
+export const bodyLimit = createMiddleware().server(
+  async ({ request, handlerType, next }) => {
+    if (handlerType !== 'serverFn') return next()
+    const bodyBytes = await measureBody(request, MAX_REQUEST_BODY)
+    if (bodyBytes === null) return tooLargeResponse()
+    return next({ context: { bodyBytes } })
+  },
+)

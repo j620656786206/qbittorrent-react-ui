@@ -144,7 +144,7 @@ inputDocuments:
 - AR-28：hash 只收 40 或 64 位小寫 hex，陣列 1 到 5000 個；永遠不把 `all` 或含 `|` 的值送給 qBittorrent。（AD-12）
 - AR-29：路徑共用 `src/shared` 一個 schema：絕對路徑，不含 NUL、反斜線、控制字元，任何一段是 `..` 就拒絕，正規化後要在 `SAVE_ROOTS` 某個根目錄底下，長度上限 1024。改名的新路徑相對於種子自己的資料夾，可以有好幾段，每一段各自檢查：不含 `\`、NUL、控制字元，不是 `.` 或 `..`，每段 1 到 255 bytes，不能以 `/` 開頭；舊路徑要在這個種子目前的檔案清單裡（容器去查）。（AD-12）
 - AR-30：`addTorrents` 只收 `magnet:` 和 `.torrent`，不收 http 網址和 `savepath`，檔案開頭要是 bencode 字典，容器不抓使用者給的網址；`setFilePriority` 的 id 是非負整數、priority 只能 `0`、`1`、`6`、`7`；刪除的一併刪檔是明確 boolean。（AD-12）
-- AR-31：CSP 和標頭：所有回應加 `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`（需要時加 `style-src 'self' 'unsafe-inline'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`；不載入外部 CDN 的 script 或字型。（AD-10）
+- AR-31：CSP 和標頭：所有回應加 `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`（需要時加 `style-src 'self' 'unsafe-inline'`）；HTML 回應的 `script-src` 是 `'self' 'nonce-<每次請求隨機>'`（Start 的 3 個內嵌 script 要用，2026-11-16 Alex 同意），靜態檔照原字串；`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`；不載入外部 CDN 的 script 或字型。（AD-10）
 - AR-32：陌生文字當純文字：lint 擋 `dangerouslySetInnerHTML`、`innerHTML`、`outerHTML`、`document.write`；從 qBittorrent 來的網址只有 `http:`、`https:`、`magnet:` 才做成連結，加 `rel="noopener noreferrer"`。（AD-10）
 
 **錯誤合約和 log**

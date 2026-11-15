@@ -1,5 +1,6 @@
 {
   "name": "react-torrent",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,6 +16,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "smoke": "node scripts/smoke-built-server.mjs",
     "format": "prettier --write . && eslint --fix"
   },
   "dependencies": {
@@ -24,7 +26,8 @@
     "nitro": "3.0.261103-rc",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "tailwindcss": "4.3.5"
+    "tailwindcss": "4.3.5",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "0.5.0",

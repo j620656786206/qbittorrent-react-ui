@@ -130,6 +130,7 @@ flowchart TD
 - **Prevents:** 有的丟例外、有的回傳；每個功能自己導去登入頁；分不出「Cloudflare 要你登入」和「連不到家裡」；錯誤訊息把家裡的位址秀在畫面上。
 - **Rule:**
   - server function 失敗用回傳 `{ ok: false, error: { code, message } }`，不 throw；throw 只留給程式錯誤。前端只有一個出口 `callFn`：加 `X-Requested-With: XMLHttpRequest`、35 秒逾時、把失敗轉成 `AppError` 丟出給 TanStack Query。
+  - 工廠接到沒預料到的例外（程式錯誤）時回 `qbit_rejected`，原始錯誤只寫 log：畫面走那個操作自己的失敗提示，不會誤報成連線問題（2026-11-16 Alex 選的，不另加第 13 個 code）。
   - `message` 只能是程式裡寫死的中文，不放例外原文、qBittorrent 原始回應或網址；原始錯誤只寫 log。畫面文字由 `src/lib/error-text.ts` 照 code 和操作決定。
   - 前端怎麼分類回應：
 
@@ -160,7 +161,7 @@ flowchart TD
 
 - **Binds:** 所有畫面、容器的回應標頭
 - **Prevents:** 種子名稱、檔名、tracker、comment 裡藏的 HTML 或 `javascript:` 連結被執行；別的網站用透明 iframe 騙點刪除。
-- **Rule:** 種子名稱、路徑、檔名、分類名、tracker、comment 一律當純文字。禁止 `dangerouslySetInnerHTML`、`innerHTML`、`outerHTML`、`document.write`（lint 擋）。從 qBittorrent 來的網址只有 `http:`、`https:`、`magnet:` 開頭才做成連結，加 `rel="noopener noreferrer"`。容器對所有回應加 `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`（樣式需要時加 `style-src 'self' 'unsafe-inline'`）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`。不載入任何外部 CDN 的 script 或字型。
+- **Rule:** 種子名稱、路徑、檔名、分類名、tracker、comment 一律當純文字。禁止 `dangerouslySetInnerHTML`、`innerHTML`、`outerHTML`、`document.write`（lint 擋）。從 qBittorrent 來的網址只有 `http:`、`https:`、`magnet:` 開頭才做成連結，加 `rel="noopener noreferrer"`。容器對所有回應加 `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`（樣式需要時加 `style-src 'self' 'unsafe-inline'`）。HTML 回應的 `script-src` 改成 `'self' 'nonce-<每次請求隨機產生>'`：TanStack Start 1.169 的頁面一定有 3 個內嵌 script（捲動位置、`$_TSR` 資料、串流邊界），沒有它們畫面是空白的；nonce 經由 `getRouter()` 的 `ssr.nonce` 傳進去，靜態檔照原本的字串。不准用 `'unsafe-inline'`，也不准用 build 時算的 hash（內容每次不同）。（2026-11-16 Alex 同意）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`。不載入任何外部 CDN 的 script 或字型。
 
 ### AD-11：寫框架程式前先查對應版本的官網文件 [ADOPTED]
 
@@ -174,6 +175,7 @@ flowchart TD
 - **Prevents:** 別的網站或 NAS 上其他服務借 Alex 的瀏覽器送刪除（CSRF）；DNS rebinding；`hashes=all` 一次刪光；路徑跳出下載資料夾去改 qBittorrent 的設定檔；讓 qBittorrent 去抓家裡網路的內部網址；超大上傳把容器記憶體吃光。
 - **Rule:**
   - `src/start.ts` 必須明確掛 Start 的 `createCsrfMiddleware`（有了 `src/start.ts`，Start 就不再自動掛），`failureResponse` 回 JSON 的 `bad_origin`，不准回純文字。再加一個全域 request middleware：`Host` 和 `Origin` 必須在環境變數 `APP_ORIGINS` 清單裡（在家的 IP 加 port、Tunnel 網域），而且要有 `X-Requested-With`；`/healthz` 例外。
+  - `createCsrfMiddleware` 開 `allowRequestsWithoutOriginCheck: true`：在家走 http 加 IP 時，瀏覽器不送 `Sec-Fetch-Site`，同源 GET 不送 `Origin`，`no-referrer` 又拿掉 `Referer`，不開的話家裡所有讀取都會被擋。防護改靠：`Host` 白名單、server function 一律要 `X-Requested-With: XMLHttpRequest`（別的網站送不出來，容器又不回 CORS）、POST 一定要帶 `Origin`、cookie 是 SameSite=Strict。（2026-11-16 Alex 同意）
   - 先檢查來源和 cookie，再讀 body。`.torrent` 每個上限 10 MB、一次 20 個、整個請求 50 MB；收 hash 陣列的請求上限 384 KB（刪除 5000 個也送得出去），其他 body 上限 64 KB。先看 `Content-Length`，讀的時候也邊讀邊算。
   - hash 只接受 40 或 64 位小寫 hex，陣列 1 到 5000 個；永遠不把 `all` 或含 `|` 的值送給 qBittorrent。
   - 路徑：環境變數 `SAVE_ROOTS`（qBittorrent 容器裡看到的下載根目錄）。所有路徑參數和常用路徑共用 `src/shared` 一個 schema：絕對路徑、不含 NUL、反斜線、控制字元，任何一段是 `..` 就拒絕，正規化後必須在某個根目錄底下，長度上限 1024。改名的新路徑相對於種子自己的資料夾，可以有好幾段（例如 `<劇名>/season<n>/檔名`），每一段各自檢查：不含 `\`、NUL、控制字元，不是 `.` 或 `..`，每段 1 到 255 bytes，不能以 `/` 開頭，舊路徑必須在這個種子目前的檔案清單裡（容器向 qBittorrent 查，不信前端）。

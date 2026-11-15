@@ -31,5 +31,7 @@ jobs:
       - run: npm test
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
+      # Boots .output: CSP nonce on HTML, asset CSP, refuses to start without env.
+      - run: npm run smoke
       # The build regenerates the route tree; a stale committed copy fails here.
       - run: git diff --exit-code src/routeTree.gen.ts
