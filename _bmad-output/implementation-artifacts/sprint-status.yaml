@@ -37,7 +37,7 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   epic-1: in-progress
   1-1-用官方範本重起專案-清掉舊檔案: done  # PR #2：官方 Start 範本、清舊檔、ESLint 分層、healthz、新 CI
-  1-2-伺服器閘門-錯誤合約和-log: backlog
+  1-2-伺服器閘門-錯誤合約和-log: review
   1-3-前端地基-設計-token-shadcn-對照-深色跟系統-callfn-和全域錯誤處理: backlog
   1-4-登入畫面: backlog
   1-5-容器保管-qbittorrent-連線和種子表: backlog
