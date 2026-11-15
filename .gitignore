@@ -3,19 +3,19 @@ node_modules
 dist
 dist-ssr
 *.local
-count.txt
 .env
 .nitro
 .tanstack
-.wrangler
 .output
-.vinxi
-todos.json
-
-# Auto Claude data directory
-.auto-claude/
-
+__unconfig*
 coverage/
+
+# Old tool folders (Auto Claude, wrangler). Keep ignored until deleted on both Macs.
+.auto-claude/
+.wrangler/
+
+# Local settings.json for development (CONFIG_DIR=./config)
+config/
 
 # UX 參考截圖：含私人資料（分類、書籤、記帳金額），只留本機。repo 是 public
 _bmad-output/planning-artifacts/ux-designs/*/imports/*.png
