@@ -53,11 +53,11 @@ The project connects to a qBittorrent instance. Connection details are configure
 
 ```env
 VITE_QBIT_BASE_URL=http://192.168.50.52:8080
-VITE_QBIT_USERNAME=j620656786206
-VITE_QBIT_PASSWORD=H9j7kEpJecaq
+VITE_QBIT_USERNAME=<your qBittorrent username>
+VITE_QBIT_PASSWORD=<your qBittorrent password>
 ```
 
-**Note**: The `.env` file is gitignored. Use `.env.example` as a template.
+**Note**: The `.env` file is gitignored. Use `.env.example` as a template. Never write real credentials into this file or any other tracked file: this repo is public.
 
 ### Testing Connection
 

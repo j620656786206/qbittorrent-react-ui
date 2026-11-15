@@ -1,0 +1,18 @@
+# react-torrent 專案規則，bmad-build-auto 每次跑都會讀到。
+# 由 /next-story 流程使用（.claude/skills/next-story/SKILL.md）。
+
+[workflow]
+
+persistent_facts = [
+  "AD-15: tests, the automated flow and CI must never call any write operation on the real qBittorrent (delete, add, move, rename, pause/resume, change priority). Verify only with fake qBittorrent responses. Real qBittorrent may only be read, and only in local development.",
+  "AD-11: before writing framework code (TanStack Start, Router, Query, shadcn/ui, Vite, zod, Tailwind and similar), check the official docs for the exact version in package.json instead of writing from memory. Record the doc URLs in the spec's Design Notes so the PR can cite them.",
+  "AD-3: qBittorrent credentials live only in the container's environment variables. The browser stores nothing.",
+  "The architecture spine wins every conflict: _bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md. The root CLAUDE.md describes the old architecture until Story 1.1 rewrites it.",
+  "Privacy: one qBittorrent category and Alex's file-organising workflow must never enter git. In every tracked file, code, test fixture, comment and commit message use only the code names X and mteam-X (paths too, e.g. /data/media/X/incompleted). Treat those torrents as already organised, not as errors. Never describe the organising workflow; at most write that files were moved outside qBittorrent by Alex's own workflow.",
+  "The repository is public: never write IP addresses, usernames, passwords or tokens into any tracked file. Use .env.example placeholders.",
+  "Never use the em dash character in any text (docs, comments, commit messages, UI strings). Use a full stop or a colon instead.",
+  "Before every git commit, run: bash .claude/skills/next-story/check.sh and commit only when every line says ok. Fix and re-run on any FAIL.",
+  "Run Node commands through nvm: prefix with 'source ~/.nvm/nvm.sh && nvm use &&'. Install the .nvmrc version with nvm install if missing.",
+  "Screenshots must use fake qBittorrent responses only, never real data. Use the ego-browser skill for any browser work; if it fails, halt as blocked instead of switching tools.",
+  "User-facing UI text is Traditional Chinese (Taiwan usage) as written in the UX spec and epics; keep wording exactly as the spec gives it.",
+]

@@ -1,0 +1,91 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 11-15-2026 23:31
+last_updated: 11-15-2026 23:31
+project: react-torrent
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-用官方範本重起專案-清掉舊檔案: backlog
+  1-2-伺服器閘門-錯誤合約和-log: backlog
+  1-3-前端地基-設計-token-shadcn-對照-深色跟系統-callfn-和全域錯誤處理: backlog
+  1-4-登入畫面: backlog
+  1-5-容器保管-qbittorrent-連線和種子表: backlog
+  1-6-前端種子資料-狀態和數字的純函式: backlog
+  1-7-頁首-全域速度和連線提示條: backlog
+  1-8-種子列表-骨架和空狀態: backlog
+  1-9-映像-ci-推送和-nas-部署範本: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-51-種排序和電腦排序選單: backlog
+  2-2-底部面板和手機排序面板: backlog
+  2-3-看板-電腦-5-欄和手機狀態分頁: backlog
+  2-4-點開詳情-三種容器-固定頭和前後切換: backlog
+  2-5-詳情概覽-狀態區-數字小卡-儲存位置: backlog
+  2-6-暫停繼續和-toast: backlog
+  2-7-檔案分頁-清單-勾選-優先順序: backlog
+  2-8-看板自動收合: backlog
+  2-9-進度環轉進來和列進場: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-設定檔和-全部-記住排序: backlog
+  3-2-電腦分類分頁: backlog
+  3-3-設定頁: backlog
+  3-4-手機分類清單: backlog
+  3-5-列表內搜尋: backlog
+  3-6-打開-app-回到上次的地方: backlog
+  3-7-快捷鍵和說明視窗: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-電腦勾選和選取列: backlog
+  4-2-手機選取模式: backlog
+  4-3-刪除確認和刪除: backlog
+  4-4-刪除淡出: backlog
+  4-5-info-hash-和貼上內容的判斷: backlog
+  4-6-新增畫面-貼上-選檔案-拖檔: backlog
+  4-7-送出新增和結果: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-位置標籤和媒體庫: backlog
+  5-2-改一個種子的路徑: backlog
+  5-3-搬移中和搬完: backlog
+  5-4-管理常用路徑和-加到常用: backlog
+  5-5-一次搬好幾個和部分失敗: backlog
+  5-6-改檔名的預覽計畫和-renamefiles: backlog
+  5-7-改檔名畫面-整季批次: backlog
+  5-8-單檔改名-接著改檔名-7-件事驗收: backlog
+  epic-5-retrospective: optional

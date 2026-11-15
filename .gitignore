@@ -16,3 +16,6 @@ todos.json
 .auto-claude/
 
 coverage/
+
+# UX 參考截圖：含私人資料（分類、書籤、記帳金額），只留本機。repo 是 public
+_bmad-output/planning-artifacts/ux-designs/*/imports/*.png
