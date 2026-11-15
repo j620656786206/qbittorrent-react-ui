@@ -88,6 +88,19 @@ const rawHtmlBans = [
   },
 ]
 
+const CREATE_SERVER_FN_BAN = {
+  group: ['@tanstack/*start*', '@tanstack/*start*/**'],
+  importNames: ['createServerFn'],
+  message:
+    'AD-5: create server functions with serverGet / serverPost and guard() from src/server/functions/_define.ts.',
+}
+// Relative or `#/` alias, with or without extension.
+const DEFINE_BAN = {
+  regex: '(^|/)_define(\\.tsx?)?$',
+  message:
+    'AD-5: only files under src/server/functions may import the server function factory.',
+}
+
 export default [
   {
     ignores: [
@@ -101,6 +114,8 @@ export default [
       'src/routeTree.gen.ts',
       'eslint.config.js',
       'prettier.config.js',
+      // Plain Node scripts; the TypeScript lint config does not apply.
+      'scripts/**',
     ],
   },
   ...tanstackConfig,
@@ -142,5 +157,29 @@ export default [
       'boundaries/no-unknown-files': 'error',
       'boundaries/no-unknown-dependencies': 'error',
     },
+  },
+  // AD-5: every server function comes from the factory in _define.ts, and
+  // only files under src/server/functions may use that factory.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/server/functions/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [CREATE_SERVER_FN_BAN, DEFINE_BAN] },
+      ],
+    },
+  },
+  {
+    files: ['src/server/functions/**/*.{ts,tsx}'],
+    ignores: ['src/server/functions/_define.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [CREATE_SERVER_FN_BAN] }],
+    },
+  },
+  // AD-16: only src/server/log writes logs.
+  {
+    files: ['src/server/**/*.{ts,tsx}', 'src/start.ts'],
+    rules: { 'no-console': 'error' },
   },
 ]

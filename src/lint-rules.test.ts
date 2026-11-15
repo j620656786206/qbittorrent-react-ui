@@ -3,7 +3,8 @@ import { dirname, join, relative } from 'node:path'
 import { ESLint } from 'eslint'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-// Guards the layer boundaries and the AD-10 raw-HTML bans in eslint.config.js.
+// Guards the layer boundaries, the AD-10 raw-HTML bans, the AD-5
+// createServerFn ban and the AD-16 no-console rule in eslint.config.js.
 // If a plugin or resolver change silently disables them, these tests go red.
 
 const ROOT = join(import.meta.dirname, '..')
@@ -56,7 +57,22 @@ const FIXTURES: Record<string, string> = {
     "import { target } from '#/lib/lint-probe-target'\n\nexport const x = target\n",
   'src/components/lint-probe.ts': 'export const x = 1\n',
   [RAW_HTML_FILE]: RAW_HTML_SOURCE,
+  'src/lib/lint-probe-create-server-fn.ts':
+    "import { createServerFn } from '@tanstack/react-start'\n\nexport const x = createServerFn\n",
+  'src/server/qbit/lint-probe-create-server-fn.ts':
+    "import { createServerFn as make } from '@tanstack/start-client-core'\n\nexport const x = make\n",
+  'src/server/qbit/lint-probe-console.ts': "console.log('x')\n\nexport const x = 1\n",
+  'src/lib/lint-probe-define-alias.ts':
+    "import { serverGet } from '#/server/functions/_define'\n\nexport const x = serverGet\n",
+  'src/routes/-lint-probe-define-relative.ts':
+    "import { serverPost } from '../server/functions/_define.ts'\n\nexport const x = serverPost\n",
 }
+
+// Real files linted alongside the probes (read only).
+const REAL_FILES = [
+  'src/server/functions/_define.ts',
+  'src/server/functions/__fixtures__/sample.ts',
+]
 
 const createdDirs: Array<string> = []
 const results = new Map<string, Array<ESLint.LintResult['messages'][number]>>()
@@ -81,7 +97,7 @@ beforeAll(async () => {
   }
 
   const eslint = new ESLint({ cwd: ROOT })
-  const lintResults = await eslint.lintFiles(Object.keys(FIXTURES))
+  const lintResults = await eslint.lintFiles([...Object.keys(FIXTURES), ...REAL_FILES])
   for (const result of lintResults) {
     results.set(relative(ROOT, result.filePath), result.messages)
   }
@@ -133,4 +149,38 @@ describe('AD-10 raw HTML bans', () => {
       expect(hit).toBe(true)
     },
   )
+})
+
+describe('AD-5 createServerFn only in _define.ts', () => {
+  it.each([
+    ['@tanstack/react-start', 'src/lib/lint-probe-create-server-fn.ts'],
+    ['@tanstack/start-client-core (renamed)', 'src/server/qbit/lint-probe-create-server-fn.ts'],
+  ])('blocks importing it from %s outside _define.ts', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('allows it in src/server/functions/_define.ts', () => {
+    expect(ruleIds('src/server/functions/_define.ts')).not.toContain('no-restricted-imports')
+  })
+})
+
+describe('AD-5 the factory is imported only under src/server/functions', () => {
+  it.each([
+    ['#/ alias from src/lib', 'src/lib/lint-probe-define-alias.ts'],
+    ['relative path from src/routes', 'src/routes/-lint-probe-define-relative.ts'],
+  ])('blocks %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('allows it inside src/server/functions', () => {
+    expect(ruleIds('src/server/functions/__fixtures__/sample.ts')).not.toContain(
+      'no-restricted-imports',
+    )
+  })
+})
+
+describe('AD-16 only src/server/log writes logs', () => {
+  it('blocks console in src/server', () => {
+    expect(ruleIds('src/server/qbit/lint-probe-console.ts')).toContain('no-console')
+  })
 })
