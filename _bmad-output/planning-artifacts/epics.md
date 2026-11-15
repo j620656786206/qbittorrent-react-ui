@@ -701,6 +701,7 @@ Alex 在 NAS 上打開新版（在家用電腦走 http、在外面用手機經 C
 **When** App 開著
 **Then** 每 5 秒經 `callFn` 呼叫 `getMaindata({ since })`；分頁不在前景時停，回前景立刻抓一次
 **And** 失敗時保留舊資料並記住最後一次成功的時間；收到 `not_logged_in`、`qbit_auth_failed` 時停止輪詢
+**And** 「立刻抓一次」只在 `src/state` 建一個 `refreshMaindata()`（取消在途請求、立刻抓一次，AR-42）；Story 1.7 的「重試」和之後所有操作都呼叫它，不另做
 
 **Given** `src/lib/maindata-merge.ts`
 **When** 套用一次回應
@@ -1209,7 +1210,7 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 
 **Given** `stopTorrents` 和 `startTorrents` 兩個 server function
 **When** 用工廠建立
-**Then** 都是 POST，zod 只收 1 到 5000 個 40 或 64 位小寫 hex 的 hash，永遠不送 `all` 或含 `|` 的值；參數用 `URLSearchParams` 組，打 qBittorrent 5.1.4 的停止和開始 API（端點名稱照官方文件確認，PR 附網址）
+**Then** 都是 POST，zod 只收 1 到 5000 個 40 或 64 位小寫 hex 的 hash，永遠不送 `all` 或含 `|` 的值；body 上限照 AD-12 收 hash 陣列的 384 KB（不是 64 KB）；參數用 `URLSearchParams` 組，打 qBittorrent 5.1.4 的停止和開始 API（端點名稱照官方文件確認，PR 附網址）
 **And** 回 AR-54 的批次形狀，qBittorrent 接受就每筆都算成功
 **And** vitest 只用假的 qBittorrent 回應：送對端點和參數、擋掉不合法的 hash、沒登入回 `not_logged_in`、qBittorrent 拒絕回 `qbit_rejected`；不對真的 qBittorrent 呼叫
 
@@ -1221,7 +1222,7 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 
 **Given** 按了「暫停」或「繼續」
 **When** 送出成功
-**Then** 不跳 toast、選單項目不換字；呼叫 `src/state` 唯一的 `refreshMaindata()`（取消在途請求、立刻抓一次；Epic 1 已有類似的就收成這一個），不改本機資料
+**Then** 不跳 toast、選單項目不換字；呼叫 `src/state` 唯一的 `refreshMaindata()`（Story 1.6 建的，沿用，不另做），不改本機資料
 **And** 這個 hash 記進 `src/state` 的 `pendingOps`，狀態反映出來或 30 秒後才拿掉；這段期間選單項目不能按，避免重複送
 **And** 已完成的種子按「繼續」後，下一次資料到了就變做種中、移到做種中欄；看板詳情面板照 Story 2.4 留著並重算「第 N 個」
 **And** 選取列沒有暫停或繼續，不做批次
@@ -1339,7 +1340,7 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 **And** 欄用虛擬化時，變寬後照一排幾張重算列
 
 **Given** 自動收合的開關
-**When** 讀 `src/lib/prefs.ts` 的 key
+**When** 讀 `src/lib/prefs.ts` 的 key（這張建立 `src/lib/prefs.ts` 和 key 表，Story 3.3、3.6 沿用）
 **Then** 預設開；關掉時捲動不收合（設定頁的開關在 Epic 3，這張先用 vitest 和手動改 localStorage 驗）
 **And** 寬度小於 1024px 時沒有這個功能
 
