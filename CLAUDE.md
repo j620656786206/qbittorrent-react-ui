@@ -1,187 +1,40 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code and Auto Claude when working with the react-torrent project.
+react-torrent 是 Alex 自用的 qBittorrent 網頁介面重寫版：一個 TanStack Start 容器（SPA 模式、Nitro 的 Node 輸出）同時送網頁、當 qBittorrent 的白名單閘門。
 
-## Project Overview
+## 先讀這些
 
-react-torrent is a modern web UI for qBittorrent built with React, Vite, TanStack Router, and TanStack Query.
+- 架構底稿：`_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md`。分層、AD 規則、慣例和版本都以這份為準，story 不能自己改。
+- PRD：`_bmad-output/planning-artifacts/prds/prd-react-torrent-2026-11-15/prd.md`
+- UX：`DESIGN.md`（repo 根目錄），以及 `_bmad-output/planning-artifacts/ux-designs/ux-react-torrent-2026-11-13/` 底下的 `DESIGN.md`、`EXPERIENCE.md`
+- Epic 和 story：`_bmad-output/planning-artifacts/epics.md`
+- 進度：`_bmad-output/implementation-artifacts/sprint-status.yaml`
+- 自動流程：`.claude/skills/next-story/`（送出前檢查 `check.sh`）、`.claude/skills/ship/`
 
-## Environment Requirements
+## 指令
 
-### Node.js Version
-
-**CRITICAL**: This project requires Node.js **20.19+** or **22.12+** for Vite 7.x compatibility.
-
-The project uses `.nvmrc` to specify the Node version:
-
-```
-lts/iron  # Currently resolves to v20.19.6
-```
-
-### Setup Node.js with nvm
-
-Before running any commands, **always** ensure you're using the correct Node.js version:
+Node 版本寫在 `.nvmrc`（26）。shell 不會記住上一個指令切過的版本，所以每個指令都要帶前綴：
 
 ```bash
-# Load nvm (if not already loaded)
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+# 這台 Mac 還沒有 Node 26 時，先裝一次
+source ~/.nvm/nvm.sh && nvm install 26
 
-# Use the version specified in .nvmrc
-nvm use
-
-# Verify version (should be v20.19.6 or higher)
-node --version
+source ~/.nvm/nvm.sh && nvm use && npm ci
+source ~/.nvm/nvm.sh && nvm use && npm run dev        # http://localhost:3000
+source ~/.nvm/nvm.sh && nvm use && npm run lint
+source ~/.nvm/nvm.sh && nvm use && npm run typecheck
+source ~/.nvm/nvm.sh && nvm use && npm test
+source ~/.nvm/nvm.sh && nvm use && npm run build
+source ~/.nvm/nvm.sh && nvm use && npm start          # 跑 build 出來的 .output/server/index.mjs
 ```
 
-**IMPORTANT for Auto Claude**: When executing commands (build, dev, test), always prefix with nvm:
+本機設定：`.env` 只留在本機、不進 git，變數名稱照 `.env.example`。舊的 `VITE_` 開頭名稱要改成 `.env.example` 的名稱；帳密絕對不能放在 `VITE_` 變數裡（AD-3，`VITE_` 會被打包進前端）。
 
-```bash
-# Instead of: npm run build
-# Use:
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npm run build'
+## 規則
 
-# Or use the init.sh script which handles this automatically
-./init.sh
-```
-
-## qBittorrent Connection
-
-### Configuration
-
-The project connects to a qBittorrent instance. Connection details are configured in `.env`:
-
-```env
-VITE_QBIT_BASE_URL=http://192.168.50.52:8080
-VITE_QBIT_USERNAME=<your qBittorrent username>
-VITE_QBIT_PASSWORD=<your qBittorrent password>
-```
-
-**Note**: The `.env` file is gitignored. Use `.env.example` as a template. Never write real credentials into this file or any other tracked file: this repo is public.
-
-### Testing Connection
-
-To test features that interact with qBittorrent (add torrents, fetch data, etc.), ensure:
-
-1. qBittorrent is running at the configured URL
-2. Credentials in `.env` are correct
-3. Network access to the qBittorrent instance is available
-
-## Commands
-
-### Development
-
-```bash
-# Start dev server (with correct Node version)
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npm run dev'
-
-# Or use init.sh which handles environment setup
-./init.sh
-```
-
-The dev server runs on **http://localhost:3000**
-
-### Build
-
-```bash
-# Build for production
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npm run build'
-```
-
-### Testing
-
-```bash
-# Run tests
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npm test'
-
-# Lint
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npm run lint'
-```
-
-## Project Structure
-
-```
-react-torrent/
-├── src/
-│   ├── components/     # React components (UI, modals, etc.)
-│   ├── lib/            # Utilities and API client
-│   │   └── api.ts      # qBittorrent API functions
-│   ├── locales/        # i18n translations (en.json, zh-Hant.json)
-│   ├── routes/         # TanStack Router routes
-│   └── main.tsx        # App entry point
-├── .nvmrc              # Node.js version specification
-├── .env                # Environment variables (gitignored)
-├── .env.example        # Environment template
-└── vite.config.ts      # Vite configuration
-```
-
-## Common Tasks for Auto Claude
-
-### Adding API Functions
-
-When adding new qBittorrent API endpoints:
-
-1. Add function to `src/lib/api.ts`
-2. Follow existing patterns (getMaindata, pauseTorrent, etc.)
-3. Use TypeScript types for requests/responses
-4. Use `getApiBaseUrl()` helper for URL construction
-
-Example:
-
-```typescript
-export async function myNewApiFunction(param: string): Promise<Response> {
-  return fetch(`${getApiBaseUrl()}/api/v2/endpoint/${param}`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-}
-```
-
-### Adding UI Components
-
-1. Create component in `src/components/`
-2. Use existing shadcn/ui components from `src/components/ui/`
-3. Add translations to `src/locales/en.json` and `src/locales/zh-Hant.json`
-4. Use TanStack Query for data fetching:
-   ```typescript
-   const { data } = useQuery({
-     queryKey: ['myData'],
-     queryFn: () => api.myFunction(),
-   })
-   ```
-
-### TypeScript Compilation
-
-Always verify TypeScript compiles without errors:
-
-```bash
-bash -c 'source ~/.nvm/nvm.sh && nvm use && npx tsc --noEmit'
-```
-
-## Troubleshooting
-
-### "Vite requires Node.js version 20.19+ or 22.12+"
-
-This warning means the wrong Node.js version is active. Fix:
-
-1. Run `nvm use` to activate the correct version from `.nvmrc`
-2. Verify with `node --version` (should show v20.19.6 or higher)
-
-### qBittorrent Connection Errors
-
-1. Verify qBittorrent is running: `curl http://192.168.50.52:8080/api/v2/app/version`
-2. Check credentials in `.env`
-3. Ensure network connectivity to the NAS
-
-### Build Errors
-
-1. Ensure correct Node version: `nvm use && node --version`
-2. Clear node_modules and reinstall: `rm -rf node_modules package-lock.json && npm install`
-3. Run lint: `npm run lint`
-
-## Notes for Auto Claude
-
-- **Always use nvm**: Prefix commands with `bash -c 'source ~/.nvm/nvm.sh && nvm use && YOUR_COMMAND'`
-- **Use init.sh**: For starting the dev environment, use `./init.sh` which handles Node version switching
-- **Verify builds**: Always run `npx tsc --noEmit` to catch TypeScript errors
-- **Test with real qBittorrent**: Features should be tested against the actual qBittorrent instance (http://192.168.50.52:8080)
+- **repo 是公開的。** 帳密、token、IP（包括家裡的內網位址）不能寫進任何追蹤的檔案、commit 訊息、PR 或 log。commit 前跑 `bash .claude/skills/next-story/check.sh`，每一行都要是 ok。
+- **私人分類只寫代稱** X 或 mteam-X，真名和相關流程不進 git。
+- **AD-15：** 測試、CI、任何自動流程都不能對真的 qBittorrent 做寫入（刪除、新增、搬移、改名、暫停繼續、改優先順序）。驗證一律用假的回應；對真的 qBittorrent 只能讀，而且只在本機開發。
+- **AD-11：** 寫 TanStack Start、Router、Query、Nitro 或其他框架的程式之前，先查跟 `package.json` 鎖定版本相符的官網文件，把網址記在 spec 和 PR 說明裡。框架套件用精確版本，不加 `^`。
+- 畫面文字直接寫繁體中文，不裝 i18n、動畫或手勢套件。
+- 分層由 ESLint（`eslint-plugin-boundaries`）擋，規則在 `eslint.config.js`，對應底稿的分層圖。

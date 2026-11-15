@@ -1,0 +1,63 @@
+Story 1.1 lint proof (2026-11-16, regenerated after review)
+
+Temporary files were created under src/ (the same cases as src/lint-rules.test.ts),
+`npm run lint` was run, and the files were deleted. Output below is complete except for
+trailing whitespace; every error comes from the rules under test.
+
+Allowed imports in the same set that did NOT error (expected):
+route -> lib (src/routes/-lint-probe-to-lib.ts), root file -> lib (src/lint-probe-root-to-lib.ts).
+
+Blocked cases:
+- feature a -> feature b, via the #/ alias and via a relative path
+- lib -> state
+- lib -> root file (../router)
+- route -> server (src/server/qbit)
+- state -> server (src/server/qbit)
+- a file outside the layer map (src/components)
+- JSX dangerouslySetInnerHTML, object key dangerouslySetInnerHTML (plain and quoted),
+  el.innerHTML =, el['outerHTML'] =, document.write, document.writeln,
+  window.document.write, globalThis.document.write, document['write'],
+  insertAdjacentHTML, createContextualFragment, setHTMLUnsafe
+
+
+> lint
+> eslint
+
+src/components/lint-probe.ts
+  1:1  error  File does not match any file pattern and does not belong to any known element  boundaries/no-unknown-files
+
+src/features/lint-probe-a/alias.ts
+  1:24  error  There is no policy allowing dependencies from elements of type "feature" and captured values: name="lint-probe-a" to elements of type "feature" and captured values: name="lint-probe-b"  boundaries/dependencies
+
+src/features/lint-probe-a/relative.ts
+  1:24  error  There is no policy allowing dependencies from elements of type "feature" and captured values: name="lint-probe-a" to elements of type "feature" and captured values: name="lint-probe-b"  boundaries/dependencies
+
+src/lib/lint-probe-html.tsx
+   2:16  error  AD-10: dangerouslySetInnerHTML is banned. Render text as plain text                                                  no-restricted-syntax
+   3:13  error  AD-10: dangerouslySetInnerHTML is banned. Render text as plain text                                                  no-restricted-syntax
+   4:13  error  AD-10: dangerouslySetInnerHTML is banned. Render text as plain text                                                  no-restricted-syntax
+   5:1   error  AD-10: assigning innerHTML / outerHTML is banned. Use textContent                                                    no-restricted-syntax
+   6:1   error  AD-10: assigning innerHTML / outerHTML is banned. Use textContent                                                    no-restricted-syntax
+   7:1   error  AD-10: document.write / document.writeln is banned                                                                   no-restricted-syntax
+   8:1   error  AD-10: document.write / document.writeln is banned                                                                   no-restricted-syntax
+   9:1   error  AD-10: document.write / document.writeln is banned                                                                   no-restricted-syntax
+  10:1   error  AD-10: document.write / document.writeln is banned                                                                   no-restricted-syntax
+  11:1   error  AD-10: document.write / document.writeln is banned                                                                   no-restricted-syntax
+  12:1   error  AD-10: insertAdjacentHTML / createContextualFragment / setHTMLUnsafe are banned. Build DOM nodes or use textContent  no-restricted-syntax
+  13:1   error  AD-10: insertAdjacentHTML / createContextualFragment / setHTMLUnsafe are banned. Build DOM nodes or use textContent  no-restricted-syntax
+  14:1   error  AD-10: insertAdjacentHTML / createContextualFragment / setHTMLUnsafe are banned. Build DOM nodes or use textContent  no-restricted-syntax
+
+src/lib/lint-probe-to-root.ts
+  1:27  error  There is no policy allowing dependencies from elements of type "lib" to file of category "root"  boundaries/dependencies
+
+src/lib/lint-probe-to-state.ts
+  1:24  error  There is no policy allowing dependencies from elements of type "lib" to elements of type "state"  boundaries/dependencies
+
+src/routes/-lint-probe-to-server.ts
+  1:24  error  There is no policy allowing dependencies from elements of type "route" to elements of type "server" and captured values: module="qbit"  boundaries/dependencies
+
+src/state/lint-probe-to-server.ts
+  1:24  error  There is no policy allowing dependencies from elements of type "state" to elements of type "server" and captured values: module="qbit"  boundaries/dependencies
+
+✖ 20 problems (20 errors, 0 warnings)
+
