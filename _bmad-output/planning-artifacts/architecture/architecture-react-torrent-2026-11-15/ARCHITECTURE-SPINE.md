@@ -243,7 +243,7 @@ flowchart TD
 | info hash | 在瀏覽器解析 `.torrent` 和磁力連結，`src/lib/info-hash.ts` 統一轉成小寫 hex 再比對 |
 | 環境變數 | `QBIT_URL`、`QBIT_USERNAME`、`QBIT_PASSWORD`、`SESSION_SECRET`、`APP_ORIGINS`、`SAVE_ROOTS`、`CONFIG_DIR`；本機放 `.env`（gitignore），正式放 Unraid 範本 |
 | 隱私 | 帳密、IP、私人分類的真名不進任何追蹤的檔案；文件裡私人分類寫代稱 X、mteam-X |
-| 測試 | vitest 測 `src/lib`、`src/state` 和 server function（假的 qBittorrent 回應）；E2E 先不做 |
+| 測試 | vitest 測 `src/lib`、`src/state` 和 server function（假的 qBittorrent 回應）；畫面和接線用 happy-dom（檔頭 `// @vitest-environment happy-dom`）；每個 PR 在 CI 跑一支只用 Chromium 的 Playwright 瀏覽器 smoke，打 build 出來的伺服器加 `scripts/fake-qbit.mjs`（2026-11-16 Epic 1 retro，Alex 決定；Story 2.0） |
 
 ## 技術
 
@@ -352,7 +352,6 @@ react-torrent/
 
 | 事情 | 為什麼可以等 |
 | --- | --- |
-| E2E 測試 | 地基和功能的 vitest 加上 CI 的 `docker run` 檢查就夠；第一個 epic 的 retro 再看 |
 | 每個 server function 的輸入輸出細節 | 照 qBittorrent 5.1.4 的 API 和 AD-5、AD-9、AD-12、AD-14，寫那個 story 時決定 |
 | 動畫的寫法細節（看板展開那段） | 凍結規則已在 AD-7、AD-13，剩下的是單一畫面的事 |
 | 監控、告警 | 只有 Alex 用，壞了他自己會發現；有 `/healthz` 和 log 就好 |
