@@ -1,5 +1,6 @@
-// Smoke test for the container image (spec 1.9 rows I1 to I5). Node built-ins
-// only; drives the Docker CLI with spawn (no shell).
+// Smoke test for the container image (spec 1.9 rows I1 to I5). Drives the
+// Docker CLI with spawn (no shell); the only package it uses is seroval,
+// through ./server-fn.mjs, to call the server functions the way the page does.
 //
 //   node scripts/smoke-image.mjs <image> <commit-sha>
 //
@@ -20,7 +21,10 @@
 // I4 commit sha: exactly one startup line, whose commit is the given sha.
 // I5 secrets stay out: no .env or .env.* entry in the exported filesystem,
 //    /app holds only .output, the SPA shell was prerendered, logs never
-//    contain the fake password or secret.
+//    contain the fake password or secret. Before the logs are read, the
+//    password goes through the paths that handle it: a wrong login whose
+//    password contains the real one, a right login, and getMaindata, whose
+//    qBittorrent login is refused by the closed port (qbit_unreachable).
 //
 // Every docker call and fetch has a timeout naming the step that stalled.
 // Containers and the volume are removed at the end, on failure and on
@@ -38,6 +42,7 @@ import {
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { callServerFn, serverFnIds } from './server-fn.mjs'
 
 const [IMAGE, COMMIT] = process.argv.slice(2)
 if (!IMAGE || !/^[0-9a-f]{7,40}$/.test(COMMIT ?? '')) {
@@ -453,6 +458,47 @@ async function checkFilesystem(dir) {
   )
 }
 
+/**
+ * I5: sends the fake password through login and the qBittorrent client, so
+ * the log check below has something it could catch.
+ */
+async function exerciseSecrets(dir, base, env) {
+  const serverDir = join(dir, 'server')
+  await dockerOk(['cp', `${OK_NAME}:/app/.output/server`, serverDir], {
+    step: 'I5 docker cp server',
+  })
+  const ids = serverFnIds(serverDir, ['login', 'getMaindata'])
+  const login = (password) =>
+    callServerFn(base, ids.login, {
+      method: 'POST',
+      data: { username: env.QBIT_USERNAME, password, remember: false },
+    })
+
+  const wrong = await login(`${env.QBIT_PASSWORD}x`)
+  check(
+    wrong.result?.error?.code === 'login_failed',
+    `I5 wrong login: ${wrong.status} ${JSON.stringify(wrong.result)}`,
+  )
+  const right = await login(env.QBIT_PASSWORD)
+  const cookie = right.cookies
+    .find((value) => value.startsWith('rt_session='))
+    ?.split(';')[0]
+  check(
+    right.result?.ok === true && Boolean(cookie),
+    `I5 login: ${right.status} ${JSON.stringify(right.result)}`,
+  )
+  if (!cookie) return
+  const maindata = await callServerFn(base, ids.getMaindata, {
+    method: 'GET',
+    data: {},
+    cookie,
+  })
+  check(
+    maindata.result?.error?.code === 'qbit_unreachable',
+    `I5 getMaindata: ${maindata.status} ${JSON.stringify(maindata.result)}`,
+  )
+}
+
 function checkLogsClean(output, env) {
   check(
     !output.includes(env.QBIT_PASSWORD),
@@ -521,9 +567,10 @@ async function main() {
     tempDir = mkdtempSync(join(tmpdir(), 'rt-smoke-image-'))
     await dockerOk(['volume', 'create', VOLUME], { step: 'volume create' })
     volumeCreated = true
-    const { env } = await checkValidBoot()
+    const { env, port } = await checkValidBoot()
     const missingLogs = await checkMissingEnv(env)
     await checkHardening()
+    await exerciseSecrets(tempDir, `http://127.0.0.1:${port}`, env)
     const okLogs = await logs(OK_NAME, 'I4 logs')
     checkCommit(okLogs)
     await checkFilesystem(tempDir)

@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
-import { focusMain } from '#/shared/ui/main-scroll'
+import { getMain } from '#/shared/ui/main-scroll'
+import { useRestoreFocusOnUnmount } from '#/shared/ui/restore-focus'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { ROW_HEIGHT, SKELETON_ROWS } from '#/features/list/list-model'
 
@@ -90,19 +90,7 @@ export function ListLoadError({
   onRetry: () => void
   busy: boolean
 }) {
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const focusedRef = useRef(false)
-
-  // Like AlertBar: only when the button had focus and nothing else took it.
-  useLayoutEffect(() => {
-    const button = buttonRef.current
-    return () => {
-      if (!focusedRef.current) return
-      const active = document.activeElement
-      if (active && active !== document.body && active !== button) return
-      focusMain()?.focus()
-    }
-  }, [])
+  const focusProps = useRestoreFocusOnUnmount(getMain)
 
   return (
     <section aria-label="種子列表" className={BLOCK_CLASS}>
@@ -110,11 +98,9 @@ export function ListLoadError({
         {LIST_LOAD_FAILED}
       </p>
       <button
-        ref={buttonRef}
+        {...focusProps}
         type="button"
         onClick={onRetry}
-        onFocus={() => (focusedRef.current = true)}
-        onBlur={() => (focusedRef.current = false)}
         aria-busy={busy || undefined}
         className={BLOCK_BUTTON_CLASS}
       >

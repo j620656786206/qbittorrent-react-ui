@@ -1,14 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { CONNECTION_CODES } from '#/lib/app-error'
 import {
   FETCH_GRACE_MS,
-  alertAction,
-  alertIcon,
   alertSurface,
   barFor,
   dimsContent,
   pickConnectionAlert,
-  runBarAction,
 } from '#/lib/connection-alert'
 import type {
   ConnectionAlertInput,
@@ -39,48 +36,51 @@ describe('A1 each alert alone', () => {
   it.each([
     [
       'cloudflare_expired',
-      input({ errorCodes: ['cloudflare_expired'] }),
+      input({
+        errorCodes: ['cloudflare_expired'],
+        lastSuccessAt: THREE_MIN_AGO,
+      }),
       'cloudflare_expired',
       'Cloudflare 登入過期了',
-      'warning',
+      null,
     ],
     [
       'home_unreachable',
       input({ errorCodes: ['home_unreachable'], lastSuccessAt: THREE_MIN_AGO }),
       'home_unreachable',
-      '連不到家裡的 NAS，最後更新 3 分前',
-      'warning',
+      '連不到家裡的 NAS',
+      '最後更新 3 分前',
     ],
     [
       'qbit_unreachable',
       input({ errorCodes: ['qbit_unreachable'], lastSuccessAt: THREE_MIN_AGO }),
       'qbit_unreachable',
-      '家裡的 qBittorrent 沒有回應，最後更新 3 分前',
-      'warning',
+      '家裡的 qBittorrent 沒有回應',
+      '最後更新 3 分前',
     ],
     [
       'disconnected',
-      input({ connectionStatus: 'disconnected' }),
+      input({ connectionStatus: 'disconnected', lastSuccessAt: TWENTY_S_AGO }),
       'disconnected',
       '斷線了',
-      'warning',
+      null,
     ],
     [
       'firewalled',
-      input({ connectionStatus: 'firewalled' }),
+      input({ connectionStatus: 'firewalled', lastSuccessAt: TWENTY_S_AGO }),
       'firewalled',
       '防火牆擋住了',
-      'warning',
+      null,
     ],
     [
       'stale',
       input({ lastSuccessAt: TWENTY_S_AGO }),
       'stale',
       '最後更新 20 秒前',
-      'muted',
+      null,
     ],
-  ] as const)('%s', (_name, value, kind, text, tone) => {
-    expect(pickConnectionAlert(value)).toEqual({ kind, text, tone })
+  ] as const)('%s', (_name, value, kind, text, detail) => {
+    expect(pickConnectionAlert(value)).toEqual({ kind, text, detail })
   })
 
   it('nothing wrong: no alert', () => {
@@ -152,33 +152,40 @@ describe('A3 boundaries', () => {
     ).toBeNull()
   })
 
-  it('home unreachable without a last success has no suffix', () => {
+  it('home unreachable without a last success has no detail', () => {
     expect(
       pickConnectionAlert(
         input({ errorCodes: ['home_unreachable'], lastSuccessAt: null }),
-      )?.text,
-    ).toBe('連不到家裡的 NAS')
+      ),
+    ).toEqual({
+      kind: 'home_unreachable',
+      text: '連不到家裡的 NAS',
+      detail: null,
+    })
   })
 })
 
 describe('A4 when the 「最後更新」 part shows', () => {
-  it('a failure 5 s after a success has no suffix (not 「剛剛」)', () => {
+  it('a failure 5 s after a success has no detail (not 「剛剛」)', () => {
     expect(
       pickConnectionAlert(
         input({ errorCodes: ['home_unreachable'], lastSuccessAt: NOW - 5_000 }),
-      )?.text,
-    ).toBe('連不到家裡的 NAS')
+      )?.detail,
+    ).toBeNull()
   })
 
-  it('the suffix appears once the data is past the stale threshold', () => {
+  it('the detail appears once the data is past the stale threshold', () => {
     expect(
       pickConnectionAlert(
         input({
           errorCodes: ['qbit_unreachable'],
           lastSuccessAt: NOW - 10_001,
         }),
-      )?.text,
-    ).toBe('家裡的 qBittorrent 沒有回應，最後更新 10 秒前')
+      ),
+    ).toMatchObject({
+      text: '家裡的 qBittorrent 沒有回應',
+      detail: '最後更新 10 秒前',
+    })
   })
 
   it.each([0, -1])('lastSuccessAt %d counts as never', (lastSuccessAt) => {
@@ -186,8 +193,8 @@ describe('A4 when the 「最後更新」 part shows', () => {
     expect(
       pickConnectionAlert(
         input({ errorCodes: ['home_unreachable'], lastSuccessAt }),
-      )?.text,
-    ).toBe('連不到家裡的 NAS')
+      )?.detail,
+    ).toBeNull()
   })
 
   it('no stale line while a fetch has just started', () => {
@@ -206,8 +213,8 @@ describe('A4 when the 「最後更新」 part shows', () => {
           lastSuccessAt: TWENTY_S_AGO,
           fetchStartedAt: NOW - 500,
         }),
-      )?.text,
-    ).toBe('連不到家裡的 NAS，最後更新 20 秒前')
+      ),
+    ).toMatchObject({ text: '連不到家裡的 NAS', detail: '最後更新 20 秒前' })
     expect(
       pickConnectionAlert(
         input({ connectionStatus: 'firewalled', fetchStartedAt: NOW - 500 }),
@@ -232,10 +239,7 @@ describe('A5 a fetch that hangs (qBittorrent stuck) still shows the stale line',
 
 describe('C6 every connection code has an alert', () => {
   it.each(CONNECTION_CODES)('%s alone shows as itself', (code) => {
-    expect(pickConnectionAlert(input({ errorCodes: [code] }))).toMatchObject({
-      kind: code,
-      tone: 'warning',
-    })
+    expect(pickConnectionAlert(input({ errorCodes: [code] }))?.kind).toBe(code)
   })
 
   it('home and qBittorrent rank equal: the one listed first wins', () => {
@@ -264,29 +268,22 @@ describe('S1 stale while a fetch is in flight (spec 1.7)', () => {
   })
 })
 
-describe('spec 1.7 surface, action, icon and dim per kind', () => {
+describe('spec 1.7 surface and dim per kind', () => {
   it.each([
-    ['cloudflare_expired', 'bar', 'reload', '重新登入', 'warning', false],
-    ['home_unreachable', 'bar', 'retry', '重試', 'offline', true],
-    ['qbit_unreachable', 'bar', 'retry', '重試', 'offline', true],
-    ['disconnected', 'speed', null, null, 'warning', false],
-    ['firewalled', 'speed', null, null, 'warning', false],
-    ['stale', 'stale', null, null, 'warning', false],
-  ] as const)(
-    '%s',
-    (kind: ConnectionAlertKind, surface, action, label, icon, dim) => {
-      expect(alertSurface(kind)).toBe(surface)
-      const decided = alertAction(kind)
-      expect(decided?.action ?? null).toBe(action)
-      expect(decided?.label ?? null).toBe(label)
-      expect(alertIcon(kind)).toBe(icon)
-      expect(dimsContent(kind)).toBe(dim)
-    },
-  )
+    ['cloudflare_expired', 'bar', false],
+    ['home_unreachable', 'bar', true],
+    ['qbit_unreachable', 'bar', true],
+    ['disconnected', 'speed', false],
+    ['firewalled', 'speed', false],
+    ['stale', 'stale', false],
+  ] as const)('%s', (kind: ConnectionAlertKind, surface, dim) => {
+    expect(alertSurface(kind)).toBe(surface)
+    expect(dimsContent(kind)).toBe(dim)
+  })
 })
 
 describe('spec 1.7 barFor: the one bar decision for both screens', () => {
-  it('splits the ticking 「最後更新」 part out of the stable text', () => {
+  it('keeps the ticking 「最後更新」 part out of the stable text', () => {
     const alert = pickConnectionAlert(
       input({ errorCodes: ['home_unreachable'], lastSuccessAt: THREE_MIN_AGO }),
     )
@@ -336,18 +333,5 @@ describe('spec 1.7 barFor: the one bar decision for both screens', () => {
     input({}),
   ])('no bar for the other kinds or no alert', (value) => {
     expect(barFor(pickConnectionAlert(value))).toBeNull()
-  })
-})
-
-describe('spec 1.7 runBarAction', () => {
-  it('retry calls the retry handler once, reload calls reload', () => {
-    const retry = vi.fn()
-    const reload = vi.fn()
-    runBarAction('retry', { retry, reload })
-    expect(retry).toHaveBeenCalledTimes(1)
-    expect(reload).not.toHaveBeenCalled()
-    runBarAction('reload', { retry, reload })
-    expect(reload).toHaveBeenCalledTimes(1)
-    expect(retry).toHaveBeenCalledTimes(1)
   })
 })

@@ -11,7 +11,7 @@ import { Checkbox } from '#/shared/ui/checkbox'
 import { Input } from '#/shared/ui/input'
 import type { ErrorCode } from '#/shared/errors'
 import type { LoginInput } from '#/shared/login'
-import { barFor, runBarAction } from '#/lib/connection-alert'
+import { barFor } from '#/lib/connection-alert'
 import { callFn } from '#/state/call-fn'
 import { clearConnectionErrors } from '#/state/connection'
 import { useLoginConnectionAlert } from '#/state/connection-alert'
@@ -129,13 +129,11 @@ export function LoginScreen({ redirect }: LoginScreenProps) {
             detail={bar.detail}
             icon={bar.icon}
             actionLabel={bar.actionLabel}
-            onAction={() =>
-              runBarAction(bar.action, {
-                // Resubmit through onSubmit, so decideSubmit still guards it.
-                retry: () => formRef.current?.requestSubmit(),
-                reload: () => window.location.reload(),
-              })
-            }
+            onAction={() => {
+              // Resubmit through onSubmit, so decideSubmit still guards it.
+              if (bar.action === 'retry') formRef.current?.requestSubmit()
+              else window.location.reload()
+            }}
             // A submit clears the codes and removes the bar: keep focus on
             // the form instead of letting it fall to `body`.
             restoreFocusTo={() => submitRef.current}

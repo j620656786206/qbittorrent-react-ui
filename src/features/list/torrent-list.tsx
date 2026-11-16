@@ -5,18 +5,18 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { formatDayKey } from '#/lib/format'
 import { EPIC1_VIEW } from '#/lib/visible-torrents'
 import { getMain } from '#/shared/ui/main-scroll'
 import {
-  refreshMaindata,
   selectStateBeforeMove,
   selectTorrents,
   useMaindata,
   useVisibleTorrents,
 } from '#/state/maindata'
 import { useMaindataFailure } from '#/state/maindata-failure'
+import { useMaindataRetry } from '#/state/maindata-retry'
 import { useNow } from '#/state/now'
 import {
   noteScroll,
@@ -29,7 +29,6 @@ import {
 import {
   ROW_GAP,
   ROW_HEIGHT,
-  dayValue,
   listView,
   rowProps,
 } from '#/features/list/list-model'
@@ -52,10 +51,26 @@ import { TorrentRow } from '#/features/list/torrent-row'
 /** Checks the local date once a minute; rows only see it change at midnight. */
 const DAY_CHECK_MS = 60_000
 
+const estimateSize = () => ROW_HEIGHT
+
+/**
+ * Only a real mouse can rest on the list: a phone keeps a sticky `:hover`
+ * where it was last tapped, and only a mouse `pointerleave` clears the freeze.
+ */
+function mouseRestsOn(element: HTMLElement | null): boolean {
+  if (!element || typeof window.matchMedia !== 'function') return false
+  return (
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches &&
+    element.matches(':hover')
+  )
+}
+
 /** Epoch ms that changes only when the local date does (setState-in-render). */
 function useToday(): number {
   const now = useNow(DAY_CHECK_MS)
-  const key = dayValue(now)
+  // Rows take a `today` that changes only at local midnight, so dates never
+  // re-render a row every minute.
+  const key = formatDayKey(now)
   const [today, setToday] = useState(() => ({ key, now }))
   if (today.key !== key) {
     setToday({ key, now })
@@ -65,18 +80,11 @@ function useToday(): number {
 }
 
 export function TorrentList() {
-  const queryClient = useQueryClient()
   const { data: live } = useVisibleTorrents(EPIC1_VIEW)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()
   const shown = useFrozenOrder(live)
-  const [retrying, setRetrying] = useState(false)
-
-  const retry = useCallback(() => {
-    if (retrying) return
-    setRetrying(true)
-    void refreshMaindata(queryClient).finally(() => setRetrying(false))
-  }, [queryClient, retrying])
+  const { retry, retrying } = useMaindataRetry()
 
   const view = listView({
     hasData: shown !== undefined,
@@ -125,7 +133,7 @@ function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
   useEffect(() => {
     const main = getMain()
     if (!main) return
-    if (sectionRef.current?.matches(':hover')) setPointerInList(true)
+    if (mouseRestsOn(sectionRef.current)) setPointerInList(true)
     const options = { passive: true } as const
     const onTouchEnd = (event: TouchEvent) => {
       if (event.touches.length === 0) touchScrollEnd()
@@ -143,11 +151,14 @@ function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
     }
   }, [])
 
+  // A new `getItemKey` makes the virtualizer re-measure every row: keep it
+  // stable (`shown` keeps its reference across polls and while frozen).
+  const getItemKey = useCallback((index: number) => shown[index], [shown])
   const virtualizer = useVirtualizer({
     count: shown.length,
     getScrollElement: getMain,
-    estimateSize: () => ROW_HEIGHT,
-    getItemKey: (index) => shown[index],
+    estimateSize,
+    getItemKey,
     overscan: 10,
     gap: ROW_GAP,
     scrollMargin,

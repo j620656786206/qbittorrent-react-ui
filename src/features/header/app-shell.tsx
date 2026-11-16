@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 import { formatCount } from '#/lib/format'
 import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
-import { MAIN_ID, focusMain } from '#/shared/ui/main-scroll'
+import { MAIN_ID, getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
 import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
@@ -225,7 +225,7 @@ function DesktopBar() {
       actionLabel={bar.actionLabel}
       onAction={() => onBarAction(bar.action)}
       busy={retrying}
-      restoreFocusTo={focusMain}
+      restoreFocusTo={getMain}
       className="hidden lg:flex"
     />
   )

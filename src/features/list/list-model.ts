@@ -1,7 +1,6 @@
 import { isFirstLoadError } from '#/lib/app-error'
 import {
   formatDate,
-  formatDayKey,
   formatPercent,
   formatRatio,
   formatRowSpeed,
@@ -168,12 +167,4 @@ export function rowProps(
       : undefined,
     today,
   }
-}
-
-/**
- * The local calendar day of `now` (「2026-11-16」): rows take a `today` that
- * changes only when this does, so dates never re-render a row every minute.
- */
-export function dayValue(now: number, timeZone?: string): string {
-  return formatDayKey(now, timeZone)
 }

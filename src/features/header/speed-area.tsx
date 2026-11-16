@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, TriangleAlert } from 'lucide-react'
 import { NO_VALUE } from '#/lib/format'
 import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
-import { focusMain } from '#/shared/ui/main-scroll'
+import { getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { useHeader } from '#/features/header/header-context'
 import type { SpeedGroup } from '#/features/header/header-model'
@@ -187,7 +187,7 @@ export function PhoneLine() {
         actionLabel={bar.actionLabel}
         onAction={() => onBarAction(bar.action)}
         busy={retrying}
-        restoreFocusTo={focusMain}
+        restoreFocusTo={getMain}
       />
     )
   }

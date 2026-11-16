@@ -5,11 +5,11 @@
 
 export const MAIN_ID = 'rt-main'
 
-/** `main`, or `null` before the shell mounts (and on the server). */
+/**
+ * `main`, or `null` before the shell mounts (and on the server). Also the
+ * focus target when a focused button disappears (bar, retry block).
+ */
 export function getMain(): HTMLElement | null {
   if (typeof document === 'undefined') return null
   return document.getElementById(MAIN_ID)
 }
-
-/** The focus target when a focused button disappears (bar, retry block). */
-export const focusMain = getMain

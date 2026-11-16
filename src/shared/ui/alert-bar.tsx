@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
 import { TriangleAlert, WifiOff } from 'lucide-react'
 import { cn } from '#/shared/ui/cn'
+import { useRestoreFocusOnUnmount } from '#/shared/ui/restore-focus'
 
 // DESIGN alert-bar (mockups S01-offline-desktop, S02-offline-phone): one
 // connection problem plus one button. Presentational only: the text and the
@@ -41,24 +41,7 @@ export function AlertBar({
   className,
 }: AlertBarProps) {
   const Icon = icon === 'offline' ? WifiOff : TriangleAlert
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const focusedRef = useRef(false)
-  const restoreRef = useRef(restoreFocusTo)
-
-  useLayoutEffect(() => {
-    restoreRef.current = restoreFocusTo
-  })
-
-  useLayoutEffect(
-    () => () => {
-      if (!focusedRef.current) return
-      const active = document.activeElement
-      if (active && active !== document.body && active !== buttonRef.current)
-        return
-      restoreRef.current?.()?.focus()
-    },
-    [],
-  )
+  const focusProps = useRestoreFocusOnUnmount(restoreFocusTo)
 
   return (
     <div
@@ -77,11 +60,9 @@ export function AlertBar({
         {detail && <span aria-hidden="true">，{detail}</span>}
       </span>
       <button
-        ref={buttonRef}
+        {...focusProps}
         type="button"
         onClick={onAction}
-        onFocus={() => (focusedRef.current = true)}
-        onBlur={() => (focusedRef.current = false)}
         aria-busy={busy || undefined}
         className="h-11 flex-none rounded-full border bg-surface px-3.5 font-semibold text-text hover-outline lg:h-8"
       >
