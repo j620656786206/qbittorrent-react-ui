@@ -91,6 +91,8 @@ export interface BigValue {
   loading: boolean
   /** A ratio of 1.00 or more: the `good` colour, like the ratio column. */
   good?: boolean
+  /** The tooltip when it differs from `text` (the full save path). */
+  title?: string
 }
 
 export interface RowModel {
@@ -173,6 +175,8 @@ function bigValue(
     return {
       ...base,
       text: locationLabel(torrent.save_path),
+      // The sort compares the full path; the tooltip shows it.
+      title: torrent.save_path,
       style,
       muted: true,
     }
@@ -239,12 +243,28 @@ export function ringOffset(arcFraction: number): number {
   return RING_CIRCUMFERENCE * (1 - arcFraction)
 }
 
+/**
+ * The clock a row reads: the minute tick (`now`) when the sort is shown as
+ * how long ago (「3 小時前」), otherwise `today`, which changes only at local
+ * midnight, so other sorts do not re-render every row every minute.
+ */
+export function rowClock(
+  sort: SortFieldId,
+  today: number,
+  now: number,
+): number {
+  return sortField(sort).kind === 'ago' ? now : today
+}
+
 export interface RowProps {
   /** The merged object: unchanged torrents keep their reference (M1). */
   torrent: SlimTorrent
   /** This torrent's `stateBeforeMove` entry, if it is moving. */
   stateBeforeMove: string | undefined
-  /** `today()`'s value: changes only when the local date changes. */
+  /**
+   * `rowClock()`: changes only when the local date changes, or every minute
+   * while the sort is shown as how long ago.
+   */
   today: number
   sort: SortFieldId
   /** Extra sorts only: this torrent's key, `undefined` while loading. */

@@ -381,9 +381,12 @@ describe('sorting', () => {
     expect(shownNames()).toEqual(['T0', 'T1'])
   })
 
-  it('S4 the first keys fail: no more waiting, values read 沒有', async () => {
+  it('S4 the first keys fail: the old order stays, values read 沒有, new torrents on top', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    await render(fakeResponse({ changed: many(2) }))
+    // Name A to Z differs from the tie order (newest first).
+    view = { sort: 'name', dir: 'desc' }
+    await render(fakeResponse({ changed: many(3) }))
+    expect(shownNames()).toEqual(['T0', 'T1', 'T2'])
     await setView({ sort: 'num_seeds', dir: 'desc' })
     expect(bigCells()[0].querySelector('[data-slot="skeleton"]')).not.toBeNull()
     await act(async () => {
@@ -392,10 +395,35 @@ describe('sorting', () => {
         error: { code: 'qbit_rejected', message: 'x' },
       })
     })
+    expect(shownNames()).toEqual(['T0', 'T1', 'T2'])
     expect(bigCells().map((cell) => cell.textContent)).toEqual([
       '做種人數（連上的） 沒有',
       '做種人數（連上的） 沒有',
+      '做種人數（連上的） 沒有',
     ])
+    await poll(delta([torrent(5)]))
+    expect(shownNames()).toEqual(['T5', 'T0', 'T1', 'T2'])
+  })
+
+  it('a sort shown as how long ago reads the minute tick, not the day', async () => {
+    const start = Date.UTC(2026, 10, 16, 4, 0, 0)
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+    vi.setSystemTime(start)
+    view = { sort: 'last_activity', dir: 'desc' }
+    await render(fakeResponse({ changed: many(1) }))
+    await act(async () => {
+      sortKeyCalls[0].resolve({
+        ok: true,
+        data: {
+          version: 'abcdef12.1',
+          full: true,
+          keys: { [fakeHash(1)]: (start - 2 * 3600_000) / 1000 },
+        },
+      })
+    })
+    expect(bigCells()[0].textContent).toBe('最後活動 2 小時前')
+    await act(async () => vi.advanceTimersByTime(3600_000))
+    expect(bigCells()[0].textContent).toBe('最後活動 3 小時前')
   })
 
   it('a torrent added since the last keys shows a skeleton, not 沒有', async () => {

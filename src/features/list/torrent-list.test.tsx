@@ -136,6 +136,12 @@ describe('the big value cell (story 2.1)', () => {
     )
   })
 
+  it('save path: the label shows, the title is the full path', () => {
+    expect(cell('save_path', { save_path: '/data/media/tv/' })).toContain(
+      '<span title="/data/media/tv/" class=',
+    )
+  })
+
   it('a text value has its full text as the title', () => {
     const name = 'mteam-tv-with-a-long-category-name'
     expect(cell('category', { category: name })).toContain(

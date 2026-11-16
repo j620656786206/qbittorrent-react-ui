@@ -91,7 +91,11 @@ function BigValueCell({ value }: { value: BigValue }) {
   return (
     <span
       dir={isPath ? 'rtl' : undefined}
-      title={value.style === 'number' || value.loading ? undefined : value.text}
+      title={
+        value.style === 'number' || value.loading
+          ? undefined
+          : (value.title ?? value.text)
+      }
       className={cn(
         'max-w-[160px] flex-none truncate text-right',
         BIG_VALUE_CLASS[value.style],

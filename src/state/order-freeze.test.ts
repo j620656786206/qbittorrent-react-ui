@@ -7,6 +7,7 @@ import {
   noteScroll,
   resetOrderFreeze,
   setPointerInList,
+  keepWithNewOnTop,
   shownOrderReducer,
   touchFrozen,
   touchScrollEnd,
@@ -82,6 +83,23 @@ describe('shownOrderReducer (the hook update)', () => {
         viewChanged: true,
       }),
     ).toBe(live)
+  })
+
+  it('S4 after failed keys the hold keeps the order but adds new torrents on top', () => {
+    const shown = ['a', 'b', 'c']
+    const input = {
+      frozen: true,
+      viewChanged: true,
+      hold: true,
+      holdAddsNew: true,
+    }
+    expect(shownOrderReducer(shown, { ...input, live: ['c', 'b', 'a'] })).toBe(
+      shown,
+    )
+    expect(
+      shownOrderReducer(shown, { ...input, live: ['c', 'new', 'a'] }),
+    ).toEqual(['new', 'a', 'c'])
+    expect(keepWithNewOnTop(null, ['x'])).toEqual(['x'])
   })
 
   it("S4 while the new sort's keys load, the order shown holds like a freeze", () => {

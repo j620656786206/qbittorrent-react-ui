@@ -13,7 +13,10 @@ import type { ExtraSortFieldId } from '#/shared/sort-fields'
 // hostname is. comment, content_path, root_path and the infohashes leave
 // the container only here, each for its own field.
 
-/** What the extras table keeps per torrent; `null` is "qBittorrent has not said". */
+/**
+ * What the extras table keeps per torrent, raw (it floors a copy for its
+ * change check only); `null` is "qBittorrent has not said".
+ */
 export interface SortExtras {
   time_active: number | null
   last_activity: number | null
@@ -48,7 +51,7 @@ export interface SortExtras {
   infohash_v2: string | null
   has_metadata: boolean | null
   comment: string | null
-  /** Floored to whole minutes; only for the average download speed. */
+  /** Seconds, as qBittorrent sends it; only for the average download speed. */
   seeding_time: number | null
 }
 

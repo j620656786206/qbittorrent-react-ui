@@ -5,7 +5,7 @@ created: '2026-11-16'
 status: 'done'
 baseline_revision: 'bdb705780e7848caa979d2389f1939a7d6f80483'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -18,6 +18,13 @@ deferred:
       app-shell.test.tsx uses the default ListViewContext; e2e sort tests run at desktop width. Story 2.2 replaces the pill with the phone sort sheet.
     location: >-
       src/features/header/sort-menu.tsx
+    severity: low
+  - summary: >-
+      The disabled ['sort-keys', null] placeholder observer is not pinned by a test.
+    evidence: |-
+      Reverting to an observer on a real field key would pass every test; the effect is briefly stale keys for one field.
+    location: >-
+      src/state/sort-keys.ts
     severity: low
 ---
 
@@ -179,6 +186,46 @@ deferred:
   - `[low]` `[patch]` (edge) null or wrong-typed extra keeps the old value. Patch: catch to null.
   - `[maybe-false]` `[reject]` (edge) phone pill text now follows the sort although the spec says unchanged. It stays disabled; following the sort is harmless. If true, low.
 
+### 2026-11-16 Review pass (follow-up)
+- verdicts: 36 findings: high 0, medium 5, low 25, false 2, maybe-false 4
+- findings:
+  - `[low]` `[reject]` (intent) `dir=desc` means the arrow, so text desc is A to Z. carried.
+  - `[maybe-false]` `[reject]` (intent) delta per field vs any field. Per-field reading implemented in the first pass; matches "for that one field". If true, low.
+  - `[false]` `[reject]` (intent) avg formula differs from the contract's summary. The contract cites VueTorrent v2.37.0 as the source; the source formula is implemented and recorded.
+  - `[low]` `[reject]` (intent) 不限速 only for speed limits. Literal meaning of 不限速; other unset limits read 沒有.
+  - `[low]` `[reject]` (intent) name-sort progress is 18px, status word 13px. Matches the big-number table (數字 vs 狀態用語).
+  - `[low]` `[reject]` (intent) bad params fall back one by one. Keeps a valid sort; the contract's default applies to the bad param.
+  - `[low]` `[reject]` (intent) flip also scrolls to top. carried: patched in the first pass per the epic rule.
+  - `[medium]` `[patch]` (intent) first-load failure jumps to tie order, against S4 "previous order kept". Patch: hold keeps the shown order, drops removed and adds new hashes on top.
+  - `[low]` `[reject]` (intent) `ago` kind for last_activity, seen_complete. carried: EXPERIENCE names them as time ago.
+  - `[low]` `[reject]` (intent) pill aria-label adds 列表. Tooltip matches the example; the label keeps the view name from Epic 1.
+  - `[low]` `[reject]` (intent) no-value decisions in `average()` and `trackerDomainOf`. S10 itself asks `trackerDomainOf` to return null; a zero duration is not a qBittorrent sentinel.
+  - `[low]` `[reject]` (intent) S12 repaint measured by hand. Recorded with method and numbers for the PR.
+  - `[low]` `[reject]` (intent) S9 not in e2e. Covered by DOM and reducer tests.
+  - `[low]` `[reject]` (intent) menu sizes checked as class strings. Width measured in e2e; screenshots compared to S03.
+  - `[low]` `[reject]` (blind) seeding_time comment stale. Same root cause as the verification-gap other finding; patched there.
+  - `[false]` `[reject]` (blind) Auto Run Result count. Fix edits this build's spec.
+  - `[low]` `[patch]` (blind) `pickSort` flips a non-directional field. Patch: no change for non-directional.
+  - `[low]` `[patch]` (blind) `fixListSearch` leaves `dir` on state. Patch: dropped in the URL fix.
+  - `[low]` `[reject]` (blind) sort-keys version shares the maindata version type. Only `useSortKeys` passes it; a mix-up cannot happen through the app.
+  - `[low]` `[reject]` (blind) getSortKeys error paths untested. They share `pull()` with getMaindata, whose error paths are tested.
+  - `[low]` `[reject]` (blind) no end-to-end leak check. The handler-level leak test covers every field; serialization adds nothing.
+  - `[medium]` `[patch]` (blind) first-failure order jump. Same patch as the intent row.
+  - `[low]` `[patch]` (blind) 更多 groups unnamed. Patch: `aria-labelledby` on each group.
+  - `[low]` `[reject]` (blind) no keyboard or focus tests for the menu. Radix owns focus; e2e drives the real menu.
+  - `[maybe-false]` `[reject]` (blind) S3 ratio-column selector may hit the big value. The big value's sr-only label is inside a different cell; settling needs a DOM dump. If true, low.
+  - `[low]` `[reject]` (blind) merged sort keys keep removed hashes. Bounded by torrents seen in a session; ignored by the list.
+  - `[low]` `[patch]` (blind) save-path sort shows the label but compares the full path. Patch: `title` is the full path.
+  - `[low]` `[reject]` (blind) `setView` writes default params. Harmless; URLs stay valid.
+  - `[medium]` `[patch]` (edge) `ago` values freeze until midnight. Patch: minute-ticking now for the ago kind.
+  - `[medium]` `[patch]` (edge) hex hashes sorted by a numeric collator. Patch: plain comparison for hash kinds.
+  - `[low]` `[patch]` (edge) total_size -1 shows 0 B. Patch: negative is no value.
+  - `[maybe-false]` `[reject]` (edge) cached error skips the wait on a revisit. With the new hold the order stays until keys arrive. If true, low.
+  - `[maybe-false]` `[reject]` (edge) phone pill text follows the sort. carried.
+  - `[medium]` `[patch]` (verification-gap) the failure release of the hold is untested. Same patch as the intent row (new DOM test).
+  - `[low]` `[defer]` (verification-gap) the `['sort-keys', null]` placeholder key is unpinned. Filed as defer.
+  - `[low]` `[patch]` (verification-gap other) `seeding_time` comment stale. Patch: comment fixed.
+
 ## Design Notes
 
 - Docs to read first (AD-11), matching locked versions: Radix DropdownMenu `https://www.radix-ui.com/primitives/docs/components/dropdown-menu` (check `modal`, `onSelect` with `preventDefault` to keep it open, `DropdownMenu.RadioGroup`/`RadioItem`); shadcn dropdown-menu `https://ui.shadcn.com/docs/components/dropdown-menu`; TanStack Router search params `https://tanstack.com/router/latest/docs/framework/react/guide/search-params` and validation with zod; TanStack Query polling `https://tanstack.com/query/v5/docs/framework/react/reference/useQuery`; VueTorrent v2.37.0 source for derived fields (`https://github.com/VueTorrent/VueTorrent/tree/v2.37.0`). Record the URLs actually read here.
@@ -207,3 +254,7 @@ Status: done
 **Verification:** lint, typecheck clean; `npm test` 70 files, 1332 tests; build, smoke ok; `CI=1 npm run smoke:browser` 11 of 11; routeTree unchanged; npm audit 0; check.sh all ok. Perf: re-sort of 4165 torrents 1.3 to 6.5 ms in vitest; menu click to redraw 10.6 to 18.2 ms in headless Chromium on the built app.
 
 **Residual risks:** real qBittorrent 5.1.4 sentinel values for each extra field were not read from the NAS; Chinese names for fields VueTorrent has no Chinese text for need Alex's review; a private tracker's comment may carry a token (Alex allowed comment through getSortKeys).
+
+### Follow-up pass (2026-11-16)
+
+Patched: `ago` values tick every minute (medium); hash kinds compare by code units (medium); a failed first keys call keeps the shown order with new torrents on top (medium); negative `total_size` is no value; `?sort=state` drops `dir` in the URL fix; `pickSort` ignores a non-directional field; `seeding_time` comment; save-path `title` is the full path; 更多 groups named. Deferred: the `['sort-keys', null]` placeholder is not pinned by a test. Follow-up review recommendation: false (no high patched on a follow-up pass). Verification: lint, typecheck clean; `npm test` 1341 pass; build, smoke ok; `CI=1 npm run smoke:browser` 11 of 11; check.sh all ok.

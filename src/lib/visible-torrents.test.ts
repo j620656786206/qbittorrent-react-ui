@@ -292,3 +292,23 @@ describe('S12 4165 torrents', () => {
     console.info('S12 select ms', times)
   })
 })
+
+describe('hash fields compare as hex code units', () => {
+  it.each(['hash', 'infohash_v1'] as const)('%s', (sort) => {
+    const low = '0a' + '0'.repeat(38)
+    const mid = '10' + '0'.repeat(38)
+    const high = '9f' + '0'.repeat(38)
+    const shortish = '00a' + '0'.repeat(37)
+    const torrents = [high, low, mid, shortish].map((hash, index) =>
+      t({ hash, added_on: T0 + index }),
+    )
+    const data = mergeMaindata(undefined, fakeResponse({ changed: torrents }))
+    const keys = Object.fromEntries(torrents.map((x) => [x.hash, x.hash]))
+    expect(selectVisibleTorrents(data, { sort, dir: 'desc' }, keys)).toEqual([
+      shortish,
+      low,
+      mid,
+      high,
+    ])
+  })
+})

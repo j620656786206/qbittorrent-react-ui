@@ -10,6 +10,7 @@ import {
   RING_CIRCUMFERENCE,
   listView,
   ringOffset,
+  rowClock,
   rowModel,
   rowProps,
 } from '#/features/list/list-model'
@@ -343,11 +344,18 @@ describe('the big number by sort', () => {
     })
   })
 
+  it('rowClock: the minute tick only for a how-long-ago sort', () => {
+    expect(rowClock('last_activity', 1, 2)).toBe(2)
+    expect(rowClock('seen_complete', 1, 2)).toBe(2)
+    expect(rowClock('added_on', 1, 2)).toBe(1)
+  })
+
   it('save path: the location label as text', () => {
     expect(big('save_path', { save_path: '/data/media/tv/' })).toMatchObject({
       text: 'media/tv',
       style: 'text',
       muted: true,
+      title: '/data/media/tv/',
     })
   })
 

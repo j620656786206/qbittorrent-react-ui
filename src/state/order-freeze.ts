@@ -75,6 +75,26 @@ export interface ShownOrderInput {
    * keep the order shown, like a freeze, until they arrive.
    */
   hold?: boolean
+  /**
+   * While holding, new torrents go on top at once instead of waiting (the
+   * first keys failed and may not come for a while). Only for `hold`, never
+   * for the pointer or touch freeze.
+   */
+  holdAddsNew?: boolean
+}
+
+/** The order shown minus gone hashes, with new ones on top in live order. */
+export function keepWithNewOnTop(
+  shown: ReadonlyArray<string> | null,
+  live: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  if (shown === null || shown === live) return live
+  const alive = new Set(live)
+  const known = new Set(shown)
+  const fresh = live.filter((hash) => !known.has(hash))
+  const kept = shown.filter((hash) => alive.has(hash))
+  if (fresh.length === 0 && kept.length === shown.length) return shown
+  return [...fresh, ...kept]
 }
 
 /**
@@ -83,10 +103,20 @@ export interface ShownOrderInput {
  */
 export function shownOrderReducer(
   shown: ShownOrder,
-  { live, frozen, viewChanged = false, hold = false }: ShownOrderInput,
+  {
+    live,
+    frozen,
+    viewChanged = false,
+    hold = false,
+    holdAddsNew = false,
+  }: ShownOrderInput,
 ): ShownOrder {
   if (live === undefined) return null
-  if (hold) return nextShownOrder(shown, live, true)
+  if (hold) {
+    return holdAddsNew
+      ? keepWithNewOnTop(shown, live)
+      : nextShownOrder(shown, live, true)
+  }
   if (viewChanged) return live
   return nextShownOrder(shown, live, frozen)
 }
@@ -170,6 +200,8 @@ export interface FrozenOrderOptions {
   viewKey?: string
   /** The view's values are still loading: keep the order shown. */
   hold?: boolean
+  /** While holding, show new torrents on top at once. */
+  holdAddsNew?: boolean
 }
 
 /**
@@ -179,7 +211,7 @@ export interface FrozenOrderOptions {
  */
 export function useFrozenOrder(
   live: ReadonlyArray<string> | undefined,
-  { viewKey = '', hold = false }: FrozenOrderOptions = {},
+  { viewKey = '', hold = false, holdAddsNew = false }: FrozenOrderOptions = {},
 ): ReadonlyArray<string> | undefined {
   const frozen = useOrderFrozen()
   const shownRef = useRef<ShownOrder>(null)
@@ -192,9 +224,10 @@ export function useFrozenOrder(
         live,
         frozen,
         hold,
+        holdAddsNew,
         viewChanged: appliedKeyRef.current !== viewKey,
       }),
-    [live, frozen, hold, viewKey],
+    [live, frozen, hold, holdAddsNew, viewKey],
   )
   // Only a committed order counts as "shown".
   useLayoutEffect(() => {

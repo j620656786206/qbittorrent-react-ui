@@ -126,6 +126,19 @@ describe('the desktop sort menu', () => {
       document.querySelectorAll('[role="menu"] [role="menu"]'),
     ).toHaveLength(0)
     expect(document.body.textContent).toContain('技術資訊')
+    // Each group is named by its header.
+    const groups = [
+      ...document.querySelectorAll('[role="group"][aria-labelledby]'),
+    ]
+    expect(groups).toHaveLength(10)
+    for (const group of groups) {
+      const id = group.getAttribute('aria-labelledby') ?? ''
+      expect(document.getElementById(id)?.textContent).toBeTruthy()
+    }
+    expect(
+      document.getElementById(groups[9].getAttribute('aria-labelledby') ?? '')
+        ?.textContent,
+    ).toBe('技術資訊')
   })
 
   it('S6 the selected item flips the direction, the menu stays open, the list goes to the top', async () => {

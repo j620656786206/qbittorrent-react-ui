@@ -2,7 +2,7 @@ import { slimSortValue, sortKeyOf } from '#/lib/sort-values'
 import { statusOf } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
 import type { SlimTorrent } from '#/shared/maindata'
-import { isExtraSortField } from '#/shared/sort-fields'
+import { isExtraSortField, sortField } from '#/shared/sort-fields'
 import type { SortView } from '#/shared/list-search'
 import type { SortValue } from '#/shared/sort-keys'
 
@@ -39,12 +39,18 @@ interface Entry {
 // value (`S01E2` before `S01E10`).
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 
-function compareKeys(a: number | string, b: number | string): number {
+function compareKeys(
+  a: number | string,
+  b: number | string,
+  plain: boolean,
+): number {
   if (typeof a === 'number' && typeof b === 'number') {
     // Larger first for `desc`; Infinity - Infinity would be NaN.
     return a === b ? 0 : a > b ? -1 : 1
   }
   if (typeof a === 'string' && typeof b === 'string') {
+    // Hashes are hex: code units, not numbers or letters as a person reads.
+    if (plain) return a === b ? 0 : a < b ? -1 : 1
     return collator.compare(a, b)
   }
   // Mixed types never happen for one field; keep the order total anyway.
@@ -65,6 +71,7 @@ export function selectVisibleTorrents(
   const { torrents, stateBeforeMove } = maindata
   const { sort, dir } = view
   const extra = isExtraSortField(sort)
+  const plain = sortField(sort).kind === 'hash'
   const sign = dir === 'desc' ? 1 : -1
   const entries: Array<Entry> = []
   for (const torrent of Object.values(torrents)) {
@@ -85,7 +92,7 @@ export function selectVisibleTorrents(
       if (a.key !== b.key) return a.key === null ? 1 : -1
       return tieBreak(a, b)
     }
-    return sign * compareKeys(a.key, b.key) || tieBreak(a, b)
+    return sign * compareKeys(a.key, b.key, plain) || tieBreak(a, b)
   })
   return entries.map((entry) => entry.hash)
 }

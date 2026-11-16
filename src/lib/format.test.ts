@@ -274,6 +274,7 @@ describe('hasNoSortValue', () => {
     ['seeding_time_limit', -2],
     ['inactive_seeding_time_limit', -1],
     ['availability', -1],
+    ['total_size', -1],
     ['num_complete', -1],
     ['priority', 0],
     ['category', ''],

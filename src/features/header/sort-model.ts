@@ -39,13 +39,16 @@ export function sortPillModel(view: SortView): SortPillModel {
 /**
  * What a click on a menu item does: the selected one flips the direction
  * and keeps the menu open; another one takes its default direction, closes
- * the menu. Both scroll the list to the top (sort-menu.tsx).
+ * the menu. Both scroll the list to the top (sort-menu.tsx). The selected
+ * field without a direction changes nothing (`null`).
  */
 export function pickSort(
   current: SortView,
   id: SortFieldId,
-): { view: SortView; keepOpen: boolean } {
+): { view: SortView; keepOpen: boolean } | null {
   const field: SortFieldDef = sortField(id)
+  // The selected field without a direction (狀態): nothing to flip.
+  if (id === current.sort && !field.directional) return null
   if (id === current.sort) {
     return {
       view: { sort: id, dir: current.dir === 'desc' ? 'asc' : 'desc' },

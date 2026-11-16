@@ -37,9 +37,13 @@ describe('pickSort', () => {
       view: { sort: 'ratio', dir: 'asc' },
       keepOpen: true,
     })
-    expect(pickSort({ sort: 'ratio', dir: 'asc' }, 'ratio').view.dir).toBe(
+    expect(pickSort({ sort: 'ratio', dir: 'asc' }, 'ratio')?.view.dir).toBe(
       'desc',
     )
+  })
+
+  it('the selected field without a direction changes nothing', () => {
+    expect(pickSort({ sort: 'state', dir: 'desc' }, 'state')).toBeNull()
   })
 
   it('S7 another one takes its default direction and closes', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDown, List } from 'lucide-react'
 import {
   MORE_SORT_GROUPS,
@@ -42,6 +42,7 @@ export function DesktopSortMenu() {
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const selectedRef = useRef<HTMLDivElement>(null)
+  const groupIdPrefix = useId()
   const pill = sortPillModel(view)
   const words = directionWords(view)
 
@@ -60,7 +61,12 @@ export function DesktopSortMenu() {
   }, [open])
 
   const onPick = (id: SortFieldId, event: Event) => {
-    const { view: next, keepOpen } = pickSort(view, id)
+    const picked = pickSort(view, id)
+    if (picked === null) {
+      event.preventDefault()
+      return
+    }
+    const { view: next, keepOpen } = picked
     if (keepOpen) event.preventDefault()
     // Any sort change, a flip too, goes back to the top of the list.
     const main = getMain()
@@ -144,8 +150,13 @@ export function DesktopSortMenu() {
           </DropdownMenuItem>
           {expanded &&
             MORE_SORT_GROUPS.map((group) => (
-              <DropdownMenuGroup key={group.group}>
-                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              <DropdownMenuGroup
+                key={group.group}
+                aria-labelledby={`${groupIdPrefix}-${group.group}`}
+              >
+                <DropdownMenuLabel id={`${groupIdPrefix}-${group.group}`}>
+                  {group.label}
+                </DropdownMenuLabel>
                 {group.fields.map(item)}
               </DropdownMenuGroup>
             ))}

@@ -66,6 +66,13 @@ describe('fixListSearch (S5)', () => {
     expect(fixListSearch({ sort: 'nope', dir: 'asc' })).toEqual({})
   })
 
+  it('a dir on a field without a direction goes', () => {
+    expect(fixListSearch({ sort: 'state', dir: 'asc' })).toEqual({
+      sort: 'state',
+    })
+    expect(fixListSearch({ sort: 'state' })).toBeNull()
+  })
+
   it('a bad dir alone goes alone; other params stay', () => {
     expect(fixListSearch({ sort: 'ratio', dir: 'up', q: 'x' })).toEqual({
       sort: 'ratio',

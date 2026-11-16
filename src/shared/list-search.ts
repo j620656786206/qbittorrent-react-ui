@@ -59,13 +59,18 @@ const isDir = (value: unknown): value is SortDir =>
 /**
  * The raw (unvalidated) search with the bad params removed, or `null` when
  * nothing needs fixing. A bad `sort` falls back to the default, so its `dir`
- * goes too; a bad `dir` alone goes alone. Other params stay.
+ * goes too; a bad `dir`, or any `dir` on a field without a direction, goes
+ * alone. Other params stay.
  */
 export function fixListSearch(
   raw: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> | null {
   const badSort = 'sort' in raw && !isSortFieldId(raw.sort)
-  const badDir = 'dir' in raw && !isDir(raw.dir)
+  // A field without a direction (狀態) ignores `dir`, so it goes too.
+  const badDir =
+    'dir' in raw &&
+    (!isDir(raw.dir) ||
+      (isSortFieldId(raw.sort) && !sortField(raw.sort).directional))
   if (!badSort && !badDir) return null
   const { sort: _sort, dir: _dir, ...rest } = raw
   return {

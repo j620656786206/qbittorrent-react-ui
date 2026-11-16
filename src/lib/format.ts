@@ -329,6 +329,8 @@ const NEGATIVE_IS_UNSET: ReadonlySet<SortFieldId> = new Set<SortFieldId>([
   'reannounce',
   'time_active',
   'popularity',
+  // -1 while the torrent has no metadata yet.
+  'total_size',
 ])
 
 /** 0 or less: a speed limit of 0 is "no limit", queue position 0 is "not queued". */
