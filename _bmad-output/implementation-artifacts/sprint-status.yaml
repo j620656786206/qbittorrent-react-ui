@@ -44,7 +44,7 @@ development_status:
   1-6-前端種子資料-狀態和數字的純函式: done  # PR #8：maindata 輪詢、merge、classify、format、paths、連線提示
   1-7-頁首-全域速度和連線提示條: done  # PR #10：頁首、速度膠囊、連線提示條、防火牆警告膠囊、登入畫面提示條
   1-8-種子列表-骨架和空狀態: done  # PR #11：虛擬列表、狀態圓圈、凍結順序、骨架、空狀態、讀不到加重試
-  1-9-映像-ci-推送和-nas-部署範本: backlog
+  1-9-映像-ci-推送和-nas-部署範本: review
   epic-1-retrospective: optional
 
   epic-2: backlog
