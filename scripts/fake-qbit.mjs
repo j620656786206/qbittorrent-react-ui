@@ -1,8 +1,11 @@
-// Dev-only fake qBittorrent for screenshots and browser checks (specs 1.7,
-// 1.8). No dependencies. Never imported from src/, never run in CI, never
-// shipped in .output. Never talks to a real qBittorrent and never reads .env.
-// Fake data only: code-name categories (X, mteam-X, mteam-tv), fake paths
-// and fake hashes.
+// Fake qBittorrent for screenshots and browser checks (specs 1.7, 1.8) and
+// the Playwright browser smoke (story 2.0). It may run locally and in CI.
+// AD-15: it only ever talks to the fake qBittorrent it starts itself: the
+// app's QBIT_URL is built from that server's own loopback address, the
+// inherited app variables are removed, and .env is never read. No
+// dependencies. Never imported from src/, never shipped in .output. Fake
+// data only: code-name categories (X, mteam-X, mteam-tv), fake paths and
+// fake hashes.
 //
 // 1. Starts a fake qBittorrent on a free loopback port:
 //    POST /api/v2/auth/login answers `Ok.` with `Set-Cookie: SID=fake`;
@@ -537,9 +540,11 @@ async function main() {
   }
   const port = frontPort()
   const origin = `http://localhost:${port}`
-  const qbitPort = await freePort()
+  await listen(fakeQbit, 0, LOOPBACK)
+  // The app's only qBittorrent: the fake above, read back from its socket.
+  const fakeQbitUrl = `http://${LOOPBACK}:${fakeQbit.address().port}`
+  // Picked after the fake listens, so the OS cannot hand out its port.
   const appPort = await freePort()
-  await listen(fakeQbit, qbitPort, LOOPBACK)
 
   configDir = mkdtempSync(join(tmpdir(), 'rt-fake-qbit-'))
   const env = { ...process.env }
@@ -548,7 +553,7 @@ async function main() {
     cwd: ROOT,
     env: {
       ...env,
-      QBIT_URL: `http://${LOOPBACK}:${qbitPort}`,
+      QBIT_URL: fakeQbitUrl,
       QBIT_USERNAME: USERNAME,
       QBIT_PASSWORD: PASSWORD,
       SESSION_SECRET: randomBytes(32).toString('base64'),

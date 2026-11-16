@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke-built-server.mjs",
+    "smoke:browser": "playwright test",
     "fake-qbit": "node scripts/fake-qbit.mjs",
     "format": "prettier --write . && eslint --fix"
   },
@@ -38,6 +39,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tanstack/eslint-config": "0.5.0",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",

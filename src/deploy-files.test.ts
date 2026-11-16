@@ -154,6 +154,22 @@ describe('deploy files', () => {
     expect(ci).not.toMatch(/docker (push|login)|login-action/)
     expect(ci).toContain('--platform linux/amd64')
     expect(ci).toContain('node scripts/smoke-image.mjs')
+    // Story 2.0: the browser smoke runs after the build and the built-server
+    // smoke, and its screenshots are uploaded even when it fails.
+    const build = ci.indexOf('npm run build')
+    const builtSmoke = ci.indexOf('npm run smoke\n')
+    const install = ci.indexOf('npx playwright install --with-deps chromium')
+    const browserSmoke = ci.indexOf('npm run smoke:browser')
+    expect(build).toBeGreaterThan(-1)
+    expect(builtSmoke).toBeGreaterThan(build)
+    expect(install).toBeGreaterThan(builtSmoke)
+    expect(browserSmoke).toBeGreaterThan(install)
+    const afterBrowserSmoke = ci.slice(browserSmoke)
+    expect(afterBrowserSmoke).toMatch(
+      /uses: actions\/upload-artifact@[0-9a-f]{40} # v\S+\n\s+if: always\(\)/,
+    )
+    expect(afterBrowserSmoke).toContain('e2e-output/screenshots/')
+    expect(afterBrowserSmoke).toContain('playwright-report/')
   })
 
   it('(d) dependabot: three monthly groups, default branch names', () => {

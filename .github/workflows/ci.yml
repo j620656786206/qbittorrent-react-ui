@@ -43,6 +43,20 @@ jobs:
       - run: npm run build
       # Boots .output: CSP nonce on HTML, asset CSP, refuses to start without env.
       - run: npm run smoke
+      # Story 2.0: the Playwright browser smoke (Chromium only) against the
+      # built server behind scripts/fake-qbit.mjs, which only talks to its
+      # own fake qBittorrent (AD-15). No .env, no real credentials.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke:browser
+      # Light and dark screenshots at 1440px and 390px, plus the report.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: browser-smoke
+          path: |
+            e2e-output/screenshots/
+            playwright-report/
+          retention-days: 14
       # The build regenerates the route tree; a stale committed copy fails here.
       - run: git diff --exit-code src/routeTree.gen.ts
       # AR-11: the image built from this PR's merge commit (github.sha), with

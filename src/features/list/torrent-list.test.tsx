@@ -189,6 +189,19 @@ describe('the list states', () => {
     expect(html).toContain('新增種子</button>')
   })
 
+  it('the no-result block keeps its exact classes after the move to src/shared/ui (story 2.0)', () => {
+    const html = renderToStaticMarkup(<ListEmpty />)
+    expect(openTags(html, 'section')[0]).toContain(
+      'class="flex h-full flex-col items-center justify-center gap-3.5 rounded-panel bg-surface p-6 text-center max-lg:-mx-1 max-lg:rounded-b-none"',
+    )
+    expect(html).toContain(
+      '<p role="status" class="m-0 text-[15px] leading-[1.2] font-bold">',
+    )
+    expect(openTags(html, 'button')[0]).toContain(
+      'class="h-11 flex-none rounded-full border bg-surface px-[18px] font-semibold text-text hover-outline lg:h-9"',
+    )
+  })
+
   it('error: the alert sentence and an enabled 「重試」', () => {
     const html = renderToStaticMarkup(
       <ListLoadError onRetry={() => {}} busy={false} />,
