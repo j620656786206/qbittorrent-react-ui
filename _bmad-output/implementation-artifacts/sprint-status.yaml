@@ -35,7 +35,7 @@ project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-用官方範本重起專案-清掉舊檔案: done  # PR #2：官方 Start 範本、清舊檔、ESLint 分層、healthz、新 CI
   1-2-伺服器閘門-錯誤合約和-log: done  # PR #3：閘門、錯誤合約、log、session、工廠、開機測試
   1-3-前端地基-設計-token-shadcn-對照-深色跟系統-callfn-和全域錯誤處理: done  # PR #4：顏色 token、shadcn 對照、焦點外框、callFn、error-text、全域 onError
@@ -47,8 +47,8 @@ development_status:
   1-9-映像-ci-推送和-nas-部署範本: done  # PR #12：Dockerfile、映像檢查、GHCR 推送、Dependabot、Unraid 範本、部署說明
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: backlog
+  epic-2: in-progress
+  2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: review
   2-1-51-種排序和電腦排序選單: backlog
   2-2-底部面板和手機排序面板: backlog
   2-3-看板-電腦-5-欄和手機狀態分頁: backlog
