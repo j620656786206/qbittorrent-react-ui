@@ -23,6 +23,7 @@ const SLIM = [
   'added_on',
   'ratio',
   'completion_on',
+  'last_activity',
   'eta',
   'progress',
   'dlspeed',

@@ -17,7 +17,6 @@ import type {
   TorrentStatusId,
 } from '#/lib/torrent-status'
 import type { SortKeys } from '#/lib/visible-torrents'
-import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import type { SlimTorrent } from '#/shared/maindata'
 import { isExtraSortField, sortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
@@ -41,9 +40,11 @@ export const ROW_GAP = 2
 /** Skeleton rows on the first load. */
 export const SKELETON_ROWS = 12
 
-/** The ring's circumference: radius 16.5 in the 36px circle. */
-export const RING_RADIUS = 16.5
-export const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+/**
+ * The sort a row model assumes when none is passed (tests): added time. The
+ * list itself always passes the URL's sort, and never 「狀態」 (the board).
+ */
+const FALLBACK_SORT: SortFieldId = 'added_on'
 
 export type ListView = 'skeleton' | 'error' | 'empty' | 'rows'
 
@@ -148,7 +149,7 @@ function bigValue(
   status: TorrentClassification,
   { now, timeZone, stateBeforeMove, sort, sortValue }: RowModelOptions,
 ): BigValue {
-  const field = sortField(sort ?? DEFAULT_SORT_VIEW.sort)
+  const field = sortField(sort ?? FALLBACK_SORT)
   const id = field.id as SortFieldId
   const base = { label: field.label, loading: false }
   if (field.kind === 'status') {
@@ -229,18 +230,13 @@ export function rowModel(
       text: formatRatio(torrent.ratio),
       good: isGoodRatio(torrent.ratio),
     },
-    showRatio: (options.sort ?? DEFAULT_SORT_VIEW.sort) !== 'ratio',
+    showRatio: (options.sort ?? FALLBACK_SORT) !== 'ratio',
     value: bigValue(torrent, status, options),
     // A move keeps the status but replaces the line with 「搬移中」 (once).
     errorDetail:
       status.status === 'error' && !status.moving ? status.detail : null,
     movingDetail: status.moving ? status.detail : null,
   }
-}
-
-/** The ring's `stroke-dashoffset` for a fraction: C x (1 - fraction). */
-export function ringOffset(arcFraction: number): number {
-  return RING_CIRCUMFERENCE * (1 - arcFraction)
 }
 
 /**
@@ -279,7 +275,7 @@ export function rowProps(
   maindata: Pick<Maindata, 'torrents' | 'stateBeforeMove'>,
   hash: string,
   today: number,
-  sort: SortFieldId = DEFAULT_SORT_VIEW.sort,
+  sort: SortFieldId = FALLBACK_SORT,
   /** The active extra sort's keys; `undefined` while loading. */
   sortKeys?: SortKeys,
   /** The first keys failed: no value instead of "loading". */

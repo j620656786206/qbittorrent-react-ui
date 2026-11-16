@@ -30,11 +30,14 @@
 //          (down answers 502 to server function calls; the three Cloudflare
 //          forms answer requests with X-Requested-With with a 401, a 302 to
 //          an Access login page, or a 200 HTML login page)
-//   data:  sample | many | empty | archived
+//   data:  sample | many | empty | archived | calm
 //          (sample: six torrents, two archived, 「全部 4」; many: 4165
 //          visible plus 50 archived, the newest 12 cover every status, a
 //          name over 200 characters and three markup names, speeds change on
-//          every request; empty: none; archived: only archived ones)
+//          every request; empty: none; archived: only archived ones; calm
+//          (story 2.3): nothing stalled or errored, so the board's 要處理
+//          column is empty: one torrent each downloading, seeding and done,
+//          plus one archived)
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -75,7 +78,7 @@ const QBIT_MODES = new Set([
   'down',
   'rejected',
 ])
-const DATA_MODES = new Set(['sample', 'many', 'empty', 'archived'])
+const DATA_MODES = new Set(['sample', 'many', 'empty', 'archived', 'calm'])
 const GROW_MODES = new Set(['0', '1'])
 const FRONT_MODES = new Set([
   'normal',
@@ -339,7 +342,35 @@ const ARCHIVED = Object.fromEntries(
   ),
 )
 
-const DATA = { sample: SAMPLE, many: MANY, empty: {}, archived: ARCHIVED }
+const CALM = Object.fromEntries([
+  torrent(1, { dlspeed: 6_510_000, eta: 2040, progress: 0.87 }),
+  torrent(2, {
+    state: 'uploading',
+    progress: 1,
+    ratio: 3.12,
+    upspeed: 2_495_611,
+    completion_on: BASE_TIME,
+    seeding_time: 41 * 24 * HOUR,
+    category: 'mteam-tv',
+    save_path: '/data/torrent/mteam-seed',
+    private: true,
+  }),
+  torrent(7, {
+    state: 'stoppedUP',
+    progress: 1,
+    ratio: 0.88,
+    completion_on: BASE_TIME - 2 * HOUR,
+  }),
+  torrent(5, { state: 'missingFiles', progress: 1 }),
+])
+
+const DATA = {
+  sample: SAMPLE,
+  many: MANY,
+  empty: {},
+  archived: ARCHIVED,
+  calm: CALM,
+}
 
 /** `grow=1`: one newer torrent per maindata request, newest on top. */
 const grown = {}

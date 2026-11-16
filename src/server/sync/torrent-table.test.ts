@@ -334,25 +334,29 @@ describe('torrent table', () => {
     expect(table.serverState.connection_status).toBe('connected')
   })
 
-  it.each([
-    // [stored seeding_time, next seeding_time, changed?]
-    [600, 659, false],
-    [600, 660, true],
-    [659, 600, false],
-    [0, 59, false],
-  ])(
-    'seeding_time is floored to whole minutes: %i then %i, changed %s',
-    (from, to, changed) => {
+  it.each(
+    (['seeding_time', 'last_activity'] as const).flatMap((field) =>
+      (
+        [
+          // [stored value, next value, changed?]
+          [600, 659, false],
+          [600, 660, true],
+          [659, 600, false],
+          [0, 59, false],
+        ] as const
+      ).map(([from, to, changed]) => [field, from, to, changed] as const),
+    ),
+  )(
+    '%s is floored to whole minutes: %i then %i, changed %s',
+    (field, from, to, changed) => {
       const { table } = setup()
-      table.apply(
-        raw({ rid: 2, torrents: { [HASH_A]: { seeding_time: from } } }),
-      )
+      table.apply(raw({ rid: 2, torrents: { [HASH_A]: { [field]: from } } }))
       const version = table.version
-      table.apply(raw({ rid: 3, torrents: { [HASH_A]: { seeding_time: to } } }))
+      table.apply(raw({ rid: 3, torrents: { [HASH_A]: { [field]: to } } }))
       expect(table.version).toBe(changed ? version + 1 : version)
       const stored = table
         .changesSince(null)
-        .changed.find((t) => t.hash === HASH_A)?.seeding_time
+        .changed.find((t) => t.hash === HASH_A)?.[field]
       expect(stored).toBe(
         Math.floor(to / SEEDING_TIME_STEP_S) * SEEDING_TIME_STEP_S,
       )

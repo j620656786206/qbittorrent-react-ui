@@ -10,6 +10,8 @@ import {
 describe('sortPillModel', () => {
   it('arrow on the pill, words in the label and tooltip', () => {
     expect(sortPillModel({ sort: 'seeding_time', dir: 'desc' })).toEqual({
+      kind: 'list',
+      viewWord: '列表',
       text: '排序：做種時間 ↓',
       shortText: '做種時間 ↓',
       title: '排序：做種時間，久的在前',
@@ -20,12 +22,14 @@ describe('sortPillModel', () => {
     )
   })
 
-  it('狀態 has no arrow and no words', () => {
+  it('狀態 is the board: no arrow, no words, 看板 last', () => {
     expect(sortPillModel({ sort: 'state', dir: 'desc' })).toEqual({
+      kind: 'board',
+      viewWord: '看板',
       text: '排序：狀態',
       shortText: '狀態',
       title: '排序：狀態',
-      ariaLabel: '排序：狀態，列表',
+      ariaLabel: '排序：狀態，看板',
     })
     expect(directionWords({ sort: 'state', dir: 'desc' })).toBeNull()
   })
@@ -44,6 +48,17 @@ describe('pickSort', () => {
 
   it('the selected field without a direction changes nothing', () => {
     expect(pickSort({ sort: 'state', dir: 'desc' }, 'state')).toBeNull()
+  })
+
+  it('K2 狀態 from the list, and back: default direction, closes', () => {
+    expect(pickSort({ sort: 'ratio', dir: 'asc' }, 'state')).toEqual({
+      view: { sort: 'state', dir: 'desc' },
+      keepOpen: false,
+    })
+    expect(pickSort({ sort: 'state', dir: 'desc' }, 'seeding_time')).toEqual({
+      view: { sort: 'seeding_time', dir: 'desc' },
+      keepOpen: false,
+    })
   })
 
   it('S7 another one takes its default direction and closes', () => {

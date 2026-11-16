@@ -90,7 +90,7 @@ describe('the desktop sort menu', () => {
     expect(trigger().title).toBe('排序：做種時間，久的在前')
   })
 
-  it('opens collapsed: five with 1 to 5, 狀態 disabled, then 更多', async () => {
+  it('opens collapsed: five with 1 to 5, 狀態 enabled, then 更多', async () => {
     await mount({ sort: 'seeding_time', dir: 'desc' })
     await open()
     expect(menu()?.getAttribute('aria-label')).toBe('排序')
@@ -101,7 +101,7 @@ describe('the desktop sort menu', () => {
       '分享率4',
       '完成時間5',
     ])
-    expect(radio('狀態').getAttribute('aria-disabled')).toBe('true')
+    expect(radio('狀態').getAttribute('aria-disabled')).toBeNull()
     expect(radio('做種時間').getAttribute('aria-checked')).toBe('true')
     // Announced as 「做種時間，久的在前」, without the arrow and the digit.
     expect(radio('做種時間').getAttribute('aria-label')).toBe(
@@ -178,10 +178,25 @@ describe('the desktop sort menu', () => {
     )
   })
 
-  it('狀態 cannot be picked', async () => {
+  it('K2 狀態 picks the board, closes the menu and scrolls to the top', async () => {
     await mount({ sort: 'added_on', dir: 'desc' })
+    main.scrollTop = 120
+    await open()
+    await click(radio('狀態'))
+    expect(setView).toHaveBeenCalledWith({ sort: 'state', dir: 'desc' })
+    expect(menu()).toBeNull()
+    expect(main.scrollTop).toBe(0)
+    expect(trigger().getAttribute('aria-label')).toBe('排序：狀態，看板')
+    expect(trigger().textContent).toContain('看板')
+    expect(trigger().textContent).not.toMatch(/[↑↓]/)
+    expect(trigger().querySelector('[data-icon="board"]')).not.toBeNull()
+  })
+
+  it('the selected 狀態 does nothing (no direction to flip)', async () => {
+    await mount({ sort: 'state', dir: 'desc' })
     await open()
     await click(radio('狀態'))
     expect(setView).not.toHaveBeenCalled()
+    expect(menu()).not.toBeNull()
   })
 })

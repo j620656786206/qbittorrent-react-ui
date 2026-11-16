@@ -21,9 +21,14 @@ export const TOMBSTONE_MS = 600_000
 /**
  * `seeding_time` is stored floored to whole minutes. qBittorrent moves it
  * every second for every seeding torrent, which alone would put most of the
- * library in each 5 s delta; the screen shows it in days.
+ * library in each 5 s delta; the screen shows it in days. `last_activity`
+ * (story 2.3) moves as often for every active torrent and is floored the
+ * same way; the screen shows it as 「N 分前」 at the finest.
  */
 export const SEEDING_TIME_STEP_S = 60
+
+const floorToMinute = (seconds: number) =>
+  Math.floor(seconds / SEEDING_TIME_STEP_S) * SEEDING_TIME_STEP_S
 
 export interface TableChanges {
   full: boolean
@@ -108,9 +113,8 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
       }
       const torrent = {
         ...parsed.data,
-        seeding_time:
-          Math.floor(parsed.data.seeding_time / SEEDING_TIME_STEP_S) *
-          SEEDING_TIME_STEP_S,
+        seeding_time: floorToMinute(parsed.data.seeding_time),
+        last_activity: floorToMinute(parsed.data.last_activity),
       }
       const changed = !existing || !sameSlimFields(existing.torrent, torrent)
       updates.push({ hash, torrent, changed })

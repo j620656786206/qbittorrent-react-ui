@@ -1,20 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { formatSize } from '#/lib/format'
-import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import { countAll, selectVisibleTorrents } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
+import { ringCircumference, ringOffset } from '#/shared/ui/status-circle'
 import {
-  RING_CIRCUMFERENCE,
   listView,
-  ringOffset,
   rowClock,
   rowModel,
   rowProps,
 } from '#/features/list/list-model'
 
+const ADDED_NEWEST = { sort: 'added_on', dir: 'desc' } as const
 // Spec 1.8 rows R1 to R6, C1 to C3, V1 to V4 and M1. Clock: 2026-11-16
 // 12:00 in Asia/Taipei, passed explicitly. C = 2 x pi x 16.5.
 
@@ -138,7 +137,7 @@ describe('C1 ring', () => {
   })
 
   it('the circumference is 2 x pi x 16.5', () => {
-    expect(RING_CIRCUMFERENCE).toBeCloseTo(C, 12)
+    expect(ringCircumference()).toBeCloseTo(C, 12)
   })
 })
 
@@ -218,7 +217,7 @@ describe('V1 to V4 listView', () => {
       }),
     )
     for (const data of [none, archived]) {
-      const visible = selectVisibleTorrents(data, DEFAULT_SORT_VIEW)
+      const visible = selectVisibleTorrents(data, ADDED_NEWEST)
       expect(
         listView({ hasData: true, visibleCount: visible.length, error: null }),
       ).toBe('empty')

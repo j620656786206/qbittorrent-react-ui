@@ -98,7 +98,9 @@ describe('shadcn components (row 21)', () => {
       'dialog.tsx',
       'dropdown-menu.tsx',
       'input.tsx',
+      'list-blocks.tsx',
       'skeleton.tsx',
+      'status-circle.tsx',
     ])
     for (const file of files) {
       const source = read(file)

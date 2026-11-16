@@ -95,7 +95,11 @@ export function extraSortSources(
   }
 }
 
-/** The board's column order, for the `state` sort until Story 2.3. */
+/**
+ * The `state` sort as a plain list order (the board's column order). Since
+ * story 2.3 「狀態」 shows the board (selectBoardColumns); this stays so the
+ * 51 sorts all order a list the same way.
+ */
 const STATUS_RANK: Readonly<Record<TorrentStatusId, number>> = {
   error: 6,
   stalled: 5,

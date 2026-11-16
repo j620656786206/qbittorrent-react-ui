@@ -30,6 +30,11 @@ export const slimTorrentSchema = z.object({
   completion_on: z.number(),
   /** Seconds, floored to whole minutes by the container's table. */
   seeding_time: z.number(),
+  /**
+   * Unix seconds of the last up or down transfer, floored to whole minutes
+   * by the container's table (story 2.3: the board's 要處理 order).
+   */
+  last_activity: z.number(),
   save_path: z.string(),
   category: z.string(),
   /** `null` while the torrent has no metadata yet (AR-58). */

@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
+import { formatDayKey } from '#/lib/format'
 
 // A ticking clock for small leaf components (「最後更新 N 秒前」). One timer
 // per interval is shared by every subscriber, so all of them read the same
@@ -72,4 +73,24 @@ export function useNow(intervalMs: number): number {
     clock.getSnapshot,
     clock.getSnapshot,
   )
+}
+
+/** Checks the local date once a minute; callers see it change at midnight. */
+export const DAY_CHECK_MS = 60_000
+
+/**
+ * `today`: epoch ms that changes only when the local date does
+ * (setState-in-render), so rows and cards showing dates do not re-render
+ * every minute; `now`: the same minute tick, for 「3 小時前」. Call it in the
+ * list or board, not in each row.
+ */
+export function useDayClock(): { today: number; now: number } {
+  const now = useNow(DAY_CHECK_MS)
+  const key = formatDayKey(now)
+  const [today, setToday] = useState(() => ({ key, now }))
+  if (today.key !== key) {
+    setToday({ key, now })
+    return { today: now, now }
+  }
+  return { today: today.now, now }
 }

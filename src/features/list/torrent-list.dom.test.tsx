@@ -424,18 +424,14 @@ describe('sorting', () => {
     const start = Date.UTC(2026, 10, 16, 4, 0, 0)
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
     vi.setSystemTime(start)
+    // Story 2.3: last_activity is a slim field (no getSortKeys call).
     view = { sort: 'last_activity', dir: 'desc' }
-    await render(fakeResponse({ changed: many(1) }))
-    await act(async () => {
-      sortKeyCalls[0].resolve({
-        ok: true,
-        data: {
-          version: 'abcdef12.1',
-          full: true,
-          keys: { [fakeHash(1)]: (start - 2 * 3600_000) / 1000 },
-        },
-      })
-    })
+    await render(
+      fakeResponse({
+        changed: [torrent(0, { last_activity: (start - 2 * 3600_000) / 1000 })],
+      }),
+    )
+    expect(sortKeyCalls).toHaveLength(0)
     expect(bigCells()[0].textContent).toBe('最後活動 2 小時前')
     await act(async () => vi.advanceTimersByTime(3600_000))
     expect(bigCells()[0].textContent).toBe('最後活動 3 小時前')

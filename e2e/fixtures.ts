@@ -105,7 +105,7 @@ export { expect }
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'
   front?: 'normal' | 'down' | 'cloudflare'
-  data?: 'sample' | 'many' | 'empty' | 'archived'
+  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm'
   grow?: '0' | '1'
 }
 
@@ -129,5 +129,14 @@ export async function login(page: Page) {
   await page.getByLabel('密碼', { exact: true }).fill(FAKE_PASS)
   await page.getByRole('button', { name: '登入', exact: true }).click()
   await page.waitForURL('/')
+  // The default page is the board (story 2.3): wait until the first load
+  // is done (no skeleton), whatever the data mode shows.
+  await expect(page.locator(`#${MAIN_ID} > *`).first()).toBeVisible()
+  await expect(page.locator(`#${MAIN_ID} [aria-busy="true"]`)).toHaveCount(0)
+}
+
+/** The list: any sort but 狀態 (the board). Waits for the first row. */
+export async function openList(page: Page, sort = 'added_on') {
+  await page.goto(`/?sort=${sort}`)
   await expect(page.getByRole('listitem').first()).toBeVisible()
 }

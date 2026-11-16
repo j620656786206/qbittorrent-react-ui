@@ -30,6 +30,7 @@ export function t(overrides: Partial<SlimTorrent> = {}): SlimTorrent {
     added_on: 1_790_000_000,
     completion_on: -1,
     seeding_time: 0,
+    last_activity: 0,
     save_path: '/data/media/X/incompleted',
     category: 'X',
     private: false,
