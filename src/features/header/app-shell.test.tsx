@@ -8,7 +8,9 @@ import { AlertBar } from '#/shared/ui/alert-bar'
 import type { ServerState } from '#/shared/maindata'
 import { clearConnectionErrors, markConnectionError } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
+import { AppError } from '#/lib/app-error'
 import { MAINDATA_KEY } from '#/state/maindata'
+import { clearMaindataFailure } from '#/state/maindata-failure'
 import { createQueryClient } from '#/state/query-client'
 import { AppShell, ShellLayout } from '#/features/header/app-shell'
 import { HeaderContext } from '#/features/header/header-context'
@@ -29,7 +31,10 @@ const normal = fakeServerState({
 
 function render(
   overrides: Partial<ConnectionAlertInput>,
-  { loaded = true }: { loaded?: boolean } = {},
+  {
+    loaded = true,
+    loadFailed = false,
+  }: { loaded?: boolean; loadFailed?: boolean } = {},
 ): string {
   const serverState: ServerState | undefined = loaded
     ? overrides.connectionStatus
@@ -48,6 +53,7 @@ function render(
     serverState,
     alert,
     allCount: loaded ? 4 : undefined,
+    loadFailed,
   })
   return renderToStaticMarkup(
     <HeaderContext value={{ model, retrying: false, onBarAction: () => {} }}>
@@ -206,6 +212,19 @@ describe('the shell markup', () => {
     expect(html.match(/>重新登入</g)).toHaveLength(2)
   })
 
+  it('spec 1.8 H1: a failed first load leaves the skeletons (option A)', () => {
+    const html = render({}, { loaded: false, loadFailed: true })
+    expect(html).not.toContain('animate-skeleton')
+    expect(html).not.toContain('aria-busy')
+    // 2 desktop pills and 2 phone groups read 「沒有」, spoken with the direction.
+    expect(html.match(/text-text-muted">沒有</g)).toHaveLength(4)
+    expect(html.match(/>下載 沒有</g)).toHaveLength(2)
+    expect(html.match(/>上傳 沒有</g)).toHaveLength(2)
+    // The 「全部」 tab and the phone category button have no count.
+    expect(html).toMatch(/<span>全部<\/span><\/button>/)
+    expect(html).toMatch(/<b class="font-semibold">全部<\/b><svg/)
+  })
+
   it('H10: skeleton bars for speeds and count', () => {
     const html = CASES.H10()
     // 2 desktop pills, 2 phone groups, desktop and phone counts.
@@ -226,6 +245,13 @@ describe('the shell markup', () => {
 
   it('phone column padding is 18px on all sides (UX-DR73)', () => {
     expect(CASES.H1()).toContain('px-4 py-[18px] lg:px-7 lg:py-[22px]')
+  })
+
+  it('phone: main keeps the page column as its content box (spec 1.8)', () => {
+    // 4px wider plus 4px padding: only the list opts into the 12px edges.
+    expect(openTags(CASES.H1(), 'main')[0]).toContain(
+      'max-lg:-mx-1 max-lg:px-1',
+    )
   })
 })
 
@@ -272,12 +298,14 @@ describe('AppShell with a seeded query client and connection store', () => {
     environmentManager.setIsServer(() => false)
     clearLoginRequired()
     clearConnectionErrors()
+    clearMaindataFailure()
   })
 
   afterEach(() => {
     environmentManager.setIsServer(() => typeof window === 'undefined')
     clearLoginRequired()
     clearConnectionErrors()
+    clearMaindataFailure()
     vi.useRealTimers()
     vi.unstubAllGlobals()
   })
@@ -312,6 +340,39 @@ describe('AppShell with a seeded query client and connection store', () => {
       return html
     }
   }
+
+  async function renderFailingShell(
+    code: 'qbit_rejected' | 'home_unreachable',
+  ) {
+    const client = createQueryClient({
+      fetchMaindata: () => Promise.reject(new AppError(code)),
+      currentPath: () => '/',
+    })
+    await client.prefetchQuery({ queryKey: MAINDATA_KEY })
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <AppShell>
+          <p>page content</p>
+        </AppShell>
+      </QueryClientProvider>,
+    )
+    client.clear()
+    return html
+  }
+
+  it('spec 1.8 H1 wiring: qbit_rejected first load leaves the skeletons', async () => {
+    const html = await renderFailingShell('qbit_rejected')
+    expect(html.match(/text-text-muted">沒有</g)).toHaveLength(4)
+    expect(html).not.toContain('aria-busy')
+    expect(html).not.toContain('animate-skeleton')
+    expect(html).toMatch(/<span>全部<\/span><\/button>/)
+  })
+
+  it('spec 1.8 H1 wiring: a connection code keeps the skeletons', async () => {
+    const html = await renderFailingShell('home_unreachable')
+    expect(html).toContain('animate-skeleton')
+    expect(html).not.toContain('>沒有<')
+  })
 
   it('H1: speeds, 「全部 4」, no bar, no dim', async () => {
     const html = (await renderShell(normal))()

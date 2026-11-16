@@ -94,6 +94,7 @@ describe('shadcn components (row 21)', () => {
       'checkbox.tsx',
       'dialog.tsx',
       'input.tsx',
+      'skeleton.tsx',
     ])
     for (const file of files) {
       const source = read(file)
@@ -147,5 +148,15 @@ describe('cn merge (row 22)', () => {
 
   it('merges two type roles as font sizes', () => {
     expect(cn('text-body', 'text-card-value')).toBe('text-card-value')
+  })
+})
+
+describe('Skeleton (spec 1.8, UX-DR88)', () => {
+  it('is the shadcn slot with the brand pulse and surface', () => {
+    const source = read('skeleton.tsx')
+    expect(source).toContain('data-slot="skeleton"')
+    expect(source).toContain('aria-hidden="true"')
+    expect(source).toContain('animate-skeleton bg-surface-muted')
+    expect(source).not.toContain('animate-pulse')
   })
 })

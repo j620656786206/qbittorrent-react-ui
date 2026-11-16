@@ -9,7 +9,9 @@ import type { ServerState } from '#/shared/maindata'
 
 // Spec 1.7 rows H1 to H11: everything the header shows, from the server
 // state, the one connection alert and the 「全部」 count. Pure, so the rows
-// are tested in node; the components only lay it out.
+// are tested in node; the components only lay it out. Spec 1.8 row H1: when
+// the first load failed with a code that has no alert (`loadFailed`), the
+// skeletons go: each speed group reads 「沒有」 and the count is left out.
 
 export interface SpeedGroup {
   /** 「9.95 MB/s」 */
@@ -21,8 +23,13 @@ export interface SpeedGroup {
 }
 
 export interface HeaderModel {
-  /** Download and upload; `null` before the first data (skeleton bars). */
+  /**
+   * Download and upload; `null` without data (skeleton bars while `loading`,
+   * otherwise 「沒有」).
+   */
   speeds: { down: SpeedGroup; up: SpeedGroup } | null
+  /** No data yet and the first load has not failed: skeletons, `aria-busy`. */
+  loading: boolean
   /**
    * qBittorrent's own connection problem (「防火牆擋住了」 「斷線了」): one
    * warning pill instead of both speed pills, and the phone line's text.
@@ -36,7 +43,10 @@ export interface HeaderModel {
   bar: ConnectionBar | null
   /** Content (`main`) at 50% opacity. */
   dim: boolean
-  /** The 「全部」 count without archived torrents; `null` is a skeleton. */
+  /**
+   * The 「全部」 count without archived torrents; `null` is a skeleton while
+   * `loading`, otherwise left out.
+   */
   allCount: number | null
 }
 
@@ -57,10 +67,16 @@ export function headerModel({
   serverState,
   alert,
   allCount,
+  loadFailed = false,
 }: {
   serverState: ServerState | undefined
   alert: ConnectionAlert | null
   allCount: number | undefined
+  /**
+   * No data and the maindata query failed with a first-load error
+   * (`isFirstLoadError` in src/lib/app-error.ts).
+   */
+  loadFailed?: boolean
 }): HeaderModel {
   const surface = alert ? alertSurface(alert.kind) : null
   const bar = barFor(alert)
@@ -80,6 +96,7 @@ export function headerModel({
           ),
         }
       : null,
+    loading: !serverState && !loadFailed,
     warning,
     staleText: alert && surface === 'stale' ? alert.text : null,
     phoneLine: bar ? 'bar' : warning ? 'warning' : 'speeds',

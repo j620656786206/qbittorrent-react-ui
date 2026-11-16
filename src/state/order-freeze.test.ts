@@ -1,0 +1,162 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  TOUCH_SETTLE_MS,
+  freezeStore,
+  isOrderFrozen,
+  nextShownOrder,
+  noteScroll,
+  resetOrderFreeze,
+  setPointerInList,
+  shownOrderReducer,
+  touchFrozen,
+  touchScrollEnd,
+  touchScrollStart,
+} from '#/state/order-freeze'
+
+// Spec 1.8 rows F1 to F6: the one owner of the order freeze.
+
+const frozenNow = () => isOrderFrozen(freezeStore.state)
+
+describe('nextShownOrder', () => {
+  it('F1 not frozen: the live order', () => {
+    const live = ['c', 'b', 'a']
+    expect(nextShownOrder(['a', 'b', 'c'], live, false)).toBe(live)
+  })
+
+  it('F2 frozen, same set reordered: the shown order, same reference', () => {
+    const shown = ['a', 'b', 'c']
+    expect(nextShownOrder(shown, ['c', 'a', 'b'], true)).toBe(shown)
+  })
+
+  it('F3 frozen, a shown hash left: shown minus that hash', () => {
+    expect(nextShownOrder(['a', 'b', 'c'], ['c', 'a'], true)).toEqual([
+      'a',
+      'c',
+    ])
+  })
+
+  it('F4 frozen, a new hash: held back until the unfreeze', () => {
+    const shown = ['a', 'b']
+    const live = ['new', 'b', 'a']
+    expect(nextShownOrder(shown, live, true)).toBe(shown)
+    expect(nextShownOrder(shown, live, false)).toBe(live)
+  })
+
+  it('F5 first render while frozen: the live order', () => {
+    const live = ['a']
+    expect(nextShownOrder(null, live, true)).toBe(live)
+  })
+})
+
+describe('shownOrderReducer (the hook update)', () => {
+  it('keeps positions while frozen, holds new hashes, drops gone ones, releases once', () => {
+    let shown = shownOrderReducer(null, { live: ['b', 'a'], frozen: false })
+    expect(shown).toEqual(['b', 'a'])
+    const before = shown
+    // Frozen: a value poll reorders and adds `c`; positions and set hold.
+    shown = shownOrderReducer(shown, { live: ['a', 'c', 'b'], frozen: true })
+    expect(shown).toBe(before)
+    // Still frozen: `b` was deleted; it leaves at once, `c` still waits.
+    shown = shownOrderReducer(shown, { live: ['c', 'a'], frozen: true })
+    expect(shown).toEqual(['a'])
+    // Unfrozen: one reorder to the live order, `c` on top.
+    const live = ['c', 'a']
+    shown = shownOrderReducer(shown, { live, frozen: false })
+    expect(shown).toBe(live)
+  })
+
+  it('no data resets; the first data while frozen is shown as is', () => {
+    expect(shownOrderReducer(['a'], { live: undefined, frozen: true })).toBe(
+      null,
+    )
+    const live = ['x']
+    expect(shownOrderReducer(null, { live, frozen: true })).toBe(live)
+  })
+})
+
+describe('F6 freeze reasons', () => {
+  beforeEach(() => {
+    // The settle check reads performance.now().
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'],
+    })
+    resetOrderFreeze()
+  })
+  afterEach(() => {
+    resetOrderFreeze()
+    vi.useRealTimers()
+  })
+
+  it('touchFrozen: touching; 299 ms after the last scroll; not at 300 ms', () => {
+    expect(TOUCH_SETTLE_MS).toBe(300)
+    expect(touchFrozen({ touching: true, lastScrollAt: null, now: 0 })).toBe(
+      true,
+    )
+    expect(
+      touchFrozen({ touching: false, lastScrollAt: 1000, now: 1299 }),
+    ).toBe(true)
+    expect(
+      touchFrozen({ touching: false, lastScrollAt: 1000, now: 1300 }),
+    ).toBe(false)
+    expect(touchFrozen({ touching: false, lastScrollAt: null, now: 0 })).toBe(
+      false,
+    )
+  })
+
+  it('mouse inside the list freezes; leaving unfreezes', () => {
+    setPointerInList(true)
+    expect(frozenNow()).toBe(true)
+    setPointerInList(false)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('a finger scrolling freezes until 300 ms after the last scroll after touchend', () => {
+    touchScrollStart()
+    expect(frozenNow()).toBe(true)
+    vi.advanceTimersByTime(50)
+    noteScroll()
+    touchScrollEnd()
+    // Momentum: scroll events keep coming after the finger lifted.
+    vi.advanceTimersByTime(100)
+    noteScroll()
+    vi.advanceTimersByTime(TOUCH_SETTLE_MS - 1)
+    expect(frozenNow()).toBe(true)
+    vi.advanceTimersByTime(1)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('a touch without scrolling ends with the finger', () => {
+    touchScrollStart()
+    touchScrollEnd()
+    vi.advanceTimersByTime(0)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('a scroll outside a touch (mouse wheel) does not freeze', () => {
+    noteScroll()
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('a new touch during the settle time keeps it frozen', () => {
+    touchScrollStart()
+    noteScroll()
+    touchScrollEnd()
+    vi.advanceTimersByTime(200)
+    touchScrollStart()
+    vi.advanceTimersByTime(1000)
+    expect(frozenNow()).toBe(true)
+    touchScrollEnd()
+    vi.advanceTimersByTime(0)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('either reason keeps it frozen', () => {
+    setPointerInList(true)
+    touchScrollStart()
+    touchScrollEnd()
+    vi.advanceTimersByTime(TOUCH_SETTLE_MS)
+    expect(frozenNow()).toBe(true)
+    setPointerInList(false)
+    expect(frozenNow()).toBe(false)
+  })
+})

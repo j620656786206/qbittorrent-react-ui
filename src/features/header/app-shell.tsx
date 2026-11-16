@@ -10,14 +10,10 @@ import type { ReactNode } from 'react'
 import { formatCount } from '#/lib/format'
 import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
+import { MAIN_ID, focusMain } from '#/shared/ui/main-scroll'
+import { Skeleton } from '#/shared/ui/skeleton'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
-import {
-  DesktopSpeed,
-  MAIN_ID,
-  PhoneLine,
-  Skeleton,
-  focusMain,
-} from '#/features/header/speed-area'
+import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 
 // The app shell for every logged-in page (FR-4; mockups S01-list-mode-
 // desktop, S01-offline-desktop, S01-loading-desktop, S02-list-mode-phone,
@@ -179,16 +175,21 @@ function IconButton({
   )
 }
 
+// The count is a skeleton while loading and left out once the first load
+// failed (spec 1.8 option A).
 function DesktopCount() {
-  const count = useHeader().model.allCount
-  if (count === null) return <Skeleton className="h-2.5 w-5 rounded-[5px]" />
+  const { allCount: count, loading } = useHeader().model
+  if (count === null)
+    return loading ? <Skeleton className="h-2.5 w-5 rounded-[5px]" /> : null
   return <span className="tabular-nums opacity-75">{formatCount(count)}</span>
 }
 
 function PhoneCount() {
-  const count = useHeader().model.allCount
+  const { allCount: count, loading } = useHeader().model
   if (count === null)
-    return <Skeleton className="h-2.5 w-[22px] rounded-[5px]" />
+    return loading ? (
+      <Skeleton className="h-2.5 w-[22px] rounded-[5px]" />
+    ) : null
   return (
     <span className="text-text-muted tabular-nums">{formatCount(count)}</span>
   )
@@ -196,7 +197,8 @@ function PhoneCount() {
 
 /** The selected 「全部」 tab, `aria-busy` until the count is known. */
 function AllTab() {
-  const loading = useHeader().model.allCount === null
+  const { allCount, loading: modelLoading } = useHeader().model
+  const loading = allCount === null && modelLoading
   return (
     <button
       type="button"
@@ -230,10 +232,14 @@ function DesktopBar() {
 }
 
 /**
- * `main`, the scroll container. Only an unreachable home or qBittorrent dims
- * it; it stays scrollable and clickable (no pointer-events change). It is the
- * focus target when the bar disappears under a focused 「重試」. Re-renders
- * every second; `children` keeps its identity, so the page is skipped.
+ * `main`, the scroll container (the list's virtualizer scrolls it). Only an
+ * unreachable home or qBittorrent dims it; it stays scrollable and clickable
+ * (no pointer-events change). It is the focus target when the bar
+ * disappears under a focused 「重試」. Re-renders every second; `children`
+ * keeps its identity, so the page is skipped. Phone: 4px of padding inside
+ * a box 4px wider on each side, so its content box stays the page column;
+ * the padding only gives room to a child that opts into the list's 12px
+ * edges (DESIGN page-phone-list) without being clipped by the scroller.
  */
 function ContentDim({ children }: { children: ReactNode }) {
   const { dim } = useHeader().model
@@ -242,7 +248,7 @@ function ContentDim({ children }: { children: ReactNode }) {
       id={MAIN_ID}
       tabIndex={-1}
       className={cn(
-        'min-h-0 flex-1 overflow-y-auto focus:outline-none',
+        'min-h-0 flex-1 overflow-y-auto focus:outline-none max-lg:-mx-1 max-lg:px-1',
         dim && 'opacity-50',
       )}
     >

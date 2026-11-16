@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ERROR_TEXT, errorText } from '#/lib/error-text'
+import { ERROR_TEXT, LIST_LOAD_FAILED, errorText } from '#/lib/error-text'
 import { ERROR_CODES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
 
@@ -39,5 +39,12 @@ describe('errorText', () => {
     expect(text).not.toContain('http')
     expect(text).not.toContain('qbit.test.invalid')
     expect(text).not.toMatch(/\b\d{1,3}(\.\d{1,3}){3}\b/)
+  })
+})
+
+describe('LIST_LOAD_FAILED (spec 1.8 V2)', () => {
+  it('is the option A wording, plain Chinese, no dash', () => {
+    expect(LIST_LOAD_FAILED).toBe('讀不到種子清單')
+    expect(LIST_LOAD_FAILED).not.toContain(EM_DASH)
   })
 })

@@ -6,7 +6,9 @@ import {
   classifyResponse,
   isAppError,
   isConnectionCode,
+  isFirstLoadError,
 } from '#/lib/app-error'
+import { ERROR_CODES } from '#/shared/errors'
 
 function response(status: number, contentType?: string): Response {
   const headers = contentType ? { 'content-type': contentType } : undefined
@@ -77,5 +79,36 @@ describe('AppError', () => {
     ])
     expect(isConnectionCode('home_unreachable')).toBe(true)
     expect(isConnectionCode('bad_origin')).toBe(false)
+  })
+})
+
+// Spec 1.8 rows V1 and V2: which maindata failures the list shows itself.
+// Every code is checked: the ones with another surface (the alert bar's
+// connection codes and `timeout`, the login screen's stop codes) are not
+// first-load errors; every other code is, so a new code is covered too.
+describe('isFirstLoadError', () => {
+  const OTHER_SURFACE = new Set<string>([
+    ...CONNECTION_CODES,
+    ...LOGIN_STOP_CODES,
+    'timeout',
+  ])
+
+  it.each(ERROR_CODES.map((code) => [code]))('%s', (code) => {
+    expect(isFirstLoadError(new AppError(code))).toBe(!OTHER_SURFACE.has(code))
+  })
+
+  it('the spec examples are first-load errors', () => {
+    for (const code of [
+      'qbit_rejected',
+      'bad_origin',
+      'invalid_input',
+    ] as const)
+      expect(isFirstLoadError(new AppError(code))).toBe(true)
+  })
+
+  it('no error is not one; a thrown bug is one', () => {
+    expect(isFirstLoadError(null)).toBe(false)
+    expect(isFirstLoadError(undefined)).toBe(false)
+    expect(isFirstLoadError(new TypeError('x'))).toBe(true)
   })
 })
