@@ -3,6 +3,8 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { getGlobalStartContext } from '@tanstack/react-start'
 import { routeTree } from './routeTree.gen'
 import { watchLoginRequired } from '#/features/login/watch-login-required'
+import { getMaindata } from '#/server/functions/get-maindata'
+import { bindFetchMaindata } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
 
 // AD-10: the request middleware's per-request CSP nonce goes on Start's inline
@@ -18,7 +20,11 @@ function cspNonce(): string | undefined {
 }
 
 export function getRouter() {
-  const queryClient = createQueryClient()
+  // src/state may not import server functions, so the maindata call is bound
+  // here. This import is also what bundles getMaindata (smoke B9, B10).
+  const queryClient = createQueryClient({
+    fetchMaindata: bindFetchMaindata(getMaindata),
+  })
   const router = createTanStackRouter({
     routeTree,
     context: { queryClient },

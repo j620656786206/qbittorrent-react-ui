@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   AppError,
+  CONNECTION_CODES,
   LOGIN_STOP_CODES,
   classifyResponse,
   isAppError,
+  isConnectionCode,
 } from '#/lib/app-error'
 
 function response(status: number, contentType?: string): Response {
@@ -65,5 +67,15 @@ describe('AppError', () => {
       'not_logged_in',
       'qbit_auth_failed',
     ])
+  })
+
+  it('lists the connection alert codes', () => {
+    expect([...CONNECTION_CODES].sort()).toEqual([
+      'cloudflare_expired',
+      'home_unreachable',
+      'qbit_unreachable',
+    ])
+    expect(isConnectionCode('home_unreachable')).toBe(true)
+    expect(isConnectionCode('bad_origin')).toBe(false)
   })
 })

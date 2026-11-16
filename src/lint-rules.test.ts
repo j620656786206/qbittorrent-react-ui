@@ -5,8 +5,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { Linter } from 'eslint'
 
 // Guards the layer boundaries, the AD-10 raw-HTML bans, the AD-5
-// createServerFn ban, the cn and src/shared/ui bans and the AD-16
-// no-console rule in eslint.config.js.
+// createServerFn ban, the cn and src/shared/ui bans, the AD-16 no-console
+// rule, the AR-39 `['maindata']` write ban, the AR-35 `refetchInterval` rule
+// and the AR-41 torrent-state ban in eslint.config.js.
 // If a plugin or resolver change silently disables them, these tests go red.
 //
 // Probes are linted from memory with `lintText` at virtual paths, so nothing
@@ -113,6 +114,74 @@ const PROBES: Record<string, string> = {
   ),
   'src/server/sync/lint-probe-qbit-session-export.ts':
     "export { createQbitSession } from '../qbit/session'\n",
+  'src/state/lint-probe-set-maindata.ts':
+    "declare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData(['maindata'], x)\n",
+  'src/features/lint-probe/set-maindata-bare.ts':
+    "declare function setQueryData(k: unknown, v: unknown): void\ndeclare const x: unknown\nsetQueryData(['maindata'], x)\n",
+  'src/features/lint-probe/set-maindata-key.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData(MAINDATA_KEY, x)\n",
+  'src/routes/-lint-probe-set-queries-maindata.ts':
+    "declare const client: { setQueriesData: (f: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueriesData({ queryKey: ['maindata'] }, x)\n",
+  'src/features/lint-probe/set-session.ts':
+    "declare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData(['session'], x)\n",
+  'src/features/lint-probe/refetch-literal.ts':
+    'export const options = { refetchInterval: 5000 }\n',
+  'src/features/lint-probe/refetch-poll.ts':
+    "import { pollInterval } from '#/state/polling'\n\nexport const options = { refetchInterval: pollInterval(5000) }\n",
+  'src/features/lint-probe/torrent-state.ts':
+    "declare const torrent: { state: string }\n\nexport const isError = torrent.state === 'error'\n",
+  'src/routes/-lint-probe-torrent-state-switch.ts':
+    "declare const torrent: { state: string }\n\nexport function word() {\n  switch (torrent.state) {\n    default:\n      return ''\n  }\n}\n",
+  'src/lib/lint-probe-torrent-state.ts':
+    "declare const torrent: { state: string }\n\nexport const isError = torrent.state === 'error'\n",
+  'src/features/lint-probe/raw-html.ts':
+    "declare const el: HTMLElement\nel.innerHTML = ''\n",
+  'src/routes/-lint-probe-raw-html.ts':
+    "declare const el: HTMLElement\nel.innerHTML = ''\n",
+  'src/features/lint-probe/qbit-session.ts':
+    "import { createQbitSession } from '#/server/qbit/session'\n\nexport const x = createQbitSession\n",
+  'src/routes/-lint-probe-qbit-session.ts':
+    "import { createQbitSession } from '../server/qbit/session'\n\nexport const x = createQbitSession\n",
+  'src/shared/ui/lint-probe-raw-html.tsx':
+    "declare const el: HTMLElement\nel.innerHTML = ''\n",
+  'src/features/lint-probe/set-maindata-as-const.ts':
+    "declare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData(['maindata'] as const, x)\n",
+  'src/features/lint-probe/set-maindata-satisfies.ts':
+    "declare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData(['maindata'] satisfies ReadonlyArray<string>, x)\n",
+  'src/features/lint-probe/set-maindata-spread.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueryData([...MAINDATA_KEY], x)\n",
+  'src/features/lint-probe/set-maindata-computed.ts':
+    "declare const client: { setQueryData: (k: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient['setQueryData'](['maindata'], x)\n",
+  'src/features/lint-probe/set-queries-as-const.ts':
+    "declare const client: { setQueriesData: (f: unknown, v: unknown) => void }\ndeclare const x: unknown\nclient.setQueriesData({ queryKey: ['maindata'] as const }, x)\n",
+  'src/features/lint-probe/use-query-fn.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare function useQuery(o: unknown): unknown\nexport const r = useQuery({ queryKey: MAINDATA_KEY, queryFn: () => 1 })\n",
+  'src/features/lint-probe/fetch-query-fn.ts':
+    "declare const client: { fetchQuery: (o: unknown) => unknown }\nexport const r = client.fetchQuery({ queryKey: ['maindata'], queryFn: () => 1 })\n",
+  'src/features/lint-probe/prefetch-query-fn.ts':
+    "declare const client: { prefetchQuery: (o: unknown) => unknown }\nexport const r = client.prefetchQuery({ queryKey: ['maindata'] as const, queryFn: () => 1 })\n",
+  'src/state/lint-probe-ensure-query-fn.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare const client: { ensureQueryData: (o: unknown) => unknown }\nexport const r = client.ensureQueryData({ queryKey: [...MAINDATA_KEY], queryFn: () => 1 })\n",
+  'src/features/lint-probe/use-query-select.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare function useQuery(o: unknown): unknown\nexport const r = useQuery({ queryKey: MAINDATA_KEY, select: (d: unknown) => d })\n",
+  'src/state/maindata.ts':
+    "declare const client: { fetchQuery: (o: unknown) => unknown }\nexport const r = client.fetchQuery({ queryKey: ['maindata'], queryFn: () => 1 })\n",
+  'src/features/lint-probe/state-optional.ts':
+    "declare const torrent: { state: string } | undefined\n\nexport const isError = torrent?.state === 'error'\n",
+  'src/features/lint-probe/state-includes.ts':
+    "declare const torrent: { state: string } | undefined\n\nexport const isUp = ['uploading', 'stalledUP'].includes(torrent!.state)\n",
+  'src/features/lint-probe/state-ends-with.ts':
+    "declare const torrent: { state: string } | undefined\n\nexport const isUp = torrent!.state.endsWith('UP')\n",
+  'src/features/lint-probe/state-lookup.ts':
+    'declare const torrent: { state: string } | undefined\n\ndeclare const LABELS: Record<string, string>\nexport const label = LABELS[torrent!.state]\n',
+  'src/features/lint-probe/state-destructure.ts':
+    'declare const torrent: { state: string }\n\nconst { state } = torrent\nexport { state }\n',
+  'src/shared/ui/lint-probe-state.tsx':
+    "declare const torrent: { state: string } | undefined\n\nexport const isError = torrent!.state === 'error'\n",
+  'src/features/lint-probe/state-variable-key.ts':
+    'declare const LABELS: Record<string, string>\ndeclare const state: string\n\nexport const label = LABELS[state]\n',
+  'src/features/lint-probe/router-state.ts':
+    "declare const router: { state: { status: string } }\n\nexport const idle = router.state.status === 'idle'\n",
 }
 
 // Real files linted alongside the probes (read only).
@@ -327,6 +396,190 @@ describe('src/shared/ui only from screens', () => {
 
   it('allows it from a route', () => {
     expect(ruleIds('src/routes/-lint-probe-ui.tsx')).toEqual([])
+  })
+})
+
+function messagesOf(file: string): Array<Linter.LintMessage> {
+  const messages = results.get(file)
+  if (!messages) throw new Error(`no lint result for ${file}`)
+  return messages.filter((message) => message.ruleId === 'no-restricted-syntax')
+}
+
+describe("AR-39 only mergeMaindata writes ['maindata']", () => {
+  it.each([
+    [
+      "client.setQueryData(['maindata'], x)",
+      'src/state/lint-probe-set-maindata.ts',
+    ],
+    [
+      "setQueryData(['maindata'], x)",
+      'src/features/lint-probe/set-maindata-bare.ts',
+    ],
+    [
+      'setQueryData(MAINDATA_KEY, x)',
+      'src/features/lint-probe/set-maindata-key.ts',
+    ],
+    [
+      "setQueriesData({ queryKey: ['maindata'] }, x)",
+      'src/routes/-lint-probe-set-queries-maindata.ts',
+    ],
+  ])('blocks %s', (_form, file) => {
+    const hits = messagesOf(file)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].message).toContain('AR-39')
+  })
+
+  it("allows setQueryData(['session'], x)", () => {
+    expect(messagesOf('src/features/lint-probe/set-session.ts')).toEqual([])
+  })
+})
+
+describe('AR-35 refetchInterval only through pollInterval()', () => {
+  it('blocks refetchInterval: 5000', () => {
+    const hits = messagesOf('src/features/lint-probe/refetch-literal.ts')
+    expect(hits).toHaveLength(1)
+    expect(hits[0].message).toContain('pollInterval')
+  })
+
+  it('allows refetchInterval: pollInterval(5000)', () => {
+    expect(messagesOf('src/features/lint-probe/refetch-poll.ts')).toEqual([])
+  })
+})
+
+describe('AR-41 no torrent.state comparisons in screens', () => {
+  it.each([
+    [
+      "torrent.state === 'error' in a feature",
+      'src/features/lint-probe/torrent-state.ts',
+    ],
+    [
+      'switch (torrent.state) in a route',
+      'src/routes/-lint-probe-torrent-state-switch.ts',
+    ],
+  ])('blocks %s', (_name, file) => {
+    const hits = messagesOf(file)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].message).toContain('classify()')
+  })
+
+  it.each([
+    [
+      "torrent.state === 'error' in src/lib",
+      'src/lib/lint-probe-torrent-state.ts',
+    ],
+    [
+      "router.state.status === 'idle' in a feature",
+      'src/features/lint-probe/router-state.ts',
+    ],
+  ])('allows %s', (_name, file) => {
+    expect(messagesOf(file)).toEqual([])
+  })
+})
+
+describe('features, routes and src/shared/ui keep the global syntax bans', () => {
+  it.each([
+    ['raw HTML in a feature', 'src/features/lint-probe/raw-html.ts'],
+    ['raw HTML in a route', 'src/routes/-lint-probe-raw-html.ts'],
+    ['raw HTML in src/shared/ui', 'src/shared/ui/lint-probe-raw-html.tsx'],
+  ])('blocks %s', (_name, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('AD-10'),
+    ])
+  })
+
+  it.each([
+    ['a feature', 'src/features/lint-probe/qbit-session.ts'],
+    ['a route', 'src/routes/-lint-probe-qbit-session.ts'],
+  ])('blocks a qbit/session import from %s', (_name, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('AD-5: src/server/qbit/session'),
+    ])
+  })
+})
+
+describe('AR-39 other key and call forms', () => {
+  it.each([
+    [
+      "['maindata'] as const",
+      'src/features/lint-probe/set-maindata-as-const.ts',
+    ],
+    [
+      "['maindata'] satisfies ...",
+      'src/features/lint-probe/set-maindata-satisfies.ts',
+    ],
+    ['[...MAINDATA_KEY]', 'src/features/lint-probe/set-maindata-spread.ts'],
+    [
+      "client['setQueryData'](...)",
+      'src/features/lint-probe/set-maindata-computed.ts',
+    ],
+    [
+      "setQueriesData({ queryKey: ['maindata'] as const })",
+      'src/features/lint-probe/set-queries-as-const.ts',
+    ],
+  ])('blocks a write with %s', (_form, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('only mergeMaindata'),
+    ])
+  })
+
+  it.each([
+    ['useQuery + MAINDATA_KEY', 'src/features/lint-probe/use-query-fn.ts'],
+    ["fetchQuery + ['maindata']", 'src/features/lint-probe/fetch-query-fn.ts'],
+    [
+      "prefetchQuery + ['maindata'] as const",
+      'src/features/lint-probe/prefetch-query-fn.ts',
+    ],
+    [
+      'ensureQueryData + [...MAINDATA_KEY] in src/state',
+      'src/state/lint-probe-ensure-query-fn.ts',
+    ],
+  ])('blocks a queryFn override: %s', (_form, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('createQueryClient({ fetchMaindata })'),
+    ])
+  })
+
+  it('allows useQuery({ queryKey: MAINDATA_KEY, select })', () => {
+    expect(messagesOf('src/features/lint-probe/use-query-select.ts')).toEqual(
+      [],
+    )
+  })
+
+  it('allows the registered query function in src/state/maindata.ts', () => {
+    expect(messagesOf('src/state/maindata.ts')).toEqual([])
+  })
+})
+
+describe('AR-41 other torrent.state forms', () => {
+  it.each([
+    ["torrent?.state === 'error'", 'src/features/lint-probe/state-optional.ts'],
+    [
+      '[...].includes(torrent.state)',
+      'src/features/lint-probe/state-includes.ts',
+    ],
+    [
+      "torrent.state.endsWith('UP')",
+      'src/features/lint-probe/state-ends-with.ts',
+    ],
+    ['LABELS[torrent.state]', 'src/features/lint-probe/state-lookup.ts'],
+    [
+      'const { state } = torrent',
+      'src/features/lint-probe/state-destructure.ts',
+    ],
+    [
+      "torrent.state === 'error' in src/shared/ui",
+      'src/shared/ui/lint-probe-state.tsx',
+    ],
+  ])('blocks %s', (_form, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('classify()'),
+    ])
+  })
+
+  it('allows a lookup by a variable that happens to be called state', () => {
+    expect(messagesOf('src/features/lint-probe/state-variable-key.ts')).toEqual(
+      [],
+    )
   })
 })
 

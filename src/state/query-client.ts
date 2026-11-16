@@ -1,16 +1,25 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
-import { isAppError, isLoginStopCode } from '#/lib/app-error'
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  hashKey,
+} from '@tanstack/react-query'
+import { isAppError, isConnectionCode, isLoginStopCode } from '#/lib/app-error'
 import type { AppError, LoginStopReason } from '#/lib/app-error'
 import type { ErrorCode } from '#/shared/errors'
+import { clearConnectionErrors, markConnectionError } from '#/state/connection'
 import {
   isLoginRequired,
   loginStore,
   markLoginRequired,
 } from '#/state/login-required'
+import { MAINDATA_KEY, maindataQueryDefaults } from '#/state/maindata'
+import type { FetchMaindata } from '#/state/maindata'
 
 // AR-35, AD-9: one QueryClient per router. The global `onError` is the only
-// place that handles the login-stop codes and `bad_origin`; story 1.7 reads
-// the connection codes from query state.
+// place that handles the login-stop codes, the connection codes and
+// `bad_origin`. Connection codes are recorded in src/state/connection.ts,
+// which only a successful `['maindata']` fetch clears.
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -19,6 +28,11 @@ export interface RouterContext {
 export interface CreateQueryClientOptions {
   /** Where to return after login. Defaults to the current same-site URL. */
   currentPath?: () => string
+  /**
+   * The `getMaindata` call (bound in src/router.tsx). When given, the
+   * `['maindata']` query options are registered on the client.
+   */
+  fetchMaindata?: FetchMaindata
 }
 
 function locationPath(): string {
@@ -44,13 +58,27 @@ const MAX_QUERY_RETRIES = 3
 /** While the login screen is needed, nothing refetches on its own. */
 const unlessLoginRequired = () => !isLoginRequired()
 
+const MAINDATA_HASH = hashKey(MAINDATA_KEY)
+
 export function createQueryClient({
   currentPath = locationPath,
+  fetchMaindata,
 }: CreateQueryClientOptions = {}): QueryClient {
-  const onError = (error: unknown) => {
+  const onError = (error: unknown, fromMaindata: boolean) => {
     if (isLoginStop(error)) {
       markLoginRequired(error.code, currentPath())
       void client.cancelQueries()
+      return
+    }
+    if (isAppError(error) && isConnectionCode(error.code)) {
+      markConnectionError(error.code)
+      return
+    }
+    // The container gave up on a hung qBittorrent: for the torrent list that
+    // is "qBittorrent not responding". An operation's timeout stays with
+    // that operation's own failure handling.
+    if (isAppError(error) && error.code === 'timeout' && fromMaindata) {
+      markConnectionError('qbit_unreachable')
       return
     }
     if (isAppError(error) && error.code === 'bad_origin') {
@@ -60,8 +88,16 @@ export function createQueryClient({
   }
 
   const client: QueryClient = new QueryClient({
-    queryCache: new QueryCache({ onError }),
-    mutationCache: new MutationCache({ onError }),
+    queryCache: new QueryCache({
+      onError: (error, query) =>
+        onError(error, query.queryHash === MAINDATA_HASH),
+      onSuccess: (_data, query) => {
+        if (query.queryHash === MAINDATA_HASH) clearConnectionErrors()
+      },
+    }),
+    mutationCache: new MutationCache({
+      onError: (error) => onError(error, false),
+    }),
     defaultOptions: {
       queries: {
         retry: (failureCount, error) =>
@@ -74,6 +110,10 @@ export function createQueryClient({
       },
     },
   })
+
+  if (fetchMaindata) {
+    client.setQueryDefaults(MAINDATA_KEY, maindataQueryDefaults(fetchMaindata))
+  }
 
   // The server builds a router (and so a client) for every request, /healthz
   // included, and the store lives as long as the process: a subscription here
