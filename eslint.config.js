@@ -97,6 +97,22 @@ const rawHtmlBans = [
   },
 ]
 
+// AD-5: only src/server/qbit may use the session (it sends to any QbitPath);
+// the rest of the app calls the client's named methods. Relative or `#/`.
+// esquery regexes cannot contain `/`, so `.` stands for the separator.
+const QBIT_SESSION_SOURCE = String.raw`/(^|[^a-z])qbit.session(\.tsx?)?$/`
+const QBIT_SESSION_MESSAGE =
+  'AD-5: src/server/qbit/session is for src/server/qbit only. Use the client from #/server/qbit.'
+const qbitSessionBans = [
+  'ImportDeclaration',
+  'ExportNamedDeclaration',
+  'ExportAllDeclaration',
+  'ImportExpression',
+].map((node) => ({
+  selector: `${node}[source.value=${QBIT_SESSION_SOURCE}]`,
+  message: QBIT_SESSION_MESSAGE,
+}))
+
 const CREATE_SERVER_FN_BAN = {
   group: ['@tanstack/*start*', '@tanstack/*start*/**'],
   importNames: ['createServerFn'],
@@ -178,8 +194,14 @@ export default [
       // Framework hooks (route handlers, server functions) are async by
       // signature even when the body does not await.
       '@typescript-eslint/require-await': 'off',
-      'no-restricted-syntax': ['error', ...rawHtmlBans],
+      'no-restricted-syntax': ['error', ...rawHtmlBans, ...qbitSessionBans],
     },
+  },
+  // The qBittorrent session is for src/server/qbit only; everyone else goes
+  // through the client's named methods (AD-5).
+  {
+    files: ['src/server/qbit/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['error', ...rawHtmlBans] },
   },
   {
     files: ['src/**/*.{ts,tsx}'],

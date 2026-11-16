@@ -103,10 +103,21 @@ const PROBES: Record<string, string> = {
   'src/routes/-lint-probe-zod.ts': importFrom('zod/v4', 'z'),
   'src/shared/lint-probe-zod.ts': importFrom('zod', 'z'),
   'src/server/qbit/lint-probe-zod.ts': importFrom('zod', 'z'),
+  'src/server/sync/lint-probe-qbit-session.ts': importFrom(
+    '#/server/qbit/session',
+    'createQbitSession',
+  ),
+  'src/server/functions/lint-probe-qbit-session.ts': importFrom(
+    '../qbit/session.ts',
+    'createQbitSession',
+  ),
+  'src/server/sync/lint-probe-qbit-session-export.ts':
+    "export { createQbitSession } from '../qbit/session'\n",
 }
 
 // Real files linted alongside the probes (read only).
 const REAL_FILES = [
+  'src/server/qbit/client.ts',
   'src/server/functions/_define.ts',
   'src/server/functions/__fixtures__/sample.ts',
   'src/shared/ui/cn.ts',
@@ -247,6 +258,31 @@ describe('AD-5 the factory is imported only under src/server/functions', () => {
     expect(
       ruleIds('src/server/functions/__fixtures__/sample.ts'),
     ).not.toContain('no-restricted-imports')
+  })
+})
+
+describe('AD-5 the qBittorrent session only from src/server/qbit', () => {
+  it.each([
+    [
+      '#/ alias from src/server/sync',
+      'src/server/sync/lint-probe-qbit-session.ts',
+    ],
+    [
+      'relative path from src/server/functions',
+      'src/server/functions/lint-probe-qbit-session.ts',
+    ],
+    [
+      're-export from src/server/sync',
+      'src/server/sync/lint-probe-qbit-session-export.ts',
+    ],
+  ])('blocks %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-syntax')
+  })
+
+  it('allows it inside src/server/qbit', () => {
+    expect(ruleIds('src/server/qbit/client.ts')).not.toContain(
+      'no-restricted-syntax',
+    )
   })
 })
 

@@ -75,7 +75,11 @@ export interface GuardSpec {
 
 export interface RunArgs<TInput> {
   input: TInput
-  /** Aborted when the 30 s timeout fires; pass it to qBittorrent calls. */
+  /**
+   * Aborted when the 30 s timeout fires. Work this call owns alone may stop
+   * on it; shared work (a maindata pull other callers join) must not, and
+   * keeps its own shorter deadline instead (`src/server/qbit/session.ts`).
+   */
   signal: AbortSignal
   session: SessionPayload | null
 }
