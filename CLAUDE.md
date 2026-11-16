@@ -28,6 +28,15 @@ source ~/.nvm/nvm.sh && nvm use && npm run build
 source ~/.nvm/nvm.sh && nvm use && npm start          # 跑 build 出來的 .output/server/index.mjs
 ```
 
+本機檢查映像（只用來驗證，Docker Desktop 要開著）。CI 和 GHCR 是 amd64，所以本機也建 amd64；Apple Silicon 的 Mac 會用模擬跑，比較慢：
+
+```bash
+docker build --platform linux/amd64 -t react-torrent:local --build-arg COMMIT_SHA=$(git rev-parse HEAD) .
+source ~/.nvm/nvm.sh && nvm use && node scripts/smoke-image.mjs react-torrent:local $(git rev-parse HEAD)
+```
+
+映像只由 CI 建和推。不准在本機 `docker push` 或登入 GHCR。部署到 Unraid 的步驟和上線後實測清單在 `docs/deployment.md`。
+
 本機設定：`.env` 只留在本機、不進 git，變數名稱照 `.env.example`。舊的 `VITE_` 開頭名稱要改成 `.env.example` 的名稱；帳密絕對不能放在 `VITE_` 變數裡（AD-3，`VITE_` 會被打包進前端）。
 
 ## 規則

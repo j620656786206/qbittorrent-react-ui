@@ -1,0 +1,37 @@
+# AR-14: three monthly version-update PRs (production npm, development npm,
+# Actions plus the Node base image). npm groups take only minor and patch
+# updates; each npm major opens its own PR so one breaking major does not
+# block the group. Security updates stay ungrouped and open any time.
+# Branches keep the default `dependabot/...` names (AR-15: the automatic flow
+# only merges `story/` branches; Alex reviews these himself).
+version: 2
+
+multi-ecosystem-groups:
+  ci-and-image:
+    schedule:
+      interval: monthly
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      production-dependencies:
+        dependency-type: production
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+      development-dependencies:
+        dependency-type: development
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  - package-ecosystem: github-actions
+    directory: /
+    patterns: ['*']
+    multi-ecosystem-group: ci-and-image
+
+  - package-ecosystem: docker
+    directory: /
+    patterns: ['*']
+    multi-ecosystem-group: ci-and-image
