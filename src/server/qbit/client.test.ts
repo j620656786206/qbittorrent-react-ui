@@ -143,6 +143,48 @@ describe('qBittorrent client', () => {
     },
   )
 
+  it('an unknown connection_status reads as disconnected, logged once without the value', async () => {
+    const { client } = setup({
+      maindata: () =>
+        jsonResponse(
+          fullMaindata({
+            server_state: { connection_status: 'fake-new-status' },
+          }),
+        ),
+    })
+    const first = await client.syncMaindata(0)
+    expect(first.server_state?.connection_status).toBe('disconnected')
+    await client.syncMaindata(1)
+    expect(out.events('qbit_unknown_connection_status')).toEqual([
+      expect.objectContaining({ level: 'warn' }),
+    ])
+    for (const line of out.lines) expect(line).not.toContain('fake-new-status')
+  })
+
+  it.each(['connected', 'firewalled', 'disconnected'])(
+    'a known connection_status (%s) is kept and not logged',
+    async (status) => {
+      const { client } = setup({
+        maindata: () =>
+          jsonResponse(
+            fullMaindata({ server_state: { connection_status: status } }),
+          ),
+      })
+      const raw = await client.syncMaindata(0)
+      expect(raw.server_state?.connection_status).toBe(status)
+      expect(out.events('qbit_unknown_connection_status')).toEqual([])
+    },
+  )
+
+  it('a delta without connection_status leaves it out', async () => {
+    const { client } = setup({
+      maindata: () =>
+        jsonResponse({ rid: 2, server_state: { dl_info_speed: 1 } }),
+    })
+    const raw = await client.syncMaindata(1)
+    expect(raw.server_state).toEqual({ dl_info_speed: 1 })
+  })
+
   it('Q11 the client exposes syncMaindata only, frozen', () => {
     const { client } = setup()
     expect(Object.keys(client)).toEqual(['syncMaindata'])

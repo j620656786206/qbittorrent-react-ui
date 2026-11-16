@@ -34,7 +34,26 @@ describe('securityHeaders middleware', () => {
     )
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+    expect(response.headers.get('cache-control')).toBe('no-store')
   })
+
+  it.each([
+    ['a server function', 'serverFn', 'http://localhost:3000/_serverFn/abc'],
+    ['a page', 'router', 'http://localhost:3000/'],
+  ] as const)(
+    '%s answer is no-store, even if the handler asked for caching',
+    async (_name, handlerType, url) => {
+      const { response } = await runChain(
+        [securityHeaders],
+        { request: new Request(url), handlerType },
+        async () =>
+          new Response('{}', {
+            headers: { 'cache-control': 'public, max-age=600' },
+          }),
+      )
+      expect(response.headers.get('cache-control')).toBe('no-store')
+    },
+  )
 
   it('uses a different nonce per request', async () => {
     const a = await runMiddleware(securityHeaders, {
@@ -89,5 +108,6 @@ describe('securityHeaders middleware', () => {
     expect(headed.headers.get('content-security-policy')).toBe(
       buildCsp('n0nce'),
     )
+    expect(headed.headers.get('cache-control')).toBe('no-store')
   })
 })

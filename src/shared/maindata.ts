@@ -22,6 +22,7 @@ export const slimTorrentSchema = z.object({
   ratio: z.number(),
   added_on: z.number(),
   completion_on: z.number(),
+  /** Seconds, floored to whole minutes by the container's table. */
   seeding_time: z.number(),
   save_path: z.string(),
   category: z.string(),
@@ -63,7 +64,14 @@ export const maindataVersionSchema = z.string().regex(MAINDATA_VERSION_PATTERN)
 export type MaindataVersion = z.infer<typeof maindataVersionSchema>
 
 export const getMaindataInputSchema = z
-  .strictObject({ since: maindataVersionSchema.optional() })
+  .strictObject({
+    since: maindataVersionSchema.optional(),
+    /**
+     * Answer from a qBittorrent pull that starts after this call arrives
+     * (refreshMaindata after an operation), not a reused recent one.
+     */
+    fresh: z.boolean().optional(),
+  })
   .optional()
 
 export type GetMaindataInput = z.infer<typeof getMaindataInputSchema>

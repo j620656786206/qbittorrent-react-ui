@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { z } from '#/shared/zod'
 import { testSession } from '#/server/auth/testing'
 import { GUARDED, input } from '#/server/functions/_define'
 import type { Guarded } from '#/server/functions/_define'

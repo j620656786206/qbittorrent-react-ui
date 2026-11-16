@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from '#/shared/zod'
 import { guard, input, serverGet } from '#/server/functions/_define'
 import { fail, ok } from '#/shared/errors'
 

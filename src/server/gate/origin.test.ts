@@ -10,7 +10,7 @@ async function expectBadOrigin(response: Response) {
   expect(response.status).toBe(403)
   expect(await response.json()).toEqual({
     ok: false,
-    error: { code: 'bad_origin', message: '請求來源不對' },
+    error: { code: 'bad_origin', message: '請求來源不對，要檢查容器的 APP_ORIGINS 設定' },
   })
 }
 

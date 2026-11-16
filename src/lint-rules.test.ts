@@ -6,8 +6,9 @@ import type { Linter } from 'eslint'
 
 // Guards the layer boundaries, the AD-10 raw-HTML bans, the AD-5
 // createServerFn ban, the cn and src/shared/ui bans, the AD-16 no-console
-// rule, the AR-39 `['maindata']` write ban, the AR-35 `refetchInterval` rule
-// and the AR-41 torrent-state ban in eslint.config.js.
+// rule, the AR-39 `['maindata']` write, queryFn and setQueryDefaults bans,
+// the AR-35 `refetchInterval` rule, the AR-41 torrent-state ban and the
+// AD-10 zod ban (including server function files) in eslint.config.js.
 // If a plugin or resolver change silently disables them, these tests go red.
 //
 // Probes are linted from memory with `lintText` at virtual paths, so nothing
@@ -177,7 +178,38 @@ const PROBES: Record<string, string> = {
   'src/features/lint-probe/state-destructure.ts':
     'declare const torrent: { state: string }\n\nconst { state } = torrent\nexport { state }\n',
   'src/shared/ui/lint-probe-state.tsx':
-    "declare const torrent: { state: string } | undefined\n\nexport const isError = torrent!.state === 'error'\n",
+    "declare const sidebar: { state: string }\n\nexport const collapsed = sidebar.state === 'collapsed'\n",
+  'src/shared/ui/lint-probe-state-destructure.tsx':
+    "declare function useSidebar(): { state: string }\n\nconst { state } = useSidebar()\nexport const collapsed = state === 'collapsed'\n",
+  'src/routes/-lint-probe-location-state.ts':
+    'declare function useLocation(): { state: unknown }\n\nconst { state } = useLocation()\nexport { state }\n',
+  'src/features/lint-probe/state-destructure-record.ts':
+    'declare const data: { torrents: Record<string, { state: string }> }\ndeclare const hash: string\n\nconst { state } = data.torrents[hash]\nexport { state }\n',
+  'src/features/lint-probe/state-destructure-param.ts':
+    'interface SlimTorrent {\n  state: string\n}\n\nexport function word({ state }: SlimTorrent) {\n  return state\n}\n',
+  'src/features/lint-probe/query-options-fn.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare function queryOptions(o: unknown): unknown\nexport const o = queryOptions({ queryKey: MAINDATA_KEY, queryFn: () => 1 })\n",
+  'src/features/lint-probe/use-queries-fn.ts':
+    "declare function useQueries(o: unknown): unknown\nexport const r = useQueries({\n  queries: [{ queryKey: ['maindata'], queryFn: () => 1 }],\n})\n",
+  'src/features/lint-probe/use-infinite-fn.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare function useInfiniteQuery(o: unknown): unknown\nexport const r = useInfiniteQuery({\n  queryKey: [...MAINDATA_KEY],\n  queryFn: () => 1,\n  initialPageParam: 0,\n})\n",
+  'src/features/lint-probe/set-defaults.ts':
+    "import { MAINDATA_KEY } from '#/state/maindata'\n\ndeclare const client: { setQueryDefaults: (k: unknown, o: unknown) => void }\nclient.setQueryDefaults(MAINDATA_KEY, { staleTime: 0 })\n",
+  'src/state/lint-probe-set-defaults.ts':
+    "declare const client: { setQueryDefaults: (k: unknown, o: unknown) => void }\nclient.setQueryDefaults(['maindata'] as const, { retry: 3 })\n",
+  'src/features/lint-probe/set-defaults-session.ts':
+    "declare const client: { setQueryDefaults: (k: unknown, o: unknown) => void }\nclient.setQueryDefaults(['session'], { queryFn: () => 1 })\n",
+  'src/state/query-client.ts':
+    "import { MAINDATA_KEY, maindataQueryDefaults } from '#/state/maindata'\n\ndeclare const client: { setQueryDefaults: (k: unknown, o: unknown) => void }\ndeclare const f: never\nclient.setQueryDefaults(MAINDATA_KEY, maindataQueryDefaults(f))\n",
+  'src/server/functions/lint-probe-zod.ts': importFrom('zod', 'z'),
+  'src/server/functions/lint-probe-zod-type.ts':
+    "import type { z } from 'zod'\n\nexport type Schema = z.ZodType\n",
+  'src/server/functions/lint-probe-zod.test.ts': importFrom('zod', 'z'),
+  'src/server/functions/__fixtures__/lint-probe-zod.ts': importFrom('zod', 'z'),
+  'src/server/functions/lint-probe-shared-zod.ts': importFrom(
+    '#/shared/zod',
+    'z',
+  ),
   'src/features/lint-probe/state-variable-key.ts':
     'declare const LABELS: Record<string, string>\ndeclare const state: string\n\nexport const label = LABELS[state]\n',
   'src/features/lint-probe/router-state.ts':
@@ -533,6 +565,18 @@ describe('AR-39 other key and call forms', () => {
       'ensureQueryData + [...MAINDATA_KEY] in src/state',
       'src/state/lint-probe-ensure-query-fn.ts',
     ],
+    [
+      'queryOptions + MAINDATA_KEY',
+      'src/features/lint-probe/query-options-fn.ts',
+    ],
+    [
+      "useQueries + ['maindata'] in queries[]",
+      'src/features/lint-probe/use-queries-fn.ts',
+    ],
+    [
+      'useInfiniteQuery + [...MAINDATA_KEY]',
+      'src/features/lint-probe/use-infinite-fn.ts',
+    ],
   ])('blocks a queryFn override: %s', (_form, file) => {
     expect(messagesOf(file).map((m) => m.message)).toEqual([
       expect.stringContaining('createQueryClient({ fetchMaindata })'),
@@ -547,6 +591,34 @@ describe('AR-39 other key and call forms', () => {
 
   it('allows the registered query function in src/state/maindata.ts', () => {
     expect(messagesOf('src/state/maindata.ts')).toEqual([])
+  })
+
+  it.each([
+    [
+      'setQueryDefaults(MAINDATA_KEY) in a feature',
+      'src/features/lint-probe/set-defaults.ts',
+    ],
+    [
+      "setQueryDefaults(['maindata'] as const) in src/state",
+      'src/state/lint-probe-set-defaults.ts',
+    ],
+  ])('blocks %s', (_form, file) => {
+    expect(messagesOf(file).map((m) => m.message)).toEqual([
+      expect.stringContaining('only createQueryClient'),
+    ])
+  })
+
+  it.each([
+    [
+      "setQueryDefaults(['session'])",
+      'src/features/lint-probe/set-defaults-session.ts',
+    ],
+    [
+      'setQueryDefaults(MAINDATA_KEY) in src/state/query-client.ts',
+      'src/state/query-client.ts',
+    ],
+  ])('allows %s', (_form, file) => {
+    expect(messagesOf(file)).toEqual([])
   })
 })
 
@@ -567,13 +639,34 @@ describe('AR-41 other torrent.state forms', () => {
       'src/features/lint-probe/state-destructure.ts',
     ],
     [
-      "torrent.state === 'error' in src/shared/ui",
-      'src/shared/ui/lint-probe-state.tsx',
+      'const { state } = data.torrents[hash]',
+      'src/features/lint-probe/state-destructure-record.ts',
+    ],
+    [
+      'function word({ state }: SlimTorrent)',
+      'src/features/lint-probe/state-destructure-param.ts',
     ],
   ])('blocks %s', (_form, file) => {
     expect(messagesOf(file).map((m) => m.message)).toEqual([
       expect.stringContaining('classify()'),
     ])
+  })
+
+  it.each([
+    [
+      "sidebar.state === 'collapsed' in src/shared/ui",
+      'src/shared/ui/lint-probe-state.tsx',
+    ],
+    [
+      'const { state } = useSidebar() in src/shared/ui',
+      'src/shared/ui/lint-probe-state-destructure.tsx',
+    ],
+    [
+      'const { state } = useLocation() in a route',
+      'src/routes/-lint-probe-location-state.ts',
+    ],
+  ])('allows a state that is not a torrent: %s', (_form, file) => {
+    expect(messagesOf(file)).toEqual([])
   })
 
   it('allows a lookup by a variable that happens to be called state', () => {
@@ -588,6 +681,7 @@ describe('AD-10 zod only through src/shared/zod.ts outside src/server', () => {
     ['src/lib', 'src/lib/lint-probe-zod.ts'],
     ['a route (zod/v4 subpath)', 'src/routes/-lint-probe-zod.ts'],
     ['src/shared', 'src/shared/lint-probe-zod.ts'],
+    ['a server function file', 'src/server/functions/lint-probe-zod.ts'],
   ])('blocks importing zod from %s', (_name, file) => {
     expect(ruleIds(file)).toContain('no-restricted-imports')
   })
@@ -597,5 +691,29 @@ describe('AD-10 zod only through src/shared/zod.ts outside src/server', () => {
       'no-restricted-imports',
     )
     expect(ruleIds('src/shared/zod.ts')).toEqual([])
+  })
+
+  it.each([
+    [
+      '#/shared/zod in a server function file',
+      'src/server/functions/lint-probe-shared-zod.ts',
+    ],
+    [
+      'zod in a server function test',
+      'src/server/functions/lint-probe-zod.test.ts',
+    ],
+    [
+      'zod in a server function fixture',
+      'src/server/functions/__fixtures__/lint-probe-zod.ts',
+    ],
+  ])('allows %s', (_name, file) => {
+    expect(ruleIds(file)).not.toContain('no-restricted-imports')
+  })
+
+  it('reports a type-only zod import in a server function file', () => {
+    // Pinned so a change in the core rule's handling is noticed.
+    expect(ruleIds('src/server/functions/lint-probe-zod-type.ts')).toContain(
+      'no-restricted-imports',
+    )
   })
 })

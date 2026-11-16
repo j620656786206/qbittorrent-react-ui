@@ -211,6 +211,7 @@ async function callServerFn(
   return {
     status: response.status,
     contentType: response.headers.get('content-type') ?? '',
+    cacheControl: response.headers.get('cache-control'),
     cookies: response.headers.getSetCookie(),
     text,
     result,
@@ -321,6 +322,17 @@ async function checkLoginFlow(base, password) {
     b10.status === 200 && codeOf(b10.result) === 'qbit_unreachable',
     `B10 getMaindata with cookie: ${b10.status} ${JSON.stringify(b10.result)}`,
   )
+  // Per-request answers: no cache may keep them (C1).
+  for (const [what, answer] of [
+    ['B1 getSession', b1],
+    ['B9 getMaindata', b9],
+    ['B10 getMaindata', b10],
+  ]) {
+    check(
+      answer.cacheControl === 'no-store',
+      `${what}: cache-control ${answer.cacheControl ?? 'missing'}`,
+    )
+  }
   check(
     b10.result?.error?.message === QBIT_UNREACHABLE_MESSAGE,
     `B10 getMaindata with cookie: message ${JSON.stringify(b10.result?.error?.message)}`,
@@ -433,6 +445,10 @@ async function checkValidBoot(configDir) {
     const html = await page.text()
     check(page.status === 200, `/: status ${page.status}`)
     noAccessControl(page, '/')
+    check(
+      page.headers.get('cache-control') === 'no-store',
+      `/: cache-control ${page.headers.get('cache-control') ?? 'missing'}`,
+    )
     const csp = page.headers.get('content-security-policy') ?? ''
     const nonce = /'nonce-([^']+)'/.exec(csp)?.[1]
     check(Boolean(nonce), `/: CSP has no nonce (${csp || 'missing'})`)
@@ -464,6 +480,11 @@ async function checkValidBoot(configDir) {
       check(
         response.headers.get('content-security-policy') === STATIC_CSP,
         `${asset}: CSP is not the AR-31 string`,
+      )
+      // The no-store of Start's answers must not reach the hashed assets.
+      check(
+        !/no-store/.test(response.headers.get('cache-control') ?? ''),
+        `${asset}: cache-control is no-store`,
       )
       noAccessControl(response, asset)
     }

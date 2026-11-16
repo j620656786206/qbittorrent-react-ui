@@ -7,19 +7,24 @@ import {
 import { isAppError, isConnectionCode, isLoginStopCode } from '#/lib/app-error'
 import type { AppError, LoginStopReason } from '#/lib/app-error'
 import type { ErrorCode } from '#/shared/errors'
-import { clearConnectionErrors, markConnectionError } from '#/state/connection'
 import {
-  isLoginRequired,
+  clearConnectionErrors,
+  clearUnreachable,
+  markConnectionError,
+} from '#/state/connection'
+import {
   loginStore,
   markLoginRequired,
+  unlessLoginRequired,
 } from '#/state/login-required'
 import { MAINDATA_KEY, maindataQueryDefaults } from '#/state/maindata'
 import type { FetchMaindata } from '#/state/maindata'
 
 // AR-35, AD-9: one QueryClient per router. The global `onError` is the only
 // place that handles the login-stop codes, the connection codes and
-// `bad_origin`. Connection codes are recorded in src/state/connection.ts,
-// which only a successful `['maindata']` fetch clears.
+// `bad_origin`. Connection codes are recorded in src/state/connection.ts;
+// a successful `['maindata']` fetch clears them, and a maindata failure the
+// container answered (any other code) clears the unreachable one.
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -55,16 +60,26 @@ const RETRY_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
 ])
 const MAX_QUERY_RETRIES = 3
 
-/** While the login screen is needed, nothing refetches on its own. */
-const unlessLoginRequired = () => !isLoginRequired()
-
 const MAINDATA_HASH = hashKey(MAINDATA_KEY)
 
 export function createQueryClient({
   currentPath = locationPath,
   fetchMaindata,
 }: CreateQueryClientOptions = {}): QueryClient {
+  // bad_origin repeats on every poll; once per client is enough to see it.
+  let badOriginLogged = false
+
   const onError = (error: unknown, fromMaindata: boolean) => {
+    // The container answered this maindata call: home and qBittorrent are
+    // reachable, whatever else went wrong.
+    if (
+      fromMaindata &&
+      isAppError(error) &&
+      !isConnectionCode(error.code) &&
+      error.code !== 'timeout'
+    ) {
+      clearUnreachable()
+    }
     if (isLoginStop(error)) {
       markLoginRequired(error.code, currentPath())
       void client.cancelQueries()
@@ -81,8 +96,9 @@ export function createQueryClient({
       markConnectionError('qbit_unreachable')
       return
     }
-    if (isAppError(error) && error.code === 'bad_origin') {
+    if (isAppError(error) && error.code === 'bad_origin' && !badOriginLogged) {
       // A programming error (gate rejected our own request), not a user state.
+      badOriginLogged = true
       console.error('bad_origin: the server gate rejected a request', error)
     }
   }
@@ -104,6 +120,7 @@ export function createQueryClient({
           isAppError(error) &&
           RETRY_CODES.has(error.code) &&
           failureCount < MAX_QUERY_RETRIES,
+        // While the login screen is needed, nothing refetches on its own.
         refetchOnWindowFocus: unlessLoginRequired,
         refetchOnReconnect: unlessLoginRequired,
         refetchOnMount: unlessLoginRequired,

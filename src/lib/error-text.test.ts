@@ -16,7 +16,7 @@ const EXPECTED: Record<ErrorCode, string> = {
   timeout: 'qBittorrent 沒有回應，請再試一次',
   invalid_input: '送出的資料格式不對',
   settings_write_failed: '設定檔寫不進去',
-  bad_origin: '請求來源不對',
+  bad_origin: '請求來源不對，要檢查容器的 APP_ORIGINS 設定',
 }
 
 const FAKE_URL = 'http://qbit.test.invalid:8080'

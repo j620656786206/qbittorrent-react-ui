@@ -6,15 +6,15 @@ import {
   LOCK_AFTER_FAILURES,
   LOCK_MS,
   consecutiveFailures,
-  expireLock,
   lockedUntil,
-  resetLoginLockout,
+  recordFailure,
 } from '#/server/auth/login-lockout'
 import {
   REMEMBER_SECONDS,
   SHORT_SECONDS,
   verifySession,
 } from '#/server/auth/session'
+import { resetLoginLockout } from '#/server/auth/testing'
 import { resetEnvCache } from '#/server/env'
 import type * as CredentialsModule from '#/server/auth/credentials'
 
@@ -196,16 +196,43 @@ describe('attemptLogin', () => {
     expect(consecutiveFailures()).toBe(1)
   })
 
-  it('lockedUntil has no side effects; expireLock resets after the lock', () => {
+  it('lockedUntil has no side effects', () => {
     failTimes(5)
     expect(lockedUntil(T0 + LOCK_MS - 1)).toBe(T0 + LOCK_MS)
     expect(lockedUntil(T0 + LOCK_MS)).toBeNull()
+    expect(lockedUntil(T0)).toBe(T0 + LOCK_MS)
     expect(consecutiveFailures()).toBe(5)
-    expireLock(T0 + LOCK_MS - 1)
-    expect(consecutiveFailures()).toBe(5)
-    expireLock(T0 + LOCK_MS)
-    expect(consecutiveFailures()).toBe(0)
-    expect(lockedUntil(T0)).toBeNull()
+  })
+
+  it.each([
+    // [failures before, ms from the last one to the next, result of the next]
+    [4, LOCK_MS - 1, T0 + LOCK_MS - 1 + LOCK_MS],
+    [4, LOCK_MS, null],
+    [5, 1, T0 + LOCK_MS],
+    [5, LOCK_MS - 1, T0 + LOCK_MS],
+    [5, LOCK_MS, null],
+  ])(
+    'recordFailure after %i failures, %i ms later: returns %s',
+    (before, gap, expected) => {
+      for (let i = 0; i < before; i += 1) recordFailure(T0)
+      expect(recordFailure(T0 + gap)).toBe(expected)
+    },
+  )
+
+  it('failures older than 15 minutes are forgotten', () => {
+    failTimes(4)
+    vi.setSystemTime(T0 + LOCK_MS)
+    expect(attemptLogin(wrong)).toEqual({ ok: false, code: 'login_failed' })
+    expect(consecutiveFailures()).toBe(1)
+  })
+
+  it('failures spaced under 15 minutes apart still add up to the lock', () => {
+    for (let i = 0; i < LOCK_AFTER_FAILURES; i += 1) {
+      vi.setSystemTime(T0 + i * (LOCK_MS - 1))
+      attemptLogin(wrong)
+    }
+    const lastAt = T0 + (LOCK_AFTER_FAILURES - 1) * (LOCK_MS - 1)
+    expect(lockedUntil(lastAt)).toBe(lastAt + LOCK_MS)
   })
 
   it('a successful login logs login_succeeded with the time only', () => {

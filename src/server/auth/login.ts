@@ -1,8 +1,6 @@
 import { credentialsMatch } from '#/server/auth/credentials'
 import {
-  LOCK_MS,
   consecutiveFailures,
-  expireLock,
   lockedUntil,
   recordFailure,
   recordSuccess,
@@ -24,7 +22,6 @@ const iso = (ms: number) => new Date(ms).toISOString()
 export function attemptLogin(input: LoginInput): LoginAttempt {
   const now = Date.now()
 
-  expireLock(now)
   const until = lockedUntil(now)
   if (until !== null) {
     // Locked: the credentials are not even compared, and the lock is not extended.
@@ -33,8 +30,9 @@ export function attemptLogin(input: LoginInput): LoginAttempt {
   }
 
   if (!credentialsMatch(input.username, input.password, getEnv())) {
-    if (recordFailure(now)) {
-      log.warn('login_locked', { until: iso(now + LOCK_MS) })
+    const lockEnd = recordFailure(now)
+    if (lockEnd !== null) {
+      log.warn('login_locked', { until: iso(lockEnd) })
       return { ok: false, code: 'login_locked' }
     }
     log.warn('login_failed', { consecutiveFailures: consecutiveFailures() })

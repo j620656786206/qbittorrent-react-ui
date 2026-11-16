@@ -112,6 +112,7 @@ export interface FakeCall {
   headers: Headers
   body: string
   signal: AbortSignal | null
+  redirect: RequestRedirect
 }
 
 type Handler = (call: FakeCall) => Response | Promise<Response>
@@ -140,6 +141,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
         headers: new Headers(init?.headers),
         body: body instanceof URLSearchParams ? body.toString() : '',
         signal: init?.signal ?? null,
+        redirect: init?.redirect ?? 'follow',
       }
       calls.push(call)
       const handler = handlers[url.pathname]

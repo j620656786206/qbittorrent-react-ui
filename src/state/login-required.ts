@@ -38,6 +38,9 @@ export function isLoginRequired(): boolean {
   return loginStore.state.loginRequired !== null
 }
 
+/** For Query's `enabled` / `refetchOn*`: nothing fetches while login is required. */
+export const unlessLoginRequired = (): boolean => !isLoginRequired()
+
 /**
  * Calls `listener` each time the store goes from `null` to set (not when the
  * reason changes while it is already set). Returns the unsubscribe function.

@@ -56,6 +56,9 @@ export function LoginScreen({ redirect }: LoginScreenProps) {
 
   const mutation = useMutation({
     mutationFn: (values: LoginInput) => callFn(login, values),
+    // The variables hold the plain password: drop the settled mutation at
+    // once instead of keeping it in the MutationCache for 5 minutes.
+    gcTime: 0,
     onSuccess: (data) => {
       completeLogin({
         data,
@@ -67,9 +70,10 @@ export function LoginScreen({ redirect }: LoginScreenProps) {
     onError: (error) => {
       const code: ErrorCode = isAppError(error) ? error.code : 'qbit_rejected'
       setSubmitError(code)
-      const effect = afterSubmitError(code)
-      if (effect.clearPassword) setPassword('')
-      if (effect.focusPassword) passwordRef.current?.focus()
+      if (afterSubmitError(code).wrongCredentials) {
+        setPassword('')
+        passwordRef.current?.focus()
+      }
     },
     onSettled: () => {
       inFlightRef.current = false
@@ -131,6 +135,7 @@ export function LoginScreen({ redirect }: LoginScreenProps) {
               name="username"
               autoComplete="username"
               autoCapitalize="none"
+              autoCorrect="off"
               spellCheck={false}
               value={username}
               onChange={(event) => setUsername(event.target.value)}
@@ -150,6 +155,9 @@ export function LoginScreen({ redirect }: LoginScreenProps) {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 autoCapitalize="none"
+                // Shown as text, iOS could autocorrect it, and the wrong
+                // attempt would count toward the global lock.
+                autoCorrect="off"
                 spellCheck={false}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}

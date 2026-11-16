@@ -20,7 +20,8 @@ import {
 import type { FakeQbitRoutes } from '#/server/qbit/testing'
 
 // Spec 1.5 rows Q1 to Q9 plus the review fixes (one deadline per send, the
-// re-login cooldown, login 401): the in-memory qBittorrent session.
+// re-login cooldown, login 401, the login's own deadline, no redirects): the
+// in-memory qBittorrent session.
 
 const LOGIN = '/api/v2/auth/login'
 const MAINDATA = '/api/v2/sync/maindata'
@@ -150,22 +151,24 @@ describe('qBittorrent session', () => {
     expect(count(MAINDATA)).toBe(0)
   })
 
+  it('login answered 401 (Origin, Referer or Host check failed): breaker opens as login_unauthorized', async () => {
+    const { sync, count } = setup({
+      login: () => new Response('Unauthorized', { status: 401 }),
+      maindata: okBody,
+    })
+    await expect(sync()).rejects.toEqual(failure('qbit_auth_failed'))
+    expect(out.events('qbit_breaker_open')).toEqual([
+      expect.objectContaining({ level: 'error', reason: 'login_unauthorized' }),
+    ])
+    await expect(sync()).rejects.toEqual(failure('qbit_auth_failed'))
+    expect(count(LOGIN)).toBe(1)
+  })
+
   it.each([
-    ['401', () => new Response('Unauthorized', { status: 401 }), true, 401],
-    ['502', () => new Response('Bad Gateway', { status: 502 }), false, 502],
-    ['an unexpected 2xx body', () => new Response('Hmm.'), false, 200],
-  ])('login answered %s', async (_name, answer, breaker, status) => {
+    ['502', () => new Response('Bad Gateway', { status: 502 }), 502],
+    ['an unexpected 2xx body', () => new Response('Hmm.'), 200],
+  ])('login answered %s', async (_name, answer, status) => {
     const { sync, count } = setup({ login: answer, maindata: okBody })
-    if (breaker) {
-      // A wrong password answered 401 is the same as `Fails.`.
-      await expect(sync()).rejects.toEqual(failure('qbit_auth_failed'))
-      expect(out.events('qbit_breaker_open')).toEqual([
-        expect.objectContaining({ reason: 'login_failed' }),
-      ])
-      await expect(sync()).rejects.toEqual(failure('qbit_auth_failed'))
-      expect(count(LOGIN)).toBe(1)
-      return
-    }
     await expect(sync()).rejects.toEqual(failure('qbit_rejected'))
     expect(out.events('qbit_breaker_open')).toHaveLength(0)
     expect(out.events('qbit_bad_response')).toEqual([
@@ -255,9 +258,11 @@ describe('qBittorrent session', () => {
       expect.objectContaining({ path: MAINDATA, status: 403 }),
     ])
     expect(out.events('qbit_breaker_open')).toHaveLength(0)
+    // The refused cookie is gone: inside the cooldown nothing is sent.
     const before = count(MAINDATA)
     await expect(sync()).rejects.toEqual(failure('qbit_rejected'))
-    expect(count(MAINDATA)).toBeGreaterThan(before)
+    expect(count(MAINDATA)).toBe(before)
+    expect(count(LOGIN)).toBe(2)
   })
 
   it('Q5 403 right after the initial login: qbit_rejected with one login', async () => {
@@ -266,11 +271,13 @@ describe('qBittorrent session', () => {
     expect(count(LOGIN)).toBe(1)
   })
 
-  it('after a 403 that follows a fresh login, a 403 skips re-login for 60 s', async () => {
+  it('after a 403 that follows a fresh login: the cookie is dropped, nothing is sent for 60 s, then one login', async () => {
     let primed = false
-    const { sync, count, advance } = setup({
+    let healed = false
+    const { sync, count, calls, advance } = setup({
       login: loginSequence(() => loginOk(NEW)),
-      maindata: () => {
+      maindata: (call) => {
+        if (healed && call.headers.get('cookie') === NEW) return okBody()
         if (primed) return forbidden()
         primed = true
         return okBody()
@@ -284,12 +291,48 @@ describe('qBittorrent session', () => {
     const maindataBefore = count(MAINDATA)
     await expect(sync()).rejects.toEqual(failure('qbit_rejected'))
     expect(count(LOGIN)).toBe(2)
-    expect(count(MAINDATA)).toBe(maindataBefore + 1)
+    expect(count(MAINDATA)).toBe(maindataBefore)
 
+    // After the cooldown: exactly one login, and its cookie is what is sent.
     advance(1)
     await expect(sync()).rejects.toEqual(failure('qbit_rejected'))
     expect(count(LOGIN)).toBe(3)
+    expect(count(MAINDATA)).toBe(maindataBefore + 1)
     expect(out.events('qbit_breaker_open')).toHaveLength(0)
+
+    // qBittorrent accepts again: after the next cooldown it recovers.
+    healed = true
+    advance(RELOGIN_COOLDOWN_MS)
+    await expect(sync()).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(4)
+    expect(calls.at(-1)?.headers.get('cookie')).toBe(NEW)
+    await expect(sync()).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(4)
+  })
+
+  it('a 403 after a fresh login keeps a newer cookie another call stored', async () => {
+    let holdNext = true
+    const release = deferred<undefined>()
+    const { sync, count } = setup({
+      login: loginSequence(),
+      maindata: async (call) => {
+        if (holdNext) {
+          holdNext = false
+          await release.promise
+        }
+        // qBittorrent only knows NEW: OLD is refused from the start.
+        return call.headers.get('cookie') === NEW ? okBody() : forbidden()
+      },
+    })
+    const first = sync() // logs in (OLD), its answer is held
+    await vi.waitFor(() => expect(count(MAINDATA)).toBe(1))
+    await sync() // 403 for OLD, re-login stores NEW, resend ok
+    expect(count(LOGIN)).toBe(2)
+    release.resolve(undefined) // the held answer: 403 right after a login
+    await expect(first).rejects.toEqual(failure('qbit_rejected'))
+    // NEW survives the cooldown that started: it is still sent.
+    await expect(sync()).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(2)
   })
 
   it.each([
@@ -478,4 +521,104 @@ describe('qBittorrent session', () => {
     await vi.advanceTimersByTimeAsync(10_000)
     expect(await joined).toEqual(failure('timeout'))
   })
+
+  it('a re-login outlives the deadline of the caller that started it, and a joiner gets its cookie', async () => {
+    vi.useFakeTimers()
+    let valid = OLD
+    let slowNext = false
+    const { sync, count, calls } = setup({
+      // Like a real fetch, the login gives up when its signal aborts.
+      login: (call) => {
+        if (count(LOGIN) === 1) return loginOk(OLD)
+        return new Promise<Response>((resolve, reject) => {
+          setTimeout(() => resolve(loginOk(NEW)), 10_000)
+          call.signal?.addEventListener('abort', () =>
+            reject(new Error('aborted')),
+          )
+        })
+      },
+      maindata: (call) => {
+        const answer = () =>
+          call.headers.get('cookie') === valid ? okBody() : forbidden()
+        if (!slowNext) return answer()
+        slowNext = false
+        return new Promise<Response>((resolve) => {
+          setTimeout(() => resolve(answer()), 20_000)
+        })
+      },
+    })
+    await sync() // stores OLD
+    valid = NEW
+    slowNext = true
+    // The leader's request takes 20 s, then its 403 starts the re-login with
+    // 5 s of its own deadline left. The login itself needs 10 s.
+    const leader = sync().then(
+      () => 'resolved',
+      (error: unknown) => error,
+    )
+    await vi.advanceTimersByTimeAsync(21_000)
+    expect(count(LOGIN)).toBe(2)
+    const joiner = sync()
+    await vi.advanceTimersByTimeAsync(QBIT_DEADLINE_MS - 21_000)
+    expect(await leader).toEqual(failure('timeout'))
+    await vi.advanceTimersByTimeAsync(5_000)
+    await expect(joiner).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(2)
+    expect(calls.at(-1)?.headers.get('cookie')).toBe(NEW)
+  })
+
+  it('a caller whose deadline passed before its re-login starts no login', async () => {
+    vi.useFakeTimers()
+    let primed = false
+    const { sync, count } = setup({
+      maindata: () => {
+        if (!primed) {
+          primed = true
+          return okBody()
+        }
+        // Answers 403 only once the caller's deadline has fired.
+        return new Promise<Response>((resolve) => {
+          setTimeout(() => resolve(forbidden()), QBIT_DEADLINE_MS)
+        })
+      },
+    })
+    await sync()
+    const settled = sync().then(
+      () => 'resolved',
+      (error: unknown) => error,
+    )
+    await vi.advanceTimersByTimeAsync(QBIT_DEADLINE_MS)
+    expect(await settled).toEqual(failure('timeout'))
+    expect(count(LOGIN)).toBe(1)
+  })
+
+  it.each([
+    ['login', 307],
+    ['login', 308],
+    ['maindata', 302],
+  ] as const)(
+    '%s answered %i: not followed, qbit_rejected, breaker closed',
+    async (route, status) => {
+      const redirect = () =>
+        new Response(null, {
+          status,
+          headers: { location: 'http://elsewhere.test.invalid/' },
+        })
+      const { sync, calls } = setup(
+        route === 'login'
+          ? { login: redirect, maindata: okBody }
+          : { maindata: redirect },
+      )
+      await expect(sync()).rejects.toEqual(failure('qbit_rejected'))
+      const path = route === 'login' ? LOGIN : MAINDATA
+      expect(calls.at(-1)?.path).toBe(path)
+      expect(calls.every((call) => call.redirect === 'manual')).toBe(true)
+      const lines = out.events('qbit_bad_response')
+      expect(lines).toEqual([
+        expect.objectContaining({ path, status, reason: 'redirect' }),
+      ])
+      for (const line of out.lines) expect(line).not.toContain('elsewhere')
+      expect(out.events('qbit_breaker_open')).toHaveLength(0)
+    },
+  )
 })

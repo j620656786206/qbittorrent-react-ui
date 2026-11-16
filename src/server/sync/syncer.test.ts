@@ -16,7 +16,8 @@ import {
 import { MIN_PULL_INTERVAL_MS, createSyncer } from '#/server/sync/syncer'
 import { TOMBSTONE_MS } from '#/server/sync/torrent-table'
 
-// Spec 1.5 rows S1, S7 to S10 and G1 to G6 through `read()`.
+// Spec 1.5 rows S1, S7 to S10 and G1 to G6 through `read()`, plus the
+// review rows F1 to F5 for `fresh` reads (refreshMaindata).
 
 const ID = 'abcdef12'
 const raw = (value: unknown): RawMaindata => rawMaindataSchema.parse(value)
@@ -336,5 +337,97 @@ describe('syncer', () => {
     slow.resolve(raw(fullMaindata()))
     await Promise.all([a, b])
     expect(syncMaindata).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('fresh reads', () => {
+  it('F1 within 1 s of a pull: pulls again instead of reusing it', async () => {
+    const { syncer, syncMaindata, queue, advance } = setup([
+      raw(fullMaindata({ rid: 5 })),
+    ])
+    const first = await syncer.read()
+    advance(500)
+    queue.push(raw({ rid: 6, torrents: { [HASH_A]: { progress: 0.9 } } }))
+    const fresh = await syncer.read(first.version, { fresh: true })
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+    expect(syncMaindata).toHaveBeenLastCalledWith(5)
+    expect(fresh.changed).toEqual([
+      expect.objectContaining({ hash: HASH_A, progress: 0.9 }),
+    ])
+  })
+
+  it('F2 a pull in flight from before the read is waited out, then a new one runs', async () => {
+    const slow = deferred<RawMaindata>()
+    const { syncer, syncMaindata, queue } = setup([slow.promise])
+    const plain = syncer.read()
+    const fresh = syncer.read(undefined, { fresh: true })
+    // Only the old pull so far: never two at once.
+    expect(syncMaindata).toHaveBeenCalledTimes(1)
+    queue.push(raw({ rid: 2, torrents: { [HASH_A]: { progress: 0.9 } } }))
+    slow.resolve(raw(fullMaindata({ rid: 1 })))
+    await plain
+    const answer = await fresh
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+    expect(syncMaindata).toHaveBeenLastCalledWith(1)
+    expect(answer.changed).toContainEqual(
+      expect.objectContaining({ hash: HASH_A, progress: 0.9 }),
+    )
+  })
+
+  it('F3 fresh reads waiting together share the one new pull', async () => {
+    const slow = deferred<RawMaindata>()
+    const { syncer, syncMaindata } = setup([slow.promise])
+    void syncer.read()
+    const a = syncer.read(undefined, { fresh: true })
+    const b = syncer.read(undefined, { fresh: true })
+    slow.resolve(raw(fullMaindata({ rid: 1 })))
+    const [ra, rb] = await Promise.all([a, b])
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+    expect(ra.version).toBe(rb.version)
+  })
+
+  it('F4 a fresh read does not join a pull that started before it arrived', async () => {
+    const first = deferred<RawMaindata>()
+    const second = deferred<RawMaindata>()
+    const { syncer, syncMaindata, queue } = setup([first.promise])
+    void syncer.read()
+    const a = syncer.read(undefined, { fresh: true })
+    queue.push(second.promise)
+    first.resolve(raw(fullMaindata({ rid: 1 })))
+    await vi.waitFor(() => expect(syncMaindata).toHaveBeenCalledTimes(2))
+    // Arrives while a's pull is in flight: needs a third.
+    const b = syncer.read(undefined, { fresh: true })
+    second.resolve(raw({ rid: 2 }))
+    await a
+    await b
+    expect(syncMaindata).toHaveBeenCalledTimes(3)
+  })
+
+  it('F5 a failed pull inside the 1 s window is not rethrown to a fresh read', async () => {
+    const { syncer, syncMaindata, queue } = setup([
+      new ServerFailure('qbit_unreachable'),
+    ])
+    await expect(syncer.read()).rejects.toEqual(failure('qbit_unreachable'))
+    queue.push(raw(fullMaindata()))
+    await expect(
+      syncer.read(undefined, { fresh: true }),
+    ).resolves.toMatchObject({ full: true })
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+  })
+
+  it('F2 a failed pull from before the read is waited out without failing it', async () => {
+    const gate = deferred<undefined>()
+    const { syncer, syncMaindata, queue } = setup([
+      gate.promise.then((): RawMaindata => {
+        throw new ServerFailure('timeout')
+      }),
+    ])
+    const plain = syncer.read()
+    const fresh = syncer.read(undefined, { fresh: true })
+    queue.push(raw(fullMaindata()))
+    gate.resolve(undefined)
+    await expect(plain).rejects.toEqual(failure('timeout'))
+    await expect(fresh).resolves.toMatchObject({ full: true })
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
   })
 })

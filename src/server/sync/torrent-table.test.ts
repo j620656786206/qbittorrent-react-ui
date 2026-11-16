@@ -9,7 +9,11 @@ import {
   fullMaindata,
   rawTorrent,
 } from '#/server/qbit/testing'
-import { TOMBSTONE_MS, createTorrentTable } from '#/server/sync/torrent-table'
+import {
+  SEEDING_TIME_STEP_S,
+  TOMBSTONE_MS,
+  createTorrentTable,
+} from '#/server/sync/torrent-table'
 import { TORRENT_FIELDS } from '#/shared/maindata'
 
 // Spec 1.5 rows S1 to S7, S11 and the G1 to G6 rules at table level.
@@ -295,6 +299,65 @@ describe('torrent table', () => {
     )
     expect(byHash).toEqual({ [HASH_A]: false, [HASH_B]: true, [HASH_C]: null })
   })
+
+  it('a new torrent without private (no metadata yet) is kept with private null', () => {
+    const { private: _left, ...noPrivate } = rawTorrent({ name: 'D' })
+    const fresh = createTorrentTable(() => 0)
+    fresh.apply(raw(fullMaindata({ torrents: { [HASH_D]: noPrivate } })))
+    expect(fresh.changesSince(null).changed).toEqual([
+      expect.objectContaining({ hash: HASH_D, private: null }),
+    ])
+
+    const { table } = setup()
+    table.apply(raw({ rid: 2, torrents: { [HASH_D]: noPrivate } }))
+    expect(table.changesSince(1).changed).toEqual([
+      expect.objectContaining({ hash: HASH_D, private: null }),
+    ])
+    // A later delta without `private` keeps what is stored.
+    table.apply(raw({ rid: 3, torrents: { [HASH_B]: { progress: 0.9 } } }))
+    expect(table.changesSince(2).changed).toEqual([
+      expect.objectContaining({ hash: HASH_B, private: true }),
+    ])
+  })
+
+  it('an unknown connection_status from qBittorrent is stored as disconnected', () => {
+    const { table } = setup()
+    table.apply(
+      raw({ rid: 2, server_state: { connection_status: 'fake-new-status' } }),
+    )
+    expect(table.serverState.connection_status).toBe('disconnected')
+    table.apply(raw({ rid: 3, server_state: { dl_info_speed: 1 } }))
+    expect(table.serverState.connection_status).toBe('disconnected')
+    table.apply(
+      raw({ rid: 4, server_state: { connection_status: 'connected' } }),
+    )
+    expect(table.serverState.connection_status).toBe('connected')
+  })
+
+  it.each([
+    // [stored seeding_time, next seeding_time, changed?]
+    [600, 659, false],
+    [600, 660, true],
+    [659, 600, false],
+    [0, 59, false],
+  ])(
+    'seeding_time is floored to whole minutes: %i then %i, changed %s',
+    (from, to, changed) => {
+      const { table } = setup()
+      table.apply(
+        raw({ rid: 2, torrents: { [HASH_A]: { seeding_time: from } } }),
+      )
+      const version = table.version
+      table.apply(raw({ rid: 3, torrents: { [HASH_A]: { seeding_time: to } } }))
+      expect(table.version).toBe(changed ? version + 1 : version)
+      const stored = table
+        .changesSince(null)
+        .changed.find((t) => t.hash === HASH_A)?.seeding_time
+      expect(stored).toBe(
+        Math.floor(to / SEEDING_TIME_STEP_S) * SEEDING_TIME_STEP_S,
+      )
+    },
+  )
 
   it('G1 no counter: full, every torrent, nothing removed', () => {
     const { table } = setup()

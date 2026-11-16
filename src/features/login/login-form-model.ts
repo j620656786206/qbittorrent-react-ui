@@ -5,13 +5,25 @@ import type { LoginRequired } from '#/state/login-required'
 // Spec 1.4 rows F1 to F5: what the login form does with a result. Pure, so it
 // is tested in node; focus and layout are checked in the browser.
 
-/** Codes shown under the password field (UX-DR59). Connection codes are left to the global onError. */
+/**
+ * Codes shown under the password field (UX-DR59). Other connection codes are
+ * left to the global onError and story 1.7's alert bar. `bad_origin` is shown
+ * here because nothing else shows it on this screen: a wrong `APP_ORIGINS`
+ * would otherwise make the button do nothing.
+ */
 export const INLINE_ERROR_CODES = [
   'login_failed',
   'login_locked',
   'invalid_input',
   'qbit_rejected',
   'timeout',
+  'bad_origin',
+] as const satisfies ReadonlyArray<ErrorCode>
+
+/** The inline codes that mean the typed credentials were not accepted. */
+export const WRONG_CREDENTIAL_CODES = [
+  'login_failed',
+  'login_locked',
 ] as const satisfies ReadonlyArray<ErrorCode>
 
 /** EXPERIENCE "送出中": after 10 s show 「還在等 NAS 回應」. */
@@ -24,15 +36,20 @@ export function isInlineErrorCode(code: ErrorCode): boolean {
 export interface SubmitErrorEffect {
   /** Text for the message slot, or `null` when the form shows nothing. */
   message: string | null
-  clearPassword: boolean
-  focusPassword: boolean
+  /**
+   * Clear and focus the password, and mark it invalid. Only for a wrong
+   * login; after a timeout or server error the typed password is kept.
+   */
+  wrongCredentials: boolean
 }
 
 export function afterSubmitError(code: ErrorCode): SubmitErrorEffect {
-  if (!isInlineErrorCode(code)) {
-    return { message: null, clearPassword: false, focusPassword: false }
+  return {
+    message: isInlineErrorCode(code) ? errorText(code) : null,
+    wrongCredentials: (
+      WRONG_CREDENTIAL_CODES as ReadonlyArray<ErrorCode>
+    ).includes(code),
   }
-  return { message: errorText(code), clearPassword: true, focusPassword: true }
 }
 
 export interface ScreenMessage {
@@ -55,8 +72,10 @@ export function screenMessage({
   loginRequired: LoginRequired | null
 }): ScreenMessage | null {
   if (submitError !== null) {
-    const { message } = afterSubmitError(submitError)
-    if (message !== null) return { text: message, passwordInvalid: true }
+    const { message, wrongCredentials } = afterSubmitError(submitError)
+    if (message !== null) {
+      return { text: message, passwordInvalid: wrongCredentials }
+    }
   }
   if (loginRequired?.reason === 'qbit_auth_failed') {
     return { text: errorText('qbit_auth_failed'), passwordInvalid: true }

@@ -23,6 +23,7 @@ import {
   MAINDATA_KEY,
   assertMaindataRegistered,
   bindFetchMaindata,
+  getMaindataFetchStartedAt,
   refreshMaindata,
 } from '#/state/maindata'
 import type { FetchMaindata } from '#/state/maindata'
@@ -385,6 +386,37 @@ describe('the maindata query', () => {
 
     await refreshMaindata(client)
     expect(fetchMaindata).toHaveBeenCalledTimes(2)
+    expect(fetchMaindata.mock.calls[0][2]).toEqual({ fresh: false })
+    expect(fetchMaindata.mock.calls[1][2]).toEqual({ fresh: true })
+
+    // Polling after the refresh asks the normal way again.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(fetchMaindata).toHaveBeenCalledTimes(3)
+    expect(fetchMaindata.mock.calls[2][2]).toEqual({ fresh: false })
+  })
+
+  it('Q5 the refresh that replaces a call in flight asks for fresh', async () => {
+    const pending = hanging()
+    const fetchMaindata = fakeFetch([ok, pending.step, ok])
+    const { client, observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(fetchMaindata.mock.calls[1][2]).toEqual({ fresh: false })
+    await refreshMaindata(client)
+    expect(fetchMaindata).toHaveBeenCalledTimes(3)
+    expect(fetchMaindata.mock.calls[2][2]).toEqual({ fresh: true })
+  })
+
+  it('Q6 bad_origin on every poll is logged only once', async () => {
+    const fetchMaindata = fakeFetch([ok, fail('bad_origin')])
+    const { observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(21_000)
+    expect(fetchMaindata).toHaveBeenCalledTimes(5)
+    const logs = consoleError.mock.calls.filter((args) =>
+      String(args[0]).includes('bad_origin'),
+    )
+    expect(logs).toHaveLength(1)
   })
 
   it('Q6 bad_origin is logged once and touches neither store', async () => {
@@ -402,7 +434,93 @@ describe('the maindata query', () => {
   })
 })
 
+describe('the fetch start time (for the stale line)', () => {
+  it('is set while a call is in flight and cleared when it settles', async () => {
+    const pending = hanging()
+    const fetchMaindata = fakeFetch([ok, pending.step])
+    const { observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(getMaindataFetchStartedAt()).toBeNull()
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    const startedAt = Date.now()
+    expect(getMaindataFetchStartedAt()).toBe(startedAt)
+    // Still the start time while the call hangs.
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(getMaindataFetchStartedAt()).toBe(startedAt)
+
+    pending.resolve(answer())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(getMaindataFetchStartedAt()).toBeNull()
+  })
+
+  it('a cancelled call settling late does not clear its replacement', async () => {
+    const first = hanging()
+    const second = hanging()
+    const fetchMaindata = fakeFetch([ok, first.step, second.step])
+    const { client, observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(1_000)
+    void refreshMaindata(client)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(first.signal()?.aborted).toBe(true)
+    expect(getMaindataFetchStartedAt()).toBe(Date.now())
+    second.resolve(answer())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(getMaindataFetchStartedAt()).toBeNull()
+  })
+})
+
 describe('the connection store', () => {
+  it('D1 the latest unreachable code replaces the other; Cloudflare stays; an answered failure clears unreachable', async () => {
+    const fetchMaindata = fakeFetch([
+      ok,
+      fail('home_unreachable'),
+      fail('qbit_unreachable'),
+      fail('home_unreachable'),
+      fail('qbit_rejected'),
+      ok,
+    ])
+    const { client, observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(connectionStore.state.errors).toEqual(['home_unreachable'])
+
+    // The phone has signal again but qBittorrent hangs.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(connectionStore.state.errors).toEqual(['qbit_unreachable'])
+
+    await mutateFailing(client, 'cloudflare_expired')
+    expect(connectionStore.state.errors).toEqual([
+      'cloudflare_expired',
+      'qbit_unreachable',
+    ])
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(connectionStore.state.errors).toEqual([
+      'cloudflare_expired',
+      'home_unreachable',
+    ])
+
+    // The container answered (qbit_rejected): reachable, Cloudflare kept.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(connectionStore.state.errors).toEqual(['cloudflare_expired'])
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(connectionStore.state.errors).toEqual([])
+  })
+
+  it('D1 a failed mutation with another code does not clear unreachable', async () => {
+    const fetchMaindata = fakeFetch([ok, fail('home_unreachable')])
+    const { client, observe } = setup(fetchMaindata)
+    observe()
+    await vi.advanceTimersByTimeAsync(5_000)
+    await mutateFailing(client, 'qbit_rejected')
+    expect(connectionStore.state.errors).toEqual(['home_unreachable'])
+  })
+
   it('only a maindata success clears it', async () => {
     const fetchMaindata = fakeFetch([ok, fail('cloudflare_expired')])
     const { client, observe } = setup(fetchMaindata)
@@ -512,10 +630,13 @@ describe('bindFetchMaindata (the production binding)', () => {
     const inFlight = requests[2].signal
     expect(inFlight?.aborted).toBe(false)
 
+    expect(sentInput(requests[2].url)).not.toContain('fresh')
+
     await refreshMaindata(client)
     expect(inFlight?.aborted).toBe(true)
     expect(requests).toHaveLength(4)
     expect(sentInput(requests[3].url)).toContain(`${ID}.2`)
+    expect(sentInput(requests[3].url)).toContain('fresh')
     expect(observer.getCurrentResult().data?.version).toBe(`${ID}.3`)
   })
 })

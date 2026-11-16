@@ -5,6 +5,7 @@ import {
   serverStateSchema,
   slimTorrentSchema,
 } from '#/shared/maindata'
+import type { ServerState } from '#/shared/maindata'
 
 // The raw `sync/maindata` answer of qBittorrent 5.1.4, limited to what the
 // table reads. Parsing strips every other key, so this schema is the
@@ -15,6 +16,16 @@ import {
 /** A maindata key is the torrent id: lowercased, then a 40 or 64 hex hash. */
 const torrentHash = z.string().toLowerCase().refine(isTorrentHash)
 
+const connectionStatus = serverStateSchema.shape.connection_status
+
+/** A status this app does not know (a newer qBittorrent) reads as `disconnected`; the client logs it. */
+export function knownConnectionStatus(
+  value: string,
+): ServerState['connection_status'] {
+  const known = connectionStatus.safeParse(value)
+  return known.success ? known.data : 'disconnected'
+}
+
 export const rawMaindataSchema = z.object({
   rid: z.number().int(),
   full_update: z.boolean().optional(),
@@ -24,7 +35,10 @@ export const rawMaindataSchema = z.object({
   torrents_removed: z.array(torrentHash).optional(),
   categories: z.record(z.string(), categorySchema.partial()).optional(),
   categories_removed: z.array(z.string()).optional(),
-  server_state: serverStateSchema.partial().optional(),
+  server_state: serverStateSchema
+    .extend({ connection_status: z.string().transform(knownConnectionStatus) })
+    .partial()
+    .optional(),
 })
 
 export type RawMaindata = z.infer<typeof rawMaindataSchema>
