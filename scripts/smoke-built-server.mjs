@@ -5,7 +5,8 @@
 //    Then calls the real `getSession` and `login` server functions through
 //    Start's handler (spec 1.4 rows B1 to B6): the gate's session context,
 //    not_logged_in as HTTP 200, the `rt_session` cookie flags and a foreign
-//    Origin.
+//    Origin. B7 and B8 (epic 1 review): a forged payload.context.session and
+//    the 64 KB body cap without a session. Also that /_shell.html is not served.
 // 2. Boots without SESSION_SECRET and checks it refuses to start.
 // Never talks to a real qBittorrent: QBIT_URL is a .invalid host.
 import { spawn } from 'node:child_process'
@@ -157,7 +158,7 @@ function serverFnIds(names) {
 async function callServerFn(
   base,
   id,
-  { method, data, origin = base, cookie, headers: extra = {} },
+  { method, data, context, origin = base, cookie, headers: extra = {} },
 ) {
   const headers = {
     Host: new URL(base).host,
@@ -170,8 +171,10 @@ async function callServerFn(
   Object.assign(headers, extra)
   let url = `${base}${SERVER_FN_BASE}${id}`
   let body
-  if (data !== undefined) {
-    const payload = JSON.stringify(await toJSONAsync({ data }))
+  if (data !== undefined || context !== undefined) {
+    // `context` is what a client may put in payload.context; Start merges it
+    // under the request middleware's context.
+    const payload = JSON.stringify(await toJSONAsync({ data, context }))
     if (method === 'GET') url += `?${new URLSearchParams({ payload })}`
     else {
       body = payload
@@ -326,6 +329,27 @@ async function checkLoginFlow(base, password) {
     `B6 login foreign Origin: ${JSON.stringify(b6Post.result)}`,
   )
   check(b6Post.cookies.length === 0, 'B6 login foreign Origin: sent Set-Cookie')
+
+  // B7: a session forged in the client's payload.context logs no one in.
+  const b7 = await getSession({
+    context: { session: { iat: 1, exp: 9_999_999_999 } },
+  })
+  check(
+    b7.status === 200 && codeOf(b7.result) === 'not_logged_in',
+    `B7 getSession with a forged context.session: ${b7.status} ${JSON.stringify(b7.result)}`,
+  )
+
+  // B8: without a session the gate caps the body at 64 KB before Start reads it.
+  const b8 = await login({
+    username: 'x'.repeat(70_000),
+    password: 'y',
+    remember: false,
+  })
+  check(
+    b8.status === 413 && codeOf(b8.result) === 'invalid_input',
+    `B8 login with a 70 KB body: ${b8.status} ${JSON.stringify(b8.result)}`,
+  )
+  check(b8.cookies.length === 0, 'B8 login with a 70 KB body: sent Set-Cookie')
 }
 
 async function checkValidBoot(configDir) {
@@ -383,6 +407,13 @@ async function checkValidBoot(configDir) {
       )
       noAccessControl(response, asset)
     }
+
+    // SPA mode leaves the prerendered shell in .output/public. Its inline
+    // scripts carry a build-time nonce, so it must never be served as a page;
+    // if a Nitro or Start upgrade starts serving it, give it the static CSP.
+    const shell = await fetch(`${base}/_shell.html`)
+    await shell.arrayBuffer()
+    check(shell.status === 404, `/_shell.html: served (status ${shell.status})`)
 
     // The login page is client-rendered (ssr: false) and needs no inline style.
     const loginPage = await fetch(`${base}/login`)

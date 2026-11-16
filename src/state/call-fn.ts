@@ -116,7 +116,9 @@ export async function callFn<TFn extends AnyServerFn>(
   const guardedFetch: CustomFetch = async (url, init) => {
     let response: Response
     try {
-      response = await globalThis.fetch(url, init)
+      // Manual: a followed Cloudflare Access redirect would fail on CORS and
+      // look like `home_unreachable`; classifyResponse sees it instead.
+      response = await globalThis.fetch(url, { ...init, redirect: 'manual' })
     } catch (error) {
       if (caller?.aborted) throw caller.reason
       // Network failure or our own timeout.

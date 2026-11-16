@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ERROR_TEXT, errorText } from '#/lib/error-text'
-import { ERROR_CODES, ERROR_MESSAGES } from '#/shared/errors'
+import { ERROR_CODES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
 
 // Spec 1.3 matrix row 17: the screen text table from the spec's Design Notes.
@@ -29,13 +29,6 @@ describe('errorText', () => {
   it('covers exactly the 12 error codes', () => {
     expect(Object.keys(ERROR_TEXT).sort()).toEqual([...ERROR_CODES].sort())
   })
-
-  it.each(ERROR_CODES.map((code) => [code]))(
-    'ERROR_MESSAGES.%s matches the screen text',
-    (code) => {
-      expect(ERROR_MESSAGES[code]).toBe(errorText(code))
-    },
-  )
 
   it.each(ERROR_CODES.map((code) => [code]))('%s', (code) => {
     const text = errorText(code)

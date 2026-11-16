@@ -2,21 +2,26 @@ import { describe, expect, it } from 'vitest'
 import { GUARDED } from './_define'
 import type { Guarded } from './_define'
 
-// AD-5 / AR-25: every export of src/server/functions/*.ts must come from the
-// factory, and all but `login` must answer not_logged_in without a session.
-// New files, in subfolders too, are picked up automatically by the glob.
+// AD-5 / AR-25: every export of a module under src/server/functions must come
+// from the factory, and all but `login` must answer not_logged_in without a
+// session. New files, in subfolders too, are picked up automatically by the
+// glob (`__fixtures__/nested/` proves the `**` form reaches subfolders).
 
 type Modules = Record<string, Record<string, unknown>>
 
 const realModules: Modules = import.meta.glob(
-  ['./*.ts', '!./_*.ts', '!./*.test.ts'],
-  {
-    eager: true,
-  },
+  [
+    './**/*.{ts,tsx}',
+    '!./**/_*.{ts,tsx}',
+    '!./**/*.test.{ts,tsx}',
+    '!./__fixtures__/**',
+  ],
+  { eager: true },
 )
-const fixtureModules: Modules = import.meta.glob(['./__fixtures__/*.ts'], {
-  eager: true,
-})
+const fixtureModules: Modules = import.meta.glob(
+  ['./__fixtures__/**/*.{ts,tsx}'],
+  { eager: true },
+)
 
 const PUBLIC_NAME = 'login'
 
@@ -74,6 +79,10 @@ describe('server function discovery', () => {
     expect(guardedOf(realModules['./login.ts'].login)?.spec.auth).toBe('public')
   })
 
+  it('finds at least one real server function', () => {
+    expect(Object.keys(realModules).length).toBeGreaterThan(0)
+  })
+
   it('the glob skips _define.ts, tests and fixtures', () => {
     for (const file of Object.keys(realModules)) {
       expect(file).not.toMatch(/(^|\/)_[^/]*$|\.test\.tsx?$|__fixtures__/)
@@ -82,11 +91,13 @@ describe('server function discovery', () => {
 
   it('the helper catches non-factory exports and public functions other than login', async () => {
     expect(Object.keys(fixtureModules).sort()).toEqual([
+      './__fixtures__/nested/unguarded.ts',
       './__fixtures__/plain.ts',
       './__fixtures__/public-login.ts',
       './__fixtures__/sample.ts',
     ])
     expect(await auditServerFunctions(fixtureModules)).toEqual([
+      './__fixtures__/nested/unguarded.ts#nestedPlain: not a server function from _define.ts',
       './__fixtures__/plain.ts#notAServerFn: not a server function from _define.ts',
       "./__fixtures__/public-login.ts#publicLeak: auth 'public' is only allowed for login",
     ])

@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import type { z } from 'zod'
-import type { SessionPayload } from '#/server/auth/session'
+import { isVerifiedSession } from '#/server/auth/verified'
+import type { SessionPayload } from '#/server/auth/verified'
 import { ServerFailure } from '#/server/errors/server-failure'
 import { DEFAULT_BODY_LIMIT, MAX_REQUEST_BODY } from '#/server/gate/body-limit'
 import { log } from '#/server/log'
@@ -15,8 +16,10 @@ import type { Result } from '#/shared/errors'
 //
 //   export const getExample = serverGet
 //     .validator(input(exampleInput))
-//     .handler(guard({ input: exampleInput }, async ({ input, signal }) => ok(...)))
+//     .handler(guard({ name: 'getExample' }, async ({ input, signal }) => ok(...)))
 //
+// The schema is named once: `input()` parses on the server (Start runs the
+// validator only there) and `guard()` takes its input type and result from it.
 // https://tanstack.com/start/latest/docs/framework/react/guide/server-functions
 
 /** Reads only. A GET function must have no side effects (AR-25). */
@@ -27,19 +30,44 @@ export const serverPost = createServerFn({ method: 'POST' })
 export const SERVER_FN_TIMEOUT_MS = 30_000
 export const GUARDED = Symbol.for('rt.guarded')
 
-/**
- * Types the call site only. Start's own validator throws on bad input, so this
- * passes data through untouched and `guard()` runs `safeParse`.
- */
-export function input<TSchema extends z.ZodType>(_schema: TSchema) {
-  return (data: z.input<TSchema>): z.input<TSchema> => data
+declare const PARSED: unique symbol
+
+/** What `input()` hands `guard()`: a zod result, never client data as is. */
+export interface ParsedInput<TOutput> {
+  readonly [PARSED]: TOutput
 }
 
-export interface GuardSpec<TSchema extends z.ZodType = z.ZodType> {
-  input: TSchema
+// Results that `input()` produced. Without a validator Start passes the
+// client's data straight through, so `guard()` only trusts these.
+const parsedResults = new WeakMap<object, z.ZodSafeParseResult<unknown>>()
+
+/**
+ * The validator for `.validator()`. It never throws (Start's own validator
+ * would turn bad input into a thrown error): `guard()` checks login first and
+ * then answers `invalid_input` when parsing failed.
+ */
+export function input<TSchema extends z.ZodType>(schema: TSchema) {
+  return (data: z.input<TSchema>): ParsedInput<z.output<TSchema>> => {
+    const handle = Object.freeze({}) as ParsedInput<z.output<TSchema>>
+    parsedResults.set(handle, schema.safeParse(data))
+    return handle
+  }
+}
+
+function readParsed(data: unknown): z.ZodSafeParseResult<unknown> | undefined {
+  return typeof data === 'object' && data !== null
+    ? parsedResults.get(data)
+    : undefined
+}
+
+export interface GuardSpec {
   /** Only `login` may be public (AD-5); the discovery test enforces it. */
   auth?: 'required' | 'public'
-  /** Bytes; defaults to 64 KB. Cannot exceed the gate's request ceiling. */
+  /**
+   * Bytes; defaults to 64 KB. Cannot exceed the gate's request ceiling.
+   * Checked after Start has read the body, so it only ever sees logged-in
+   * callers: the gate already caps requests without a session at 64 KB.
+   */
   bodyLimit?: number
   /** Shown in `server_fn_*` log lines; use the export name. */
   name?: string
@@ -53,8 +81,8 @@ export interface RunArgs<TInput> {
 }
 
 /** What Start (or a test) hands the handler; context comes from the gate. */
-export interface GuardCall {
-  data?: unknown
+export interface GuardCall<TInput = unknown> {
+  data?: ParsedInput<TInput>
   context?: unknown
 }
 
@@ -70,19 +98,17 @@ interface GateContext {
 
 function readContext(context: unknown): GateContext {
   const value = (context ?? {}) as Partial<Record<keyof GateContext, unknown>>
-  const session =
-    typeof value.session === 'object' && value.session !== null
-      ? (value.session as SessionPayload)
-      : null
+  // Only a session `verifySession` made; never a client-sent look-alike.
+  const session = isVerifiedSession(value.session) ? value.session : null
   const bodyBytes = typeof value.bodyBytes === 'number' ? value.bodyBytes : 0
   return { session, bodyBytes }
 }
 
 const TIMED_OUT = Symbol('timed out')
 
-export function guard<TSchema extends z.ZodType, TData>(
-  spec: GuardSpec<TSchema>,
-  run: (args: RunArgs<z.output<TSchema>>) => Promise<Result<TData>>,
+export function guard<TInput, TData>(
+  spec: GuardSpec,
+  run: (args: RunArgs<TInput>) => Promise<Result<TData>>,
 ) {
   const limit = spec.bodyLimit ?? DEFAULT_BODY_LIMIT
   if (!Number.isInteger(limit) || limit < 0 || limit > MAX_REQUEST_BODY) {
@@ -92,14 +118,14 @@ export function guard<TSchema extends z.ZodType, TData>(
   }
   const fn = spec.name
 
-  const runner = async (call: GuardCall): Promise<Result<TData>> => {
+  const runner = async (call: GuardCall<TInput>): Promise<Result<TData>> => {
     const { session, bodyBytes } = readContext(call.context)
     if (spec.auth !== 'public' && session === null) return fail('not_logged_in')
     if (bodyBytes > limit) {
       return fail('invalid_input')
     }
-    const parsed = spec.input.safeParse(call.data)
-    if (!parsed.success) return fail('invalid_input')
+    const parsed = readParsed(call.data)
+    if (!parsed?.success) return fail('invalid_input')
 
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -107,7 +133,7 @@ export function guard<TSchema extends z.ZodType, TData>(
       timer = setTimeout(() => resolve(TIMED_OUT), SERVER_FN_TIMEOUT_MS)
     })
     const pending = Promise.resolve().then(() =>
-      run({ input: parsed.data, signal: controller.signal, session }),
+      run({ input: parsed.data as TInput, signal: controller.signal, session }),
     )
     // A handler that rejects after the timeout must not become unhandled.
     pending.catch(() => undefined)
@@ -137,7 +163,7 @@ export function guard<TSchema extends z.ZodType, TData>(
     }
   }
 
-  const guarded: Guarded = { spec, run: runner }
-  const handler = (call: GuardCall) => runner(call)
+  const guarded: Guarded = { spec, run: runner as Guarded['run'] }
+  const handler = (call: GuardCall<TInput>) => runner(call)
   return Object.assign(handler, { [GUARDED]: guarded })
 }

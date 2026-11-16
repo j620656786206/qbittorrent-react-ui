@@ -5,12 +5,20 @@ import {
   classifyResponse,
   isAppError,
 } from '#/lib/app-error'
-import { ERROR_MESSAGES } from '#/shared/errors'
 
 function response(status: number, contentType?: string): Response {
   const headers = contentType ? { 'content-type': contentType } : undefined
   const body = status === 204 ? null : 'x'
   return new Response(body, { status, headers })
+}
+
+/** What a browser's `fetch` with `redirect: 'manual'` gives for a 3xx. */
+function opaqueRedirect(): Response {
+  const result = new Response(null, { status: 204 })
+  Object.defineProperty(result, 'type', { value: 'opaqueredirect' })
+  Object.defineProperty(result, 'status', { value: 0 })
+  Object.defineProperty(result, 'ok', { value: false })
+  return result
 }
 
 describe('classifyResponse', () => {
@@ -31,16 +39,22 @@ describe('classifyResponse', () => {
     [404, 'text/html', 'home_unreachable'],
     [429, 'text/html', 'home_unreachable'],
     [429, 'application/json', null],
+    [302, undefined, 'cloudflare_expired'],
+    [307, 'text/html', 'cloudflare_expired'],
   ] as const)('%i %s -> %s', (status, type, expected) => {
     expect(classifyResponse(response(status, type))).toBe(expected)
+  })
+
+  it('a browser opaque redirect (status 0) -> cloudflare_expired', () => {
+    expect(classifyResponse(opaqueRedirect())).toBe('cloudflare_expired')
   })
 })
 
 describe('AppError', () => {
-  it('always carries the fixed message for its code', () => {
+  it('carries only its code, never screen or server text', () => {
     const error = new AppError('home_unreachable')
     expect(error.code).toBe('home_unreachable')
-    expect(error.message).toBe(ERROR_MESSAGES.home_unreachable)
+    expect(error.message).toBe('home_unreachable')
     expect(isAppError(error)).toBe(true)
     expect(isAppError(new Error('x'))).toBe(false)
     expect(isAppError({ code: 'home_unreachable' })).toBe(false)

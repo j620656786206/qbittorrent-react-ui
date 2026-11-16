@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { getRequestProtocol, setCookie } from '@tanstack/react-start/server'
+import { markVerified } from '#/server/auth/verified'
+import type { SessionPayload } from '#/server/auth/verified'
 import { getEnv } from '#/server/env'
 
 // AD-2 / AR-22: `rt_session` = base64url(JSON {v, iat, exp}) + "." +
@@ -10,10 +12,7 @@ export const SESSION_COOKIE = 'rt_session'
 export const REMEMBER_SECONDS = 90 * 24 * 60 * 60
 export const SHORT_SECONDS = 12 * 60 * 60
 
-export interface SessionPayload {
-  iat: number
-  exp: number
-}
+export type { SessionPayload }
 
 interface SessionClock {
   /** Unix seconds; defaults to the current time. */
@@ -76,7 +75,8 @@ export function verifySession(
   const { v, iat, exp } = payload as Record<string, unknown>
   if (v !== 1 || !isInteger(iat) || !isInteger(exp)) return null
   const now = options.now ?? nowSeconds()
-  return now < exp ? { iat, exp } : null
+  if (now >= exp) return null
+  return markVerified({ iat, exp })
 }
 
 /** Value of `rt_session` in a `Cookie` request header, if any. */

@@ -62,6 +62,26 @@ const ROWS: Array<Row> = [
     expected: { code: 'cloudflare_expired' },
   },
   {
+    name: '4 Cloudflare redirect (opaque, as a browser reports it)',
+    respond: async () => {
+      const result = new Response(null, { status: 204 })
+      Object.defineProperty(result, 'type', { value: 'opaqueredirect' })
+      Object.defineProperty(result, 'status', { value: 0 })
+      Object.defineProperty(result, 'ok', { value: false })
+      return result
+    },
+    expected: { code: 'cloudflare_expired' },
+  },
+  {
+    name: '4 Cloudflare redirect (302)',
+    respond: async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://team.cloudflareaccess.com/login' },
+      }),
+    expected: { code: 'cloudflare_expired' },
+  },
+  {
     name: '5 HTML in 200',
     respond: async () => html(200),
     expected: { code: 'cloudflare_expired' },
@@ -187,11 +207,12 @@ describe('callFn (rows 1 to 6, 8, 10, 11)', () => {
       expect(url).toBe('/_serverFn/rt-test')
       const headers = new Headers(init.headers)
       expect(headers.get('x-requested-with')).toBe('XMLHttpRequest')
+      expect(init.redirect).toBe('manual')
       expect(String(init.body)).toContain('input-marker-17')
     },
   )
 
-  it('row 2: the message is the fixed Chinese text, not the server text', async () => {
+  it('row 2: the message is the code, not the server text', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -205,7 +226,7 @@ describe('callFn (rows 1 to 6, 8, 10, 11)', () => {
       (caught: unknown) => caught,
     )
     expect(error).toBeInstanceOf(AppError)
-    expect((error as AppError).message).toBe('qBittorrent 拒絕這個操作')
+    expect((error as AppError).message).toBe('qbit_rejected')
   })
 
   it('row 8: the error page body is never read into the message', async () => {

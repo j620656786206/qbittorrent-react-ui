@@ -17,9 +17,9 @@ export const ERROR_CODES = [
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
 
-// The only text a server function may put in `message`. Screen text comes from
-// `src/lib/error-text.ts`; these strings must equal it (UX-DR96 wording,
-// enforced by src/lib/error-text.test.ts).
+// The only text a server function may put in `message`, and the base table of
+// `src/lib/error-text.ts`, where screens get their text (UX-DR96 wording,
+// checked by src/lib/error-text.test.ts).
 export const ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   not_logged_in: '請先登入',
   login_failed: '帳號或密碼不對',

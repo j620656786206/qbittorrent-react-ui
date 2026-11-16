@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_BODY_LIMIT, MAX_REQUEST_BODY, bodyLimit } from './body-limit'
+import { testSession } from '#/server/auth/testing'
+import {
+  ANONYMOUS_BODY_LIMIT,
+  DEFAULT_BODY_LIMIT,
+  MAX_REQUEST_BODY,
+  bodyLimit,
+} from './body-limit'
 import { runMiddleware, serverFnRequest } from './testing'
 
 function trackedStream(chunkSize: number, chunks: number) {
@@ -32,9 +38,35 @@ async function expectTooLarge(response: Response) {
 }
 
 describe('body limit (AR-27)', () => {
-  it('uses 64 KB as default and request ceiling', () => {
+  it('uses 64 KB as default, request ceiling and anonymous ceiling', () => {
     expect(DEFAULT_BODY_LIMIT).toBe(65_536)
     expect(MAX_REQUEST_BODY).toBe(65_536)
+    // Never raise this with MAX_REQUEST_BODY: it is what a caller without a
+    // session can make the container read and parse.
+    expect(ANONYMOUS_BODY_LIMIT).toBe(65_536)
+  })
+
+  it('measures a logged-in request against the request ceiling', async () => {
+    const request = serverFnRequest({ method: 'POST', body: 'z'.repeat(1000) })
+    const { next } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).toHaveBeenCalledWith({ context: { bodyBytes: 1000 } })
+  })
+
+  it('treats a session look-alike as anonymous', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'x',
+      headers: { 'content-length': String(ANONYMOUS_BODY_LIMIT + 1) },
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: { iat: 1, exp: 9_999_999_999 } },
+    })
+    expect(next).not.toHaveBeenCalled()
+    await expectTooLarge(response)
   })
 
   it('rejects Content-Length 65537 without reading the body', async () => {

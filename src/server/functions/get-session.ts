@@ -9,7 +9,7 @@ const noInput = z.undefined()
 export const getSession = serverGet
   .validator(input(noInput))
   .handler(
-    guard({ input: noInput, name: 'getSession' }, async ({ session }) =>
+    guard({ name: 'getSession' }, async ({ session }) =>
       session ? ok({ exp: session.exp }) : fail('not_logged_in'),
     ),
   )
