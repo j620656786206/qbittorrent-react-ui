@@ -50,7 +50,7 @@ development_status:
   epic-2: in-progress
   2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: done  # PR #16：Playwright 瀏覽器 smoke、中文找不到頁面、登入和 _authed 接線測試
   2-1-51-種排序和電腦排序選單: done  # PR #17：51 種排序、電腦排序選單、getSortKeys 用到才拿、tracker 只送網域
-  2-2-底部面板和手機排序面板: backlog
+  2-2-底部面板和手機排序面板: review
   2-3-看板-電腦-5-欄和手機狀態分頁: backlog
   2-4-點開詳情-三種容器-固定頭和前後切換: backlog
   2-5-詳情概覽-狀態區-數字小卡-儲存位置: backlog
@@ -112,5 +112,5 @@ action_items:
     action: "First Epic 2 story that renders Dialog or a sheet: pick style-src per
       AR-31 and show zero CSP violations in the browser smoke"
     owner: "Claude"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md"
