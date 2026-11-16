@@ -16,3 +16,7 @@ coverage
 .auto-claude
 .wrangler
 **/.DS_Store
+# Playwright browser smoke output
+test-results
+playwright-report
+e2e-output

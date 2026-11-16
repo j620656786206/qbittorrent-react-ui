@@ -1,4 +1,9 @@
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
+import {
+  CENTER_BLOCK_BUTTON_CLASS,
+  CENTER_BLOCK_CLASS,
+  CENTER_BLOCK_TEXT_CLASS,
+} from '#/shared/ui/center-block'
 import { getMain } from '#/shared/ui/main-scroll'
 import { useRestoreFocusOnUnmount } from '#/shared/ui/restore-focus'
 import { Skeleton } from '#/shared/ui/skeleton'
@@ -57,21 +62,17 @@ export function ListSkeleton() {
 }
 
 /** S01/S02 no-result block; phone edges and corners like the list section. */
-const BLOCK_CLASS =
-  'flex h-full flex-col items-center justify-center gap-3.5 rounded-panel bg-surface p-6 text-center max-lg:-mx-1 max-lg:rounded-b-none'
-const BLOCK_TEXT_CLASS = 'm-0 text-[15px] leading-[1.2] font-bold'
-const BLOCK_BUTTON_CLASS =
-  'h-11 flex-none rounded-full border bg-surface px-[18px] font-semibold text-text hover-outline lg:h-9'
+const BLOCK_CLASS = `${CENTER_BLOCK_CLASS} max-lg:-mx-1 max-lg:rounded-b-none`
 
 /** No visible torrent: 「這個分類沒有種子」 and the disabled 「新增種子」. */
 export function ListEmpty() {
   return (
     <section aria-label="種子列表，共 0 個" className={BLOCK_CLASS}>
-      <p role="status" className={BLOCK_TEXT_CLASS}>
+      <p role="status" className={CENTER_BLOCK_TEXT_CLASS}>
         這個分類沒有種子
       </p>
       {/* Epic 1 placeholder: native `disabled` like the header's 新增. */}
-      <button type="button" disabled className={BLOCK_BUTTON_CLASS}>
+      <button type="button" disabled className={CENTER_BLOCK_BUTTON_CLASS}>
         新增種子
       </button>
     </section>
@@ -94,7 +95,7 @@ export function ListLoadError({
 
   return (
     <section aria-label="種子列表" className={BLOCK_CLASS}>
-      <p role="alert" className={BLOCK_TEXT_CLASS}>
+      <p role="alert" className={CENTER_BLOCK_TEXT_CLASS}>
         {LIST_LOAD_FAILED}
       </p>
       <button
@@ -102,7 +103,7 @@ export function ListLoadError({
         type="button"
         onClick={onRetry}
         aria-busy={busy || undefined}
-        className={BLOCK_BUTTON_CLASS}
+        className={CENTER_BLOCK_BUTTON_CLASS}
       >
         重試
       </button>

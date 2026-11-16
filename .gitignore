@@ -19,3 +19,8 @@ config/
 
 # UX 參考截圖：含私人資料（分類、書籤、記帳金額），只留本機。repo 是 public
 _bmad-output/planning-artifacts/ux-designs/*/imports/*.png
+
+# Playwright browser smoke output (story 2.0)
+test-results/
+playwright-report/
+e2e-output/
