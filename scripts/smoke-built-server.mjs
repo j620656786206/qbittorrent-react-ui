@@ -7,8 +7,16 @@
 //    not_logged_in as HTTP 200, the `rt_session` cookie flags and a foreign
 //    Origin. B7 and B8 (epic 1 review): a forged payload.context.session and
 //    the 64 KB body cap without a session. Also that /_shell.html is not served.
+//    B9 and B10 (spec 1.5): `getMaindata` without a cookie is not_logged_in;
+//    with one it reaches the real qBittorrent client, whose QBIT_URL is a
+//    closed local port (connection refused, no DNS involved), and answers
+//    qbit_unreachable with the fixed message. After shutdown, stdout has the
+//    qbit_unreachable line and nothing names QBIT_URL: the client and the log
+//    masking, end to end, with no qBittorrent. Also that no file under
+//    .output/public contains server-only qBittorrent code.
 // 2. Boots without SESSION_SECRET and checks it refuses to start.
-// Never talks to a real qBittorrent: QBIT_URL is a .invalid host.
+// Never talks to a real qBittorrent: QBIT_URL is a closed local port or a
+// .invalid host.
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import {
@@ -30,6 +38,13 @@ const ENTRY = join(ROOT, '.output/server/index.mjs')
 const SERVER_DIR = join(ROOT, '.output/server')
 const SERVER_FN_BASE = '/_serverFn/'
 const FOREIGN_ORIGIN = 'https://evil.example'
+// Port 1 on loopback: nothing listens there, so every connect is refused.
+const QBIT_URL_CLOSED = 'http://127.0.0.1:1'
+const QBIT_HOST = '127.0.0.1'
+const PUBLIC_DIR = join(ROOT, '.output/public')
+// Strings that exist only in the server's qBittorrent code.
+const SERVER_ONLY_MARKERS = ['qbit_breaker_open', 'sync/maindata']
+const QBIT_UNREACHABLE_MESSAGE = '家裡的 qBittorrent 沒有回應'
 const APP_ENV = [
   'QBIT_URL',
   'QBIT_USERNAME',
@@ -197,6 +212,7 @@ async function callServerFn(
     status: response.status,
     contentType: response.headers.get('content-type') ?? '',
     cookies: response.headers.getSetCookie(),
+    text,
     result,
   }
 }
@@ -205,9 +221,11 @@ const codeOf = (result) => result?.error?.code
 
 /** Spec 1.4 rows B1 to B6, carried items (a) and (b) from 1.2. */
 async function checkLoginFlow(base, password) {
-  const ids = serverFnIds(['login', 'getSession'])
+  const ids = serverFnIds(['login', 'getSession', 'getMaindata'])
   const getSession = (options = {}) =>
     callServerFn(base, ids.getSession, { method: 'GET', ...options })
+  const getMaindata = (options = {}) =>
+    callServerFn(base, ids.getMaindata, { method: 'GET', data: {}, ...options })
   const login = (data, options = {}) =>
     callServerFn(base, ids.login, { method: 'POST', data, ...options })
 
@@ -290,6 +308,28 @@ async function checkLoginFlow(base, password) {
   const cookie = b3Cookie?.split(';')[0]
   if (!cookie) return
 
+  // B9: getMaindata without a cookie, in the contract and before any qBittorrent call.
+  const b9 = await getMaindata()
+  check(
+    b9.status === 200 && codeOf(b9.result) === 'not_logged_in',
+    `B9 getMaindata without cookie: ${b9.status} ${JSON.stringify(b9.result)}`,
+  )
+
+  // B10: with the B3 cookie the real client runs; the .invalid host never resolves.
+  const b10 = await getMaindata({ cookie })
+  check(
+    b10.status === 200 && codeOf(b10.result) === 'qbit_unreachable',
+    `B10 getMaindata with cookie: ${b10.status} ${JSON.stringify(b10.result)}`,
+  )
+  check(
+    b10.result?.error?.message === QBIT_UNREACHABLE_MESSAGE,
+    `B10 getMaindata with cookie: message ${JSON.stringify(b10.result?.error?.message)}`,
+  )
+  check(
+    !b10.text.includes(QBIT_HOST),
+    'B10 getMaindata with cookie: the response names the QBIT_URL host',
+  )
+
   // B5: the B3 cookie reaches guard() through the gate's context.
   const b5 = await getSession({ cookie })
   check(
@@ -352,12 +392,32 @@ async function checkLoginFlow(base, password) {
   check(b8.cookies.length === 0, 'B8 login with a 70 KB body: sent Set-Cookie')
 }
 
+function filesUnder(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    return entry.isDirectory() ? filesUnder(path) : [path]
+  })
+}
+
+/** Server code must never reach the browser bundle. */
+function checkPublicBundle() {
+  for (const file of filesUnder(PUBLIC_DIR)) {
+    const text = readFileSync(file, 'latin1')
+    for (const marker of SERVER_ONLY_MARKERS) {
+      check(
+        !text.includes(marker),
+        `${file.slice(ROOT.length)}: contains ${marker}`,
+      )
+    }
+  }
+}
+
 async function checkValidBoot(configDir) {
   const port = await freePort()
   const base = `http://localhost:${port}`
   const password = randomBytes(12).toString('base64url')
   const server = boot({
-    QBIT_URL: 'http://qbit.test.invalid:8080',
+    QBIT_URL: QBIT_URL_CLOSED,
     QBIT_USERNAME: 'smoke-user',
     QBIT_PASSWORD: password,
     SESSION_SECRET: randomBytes(32).toString('base64'),
@@ -429,6 +489,20 @@ async function checkValidBoot(configDir) {
       server.child.kill('SIGKILL'),
     )
   }
+
+  // B10, after shutdown: the client logged the failure, and AD-16 masking
+  // kept the qBittorrent host out of every line.
+  const lines = server.output.stdout.split('\n').filter(Boolean)
+  check(
+    lines.some((line) => line.includes('"event":"qbit_unreachable"')),
+    'B10: stdout has no qbit_unreachable line',
+  )
+  const naming = lines.filter((line) => line.includes(QBIT_HOST)).length
+  check(naming === 0, `B10: ${naming} stdout line(s) name the QBIT_URL host`)
+  check(
+    !server.output.stderr.includes(QBIT_HOST),
+    'B10: stderr names the QBIT_URL host',
+  )
 }
 
 async function checkMissingSecret(configDir) {
@@ -479,6 +553,7 @@ async function main() {
   }
   const configDir = mkdtempSync(join(tmpdir(), 'rt-smoke-'))
   try {
+    checkPublicBundle()
     await checkValidBoot(configDir)
     await checkMissingSecret(configDir)
   } catch (error) {
