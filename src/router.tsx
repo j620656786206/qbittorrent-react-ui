@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { getGlobalStartContext } from '@tanstack/react-start'
 import { routeTree } from './routeTree.gen'
+import { watchLoginRequired } from '#/features/login/watch-login-required'
 import { createQueryClient } from '#/state/query-client'
 
 // AD-10: the request middleware's per-request CSP nonce goes on Start's inline
@@ -29,6 +30,9 @@ export function getRouter() {
     defaultPreloadStaleTime: 0,
     ssr: { nonce: cspNonce() },
   })
+
+  // Browser only, so server renders add no subscription to the module-level store.
+  if (typeof window !== 'undefined') watchLoginRequired(router)
 
   return router
 }

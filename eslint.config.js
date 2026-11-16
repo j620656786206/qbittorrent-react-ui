@@ -121,6 +121,15 @@ const SHARED_UI_BAN = {
   message: 'src/shared/ui is for routes and features only.',
 }
 
+// AD-10: the CSP has no 'unsafe-eval'. zod's eval probe runs at schema
+// construction unless jitless is set, so outside src/server every schema
+// takes `z` from src/shared/zod.ts, which sets it first.
+const ZOD_BAN = {
+  regex: '^zod(/|$)',
+  message:
+    "AD-10: import { z } from '#/shared/zod' (jitless, no CSP eval violation).",
+}
+
 // A later flat-config block replaces `no-restricted-imports` for the files it
 // matches instead of merging, so the file groups below are disjoint and each
 // lists every ban that applies to it.
@@ -131,6 +140,7 @@ const CN_FILE = 'src/shared/ui/cn.ts'
 const DEFINE_FILE = 'src/server/functions/_define.ts'
 const SERVER_FUNCTIONS = 'src/server/functions/**'
 const SHARED_UI = 'src/shared/ui/**'
+const ZOD_FILE = 'src/shared/zod.ts'
 const NO_UI_LAYERS = [
   'src/server/**/*.{ts,tsx}',
   'src/lib/**/*.{ts,tsx}',
@@ -201,20 +211,45 @@ export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     ignores: NO_UI_LAYERS,
-    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN),
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN, ZOD_BAN),
   },
   {
     files: [`${SHARED_UI}/*.{ts,tsx}`],
     ignores: [CN_FILE],
-    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN),
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN, ZOD_BAN),
   },
   {
     files: [CN_FILE],
-    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN),
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, ZOD_BAN),
+  },
+  // src/server never reaches the browser: zod directly is fine there.
+  {
+    files: ['src/server/**/*.{ts,tsx}'],
+    ignores: [SERVER_FUNCTIONS],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      SHARED_UI_BAN,
+    ),
   },
   {
-    files: NO_UI_LAYERS,
-    ignores: [SERVER_FUNCTIONS, SHARED_UI],
+    files: [
+      'src/lib/**/*.{ts,tsx}',
+      'src/state/**/*.{ts,tsx}',
+      'src/shared/**/*.{ts,tsx}',
+    ],
+    ignores: [SHARED_UI, ZOD_FILE],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      SHARED_UI_BAN,
+      ZOD_BAN,
+    ),
+  },
+  {
+    files: [ZOD_FILE],
     rules: restrictImports(
       CREATE_SERVER_FN_BAN,
       DEFINE_BAN,

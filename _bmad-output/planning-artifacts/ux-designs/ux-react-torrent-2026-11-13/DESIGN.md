@@ -503,6 +503,8 @@ components:
 
 **已知問題，Alex 看過接受**（memlog #142、#143）：深色模式選取列上的紅色刪除按鈕（`delete-dark` `#E0707F`）對選取列底（`selection-bar-dark` `#E9EEF5`）只有 2.65:1，低於圖形 3:1 的規則。按鈕上的字對按鈕底是 5.8，有過。畫稿：`SD-delete-phone`。Alex 看過提醒沒有要改，先照這樣，不調色值。
 
+**已知問題，Alex 接受**（2026-11-16，Story 1.4）：手機登入畫面沒有卡片，錯誤那一行（13px／600，`status-error` `#D93A3A`）直接放在 `surface-page` `#F6F6F4` 上，淺色只有 4.20:1，低於文字 4.5 的規則。電腦版在白卡片上是 4.55，深色是 4.75，都有過；驚嘆號圖示 4.20 過了圖形 3:1。手機錯誤狀態沒有畫稿。Alex 選了接受，不改字色、不調色值。
+
 ## Typography
 
 兩種字型。介面全部用系統字（Apple 系統字、PingFang TC、Noto Sans TC），路徑用等寬字（`{typography.path}`），因為路徑要一個字一個字對。

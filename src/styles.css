@@ -281,6 +281,23 @@
   }
 }
 
+/* Entrance (mockup `rise`, spec 1.4): 10px up and fade in, transform and
+ * opacity only, off for reduced motion. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@utility animate-rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* 6. Base rules (UX-DR7, UX-DR75, NFR-6, NFR-7). */
 @layer base {
   html,
