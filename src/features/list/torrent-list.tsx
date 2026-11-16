@@ -7,8 +7,12 @@ import {
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatDayKey } from '#/lib/format'
-import { EPIC1_VIEW } from '#/lib/visible-torrents'
+import type { SortKeys } from '#/lib/visible-torrents'
+import { getSortKeys } from '#/server/functions/get-sort-keys'
+import { isExtraSortField } from '#/shared/sort-fields'
+import type { SortFieldId } from '#/shared/sort-fields'
 import { getMain } from '#/shared/ui/main-scroll'
+import { useListView, viewKeyOf } from '#/state/list-view'
 import {
   selectStateBeforeMove,
   selectTorrents,
@@ -26,10 +30,12 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
+import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
 import {
   ROW_GAP,
   ROW_HEIGHT,
   listView,
+  rowClock,
   rowProps,
 } from '#/features/list/list-model'
 import {
@@ -41,7 +47,10 @@ import {
 import { TorrentRow } from '#/features/list/torrent-row'
 
 // FR-15, NFR-1, AR-7, AR-50: the torrent list. Order only from
-// `useVisibleTorrents(EPIC1_VIEW)` through the freeze (`useFrozenOrder`);
+// `useVisibleTorrents(view, sortKeys)` through the freeze (`useFrozenOrder`);
+// the view is the URL's sort (`useListView`). An extra sort's keys come from
+// `['sort-keys', field]`, polled only while that sort is active; until its
+// first keys arrive the order shown stays and the big numbers are skeletons.
 // rows are virtualized with `main` (the shell's scroll container) as the
 // scroll element, fixed height, keyed by hash. Only the rows in view plus
 // 10 above and below exist. Docs: TanStack Virtual `Virtualizer` options
@@ -65,8 +74,11 @@ function mouseRestsOn(element: HTMLElement | null): boolean {
   )
 }
 
-/** Epoch ms that changes only when the local date does (setState-in-render). */
-function useToday(): number {
+/**
+ * `today`: epoch ms that changes only when the local date does
+ * (setState-in-render); `now`: the same minute tick, for 「3 小時前」.
+ */
+function useClock(): { today: number; now: number } {
   const now = useNow(DAY_CHECK_MS)
   // Rows take a `today` that changes only at local midnight, so dates never
   // re-render a row every minute.
@@ -74,33 +86,72 @@ function useToday(): number {
   const [today, setToday] = useState(() => ({ key, now }))
   if (today.key !== key) {
     setToday({ key, now })
-    return now
+    return { today: now, now }
   }
-  return today.now
+  return { today: today.now, now }
 }
 
+const fetchSortKeys = bindFetchSortKeys(getSortKeys)
+
 export function TorrentList() {
-  const { data: live } = useVisibleTorrents(EPIC1_VIEW)
+  const { view } = useListView()
+  const extraField = isExtraSortField(view.sort) ? view.sort : null
+  const { data: sortKeysData, isError: keysError } = useSortKeys(
+    extraField,
+    fetchSortKeys,
+  )
+  const sortKeys = extraField ? sortKeysData?.keys : undefined
+  // The first keys failed: every value reads 「沒有」 (the connection alert,
+  // if any, explains why) and the order shown stays, with new torrents on
+  // top, until a later poll brings keys and the list sorts.
+  const keysFailed = extraField !== null && sortKeys === undefined && keysError
+  const { data: live } = useVisibleTorrents(view, sortKeys)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()
-  const shown = useFrozenOrder(live)
+  const shown = useFrozenOrder(live, {
+    viewKey: viewKeyOf(view),
+    hold: extraField !== null && sortKeys === undefined,
+    holdAddsNew: keysFailed,
+  })
   const { retry, retrying } = useMaindataRetry()
 
-  const view = listView({
+  const state = listView({
     hasData: shown !== undefined,
     visibleCount: shown?.length ?? 0,
     error: failure,
   })
-  if (view === 'skeleton') return <ListSkeleton />
-  if (view === 'error') return <ListLoadError onRetry={retry} busy={retrying} />
-  if (view === 'empty' || !shown) return <ListEmpty />
-  return <TorrentRows shown={shown} />
+  if (state === 'skeleton') return <ListSkeleton />
+  if (state === 'error')
+    return <ListLoadError onRetry={retry} busy={retrying} />
+  if (state === 'empty' || !shown) return <ListEmpty />
+  return (
+    <TorrentRows
+      shown={shown}
+      sort={view.sort}
+      sortKeys={sortKeys}
+      keysFailed={keysFailed}
+    />
+  )
 }
 
-function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
+function TorrentRows({
+  shown,
+  sort,
+  sortKeys,
+  keysFailed,
+}: {
+  shown: ReadonlyArray<string>
+  sort: SortFieldId
+  /** The active extra sort's keys; `undefined` while loading or for a slim sort. */
+  sortKeys: SortKeys | undefined
+  /** The first keys failed: values read 「沒有」 instead of skeletons. */
+  keysFailed: boolean
+}) {
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
-  const today = useToday()
+  const clock = useClock()
+  // Only a sort shown as 「N 前」 makes the rows read the minute tick.
+  const today = rowClock(sort, clock.today, clock.now)
   const listRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -189,7 +240,14 @@ function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
           const hash = shown[item.index]
           const props =
             torrents && stateBeforeMove
-              ? rowProps({ torrents, stateBeforeMove }, hash, today)
+              ? rowProps(
+                  { torrents, stateBeforeMove },
+                  hash,
+                  today,
+                  sort,
+                  sortKeys,
+                  keysFailed,
+                )
               : null
           return (
             <div

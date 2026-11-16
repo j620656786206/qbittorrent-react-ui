@@ -7,6 +7,7 @@ import {
   noteScroll,
   resetOrderFreeze,
   setPointerInList,
+  keepWithNewOnTop,
   shownOrderReducer,
   touchFrozen,
   touchScrollEnd,
@@ -71,6 +72,55 @@ describe('shownOrderReducer (the hook update)', () => {
     )
     const live = ['x']
     expect(shownOrderReducer(null, { live, frozen: true })).toBe(live)
+  })
+
+  it('S9 a sort change applies at once even while frozen', () => {
+    const live = ['c', 'b', 'a']
+    expect(
+      shownOrderReducer(['a', 'b', 'c'], {
+        live,
+        frozen: true,
+        viewChanged: true,
+      }),
+    ).toBe(live)
+  })
+
+  it('S4 after failed keys the hold keeps the order but adds new torrents on top', () => {
+    const shown = ['a', 'b', 'c']
+    const input = {
+      frozen: true,
+      viewChanged: true,
+      hold: true,
+      holdAddsNew: true,
+    }
+    expect(shownOrderReducer(shown, { ...input, live: ['c', 'b', 'a'] })).toBe(
+      shown,
+    )
+    expect(
+      shownOrderReducer(shown, { ...input, live: ['c', 'new', 'a'] }),
+    ).toEqual(['new', 'a', 'c'])
+    expect(keepWithNewOnTop(null, ['x'])).toEqual(['x'])
+  })
+
+  it("S4 while the new sort's keys load, the order shown holds like a freeze", () => {
+    const shown = ['a', 'b', 'c']
+    expect(
+      shownOrderReducer(shown, {
+        live: ['c', 'new', 'b', 'a'],
+        frozen: false,
+        viewChanged: true,
+        hold: true,
+      }),
+    ).toBe(shown)
+    // A deleted torrent still leaves at once.
+    expect(
+      shownOrderReducer(shown, {
+        live: ['c', 'a'],
+        frozen: false,
+        viewChanged: true,
+        hold: true,
+      }),
+    ).toEqual(['a', 'c'])
   })
 })
 

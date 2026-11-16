@@ -94,7 +94,7 @@ describe('the row', () => {
     }
     // Desktop column; phone keeps it for screen readers only.
     expect(html).toMatch(/w-\[76px\][^"]*max-lg:sr-only/)
-    expect(html).toContain('<span class="sr-only">加入 </span>今天 09:12')
+    expect(html).toContain('<span class="sr-only">加入時間 </span>今天 09:12')
     expect(html).toContain('text-good')
   })
 
@@ -105,11 +105,68 @@ describe('the row', () => {
   })
 })
 
+describe('the big value cell (story 2.1)', () => {
+  const cell = (
+    sort: Parameters<typeof rowModel>[1]['sort'],
+    overrides: Partial<SlimTorrent> = {},
+    sortValue?: Parameters<typeof rowModel>[1]['sortValue'],
+  ) =>
+    renderToStaticMarkup(
+      <RowContent
+        model={rowModel(t(overrides), { ...OPTIONS, sort, sortValue })}
+      />,
+    )
+
+  it('a path runs right to left with the path as an isolated left-to-right run', () => {
+    const html = cell('content_path', {}, '/data/media/tv/Show.S01')
+    expect(html).toMatch(
+      /<span dir="rtl" title="\/data\/media\/tv\/Show\.S01" class="[^"]*max-w-\[160px\][^"]*"><span class="sr-only">內容路徑 <\/span><bdi dir="ltr">\/data\/media\/tv\/Show\.S01<\/bdi><\/span>/,
+    )
+  })
+
+  it('a missing value is a muted 沒有', () => {
+    expect(cell('num_seeds', {}, null)).toMatch(
+      /<span class="[^"]*text-row-value[^"]*text-text-muted[^"]*"><span class="sr-only">做種人數（連上的） <\/span>沒有<\/span>/,
+    )
+  })
+
+  it('a hash is the first 8 characters in the path font', () => {
+    expect(cell('hash', { hash: fakeHash('ab') })).toMatch(
+      /<span title="abababab" class="[^"]*font-mono text-path[^"]*"><span class="sr-only">Hash <\/span>abababab<\/span>/,
+    )
+  })
+
+  it('save path: the label shows, the title is the full path', () => {
+    expect(cell('save_path', { save_path: '/data/media/tv/' })).toContain(
+      '<span title="/data/media/tv/" class=',
+    )
+  })
+
+  it('a text value has its full text as the title', () => {
+    const name = 'mteam-tv-with-a-long-category-name'
+    expect(cell('category', { category: name })).toContain(
+      `<span title="${name}" class=`,
+    )
+  })
+
+  it('a ratio of 1 or more as the big value is good', () => {
+    expect(cell('ratio', { ratio: 1.5 })).toMatch(
+      /class="[^"]*text-row-value[^"]*text-good[^"]*"><span class="sr-only">分享率 <\/span>1\.50</,
+    )
+  })
+})
+
 describe('TorrentRow (the memoized row)', () => {
   it('a move remembered as pausedUP keeps 已完成 and says 搬移中', () => {
     const torrent = t({ hash: fakeHash(5), state: 'moving', progress: 1 })
     const html = renderToStaticMarkup(
-      <TorrentRow torrent={torrent} stateBeforeMove="pausedUP" today={NOW} />,
+      <TorrentRow
+        torrent={torrent}
+        stateBeforeMove="pausedUP"
+        today={NOW}
+        sort="added_on"
+        sortValue={undefined}
+      />,
     )
     expect(html).toMatch(/role="img" aria-label="已完成"/)
     expect(html.match(/搬移中/g)).toHaveLength(1)

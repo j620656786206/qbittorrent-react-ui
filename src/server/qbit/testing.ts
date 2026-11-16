@@ -12,18 +12,39 @@ export const HASH_B = 'b'.repeat(40)
 export const HASH_C = 'c'.repeat(64)
 export const HASH_D = 'd'.repeat(40)
 
-/** Values that must never leave the container. */
+/**
+ * Values that must never leave the container through getMaindata. Through
+ * getSortKeys: the tracker URL (its passkey), the magnet link and the
+ * external addresses never; comment, content_path, root_path and the
+ * infohashes only for their own field (`SORT_KEY_ONLY_MARKERS`);
+ * download_path never (not one of the 51 sorts). The tracker's hostname
+ * (`FAKE_TRACKER_DOMAIN`) may leave only as `tracker_domain`.
+ */
 export const LEAK_MARKERS = {
   last_external_address_v4: 'fake-external-v4',
   last_external_address_v6: 'fake-external-v6',
   magnet_uri: 'magnet:?xt=fake-magnet-marker',
-  tracker: 'http://fake-tracker-marker.invalid/announce',
+  tracker:
+    'http://fake-tracker-marker.invalid/announce?passkey=fake-passkey-marker',
   comment: 'fake-comment-marker',
   content_path: '/downloads/fake-content-path-marker',
   download_path: '/downloads/fake-download-path-marker',
   root_path: '/downloads/fake-root-path-marker',
   infohash_v1: 'fake-infohash-v1-marker',
   infohash_v2: 'fake-infohash-v2-marker',
+} as const
+
+/** The passkey inside the fake tracker URL. */
+export const FAKE_PASSKEY = 'fake-passkey-marker'
+export const FAKE_TRACKER_DOMAIN = 'fake-tracker-marker.invalid'
+
+/** Markers getSortKeys may send, each only for the field named here. */
+export const SORT_KEY_ONLY_MARKERS = {
+  comment: LEAK_MARKERS.comment,
+  content_path: LEAK_MARKERS.content_path,
+  root_path: LEAK_MARKERS.root_path,
+  infohash_v1: LEAK_MARKERS.infohash_v1,
+  infohash_v2: LEAK_MARKERS.infohash_v2,
 } as const
 
 /** A complete raw maindata torrent (no `hash`: qBittorrent keys by it). */
@@ -45,6 +66,29 @@ export function rawTorrent(overrides: Record<string, unknown> = {}) {
     category: 'movies',
     private: false,
     num_seeds: 3,
+    num_leechs: 1,
+    num_complete: 40,
+    num_incomplete: 7,
+    time_active: 7_250,
+    last_activity: 1_700_003_645,
+    seen_complete: 1_700_002_000,
+    amount_left: 1_073_741_824,
+    availability: 1.4567,
+    downloaded: 1_073_741_824,
+    uploaded: 268_435_456,
+    downloaded_session: 1_048_576,
+    uploaded_session: 524_288,
+    popularity: 0.123,
+    trackers_count: 2,
+    dl_limit: -1,
+    up_limit: 102_400,
+    ratio_limit: -2,
+    seeding_time_limit: -2,
+    inactive_seeding_time_limit: -1,
+    priority: 3,
+    reannounce: 1_799,
+    has_metadata: true,
+    tags: 'fake-tag',
     magnet_uri: LEAK_MARKERS.magnet_uri,
     tracker: LEAK_MARKERS.tracker,
     comment: LEAK_MARKERS.comment,

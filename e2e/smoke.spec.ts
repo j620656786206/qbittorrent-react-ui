@@ -207,3 +207,187 @@ test('P7 an unknown URL logged in: the link reaches the list', async ({
   await page.waitForURL('/')
   await expect(rows(page).first()).toBeVisible()
 })
+
+// Story 2.1: the desktop sort menu, an extra sort, the URL and the big
+// numbers, with the same CSP and console watch as every test.
+
+const DESKTOP = WIDTHS[0]
+
+const sortPill = (page: Page) =>
+  page
+    .getByRole('button', { name: /^排序：.*，列表$/ })
+    .filter({ visible: true })
+const sortMenu = (page: Page) => page.getByRole('menu', { name: '排序' })
+
+/** The big numbers of the first `count` rows, in list order, without the label. */
+async function bigValues(page: Page, count: number): Promise<Array<string>> {
+  return page.evaluate((max) => {
+    const items = [...document.querySelectorAll('[role="listitem"]')]
+      .map((item) => ({
+        index: Number(item.getAttribute('aria-posinset')),
+        cell: item.querySelector(':scope > div > div > span:last-child'),
+      }))
+      .sort((a, b) => a.index - b.index)
+      .slice(0, max)
+    return items.map(({ cell }) => {
+      const label = cell?.querySelector('.sr-only')?.textContent ?? ''
+      return (cell?.textContent ?? '').slice(label.length).trim()
+    })
+  }, count)
+}
+
+test('S1 the sort menu: 更多, an extra sort, flip, reopen at the item', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'many' })
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  // Every sort change uses `replace`: no new history entries.
+  const historyLength = () => page.evaluate(() => history.length)
+  const entries = await historyLength()
+  await expect(sortPill(page)).toHaveAccessibleName(
+    '排序：加入時間，新的在前，列表',
+  )
+  await expect(sortPill(page)).toHaveAttribute(
+    'title',
+    '排序：加入時間，新的在前',
+  )
+
+  await sortPill(page).click()
+  const menu = sortMenu(page)
+  await expect(menu).toBeVisible()
+  const items = menu.getByRole('menuitemradio')
+  await expect(items).toHaveCount(5)
+  await expect(items.first()).toHaveAttribute('aria-disabled', 'true')
+  // Announced without the arrow and the shortcut digit.
+  await expect(
+    menu.getByRole('menuitemradio', { checked: true }),
+  ).toHaveAccessibleName('加入時間，新的在前')
+  const width = await menu.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  )
+  expect(width).toBe(260)
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/sort-menu-light.png` })
+
+  await menu.getByRole('menuitem', { name: '更多' }).click()
+  await expect(menu).toBeVisible()
+  await expect(items).toHaveCount(51)
+  await page.screenshot({ path: `${SCREENSHOT_DIR}/sort-menu-more-light.png` })
+
+  // A switch scrolls the list back to the top.
+  await scrollMain(page, 'middle')
+  await menu.getByRole('menuitemradio', { name: /^做種人數（連上的）/ }).click()
+  await expect(menu).toBeHidden()
+  await expect(sortPill(page)).toHaveAccessibleName(
+    '排序：做種人數（連上的），大的在前，列表',
+  )
+  await expect(page).toHaveURL(/[?&]sort=num_seeds/)
+  await expect(page).toHaveURL(/[?&]dir=desc/)
+  expect(
+    await page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop),
+  ).toBe(0)
+  // The keys arrive from getSortKeys; then the list is sorted large first.
+  await expect.poll(async () => (await bigValues(page, 1))[0]).toBe('8')
+  const desc = (await bigValues(page, 20)).map(Number)
+  expect(desc).toEqual([...desc].sort((a, b) => b - a))
+
+  // Reopened: 更多 already open, the current sort checked and in view.
+  await sortPill(page).click()
+  await expect(items).toHaveCount(51)
+  const current = menu.getByRole('menuitemradio', { checked: true })
+  await expect(current).toHaveAccessibleName('做種人數（連上的），大的在前')
+  await expect(current).toHaveText(/^做種人數（連上的）\u3000大的在前 ↓$/)
+  await expect(current).toBeInViewport()
+  await page.screenshot({
+    path: `${SCREENSHOT_DIR}/sort-menu-selected-light.png`,
+  })
+
+  // Clicking the selected one flips the direction, keeps the menu open and
+  // goes back to the top of the list.
+  await scrollMain(page, 'middle')
+  await current.click()
+  await expect(menu).toBeVisible()
+  await expect(page).toHaveURL(/[?&]dir=asc/)
+  await expect(current).toHaveText(/^做種人數（連上的）\u3000小的在前 ↑$/)
+  expect(
+    await page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop),
+  ).toBe(0)
+  expect(await historyLength()).toBe(entries)
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect.poll(async () => (await bigValues(page, 1))[0]).toBe('0')
+  const asc = (await bigValues(page, 20)).map(Number)
+  expect(asc).toEqual([...asc].sort((a, b) => a - b))
+})
+
+test('S2 a bad sort in the URL falls back and the URL is fixed', async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  await page.goto('/?sort=nope&dir=up')
+  await page.waitForURL('/')
+  await expect(sortPill(page)).toHaveAccessibleName(
+    '排序：加入時間，新的在前，列表',
+  )
+  await page.goto('/?sort=ratio&dir=sideways')
+  await page.waitForURL('/?sort=ratio')
+  await expect(sortPill(page)).toHaveAccessibleName(
+    '排序：分享率，高的在前，列表',
+  )
+  // The fixes replaced the bad entries: going back never meets them.
+  await page.goBack()
+  expect(page.url()).not.toContain('sort=nope')
+  expect(page.url()).not.toContain('sideways')
+})
+
+const SCREENSHOT_SORTS = [
+  'seeding_time',
+  'ratio',
+  'name',
+  'save_path',
+  'hash',
+] as const
+
+test('S3 sorted lists and the menu in light and dark', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'many' })
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  for (const scheme of SCHEMES) {
+    await page.emulateMedia({ colorScheme: scheme })
+    for (const sort of SCREENSHOT_SORTS) {
+      await page.goto(`/?sort=${sort}`)
+      await expect(rows(page).first()).toBeVisible()
+      // Sorting by ratio hides the ratio column.
+      await expect(page.getByText(/^分享率\s/).first()).toBeVisible({
+        visible: sort !== 'ratio',
+      })
+      await page.screenshot({
+        path: `${SCREENSHOT_DIR}/sort-${sort}-${scheme}.png`,
+        animations: 'disabled',
+      })
+    }
+    if (scheme === 'dark') {
+      await page.goto('/?sort=num_seeds')
+      await sortPill(page).click()
+      await expect(sortMenu(page).getByRole('menuitemradio')).toHaveCount(51)
+      await page.screenshot({
+        path: `${SCREENSHOT_DIR}/sort-menu-selected-dark.png`,
+        animations: 'disabled',
+      })
+      await page.keyboard.press('Escape')
+      await sortPill(page).click()
+      await sortMenu(page).getByRole('menuitem', { name: '更多' }).click()
+      await expect(sortMenu(page).getByRole('menuitemradio')).toHaveCount(5)
+      await page.screenshot({
+        path: `${SCREENSHOT_DIR}/sort-menu-dark.png`,
+        animations: 'disabled',
+      })
+      await page.keyboard.press('Escape')
+    }
+  }
+})

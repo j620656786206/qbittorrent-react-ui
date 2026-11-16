@@ -10,6 +10,7 @@ import {
   FAKE_USERNAME,
   HASH_A,
   LEAK_MARKERS,
+  SORT_KEY_ONLY_MARKERS,
   captureStdout,
   fakeQbit,
   fullMaindata,
@@ -67,7 +68,18 @@ describe('qBittorrent client', () => {
     expect(call?.method).toBe('GET')
     expect([...(call?.query.entries() ?? [])]).toEqual([['rid', '7']])
     expect(Object.keys(raw.torrents ?? {})).toEqual([HASH_A])
-    expect(raw.torrents?.[HASH_A]).toEqual({ name: 'A', private: true })
+    // The sort extras stay (story 2.1); the tracker only as its hostname,
+    // the magnet, download path and external addresses not at all.
+    expect(raw.torrents?.[HASH_A]).toEqual({
+      name: 'A',
+      private: true,
+      comment: LEAK_MARKERS.comment,
+      content_path: LEAK_MARKERS.content_path,
+      root_path: LEAK_MARKERS.root_path,
+      infohash_v1: LEAK_MARKERS.infohash_v1,
+      infohash_v2: LEAK_MARKERS.infohash_v2,
+      tracker: 'fake-tracker-marker.invalid',
+    })
     expect(Object.keys(raw.server_state ?? {}).sort()).toEqual(
       [
         'connection_status',
@@ -79,8 +91,11 @@ describe('qBittorrent client', () => {
       ].sort(),
     )
     const text = JSON.stringify(raw)
+    const extras: ReadonlySet<string> = new Set(
+      Object.values(SORT_KEY_ONLY_MARKERS),
+    )
     for (const marker of Object.values(LEAK_MARKERS)) {
-      expect(text).not.toContain(marker)
+      if (!extras.has(marker)) expect(text).not.toContain(marker)
     }
   })
 

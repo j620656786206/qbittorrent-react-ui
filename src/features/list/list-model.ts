@@ -1,22 +1,34 @@
 import { isFirstLoadError } from '#/lib/app-error'
 import {
-  formatDate,
   formatPercent,
   formatRatio,
   formatRowSpeed,
   formatSize,
+  formatSortValue,
+  hasNoSortValue,
   isGoodRatio,
 } from '#/lib/format'
 import { locationLabel } from '#/lib/paths'
+import { slimSortValue } from '#/lib/sort-values'
 import { classify } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
-import type { TorrentStatusId } from '#/lib/torrent-status'
+import type {
+  TorrentClassification,
+  TorrentStatusId,
+} from '#/lib/torrent-status'
+import type { SortKeys } from '#/lib/visible-torrents'
+import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import type { SlimTorrent } from '#/shared/maindata'
+import { isExtraSortField, sortField } from '#/shared/sort-fields'
+import type { SortFieldId } from '#/shared/sort-fields'
+import type { SortValue } from '#/shared/sort-keys'
 
 // Spec 1.8 rows R1 to R6, C1 to C3, V1 to V4, M1: everything a list row and
 // the list's state show, pure, so the rows are tested in node. Status, word,
 // ring and error text come only from classify(); numbers only from
 // format.ts; the location only from locationLabel(). All text is plain text.
+// Story 2.1: the big number on the right follows the sort (EXPERIENCE 列表
+// 右邊的大數字), and the 分享率 column hides while sorting by ratio.
 
 /**
  * One row box, skeleton and data, both breakpoints: whole pixels so rows
@@ -61,6 +73,28 @@ export interface RowSpeed {
   text: string
 }
 
+/**
+ * How the big number looks (DESIGN list-row): `number` is `row-value` 18px
+ * bold; the others are `body` 13px `text-muted`, at most 160px, cut at the
+ * end (`text`), from the front (`path`), or in the path font (`hash`).
+ */
+export type BigValueStyle = 'number' | 'text' | 'path' | 'hash'
+
+export interface BigValue {
+  /** The sort's name, read before the value by screen readers. */
+  label: string
+  text: string
+  style: BigValueStyle
+  /** `text-muted` (no value, a speed of 0, no limit); text styles always are. */
+  muted: boolean
+  /** An extra sort's first keys are loading: a small skeleton bar instead. */
+  loading: boolean
+  /** A ratio of 1.00 or more: the `good` colour, like the ratio column. */
+  good?: boolean
+  /** The tooltip when it differs from `text` (the full save path). */
+  title?: string
+}
+
 export interface RowModel {
   circle: {
     status: TorrentStatusId
@@ -76,8 +110,10 @@ export interface RowModel {
   /** Under 100%: ↓ download speed, otherwise ↑ upload; `null` at 0. */
   speed: RowSpeed | null
   ratio: { text: string; good: boolean }
-  /** The big value on the right: the added time (Epic 1's fixed sort). */
-  value: string
+  /** False while sorting by ratio: the big number is the ratio then. */
+  showRatio: boolean
+  /** The big value on the right, following the sort. */
+  value: BigValue
   /** classify()'s reason on an error row; replaces size and speed on phone. */
   errorDetail: string | null
   /** 「搬移中」 while qBittorrent moves the files (EXPERIENCE 搬移中). */
@@ -91,6 +127,70 @@ export interface RowModelOptions {
   timeZone?: string
   /** `Maindata.stateBeforeMove` (or just this torrent's entry). */
   stateBeforeMove: Readonly<Record<string, string>>
+  /** The active sort; added time when left out. */
+  sort?: SortFieldId
+  /**
+   * An extra sort's value for this torrent (getSortKeys); `undefined` while
+   * its keys are loading. Slim sorts read the torrent and ignore this.
+   */
+  sortValue?: SortValue
+}
+
+const TEXT_STYLES: Readonly<Partial<Record<string, BigValueStyle>>> = {
+  text: 'text',
+  location: 'text',
+  path: 'path',
+  hash: 'hash',
+}
+
+function bigValue(
+  torrent: SlimTorrent,
+  status: TorrentClassification,
+  { now, timeZone, stateBeforeMove, sort, sortValue }: RowModelOptions,
+): BigValue {
+  const field = sortField(sort ?? DEFAULT_SORT_VIEW.sort)
+  const id = field.id as SortFieldId
+  const base = { label: field.label, loading: false }
+  if (field.kind === 'status') {
+    // Name (and state until the board): the progress where the row draws
+    // one, otherwise the status word (13px).
+    return id === 'name' && status.showsProgress
+      ? {
+          ...base,
+          text: formatPercent(torrent.progress),
+          style: 'number',
+          muted: false,
+        }
+      : { ...base, text: status.word, style: 'text', muted: true }
+  }
+  const extra = isExtraSortField(id)
+  if (extra && sortValue === undefined) {
+    return { ...base, text: '', style: 'number', muted: true, loading: true }
+  }
+  const value = extra
+    ? (sortValue ?? null)
+    : slimSortValue(id, torrent, stateBeforeMove)
+  const style = TEXT_STYLES[field.kind] ?? 'number'
+  if (field.kind === 'location' && !hasNoSortValue(id, value)) {
+    return {
+      ...base,
+      text: locationLabel(torrent.save_path),
+      // The sort compares the full path; the tooltip shows it.
+      title: torrent.save_path,
+      style,
+      muted: true,
+    }
+  }
+  const formatted = formatSortValue(id, value, now, timeZone)
+  return {
+    ...base,
+    text: formatted.text,
+    style,
+    muted: style !== 'number' || formatted.muted,
+    ...(field.kind === 'ratio' && typeof value === 'number'
+      ? { good: isGoodRatio(value) }
+      : {}),
+  }
 }
 
 function clampFraction(progress: number): number {
@@ -100,8 +200,9 @@ function clampFraction(progress: number): number {
 
 export function rowModel(
   torrent: SlimTorrent,
-  { now, timeZone, stateBeforeMove }: RowModelOptions,
+  options: RowModelOptions,
 ): RowModel {
+  const { now, timeZone, stateBeforeMove } = options
   const status = classify(torrent, { now, timeZone, stateBeforeMove })
   const downloading = torrent.progress < 1
   const speedText = formatRowSpeed(
@@ -128,7 +229,8 @@ export function rowModel(
       text: formatRatio(torrent.ratio),
       good: isGoodRatio(torrent.ratio),
     },
-    value: formatDate(torrent.added_on, now, timeZone),
+    showRatio: (options.sort ?? DEFAULT_SORT_VIEW.sort) !== 'ratio',
+    value: bigValue(torrent, status, options),
     // A move keeps the status but replaces the line with 「搬移中」 (once).
     errorDetail:
       status.status === 'error' && !status.moving ? status.detail : null,
@@ -141,13 +243,32 @@ export function ringOffset(arcFraction: number): number {
   return RING_CIRCUMFERENCE * (1 - arcFraction)
 }
 
+/**
+ * The clock a row reads: the minute tick (`now`) when the sort is shown as
+ * how long ago (「3 小時前」), otherwise `today`, which changes only at local
+ * midnight, so other sorts do not re-render every row every minute.
+ */
+export function rowClock(
+  sort: SortFieldId,
+  today: number,
+  now: number,
+): number {
+  return sortField(sort).kind === 'ago' ? now : today
+}
+
 export interface RowProps {
   /** The merged object: unchanged torrents keep their reference (M1). */
   torrent: SlimTorrent
   /** This torrent's `stateBeforeMove` entry, if it is moving. */
   stateBeforeMove: string | undefined
-  /** `today()`'s value: changes only when the local date changes. */
+  /**
+   * `rowClock()`: changes only when the local date changes, or every minute
+   * while the sort is shown as how long ago.
+   */
   today: number
+  sort: SortFieldId
+  /** Extra sorts only: this torrent's key, `undefined` while loading. */
+  sortValue: SortValue | undefined
 }
 
 /**
@@ -158,9 +279,25 @@ export function rowProps(
   maindata: Pick<Maindata, 'torrents' | 'stateBeforeMove'>,
   hash: string,
   today: number,
+  sort: SortFieldId = DEFAULT_SORT_VIEW.sort,
+  /** The active extra sort's keys; `undefined` while loading. */
+  sortKeys?: SortKeys,
+  /** The first keys failed: no value instead of "loading". */
+  keysFailed = false,
 ): RowProps | null {
   if (!Object.hasOwn(maindata.torrents, hash)) return null
+  // Slim sorts read the torrent; only an extra sort's key is passed, so the
+  // row re-renders only when its own value changes. A hash the keys lack (a
+  // torrent added since the last sort-keys poll) is still loading
+  // (`undefined`); `null` means qBittorrent has no value.
+  let sortValue: SortValue | undefined
+  if (isExtraSortField(sort)) {
+    if (sortKeys && Object.hasOwn(sortKeys, hash)) sortValue = sortKeys[hash]
+    else if (keysFailed) sortValue = null
+  }
   return {
+    sort,
+    sortValue,
     torrent: maindata.torrents[hash],
     stateBeforeMove: Object.hasOwn(maindata.stateBeforeMove, hash)
       ? maindata.stateBeforeMove[hash]

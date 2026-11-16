@@ -120,7 +120,7 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label, no title',
+    '%s: every placeholder is disabled with its label; only the sort pill has a title',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
@@ -133,13 +133,28 @@ describe('the shell markup', () => {
         '設定',
         '搜尋',
         '新增種子',
-        '排序：加入時間，新的在前，列表',
         '分類：全部',
         '排序：加入時間，新的在前，列表',
       ])
-      expect(html).not.toMatch(/\stitle="/)
+      // Only the desktop sort pill has a tooltip (story 2.1).
+      expect(html.match(/\stitle="[^"]*"/g)).toEqual([
+        ' title="排序：加入時間，新的在前"',
+      ])
     },
   )
+
+  it('the desktop sort pill is enabled and opens a menu (story 2.1)', () => {
+    const html = CASES.H1()
+    const pill = openTags(html, 'button').find((tag) =>
+      tag.includes('aria-haspopup="menu"'),
+    )
+    expect(pill).toBeDefined()
+    expect(pill).not.toMatch(/\sdisabled=""/)
+    expect(attr(pill ?? '', 'aria-label')).toBe(
+      '排序：加入時間，新的在前，列表',
+    )
+    expect(text(html)).toContain('排序：加入時間 ↓')
+  })
 
   it('the selected 「全部」 tab is not disabled', () => {
     const html = CASES.H1()
