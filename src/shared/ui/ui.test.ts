@@ -87,7 +87,9 @@ describe('shadcn components (row 21)', () => {
   })
 
   it('leaves keyboard focus to the global :focus-visible outline', () => {
-    const files = readdirSync(UI_DIR).filter((file) => file.endsWith('.tsx'))
+    const files = readdirSync(UI_DIR).filter(
+      (file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'),
+    )
     expect(files.sort()).toEqual([
       'alert-bar.tsx',
       'button.tsx',

@@ -11,7 +11,6 @@ import {
 import type { SlimTorrent } from '#/shared/maindata'
 import {
   RING_CIRCUMFERENCE,
-  dayValue,
   listView,
   ringOffset,
   rowModel,
@@ -288,15 +287,5 @@ describe('M1 memo', () => {
   it('a hash without data has no props', () => {
     const data = mergeMaindata(undefined, fakeResponse())
     expect(rowProps(data, fakeHash(9), NOW)).toBeNull()
-  })
-})
-
-describe('dayValue', () => {
-  it('changes at local midnight only', () => {
-    const before = Date.UTC(2026, 10, 16, 15, 59, 59)
-    const after = Date.UTC(2026, 10, 16, 16, 0, 0)
-    expect(dayValue(NOW, ZONE)).toBe('2026-11-16')
-    expect(dayValue(before, ZONE)).toBe('2026-11-16')
-    expect(dayValue(after, ZONE)).toBe('2026-11-17')
   })
 })

@@ -31,7 +31,12 @@ updates:
     patterns: ['*']
     multi-ecosystem-group: ci-and-image
 
+  # A Node major moves .nvmrc, CI and the image together: Alex does it by
+  # hand. Here CI would test the old major while the image ran the new one.
   - package-ecosystem: docker
     directory: /
     patterns: ['*']
     multi-ecosystem-group: ci-and-image
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']

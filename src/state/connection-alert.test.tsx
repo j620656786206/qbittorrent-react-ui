@@ -82,7 +82,10 @@ describe('connectionAlertInput', () => {
         now: NOW,
       }),
     )
-    expect(alert?.text).toBe('連不到家裡的 NAS，最後更新 3 分前')
+    expect(alert).toMatchObject({
+      text: '連不到家裡的 NAS',
+      detail: '最後更新 3 分前',
+    })
   })
 
   it('H10: no data yet, home unreachable has no suffix', () => {
@@ -108,7 +111,7 @@ describe('loginConnectionAlertInput (LA1, LA2)', () => {
     expect(pickConnectionAlert(loginConnectionAlertInput([code]))).toEqual({
       kind: code,
       text,
-      tone: 'warning',
+      detail: null,
     })
   })
 
@@ -300,7 +303,7 @@ describe('useConnectionAlert itself (server render with a seeded client)', () =>
     expect(currentAlert(client)).toEqual({
       kind: 'home_unreachable',
       text: '連不到家裡的 NAS',
-      tone: 'warning',
+      detail: null,
     })
   })
 
@@ -309,7 +312,10 @@ describe('useConnectionAlert itself (server render with a seeded client)', () =>
     await client.prefetchQuery({ queryKey: MAINDATA_KEY })
     vi.setSystemTime(NOW + 3 * 60_000)
     markConnectionError('home_unreachable')
-    expect(currentAlert(client)?.text).toBe('連不到家裡的 NAS，最後更新 3 分前')
+    expect(currentAlert(client)).toMatchObject({
+      text: '連不到家裡的 NAS',
+      detail: '最後更新 3 分前',
+    })
   })
 
   it.each([

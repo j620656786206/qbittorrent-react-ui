@@ -22,11 +22,14 @@ export type ConnectionAlertKind =
 
 export interface ConnectionAlert {
   kind: ConnectionAlertKind
+  /** The problem itself (for `stale`, the 「最後更新」 line, which ticks). */
   text: string
-  /** `warning` uses `status-stalled`; `muted` is `text-muted`. */
-  tone: 'warning' | 'muted'
+  /**
+   * 「最後更新 N 前」 next to a problem, once the data is stale; it ticks, so
+   * the bar keeps it out of its live region. `null` otherwise.
+   */
+  detail: string | null
 }
-
 export interface ConnectionAlertInput {
   /** Every active code, from src/state/connection.ts. */
   errorCodes: ReadonlyArray<ConnectionCode>
@@ -51,32 +54,6 @@ function lastUpdated(lastSuccessAt: number | null, now: number): string | null {
   if (lastSuccessAt === null || lastSuccessAt <= 0) return null
   if (now - lastSuccessAt <= STALE_AFTER_MS) return null
   return `最後更新 ${formatAgo(lastSuccessAt / 1000, now)}`
-}
-
-/** Lower rank wins. Every ConnectionCode needs a row (a new code fails to compile). */
-type CodeRank = 0 | 1
-
-interface CodeAlert {
-  rank: CodeRank
-  /** Adds 「，最後更新 N 前」 once the data is stale. */
-  withLastUpdated: boolean
-}
-
-const CODE_ALERTS: Readonly<Record<ConnectionCode, CodeAlert>> = {
-  cloudflare_expired: { rank: 0, withLastUpdated: false },
-  home_unreachable: { rank: 1, withLastUpdated: true },
-  qbit_unreachable: { rank: 1, withLastUpdated: true },
-}
-
-/** The highest active code; on equal rank the one listed first. */
-function topCode(codes: ReadonlyArray<ConnectionCode>): ConnectionCode | null {
-  let top: ConnectionCode | null = null
-  for (const code of codes) {
-    if (top === null || CODE_ALERTS[code].rank < CODE_ALERTS[top].rank) {
-      top = code
-    }
-  }
-  return top
 }
 
 function isFetchStarting(fetchStartedAt: number | null, now: number): boolean {
@@ -109,69 +86,72 @@ interface KindRule {
   icon: 'offline' | 'warning'
   /** Content at 50%: the data on screen may be old. */
   dim: boolean
-  /** `warning` uses `status-stalled`; `muted` is `text-muted`. */
-  tone: 'warning' | 'muted'
+  /** Lower wins; on equal rank the one found first. */
+  rank: number
+  /** Adds 「最後更新 N 前」 as `detail` once the data is stale. */
+  withLastUpdated: boolean
 }
 
 const RETRY: AlertAction = { action: 'retry', label: '重試' }
 const RELOAD: AlertAction = { action: 'reload', label: '重新登入' }
 
-/** Every per-kind rule in one place; the helpers below only read it. */
+/**
+ * Every per-kind rule in one place; the helpers below only read it. Every
+ * kind needs a row (a new code fails to compile).
+ */
 const KIND_RULES: Readonly<Record<ConnectionAlertKind, KindRule>> = {
   cloudflare_expired: {
     surface: 'bar',
     action: RELOAD,
     icon: 'warning',
     dim: false,
-    tone: 'warning',
+    rank: 0,
+    withLastUpdated: false,
   },
   home_unreachable: {
     surface: 'bar',
     action: RETRY,
     icon: 'offline',
     dim: true,
-    tone: 'warning',
+    rank: 1,
+    withLastUpdated: true,
   },
   qbit_unreachable: {
     surface: 'bar',
     action: RETRY,
     icon: 'offline',
     dim: true,
-    tone: 'warning',
+    rank: 1,
+    withLastUpdated: true,
   },
   disconnected: {
     surface: 'speed',
     action: null,
     icon: 'warning',
     dim: false,
-    tone: 'warning',
+    rank: 2,
+    withLastUpdated: false,
   },
   firewalled: {
     surface: 'speed',
     action: null,
     icon: 'warning',
     dim: false,
-    tone: 'warning',
+    rank: 3,
+    withLastUpdated: false,
   },
   stale: {
     surface: 'stale',
     action: null,
     icon: 'warning',
     dim: false,
-    tone: 'muted',
+    rank: 4,
+    withLastUpdated: false,
   },
 }
 
 export function alertSurface(kind: ConnectionAlertKind): AlertSurface {
   return KIND_RULES[kind].surface
-}
-
-export function alertAction(kind: ConnectionAlertKind): AlertAction | null {
-  return KIND_RULES[kind].action
-}
-
-export function alertIcon(kind: ConnectionAlertKind): 'offline' | 'warning' {
-  return KIND_RULES[kind].icon
 }
 
 export function dimsContent(kind: ConnectionAlertKind): boolean {
@@ -192,65 +172,56 @@ export interface ConnectionBar {
 /** The bar for an alert, or `null` when it does not use the bar. */
 export function barFor(alert: ConnectionAlert | null): ConnectionBar | null {
   if (!alert) return null
-  const rule = KIND_RULES[alert.kind]
-  if (rule.surface !== 'bar' || !rule.action) return null
-  // Bar kinds are connection codes: their text starts with errorText(code).
-  const base = errorText(alert.kind as ConnectionCode)
-  const split = alert.text.startsWith(base)
-  const rest = split ? alert.text.slice(base.length).replace(/^，/, '') : ''
+  const { surface, action, icon } = KIND_RULES[alert.kind]
+  if (surface !== 'bar' || !action) return null
   return {
-    text: split ? base : alert.text,
-    detail: rest === '' ? null : rest,
-    icon: rule.icon,
-    action: rule.action.action,
-    actionLabel: rule.action.label,
+    text: alert.text,
+    detail: alert.detail,
+    icon,
+    action: action.action,
+    actionLabel: action.label,
   }
 }
 
-/** Runs the bar button's handler: the screen supplies what retry means. */
-export function runBarAction(
-  action: BarAction,
-  handlers: { retry: () => void; reload: () => void },
-): void {
-  handlers[action]()
+const STATUS_TEXT = {
+  disconnected: '斷線了',
+  firewalled: '防火牆擋住了',
+} as const
+
+/** Every alert that applies now, in the order found (codes first). */
+function activeKinds(
+  { errorCodes, connectionStatus, fetchStartedAt, now }: ConnectionAlertInput,
+  updated: string | null,
+): Array<ConnectionAlertKind> {
+  const kinds: Array<ConnectionAlertKind> = [...errorCodes]
+  if (
+    connectionStatus === 'disconnected' ||
+    connectionStatus === 'firewalled'
+  ) {
+    kinds.push(connectionStatus)
+  }
+  if (updated && !isFetchStarting(fetchStartedAt, now)) kinds.push('stale')
+  return kinds
 }
 
-export function pickConnectionAlert({
-  errorCodes,
-  connectionStatus,
-  lastSuccessAt,
-  fetchStartedAt,
-  now,
-}: ConnectionAlertInput): ConnectionAlert | null {
-  const updated = lastUpdated(lastSuccessAt, now)
-  const code = topCode(errorCodes)
-  if (code) {
-    const text = errorText(code)
-    return {
-      kind: code,
-      text:
-        CODE_ALERTS[code].withLastUpdated && updated
-          ? `${text}，${updated}`
-          : text,
-      tone: KIND_RULES[code].tone,
+export function pickConnectionAlert(
+  input: ConnectionAlertInput,
+): ConnectionAlert | null {
+  const updated = lastUpdated(input.lastSuccessAt, input.now)
+  let kind: ConnectionAlertKind | null = null
+  for (const candidate of activeKinds(input, updated)) {
+    if (kind === null || KIND_RULES[candidate].rank < KIND_RULES[kind].rank) {
+      kind = candidate
     }
   }
-  if (connectionStatus === 'disconnected') {
-    return {
-      kind: 'disconnected',
-      text: '斷線了',
-      tone: KIND_RULES.disconnected.tone,
-    }
+  if (kind === null) return null
+  if (kind === 'stale') return { kind, text: updated ?? '', detail: null }
+  return {
+    kind,
+    text:
+      kind === 'disconnected' || kind === 'firewalled'
+        ? STATUS_TEXT[kind]
+        : errorText(kind),
+    detail: KIND_RULES[kind].withLastUpdated ? updated : null,
   }
-  if (connectionStatus === 'firewalled') {
-    return {
-      kind: 'firewalled',
-      text: '防火牆擋住了',
-      tone: KIND_RULES.firewalled.tone,
-    }
-  }
-  if (updated && !isFetchStarting(fetchStartedAt, now)) {
-    return { kind: 'stale', text: updated, tone: KIND_RULES.stale.tone }
-  }
-  return null
 }

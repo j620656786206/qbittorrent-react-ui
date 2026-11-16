@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRetryGuard } from '#/features/header/retry-guard'
+import { createRetryGuard } from '#/state/maindata-retry'
 
 // Spec 1.7 review: 「重試」 shows a busy state and ignores presses meanwhile.
 
@@ -42,6 +42,20 @@ describe('createRetryGuard', () => {
     guard(() => failing.promise)
     failing.reject(new Error('x'))
     await failing.promise.catch(() => {})
+    await Promise.resolve()
+    expect(busy.mock.calls).toEqual([[true], [false]])
+    const next = vi.fn(async () => {})
+    guard(next)
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+
+  it('a run that throws synchronously still clears busy', async () => {
+    const busy = vi.fn()
+    const guard = createRetryGuard(busy)
+    guard(() => {
+      throw new Error('x')
+    })
+    await Promise.resolve()
     await Promise.resolve()
     expect(busy.mock.calls).toEqual([[true], [false]])
     const next = vi.fn(async () => {})

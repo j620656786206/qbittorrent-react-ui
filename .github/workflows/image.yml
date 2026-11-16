@@ -35,11 +35,12 @@ jobs:
           cache: npm
 
       # The squash commit on main was never tested as such: check it again.
+      # `npm audit` stays on the PR only: it reads outside advisory data, so a
+      # new advisory with no fix yet would block every push, fixes included.
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
       - run: npm run smoke
 
