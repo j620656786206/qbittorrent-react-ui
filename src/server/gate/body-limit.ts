@@ -1,13 +1,20 @@
 import { createMiddleware } from '@tanstack/react-start'
+import { isVerifiedSession } from '#/server/auth/verified'
 import { failureResponse } from '#/server/gate/respond'
 
 // AD-12 / AR-27. Start reads the body after middleware and the function id is
 // opaque here, so this enforces a request-level ceiling and passes the
 // measured size on; `guard()` compares it with each function's own limit.
+// `guard()` runs only after Start has read and parsed the body, so the
+// ceiling is decided here, before that: a request without a valid session
+// (anyone who has not logged in, and `login` itself) never gets more than
+// ANONYMOUS_BODY_LIMIT, however high MAX_REQUEST_BODY is raised later.
 
 export const DEFAULT_BODY_LIMIT = 65_536
 /** Request-level ceiling. Later stories raise it for uploads and hash lists. */
 export const MAX_REQUEST_BODY = DEFAULT_BODY_LIMIT
+/** Ceiling without a valid session. Stays 64 KB when MAX_REQUEST_BODY grows. */
+export const ANONYMOUS_BODY_LIMIT = 65_536
 
 export function tooLargeResponse(): Response {
   return failureResponse('invalid_input', 413)
@@ -54,9 +61,14 @@ export async function measureBody(
 }
 
 export const bodyLimit = createMiddleware().server(
-  async ({ request, handlerType, next }) => {
+  async ({ request, handlerType, context, next }) => {
     if (handlerType !== 'serverFn') return next()
-    const bodyBytes = await measureBody(request, MAX_REQUEST_BODY)
+    // Runs after sessionGate, which always sets `context.session`.
+    const session = (context as { session?: unknown } | undefined)?.session
+    const ceiling = isVerifiedSession(session)
+      ? MAX_REQUEST_BODY
+      : ANONYMOUS_BODY_LIMIT
+    const bodyBytes = await measureBody(request, ceiling)
     if (bodyBytes === null) return tooLargeResponse()
     return next({ context: { bodyBytes } })
   },

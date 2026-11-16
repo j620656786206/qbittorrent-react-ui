@@ -7,8 +7,8 @@ const loginInput = z.object({ username: z.string(), password: z.string() })
 
 export const login = serverPost
   .validator(input(loginInput))
-  .handler(guard({ input: loginInput, auth: 'public' }, async () => ok(null)))
+  .handler(guard({ auth: 'public' }, async () => ok(null)))
 
 export const publicLeak = serverPost
   .validator(input(loginInput))
-  .handler(guard({ input: loginInput, auth: 'public' }, async () => ok(null)))
+  .handler(guard({ auth: 'public' }, async () => ok(null)))

@@ -5,9 +5,10 @@ import {
 } from '#/server/auth/login-lockout'
 import { setSessionCookie, verifySession } from '#/server/auth/session'
 import { resetEnvCache } from '#/server/env'
-import { GUARDED } from '#/server/functions/_define'
+import { GUARDED, input } from '#/server/functions/_define'
 import type { Guarded } from '#/server/functions/_define'
 import { login } from '#/server/functions/login'
+import { loginInputSchema } from '#/shared/login'
 import type * as SessionModule from '#/server/auth/session'
 
 // Spec 1.4 rows L1, L2 and L8 through the real factory. The cookie helper
@@ -28,7 +29,11 @@ const FAKE_ENV = {
 }
 
 const guarded = (login as unknown as Record<symbol, Guarded>)[GUARDED]
-const run = (data: unknown) => guarded.run({ data, context: { session: null } })
+const run = (data: unknown) =>
+  guarded.run({
+    data: input(loginInputSchema)(data as never),
+    context: { session: null },
+  })
 
 let fetchSpy: ReturnType<typeof vi.fn>
 

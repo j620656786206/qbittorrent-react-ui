@@ -4,6 +4,9 @@ import type { SessionPayload } from '#/server/auth/session'
 
 // AR-26 "cookie before body": verify `rt_session` before any body byte is
 // read. Never rejects; the factory's `guard()` enforces login per function.
+// It always sets `session` (null when logged out), and `guard()` accepts only
+// a value from `verifySession` (`isVerifiedSession`), so a `session` key in the
+// client's own `payload.context` can never log anyone in.
 
 function sessionFrom(request: Request): SessionPayload | null {
   try {

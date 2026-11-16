@@ -274,6 +274,14 @@ describe('after a login stop', () => {
     })
   })
 
+  it('adds no store subscription on the server, where each request builds a client', () => {
+    vi.stubGlobal('window', undefined)
+    const subscribe = vi.spyOn(loginStore, 'subscribe')
+    createQueryClient()
+    createQueryClient()
+    expect(subscribe).not.toHaveBeenCalled()
+  })
+
   it('records nothing on the server (no window)', async () => {
     vi.stubGlobal('window', undefined)
     const fetchMock = route({

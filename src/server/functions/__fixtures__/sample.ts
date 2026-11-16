@@ -8,7 +8,7 @@ const sampleInput = z.object({ since: z.number().int().nonnegative() })
 export const getSample = serverGet
   .validator(input(sampleInput))
   .handler(
-    guard({ input: sampleInput, bodyLimit: 1024 }, async ({ input: data }) =>
+    guard({ bodyLimit: 1024, name: 'getSample' }, async ({ input: data }) =>
       ok({ since: data.since }),
     ),
   )

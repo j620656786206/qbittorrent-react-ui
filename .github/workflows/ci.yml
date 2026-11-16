@@ -19,6 +19,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # check.sh diffs against the base branch.
+          fetch-depth: 0
+
+      # The repo is public: no credentials, home addresses, private category
+      # names or em dashes, also for PRs that did not go through /ship.
+      - name: Public-repo check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash .claude/skills/next-story/check.sh "origin/$BASE_REF"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

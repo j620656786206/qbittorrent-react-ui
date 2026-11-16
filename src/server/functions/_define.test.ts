@@ -3,10 +3,16 @@ import { z } from 'zod'
 import { ServerFailure } from '#/server/errors/server-failure'
 import { ERROR_MESSAGES, ok } from '#/shared/errors'
 import { getSample } from './__fixtures__/sample'
-import { GUARDED, SERVER_FN_TIMEOUT_MS, guard } from './_define'
+import { GUARDED, SERVER_FN_TIMEOUT_MS, guard, input } from './_define'
 import type { Guarded } from './_define'
+import { testSession } from '#/server/auth/testing'
 
-const SESSION = { iat: 1, exp: 2 }
+const SESSION = testSession()
+const schema = z.object({ n: z.number() })
+/** What Start's server-side validator step hands the handler. */
+const parse = (data: unknown) => input(schema)(data as never)
+const sampleData = (data: unknown) =>
+  input(z.object({ since: z.number().int().nonnegative() }))(data as never)
 const FAKE_QBIT_URL = 'http://qbit.test.invalid:8080'
 
 function guardedOf(fn: unknown): Guarded {
@@ -27,11 +33,9 @@ function makeGuarded(
     name?: string
   } = {},
 ) {
-  const schema = z.object({ n: z.number() })
-  const safeParse = vi.spyOn(schema, 'safeParse')
   const spy = vi.fn(run)
-  const handler = guard({ input: schema, ...spec }, spy as never)
-  return { guarded: guardedOf(handler), run: spy, safeParse }
+  const handler = guard(spec, spy as never)
+  return { guarded: guardedOf(handler), run: spy }
 }
 
 let stdout: Array<string>
@@ -52,33 +56,65 @@ const logLines = () =>
   stdout.map((line) => JSON.parse(line) as Record<string, unknown>)
 
 describe('guard()', () => {
-  it('no session: not_logged_in, zod and handler not run', async () => {
-    const { guarded, run, safeParse } = makeGuarded(async () => ok(1))
+  it('no session: not_logged_in before input errors, handler not run', async () => {
+    const { guarded, run } = makeGuarded(async () => ok(1))
     expect(
-      await guarded.run({ data: { n: 1 }, context: { session: null } }),
+      await guarded.run({ data: parse({ n: 1 }), context: { session: null } }),
     ).toEqual({
       ok: false,
       error: { code: 'not_logged_in', message: ERROR_MESSAGES.not_logged_in },
     })
-    expect(await guarded.run({ data: { n: 1 } })).toMatchObject({
+    expect(await guarded.run({ data: parse({ n: 1 }) })).toMatchObject({
       error: { code: 'not_logged_in' },
     })
-    expect(safeParse).not.toHaveBeenCalled()
+    expect(
+      await guarded.run({ data: parse({ n: 'bad' }), context: {} }),
+    ).toMatchObject({ error: { code: 'not_logged_in' } })
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('ignores a session-shaped object that verifySession did not make', async () => {
+    // Start merges the client's payload.context under the gate's context, so
+    // guard() must not trust any object that merely looks like a session.
+    const { guarded, run } = makeGuarded(async () => ok(1))
+    for (const session of [{ iat: 1, exp: 9_999_999_999 }, { ...SESSION }]) {
+      expect(
+        await guarded.run({ data: parse({ n: 1 }), context: { session } }),
+      ).toMatchObject({ error: { code: 'not_logged_in' } })
+    }
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('data that did not come from input() is invalid_input', async () => {
+    // A function defined without `.validator(input(schema))` gets the
+    // client's data as is; guard() refuses it instead of trusting it.
+    const { guarded, run } = makeGuarded(async () => ok(1))
+    expect(
+      await guarded.run({
+        data: { n: 1 } as never,
+        context: { session: SESSION },
+      }),
+    ).toMatchObject({ error: { code: 'invalid_input' } })
     expect(run).not.toHaveBeenCalled()
   })
 
   it("auth: 'public' runs without a session", async () => {
-    const { guarded, run } = makeGuarded(async ({ input }) => ok(input.n), {
-      auth: 'public',
-    })
-    expect(await guarded.run({ data: { n: 7 }, context: {} })).toEqual(ok(7))
+    const { guarded, run } = makeGuarded(
+      async ({ input: data }) => ok(data.n),
+      {
+        auth: 'public',
+      },
+    )
+    expect(await guarded.run({ data: parse({ n: 7 }), context: {} })).toEqual(
+      ok(7),
+    )
     expect(run).toHaveBeenCalledTimes(1)
   })
 
   it('bad input: invalid_input with the fixed message, handler not run', async () => {
     const { guarded, run } = makeGuarded(async () => ok(1))
     const result = await guarded.run({
-      data: { n: 'nope' },
+      data: parse({ n: 'nope' }),
       context: { session: SESSION },
     })
     expect(result).toEqual({
@@ -90,9 +126,14 @@ describe('guard()', () => {
   })
 
   it('passes parsed input, session and a signal to the handler', async () => {
-    const { guarded, run } = makeGuarded(async ({ input }) => ok(input.n * 2))
+    const { guarded, run } = makeGuarded(async ({ input: data }) =>
+      ok(data.n * 2),
+    )
     expect(
-      await guarded.run({ data: { n: 4 }, context: { session: SESSION } }),
+      await guarded.run({
+        data: parse({ n: 4 }),
+        context: { session: SESSION },
+      }),
     ).toEqual(ok(8))
     const args = run.mock.calls[0][0] as {
       session: unknown
@@ -110,7 +151,7 @@ describe('guard()', () => {
       return new Promise(() => undefined)
     })
     const pending = guarded.run({
-      data: { n: 1 },
+      data: parse({ n: 1 }),
       context: { session: SESSION },
     })
     let settled = false
@@ -136,7 +177,7 @@ describe('guard()', () => {
         }),
     )
     const pending = guarded.run({
-      data: { n: 1 },
+      data: parse({ n: 1 }),
       context: { session: SESSION },
     })
     await vi.advanceTimersByTimeAsync(SERVER_FN_TIMEOUT_MS)
@@ -148,7 +189,10 @@ describe('guard()', () => {
       throw new ServerFailure('qbit_rejected', 'qBittorrent said Fails.')
     })
     expect(
-      await guarded.run({ data: { n: 1 }, context: { session: SESSION } }),
+      await guarded.run({
+        data: parse({ n: 1 }),
+        context: { session: SESSION },
+      }),
     ).toEqual({
       ok: false,
       error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
@@ -168,7 +212,7 @@ describe('guard()', () => {
       throw new Error(`connect ECONNREFUSED ${FAKE_QBIT_URL}`)
     })
     const result = await guarded.run({
-      data: { n: 1 },
+      data: parse({ n: 1 }),
       context: { session: SESSION },
     })
     expect(result).toEqual({
@@ -189,7 +233,10 @@ describe('guard()', () => {
       throw new TypeError('boom')
     })
     expect(
-      await guarded.run({ data: { n: 1 }, context: { session: SESSION } }),
+      await guarded.run({
+        data: parse({ n: 1 }),
+        context: { session: SESSION },
+      }),
     ).toMatchObject({
       error: { code: 'qbit_rejected' },
     })
@@ -203,7 +250,10 @@ describe('guard() hardening', () => {
       error: { code: 'qbit_rejected', message: `raw ${FAKE_QBIT_URL}` },
     }))
     expect(
-      await guarded.run({ data: { n: 1 }, context: { session: SESSION } }),
+      await guarded.run({
+        data: parse({ n: 1 }),
+        context: { session: SESSION },
+      }),
     ).toEqual({
       ok: false,
       error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
@@ -216,7 +266,10 @@ describe('guard() hardening', () => {
       error: { code: 'made_up', message: 'x' },
     }))
     expect(
-      await guarded.run({ data: { n: 1 }, context: { session: SESSION } }),
+      await guarded.run({
+        data: parse({ n: 1 }),
+        context: { session: SESSION },
+      }),
     ).toMatchObject({
       error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
     })
@@ -245,7 +298,7 @@ describe('guard() hardening', () => {
       },
       { name: 'getThing' },
     )
-    await guarded.run({ data: { n: 1 }, context: { session: SESSION } })
+    await guarded.run({ data: parse({ n: 1 }), context: { session: SESSION } })
     expect(logLines()).toEqual([
       expect.objectContaining({ event: 'server_fn_exception', fn: 'getThing' }),
     ])
@@ -264,7 +317,7 @@ describe('fixture getSample (bodyLimit 1024)', () => {
     const { guarded, run } = makeGuarded(async () => ok(1), { bodyLimit: 1024 })
     expect(
       await guarded.run({
-        data: { n: 1 },
+        data: parse({ n: 1 }),
         context: { session: SESSION, bodyBytes: 2000 },
       }),
     ).toMatchObject({
@@ -273,7 +326,7 @@ describe('fixture getSample (bodyLimit 1024)', () => {
     expect(run).not.toHaveBeenCalled()
     expect(
       await sample.run({
-        data: { since: 1 },
+        data: sampleData({ since: 1 }),
         context: { session: SESSION, bodyBytes: 2000 },
       }),
     ).toMatchObject({
@@ -284,11 +337,11 @@ describe('fixture getSample (bodyLimit 1024)', () => {
   it('the default limit is 64 KB', async () => {
     const { guarded } = makeGuarded(async () => ok(1))
     const at = await guarded.run({
-      data: { n: 1 },
+      data: parse({ n: 1 }),
       context: { session: SESSION, bodyBytes: 65_536 },
     })
     const over = await guarded.run({
-      data: { n: 1 },
+      data: parse({ n: 1 }),
       context: { session: SESSION, bodyBytes: 65_537 },
     })
     expect(at.ok).toBe(true)
@@ -298,7 +351,7 @@ describe('fixture getSample (bodyLimit 1024)', () => {
   it('succeeds with a session and valid input', async () => {
     expect(
       await sample.run({
-        data: { since: 5 },
+        data: sampleData({ since: 5 }),
         context: { session: SESSION, bodyBytes: 0 },
       }),
     ).toEqual(ok({ since: 5 }))

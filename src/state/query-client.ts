@@ -75,6 +75,11 @@ export function createQueryClient({
     },
   })
 
+  // The server builds a router (and so a client) for every request, /healthz
+  // included, and the store lives as long as the process: a subscription here
+  // would keep every one of those clients alive. Nothing polls on the server.
+  if (typeof window === 'undefined') return client
+
   // When login becomes required (polling stops) or is cleared (polling
   // resumes), make every observer re-read `pollInterval` now: an observer
   // only recomputes `refetchInterval` when its options are set.

@@ -1,12 +1,17 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { ESLint } from 'eslint'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import type { Linter } from 'eslint'
 
 // Guards the layer boundaries, the AD-10 raw-HTML bans, the AD-5
 // createServerFn ban, the cn and src/shared/ui bans and the AD-16
 // no-console rule in eslint.config.js.
 // If a plugin or resolver change silently disables them, these tests go red.
+//
+// Probes are linted from memory with `lintText` at virtual paths, so nothing
+// is written into src/ (a concurrent lint or commit never sees them). Import
+// targets are real files.
 
 const ROOT = join(import.meta.dirname, '..')
 
@@ -34,28 +39,34 @@ const RAW_HTML_SOURCE = [
   '',
 ].join('\n')
 
-// Files written for the test; targets only need to exist.
-const FIXTURES: Record<string, string> = {
-  'src/state/lint-probe-target.ts': 'export const target = 1\n',
-  'src/server/qbit/lint-probe-target.ts': 'export const target = 1\n',
-  'src/lib/lint-probe-target.ts': 'export const target = 1\n',
-  'src/features/lint-probe-b/target.ts': 'export const target = 1\n',
-  'src/lib/lint-probe-to-state.ts':
-    "import { target } from '#/state/lint-probe-target'\n\nexport const x = target\n",
-  'src/lib/lint-probe-to-root.ts':
-    "import { getRouter } from '../router'\n\nexport const x = getRouter\n",
-  'src/state/lint-probe-to-server.ts':
-    "import { target } from '#/server/qbit/lint-probe-target'\n\nexport const x = target\n",
-  'src/routes/-lint-probe-to-server.ts':
-    "import { target } from '#/server/qbit/lint-probe-target'\n\nexport const x = target\n",
-  'src/routes/-lint-probe-to-lib.ts':
-    "import { target } from '#/lib/lint-probe-target'\n\nexport const x = target\n",
-  'src/features/lint-probe-a/relative.ts':
-    "import { target } from '../lint-probe-b/target'\n\nexport const x = target\n",
-  'src/features/lint-probe-a/alias.ts':
-    "import { target } from '#/features/lint-probe-b/target'\n\nexport const x = target\n",
-  'src/lint-probe-root-to-lib.ts':
-    "import { target } from '#/lib/lint-probe-target'\n\nexport const x = target\n",
+/** A real feature to import across from a virtual sibling feature. */
+function realFeatureModule(): { name: string; file: string } {
+  const featuresDir = join(ROOT, 'src/features')
+  for (const name of readdirSync(featuresDir).sort()) {
+    const files = readdirSync(join(featuresDir, name)).filter(
+      (file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file),
+    )
+    if (files.length > 0) return { name, file: files[0].replace(/\.tsx?$/, '') }
+  }
+  throw new Error('src/features has no module to probe cross-feature imports')
+}
+
+const feature = realFeatureModule()
+const importFrom = (specifier: string, name: string) =>
+  `import { ${name} } from '${specifier}'\n\nexport const x = ${name}\n`
+
+const PROBES: Record<string, string> = {
+  'src/lib/lint-probe-to-state.ts': importFrom(
+    '#/state/polling',
+    'pollInterval',
+  ),
+  'src/lib/lint-probe-to-root.ts': importFrom('../router', 'getRouter'),
+  'src/state/lint-probe-to-server.ts': importFrom('#/server/log', 'log'),
+  'src/routes/-lint-probe-to-server.ts': importFrom('#/server/log', 'log'),
+  'src/routes/-lint-probe-to-lib.ts': importFrom('#/lib/app-error', 'AppError'),
+  'src/features/lint-probe/relative.ts': `import * as other from '../${feature.name}/${feature.file}'\n\nexport const x = other\n`,
+  'src/features/lint-probe/alias.ts': `import * as other from '#/features/${feature.name}/${feature.file}'\n\nexport const x = other\n`,
+  'src/lint-probe-root-to-lib.ts': importFrom('#/lib/app-error', 'AppError'),
   'src/components/lint-probe.ts': 'export const x = 1\n',
   [RAW_HTML_FILE]: RAW_HTML_SOURCE,
   'src/lib/lint-probe-create-server-fn.ts':
@@ -64,37 +75,34 @@ const FIXTURES: Record<string, string> = {
     "import { createServerFn as make } from '@tanstack/start-client-core'\n\nexport const x = make\n",
   'src/server/qbit/lint-probe-console.ts':
     "console.log('x')\n\nexport const x = 1\n",
-  'src/lib/lint-probe-define-alias.ts':
-    "import { serverGet } from '#/server/functions/_define'\n\nexport const x = serverGet\n",
-  'src/routes/-lint-probe-define-relative.ts':
-    "import { serverPost } from '../server/functions/_define.ts'\n\nexport const x = serverPost\n",
-  'src/routes/-lint-probe-cn.tsx':
-    "import { cn } from 'cn'\n\nexport const x = cn\n",
-  'src/server/qbit/lint-probe-ui.ts':
-    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
-  'src/server/qbit/lint-probe-ui-relative.ts':
-    "import { cn } from '../../shared/ui/cn'\n\nexport const x = cn\n",
-  'src/lib/lint-probe-ui.ts':
-    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
-  'src/state/lint-probe-ui.ts':
-    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
-  // Subfolder so server function discovery never picks it up.
+  'src/lib/lint-probe-define-alias.ts': importFrom(
+    '#/server/functions/_define',
+    'serverGet',
+  ),
+  'src/routes/-lint-probe-define-relative.ts': importFrom(
+    '../server/functions/_define.ts',
+    'serverPost',
+  ),
+  'src/routes/-lint-probe-cn.tsx': importFrom('cn', 'cn'),
+  'src/server/qbit/lint-probe-ui.ts': importFrom(
+    '#/shared/ui/button',
+    'Button',
+  ),
+  'src/server/qbit/lint-probe-ui-relative.ts': importFrom(
+    '../../shared/ui/cn',
+    'cn',
+  ),
+  'src/lib/lint-probe-ui.ts': importFrom('#/shared/ui/button', 'Button'),
+  'src/state/lint-probe-ui.ts': importFrom('#/shared/ui/button', 'Button'),
   'src/server/functions/lint-probe/ui.ts':
     "import { Button } from '#/shared/ui/button'\nimport { cn } from 'cn'\n\nexport const x = [Button, cn]\n",
-  'src/lib/lint-probe-cn.ts':
-    "import { cn } from 'cn'\n\nexport const x = cn\n",
-  'src/shared/lint-probe-ui.ts':
-    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
-  'src/routes/-lint-probe-ui.tsx':
-    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
-  'src/lib/lint-probe-zod.ts':
-    "import { z } from 'zod'\n\nexport const x = z\n",
-  'src/routes/-lint-probe-zod.ts':
-    "import { z } from 'zod/v4'\n\nexport const x = z\n",
-  'src/shared/lint-probe-zod.ts':
-    "import { z } from 'zod'\n\nexport const x = z\n",
-  'src/server/qbit/lint-probe-zod.ts':
-    "import { z } from 'zod'\n\nexport const x = z\n",
+  'src/lib/lint-probe-cn.ts': importFrom('cn', 'cn'),
+  'src/shared/lint-probe-ui.ts': importFrom('#/shared/ui/button', 'Button'),
+  'src/routes/-lint-probe-ui.tsx': importFrom('#/shared/ui/button', 'Button'),
+  'src/lib/lint-probe-zod.ts': importFrom('zod', 'z'),
+  'src/routes/-lint-probe-zod.ts': importFrom('zod/v4', 'z'),
+  'src/shared/lint-probe-zod.ts': importFrom('zod', 'z'),
+  'src/server/qbit/lint-probe-zod.ts': importFrom('zod', 'z'),
 }
 
 // Real files linted alongside the probes (read only).
@@ -105,8 +113,7 @@ const REAL_FILES = [
   'src/shared/zod.ts',
 ]
 
-const createdDirs: Array<string> = []
-const results = new Map<string, Array<ESLint.LintResult['messages'][number]>>()
+const results = new Map<string, Array<Linter.LintMessage>>()
 
 function ruleIds(file: string): Array<string | null> {
   const messages = results.get(file)
@@ -114,34 +121,49 @@ function ruleIds(file: string): Array<string | null> {
   return messages.map((message) => message.ruleId)
 }
 
-beforeAll(async () => {
-  for (const [file, source] of Object.entries(FIXTURES)) {
-    const dir = dirname(join(ROOT, file))
-    if (!existsSync(dir)) {
-      // Remember the outermost new directory so cleanup removes all of it.
-      let top = dir
-      while (!existsSync(dirname(top))) top = dirname(top)
-      createdDirs.push(top)
-      mkdirSync(dir, { recursive: true })
-    }
-    writeFileSync(join(ROOT, file), source)
+/**
+ * Virtual files are outside the TypeScript project, so rules that need type
+ * information are switched off for them. The rules under test need none.
+ */
+async function untypedOverride(): Promise<Linter.Config> {
+  const config = (await new ESLint({ cwd: ROOT }).calculateConfigForFile(
+    join(ROOT, 'src/lib/app-error.ts'),
+  )) as Linter.Config
+  const off: Linter.RulesRecord = {}
+  for (const id of Object.keys(config.rules ?? {})) {
+    const slash = id.lastIndexOf('/')
+    if (slash === -1) continue
+    const rule =
+      config.plugins?.[id.slice(0, slash)]?.rules?.[id.slice(slash + 1)]
+    const docs = rule?.meta?.docs as
+      { requiresTypeChecking?: boolean } | undefined
+    if (docs?.requiresTypeChecking) off[id] = 'off'
   }
+  return {
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      parserOptions: { project: false, projectService: false },
+    },
+    rules: off,
+  }
+}
 
-  const eslint = new ESLint({ cwd: ROOT })
-  const lintResults = await eslint.lintFiles([
-    ...Object.keys(FIXTURES),
-    ...REAL_FILES,
-  ])
-  for (const result of lintResults) {
+beforeAll(async () => {
+  const probes = new ESLint({
+    cwd: ROOT,
+    overrideConfig: await untypedOverride(),
+  })
+  for (const [file, source] of Object.entries(PROBES)) {
+    const [result] = await probes.lintText(source, {
+      filePath: join(ROOT, file),
+    })
+    results.set(file, result.messages)
+  }
+  const real = await new ESLint({ cwd: ROOT }).lintFiles(REAL_FILES)
+  for (const result of real) {
     results.set(relative(ROOT, result.filePath), result.messages)
   }
 }, 120_000)
-
-afterAll(() => {
-  for (const file of Object.keys(FIXTURES))
-    rmSync(join(ROOT, file), { force: true })
-  for (const dir of createdDirs) rmSync(dir, { recursive: true, force: true })
-})
 
 describe('layer boundaries', () => {
   it.each([
@@ -150,10 +172,13 @@ describe('layer boundaries', () => {
     ['state -> server', 'src/state/lint-probe-to-server.ts'],
     ['route -> server', 'src/routes/-lint-probe-to-server.ts'],
     [
-      'feature a -> feature b (relative)',
-      'src/features/lint-probe-a/relative.ts',
+      'feature -> another feature (relative)',
+      'src/features/lint-probe/relative.ts',
     ],
-    ['feature a -> feature b (#/ alias)', 'src/features/lint-probe-a/alias.ts'],
+    [
+      'feature -> another feature (#/ alias)',
+      'src/features/lint-probe/alias.ts',
+    ],
   ])('blocks %s', (_name, file) => {
     expect(ruleIds(file)).toContain('boundaries/dependencies')
   })
