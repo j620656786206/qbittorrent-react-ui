@@ -239,6 +239,15 @@ export function formatDate(
   return `${then.year}/${monthDay}`
 }
 
+/**
+ * The calendar day of an instant in the zone (runtime's when left out), for
+ * "did the date change" checks: 「2026-11-16」.
+ */
+export function formatDayKey(epochMs: number, timeZone?: string): string {
+  const { year, month, day } = zonedParts(epochMs, timeZone)
+  return `${year}-${pad2(month)}-${pad2(day)}`
+}
+
 /** Single largest unit, floored. Under 10 s (or in the future) is 「剛剛」. */
 function formatElapsed(ms: number): string {
   const seconds = Math.floor(ms / 1000)

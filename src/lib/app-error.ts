@@ -75,3 +75,20 @@ export function classifyResponse(response: Response): ErrorCode | null {
   }
   return null
 }
+
+/**
+ * Spec 1.8 V2, option A: a failed maindata load the screen must show itself.
+ * Connection codes and `timeout` (read as qBittorrent not responding) have
+ * the alert bar, the login-stop codes the login screen; every other failure
+ * (`qbit_rejected`, `bad_origin`, `invalid_input`, or a thrown bug) has no
+ * other surface. `null` (no error) is not one.
+ */
+export function isFirstLoadError(error: unknown): boolean {
+  if (error === null || error === undefined) return false
+  if (!isAppError(error)) return true
+  return (
+    !isConnectionCode(error.code) &&
+    !isLoginStopCode(error.code) &&
+    error.code !== 'timeout'
+  )
+}

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { isFirstLoadError } from '#/lib/app-error'
 import { runBarAction } from '#/lib/connection-alert'
 import type { BarAction } from '#/lib/connection-alert'
 import { countAll } from '#/lib/visible-torrents'
@@ -10,6 +11,7 @@ import {
   selectServerState,
   useMaindata,
 } from '#/state/maindata'
+import { useMaindataFailure } from '#/state/maindata-failure'
 import { headerModel } from '#/features/header/header-model'
 import type { HeaderModel } from '#/features/header/header-model'
 import { createRetryGuard } from '#/features/header/retry-guard'
@@ -37,6 +39,7 @@ export function useHeader(): HeaderState {
 export function HeaderProvider({ children }: { children: ReactNode }) {
   const alert = useConnectionAlert()
   const { data: serverState } = useMaindata(selectServerState)
+  const failure = useMaindataFailure()
   const { data: allCount } = useMaindata(countAll)
   const queryClient = useQueryClient()
   const [retrying, setRetrying] = useState(false)
@@ -52,7 +55,12 @@ export function HeaderProvider({ children }: { children: ReactNode }) {
   )
 
   const value: HeaderState = {
-    model: headerModel({ serverState, alert, allCount }),
+    model: headerModel({
+      serverState,
+      alert,
+      allCount,
+      loadFailed: serverState === undefined && isFirstLoadError(failure),
+    }),
     retrying,
     onBarAction,
   }

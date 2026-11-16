@@ -5,6 +5,7 @@ import {
   formatAgo,
   formatCount,
   formatDate,
+  formatDayKey,
   formatDuration,
   formatEta,
   formatPercent,
@@ -234,5 +235,19 @@ describe('formatSpeedLimitFull (spoken limit, spec 1.7)', () => {
     [512_000, '上限 500 KB/s'],
   ] as const)('%s -> %s', (value, text) => {
     expect(formatSpeedLimitFull(value)).toBe(text)
+  })
+})
+
+// Spec 1.8: the day key behind the list's `today`.
+describe('formatDayKey', () => {
+  it('the zoned calendar day, changing at local midnight', () => {
+    expect(formatDayKey(NOW, TAIPEI)).toBe('2026-11-16')
+    expect(formatDayKey(Date.UTC(2026, 10, 16, 15, 59, 59), TAIPEI)).toBe(
+      '2026-11-16',
+    )
+    expect(formatDayKey(Date.UTC(2026, 10, 16, 16, 0, 0), TAIPEI)).toBe(
+      '2026-11-17',
+    )
+    expect(formatDayKey(NOW, 'UTC')).toBe('2026-11-16')
   })
 })

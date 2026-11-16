@@ -1,10 +1,12 @@
-// Dev-only fake qBittorrent for screenshots and browser checks (spec 1.7).
-// No dependencies. Never imported from src/, never run in CI, never shipped
-// in .output. Never talks to a real qBittorrent and never reads .env.
+// Dev-only fake qBittorrent for screenshots and browser checks (specs 1.7,
+// 1.8). No dependencies. Never imported from src/, never run in CI, never
+// shipped in .output. Never talks to a real qBittorrent and never reads .env.
+// Fake data only: code-name categories (X, mteam-X, mteam-tv), fake paths
+// and fake hashes.
 //
 // 1. Starts a fake qBittorrent on a free loopback port:
 //    POST /api/v2/auth/login answers `Ok.` with `Set-Cookie: SID=fake`;
-//    GET /api/v2/sync/maindata answers six fake torrents (two archived) and a
+//    GET /api/v2/sync/maindata answers the torrents of the `data` mode and a
 //    mode-driven server_state, always as a full update.
 // 2. Boots the built server (.output/server/index.mjs) with fake env, the
 //    inherited app variables removed (like scripts/smoke-built-server.mjs).
@@ -12,14 +14,22 @@
 //    forwards to it and can pretend to be a broken path from outside.
 //
 // Usage: npm run fake-qbit [-- --port 3100]  (also --port=3100)
-// Switch modes (loopback only):
-//   curl -X POST 'http://localhost:3100/__fake/mode?qbit=normal&front=normal'
-//   qbit:  normal | alt | firewalled | disconnected | slow | down
-//          (slow delays maindata 25 s; down closes every connection)
+// Switch modes (loopback only; any subset of the parameters):
+//   curl -X POST 'http://localhost:3100/__fake/mode?qbit=normal&front=normal&data=sample&grow=0'
+//   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
+//          (slow delays maindata 25 s; down closes every connection;
+//          rejected answers maindata with 200 `not json`, so the container
+//          returns qbit_rejected)
 //   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
 //          (down answers 502 to server function calls; the three Cloudflare
 //          forms answer requests with X-Requested-With with a 401, a 302 to
 //          an Access login page, or a 200 HTML login page)
+//   data:  sample | many | empty | archived
+//          (sample: six torrents, two archived, 「全部 4」; many: 4165
+//          visible plus 50 archived, the newest 12 cover every status, a
+//          name over 200 characters and three markup names, speeds change on
+//          every request; empty: none; archived: only archived ones)
+//   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
@@ -57,7 +67,10 @@ const QBIT_MODES = new Set([
   'disconnected',
   'slow',
   'down',
+  'rejected',
 ])
+const DATA_MODES = new Set(['sample', 'many', 'empty', 'archived'])
+const GROW_MODES = new Set(['0', '1'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -68,7 +81,7 @@ const FRONT_MODES = new Set([
 // A reserved name (RFC 2606): never resolves, never leaves this machine.
 const ACCESS_LOGIN = 'https://access.example/cdn-cgi/access/login'
 const ACCESS_PAGE = '<!doctype html><html><body><h1>Sign in</h1></body></html>'
-const mode = { qbit: 'normal', front: 'normal' }
+const mode = { qbit: 'normal', front: 'normal', data: 'sample', grow: '0' }
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
 function frontPort() {
@@ -103,6 +116,7 @@ function freePort() {
 // so 「全部 4」. Code-name categories, fake hashes, fake paths only.
 const hash = (n) => n.toString(16).padStart(40, '0')
 const HOUR = 3600
+const DAY = 24 * HOUR
 const BASE_TIME = Math.floor(Date.UTC(2026, 10, 15, 1, 0, 0) / 1000)
 function torrent(n, fields) {
   return [
@@ -126,7 +140,7 @@ function torrent(n, fields) {
     },
   ]
 }
-const TORRENTS = Object.fromEntries([
+const SAMPLE = Object.fromEntries([
   torrent(1, { dlspeed: 6_510_000, eta: 2040, progress: 0.87 }),
   torrent(2, {
     state: 'uploading',
@@ -149,6 +163,160 @@ const TORRENTS = Object.fromEntries([
   torrent(5, { state: 'missingFiles', progress: 1 }),
   torrent(6, { state: 'missingFiles', progress: 1, category: 'mteam-tv' }),
 ])
+
+// Spec 1.8 `data=many`: 4165 visible torrents plus 50 archived. Numbers
+// from 1000 up so the hashes never meet the sample's.
+const MANY_VISIBLE = 4165
+const MANY_ARCHIVED = 50
+/** Added time of the newest `many` torrent: fixed, so screenshots repeat. */
+const MANY_NEWEST = BASE_TIME + 10 * HOUR
+const LONG_NAME = `Fake.Long.Name.${'Season.Pack.Extended.Edition.'.repeat(8)}2160p.WEB-DL`
+const MARKUP_NAMES = [
+  '<script>alert(1)</script>',
+  '<img src=x onerror=alert(1)>',
+  'javascript:alert(1)',
+]
+const SEED = {
+  category: 'mteam-tv',
+  save_path: '/data/torrent/mteam-seed',
+  private: true,
+}
+/** The newest 12, newest first: every status the list draws. */
+const NEWEST = [
+  { state: 'downloading', progress: 0.87, eta: 2040 },
+  { name: MARKUP_NAMES[0], state: 'pausedDL', progress: 0.45 },
+  { name: LONG_NAME, state: 'stalledDL', progress: 0.87, category: 'mteam-X' },
+  {
+    ...SEED,
+    state: 'uploading',
+    progress: 1,
+    ratio: 3.12,
+    seeding_time: 41 * DAY,
+  },
+  {
+    state: 'stoppedUP',
+    progress: 1,
+    ratio: 0.88,
+    completion_on: MANY_NEWEST - HOUR,
+  },
+  { name: MARKUP_NAMES[1], state: 'error', progress: 0.3 },
+  { ...SEED, state: 'missingFiles', progress: 1, ratio: 1 },
+  { state: 'moving', progress: 1, ratio: -1 },
+  { name: MARKUP_NAMES[2], state: 'unknown', progress: 0.1 },
+  { state: 'downloading', progress: 0, eta: 8_640_000 },
+  { state: 'queuedDL', progress: 0.12, category: 'mteam-X' },
+  {
+    ...SEED,
+    state: 'stalledUP',
+    progress: 1,
+    ratio: 1.42,
+    seeding_time: 9 * DAY,
+  },
+]
+const BULK_STATES = [
+  'stoppedUP',
+  'uploading',
+  'stalledUP',
+  'pausedDL',
+  'downloading',
+]
+
+function manyTorrent(index) {
+  const n = 1000 + index
+  const added_on = MANY_NEWEST - index * 47 * 60
+  const base = {
+    name: `Fake.Show.${n}.S01E${String((index % 24) + 1).padStart(2, '0')}.1080p`,
+    state: BULK_STATES[index % BULK_STATES.length],
+    progress: 1,
+    size: (2 + (index % 40)) * 1024 ** 3,
+    ratio: (index % 300) / 100,
+    added_on,
+    completion_on: added_on + HOUR,
+    seeding_time: (index % 400) * DAY,
+    save_path:
+      index % 3 === 0
+        ? '/data/torrent/mteam-seed'
+        : '/data/media/X/incompleted',
+    category: ['X', 'mteam-X', 'mteam-tv'][index % 3],
+    private: index % 3 === 0,
+  }
+  if (base.state === 'pausedDL' || base.state === 'downloading') {
+    base.progress = ((index * 37) % 100) / 100
+    base.completion_on = -1
+    base.seeding_time = 0
+  }
+  const fields = { ...base, ...(NEWEST[index] ?? {}) }
+  // Like qBittorrent: an incomplete torrent never completed or seeded.
+  if (fields.progress < 1) {
+    fields.completion_on = -1
+    fields.seeding_time = 0
+  }
+  return torrent(n, fields)
+}
+
+const MANY = Object.fromEntries([
+  ...Array.from({ length: MANY_VISIBLE }, (_, index) => manyTorrent(index)),
+  ...Array.from({ length: MANY_ARCHIVED }, (_, index) =>
+    torrent(9000 + index, {
+      name: `Fake.Archived.${index}.1080p`,
+      state: 'missingFiles',
+      progress: 1,
+      added_on: MANY_NEWEST - (index + 1) * 13 * 60,
+    }),
+  ),
+])
+
+const ARCHIVED = Object.fromEntries(
+  Array.from({ length: 6 }, (_, index) =>
+    torrent(9500 + index, {
+      name: `Fake.Archived.${index}.1080p`,
+      state: 'missingFiles',
+      progress: 1,
+    }),
+  ),
+)
+
+const DATA = { sample: SAMPLE, many: MANY, empty: {}, archived: ARCHIVED }
+
+/** `grow=1`: one newer torrent per maindata request, newest on top. */
+const grown = {}
+let growCount = 0
+
+function addGrown() {
+  growCount += 1
+  const n = 20_000 + growCount
+  const [key, value] = torrent(n, {
+    name: `Fake.New.${growCount}.S01E01.1080p`,
+    progress: 0.01,
+    dlspeed: 1_200_000,
+    eta: 3600,
+    added_on: MANY_NEWEST + growCount * 60,
+  })
+  grown[key] = value
+}
+
+/** In `many`, downloading and seeding speeds move on every request. */
+function withSpeeds(torrents, tick) {
+  const out = {}
+  for (const [key, value] of Object.entries(torrents)) {
+    const wave = ((Number.parseInt(key.slice(-4), 16) + tick * 7) % 50) + 1
+    if (value.state === 'downloading' && value.progress > 0) {
+      out[key] = { ...value, dlspeed: wave * 130_000, upspeed: wave * 3_000 }
+    } else if (value.state === 'uploading') {
+      out[key] = { ...value, upspeed: wave * 50_000 }
+    } else {
+      out[key] = value
+    }
+  }
+  return out
+}
+
+function currentTorrents(tick) {
+  const base = DATA[mode.data]
+  const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
+  return growCount > 0 ? { ...torrents, ...grown } : torrents
+}
+
 const CATEGORIES = {
   X: { name: 'X', savePath: '/data/media/X' },
   'mteam-X': { name: 'mteam-X', savePath: '/data/torrent/mteam-seed' },
@@ -211,14 +379,16 @@ const fakeQbit = createServer(async (req, res) => {
     if (mode.qbit === 'slow') {
       await new Promise((resolve) => setTimeout(resolve, SLOW_MS))
     }
+    if (mode.qbit === 'rejected') return send(res, 200, 'not json')
     rid += 1
+    if (mode.grow === '1') addGrown()
     return send(
       res,
       200,
       JSON.stringify({
         rid,
         full_update: true,
-        torrents: TORRENTS,
+        torrents: currentTorrents(rid),
         categories: CATEGORIES,
         server_state: serverState(),
       }),
@@ -240,15 +410,29 @@ function controlMode(req, res, url) {
   if (!isLoopback(req.socket.remoteAddress))
     return send(res, 403, 'loopback only\n')
   if (req.method === 'POST') {
-    const qbit = url.searchParams.get('qbit')
-    const front = url.searchParams.get('front')
-    if (qbit !== null && !QBIT_MODES.has(qbit))
-      return send(res, 400, `unknown qbit mode: ${qbit}\n`)
-    if (front !== null && !FRONT_MODES.has(front))
-      return send(res, 400, `unknown front mode: ${front}\n`)
-    if (qbit !== null) mode.qbit = qbit
-    if (front !== null) mode.front = front
-    console.log(`mode: qbit=${mode.qbit} front=${mode.front}`)
+    const allowed = {
+      qbit: QBIT_MODES,
+      front: FRONT_MODES,
+      data: DATA_MODES,
+      grow: GROW_MODES,
+    }
+    const next = {}
+    for (const [name, values] of Object.entries(allowed)) {
+      const value = url.searchParams.get(name)
+      if (value === null) continue
+      if (!values.has(value))
+        return send(res, 400, `unknown ${name} mode: ${value}\n`)
+      next[name] = value
+    }
+    // A new data set or growth turned off starts without grown torrents.
+    if ((next.data && next.data !== mode.data) || next.grow === '0') {
+      for (const key of Object.keys(grown)) delete grown[key]
+      growCount = 0
+    }
+    Object.assign(mode, next)
+    console.log(
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow}`,
+    )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
   }
@@ -411,9 +595,11 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal'
-  qbit:  normal | alt | firewalled | disconnected | slow | down
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0'
+  qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
+  data:  sample | many | empty | archived
+  grow:  0 | 1
 Ctrl+C stops everything.`)
 }
 

@@ -18,6 +18,10 @@ import {
   unlessLoginRequired,
 } from '#/state/login-required'
 import { MAINDATA_KEY, maindataQueryDefaults } from '#/state/maindata'
+import {
+  clearMaindataFailure,
+  markMaindataFailure,
+} from '#/state/maindata-failure'
 import type { FetchMaindata } from '#/state/maindata'
 
 // AR-35, AD-9: one QueryClient per router. The global `onError` is the only
@@ -70,6 +74,8 @@ export function createQueryClient({
   let badOriginLogged = false
 
   const onError = (error: unknown, fromMaindata: boolean) => {
+    // Kept until the next maindata success (spec 1.8 V2, H1).
+    if (fromMaindata) markMaindataFailure(error)
     // The container answered this maindata call: home and qBittorrent are
     // reachable, whatever else went wrong.
     if (
@@ -111,7 +117,9 @@ export function createQueryClient({
       onError: (error, query) =>
         onError(error, query.queryHash === MAINDATA_HASH),
       onSuccess: (_data, query) => {
-        if (query.queryHash === MAINDATA_HASH) clearConnectionErrors()
+        if (query.queryHash !== MAINDATA_HASH) return
+        clearConnectionErrors()
+        clearMaindataFailure()
       },
     }),
     mutationCache: new MutationCache({

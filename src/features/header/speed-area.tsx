@@ -1,6 +1,9 @@
 import { ArrowDown, ArrowUp, TriangleAlert } from 'lucide-react'
+import { NO_VALUE } from '#/lib/format'
 import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
+import { focusMain } from '#/shared/ui/main-scroll'
+import { Skeleton } from '#/shared/ui/skeleton'
 import { useHeader } from '#/features/header/header-context'
 import type { SpeedGroup } from '#/features/header/header-model'
 
@@ -11,12 +14,8 @@ import type { SpeedGroup } from '#/features/header/header-model'
 //
 // Screen readers get one sentence per group with the unit
 // (「上傳 2.38 MB/s，上限 32.7 MB/s」); the visible parts are hidden from them.
-// While there is no data yet the area is `aria-busy`.
-
-export const MAIN_ID = 'rt-main'
-
-/** The bar's focus target when it disappears under a focused button. */
-export const focusMain = () => document.getElementById(MAIN_ID)
+// While there is no data yet the area is `aria-busy`; when the first load
+// failed (spec 1.8 option A) each group reads 「沒有」 instead.
 
 const ARROWS = {
   down: { Icon: ArrowDown, label: '下載', color: 'text-status-downloading' },
@@ -31,18 +30,6 @@ const SKELETON: Record<Direction, [string, string]> = {
   up: ['h-3 w-[100px] rounded-[6px]', 'h-2.5 w-[104px] rounded-[5px]'],
 }
 
-export function Skeleton({ className }: { className: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'block flex-none animate-skeleton bg-surface-muted',
-        className,
-      )}
-    />
-  )
-}
-
 function Arrow({ direction, size }: { direction: Direction; size: number }) {
   const { Icon, color } = ARROWS[direction]
   return (
@@ -55,21 +42,36 @@ function Arrow({ direction, size }: { direction: Direction; size: number }) {
   )
 }
 
-/** The visible speed and limit, plus the spoken sentence (or the skeleton). */
+/**
+ * The visible speed and limit, plus the spoken sentence; before data the
+ * skeleton, or 「沒有」 once the first load failed.
+ */
 function GroupContent({
   direction,
   group,
+  loading,
   skeleton,
 }: {
   direction: Direction
   group: SpeedGroup | null
+  loading: boolean
   skeleton: string
 }) {
-  if (!group) {
+  if (!group && loading) {
     return (
       <>
         <Skeleton className={skeleton} />
         <span className="sr-only">{ARROWS[direction].label}</span>
+      </>
+    )
+  }
+  if (!group) {
+    return (
+      <>
+        <span aria-hidden="true" className="text-text-muted">
+          {NO_VALUE}
+        </span>
+        <span className="sr-only">{`${ARROWS[direction].label} ${NO_VALUE}`}</span>
       </>
     )
   }
@@ -87,19 +89,22 @@ function GroupContent({
 function SpeedPill({
   direction,
   group,
+  loading,
 }: {
   direction: Direction
   group: SpeedGroup | null
+  loading: boolean
 }) {
   return (
     <span
-      aria-busy={group ? undefined : true}
+      aria-busy={!group && loading ? true : undefined}
       className="inline-flex flex-none items-center gap-1.5 rounded-full border bg-surface px-3.5 py-[7px] whitespace-nowrap tabular-nums"
     >
       <Arrow direction={direction} size={14} />
       <GroupContent
         direction={direction}
         group={group}
+        loading={loading}
         skeleton={SKELETON[direction][0]}
       />
     </span>
@@ -123,8 +128,16 @@ export function DesktopSpeed() {
         </span>
       ) : (
         <>
-          <SpeedPill direction="down" group={model.speeds?.down ?? null} />
-          <SpeedPill direction="up" group={model.speeds?.up ?? null} />
+          <SpeedPill
+            direction="down"
+            group={model.speeds?.down ?? null}
+            loading={model.loading}
+          />
+          <SpeedPill
+            direction="up"
+            group={model.speeds?.up ?? null}
+            loading={model.loading}
+          />
         </>
       )}
       {model.staleText && (
@@ -139,9 +152,11 @@ export function DesktopSpeed() {
 function PhoneGroup({
   direction,
   group,
+  loading,
 }: {
   direction: Direction
   group: SpeedGroup | null
+  loading: boolean
 }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -149,6 +164,7 @@ function PhoneGroup({
       <GroupContent
         direction={direction}
         group={group}
+        loading={loading}
         skeleton={SKELETON[direction][1]}
       />
     </span>
@@ -190,11 +206,19 @@ export function PhoneLine() {
   }
   return (
     <p
-      aria-busy={model.speeds ? undefined : true}
+      aria-busy={!model.speeds && model.loading ? true : undefined}
       className="m-0 flex flex-wrap items-center gap-x-3 text-[12px] leading-[1.4] tabular-nums"
     >
-      <PhoneGroup direction="down" group={model.speeds?.down ?? null} />
-      <PhoneGroup direction="up" group={model.speeds?.up ?? null} />
+      <PhoneGroup
+        direction="down"
+        group={model.speeds?.down ?? null}
+        loading={model.loading}
+      />
+      <PhoneGroup
+        direction="up"
+        group={model.speeds?.up ?? null}
+        loading={model.loading}
+      />
       {model.staleText && (
         <span className="whitespace-nowrap text-text-muted">
           {model.staleText}

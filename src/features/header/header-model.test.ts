@@ -48,6 +48,7 @@ describe('H1 normal', () => {
           spoken: '上傳 2.38 MB/s，上限 32.7 MB/s',
         },
       },
+      loading: false,
       warning: null,
       staleText: null,
       phoneLine: 'speeds',
@@ -255,5 +256,43 @@ describe('H11 count', () => {
       allCount: countAll(maindata),
     })
     expect(model.allCount).toBe(4)
+  })
+})
+
+// Spec 1.8 row H1 (option A): the first load failed with a code that has no
+// alert; the header leaves its skeletons.
+describe('spec 1.8 H1 first-load error', () => {
+  it('no data and qbit_rejected: not loading, no speeds, no count, no bar', () => {
+    const model = headerModel({
+      serverState: undefined,
+      alert: null,
+      allCount: undefined,
+      loadFailed: true,
+    })
+    expect(model.loading).toBe(false)
+    expect(model.speeds).toBeNull()
+    expect(model.allCount).toBeNull()
+    expect(model.bar).toBeNull()
+    expect(model.dim).toBe(false)
+  })
+
+  it('no data and no failure: loading (skeletons)', () => {
+    const model = headerModel({
+      serverState: undefined,
+      alert: null,
+      allCount: undefined,
+    })
+    expect(model.loading).toBe(true)
+  })
+
+  it('data wins over an old failure', () => {
+    const model = headerModel({
+      serverState: normal,
+      alert: null,
+      allCount: 4,
+      loadFailed: true,
+    })
+    expect(model.loading).toBe(false)
+    expect(model.speeds).not.toBeNull()
   })
 })
