@@ -48,7 +48,7 @@ development_status:
   epic-1-retrospective: done
 
   epic-2: in-progress
-  2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: review
+  2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: done  # PR #16：Playwright 瀏覽器 smoke、中文找不到頁面、登入和 _authed 接線測試
   2-1-51-種排序和電腦排序選單: backlog
   2-2-底部面板和手機排序面板: backlog
   2-3-看板-電腦-5-欄和手機狀態分頁: backlog
