@@ -403,11 +403,19 @@ describe('sorting', () => {
       })
     })
     expect(shownNames()).toEqual(['T0', 'T1', 'T2'])
-    expect(bigCells().map((cell) => cell.textContent)).toEqual([
+    const noValue = [
       '做種人數（連上的） 沒有',
       '做種人數（連上的） 沒有',
       '做種人數（連上的） 沒有',
-    ])
+    ]
+    expect(bigCells().map((cell) => cell.textContent)).toEqual(noValue)
+    // The next poll starts: Query clears its own error while it runs, the
+    // rows keep reading 沒有 instead of blinking back to skeletons.
+    await act(async () => {
+      void client.refetchQueries({ queryKey: ['sort-keys', 'num_seeds'] })
+    })
+    expect(sortKeyCalls).toHaveLength(2)
+    expect(bigCells().map((cell) => cell.textContent)).toEqual(noValue)
     await poll(delta([torrent(5)]))
     expect(shownNames()).toEqual(['T5', 'T0', 'T1', 'T2'])
   })

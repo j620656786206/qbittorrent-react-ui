@@ -96,15 +96,18 @@ const fetchSortKeys = bindFetchSortKeys(getSortKeys)
 export function TorrentList() {
   const { view } = useListView()
   const extraField = isExtraSortField(view.sort) ? view.sort : null
-  const { data: sortKeysData, isError: keysError } = useSortKeys(
+  const { data: sortKeysData, errorUpdateCount } = useSortKeys(
     extraField,
     fetchSortKeys,
   )
   const sortKeys = extraField ? sortKeysData?.keys : undefined
   // The first keys failed: every value reads 「沒有」 (the connection alert,
   // if any, explains why) and the order shown stays, with new torrents on
-  // top, until a later poll brings keys and the list sorts.
-  const keysFailed = extraField !== null && sortKeys === undefined && keysError
+  // top, until a later poll brings keys and the list sorts. Sticky: with no
+  // data Query resets `isError` each time a poll starts, while
+  // `errorUpdateCount` only grows (epic 2 review).
+  const keysFailed =
+    extraField !== null && sortKeys === undefined && errorUpdateCount > 0
   const { data: live } = useVisibleTorrents(view, sortKeys)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()

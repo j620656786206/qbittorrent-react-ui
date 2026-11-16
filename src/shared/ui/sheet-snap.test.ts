@@ -4,8 +4,8 @@ import {
   releaseVelocity,
   settleSheet,
   sheetRestHeight,
-} from '#/lib/sheet-snap'
-import type { SheetMode, SheetRelease } from '#/shared/sheet'
+} from '#/shared/ui/sheet-snap'
+import type { SheetMode, SheetRelease } from '#/shared/ui/sheet-snap'
 
 // Spec 2.2 rows B6 to B8: where a released drag ends, per mode.
 

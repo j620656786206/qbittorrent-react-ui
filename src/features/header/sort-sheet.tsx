@@ -11,6 +11,7 @@ import { BottomSheet } from '#/shared/ui/bottom-sheet'
 import { cn } from '#/shared/ui/cn'
 import { getMain } from '#/shared/ui/main-scroll'
 import { useListView } from '#/state/list-view'
+import { useSheetOrderHold } from '#/state/order-freeze'
 import {
   directionWords,
   pickSort,
@@ -97,6 +98,8 @@ export function PhoneSortSheet({
   const selectedRef = useRef<HTMLButtonElement>(null)
   const groupIdPrefix = useId()
   const words = directionWords(view)
+  // The torrent list behind the sheet keeps its order while it is open.
+  useSheetOrderHold(open)
 
   // The sheet is the phone's container: at desktop width (the pill is
   // hidden there) it closes, and focus falls back to `main`.

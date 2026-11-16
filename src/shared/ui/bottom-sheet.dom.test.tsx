@@ -3,21 +3,19 @@ import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SheetRuntime, SheetSnap } from '#/shared/sheet'
 import {
   BottomSheet,
   SHEET_EASING,
   SHEET_MOTION_MS,
-  SheetRuntimeContext,
-  bodyTouchAction,
-  shouldDragSheet,
 } from '#/shared/ui/bottom-sheet'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
+import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
 
 // Spec 2.2 rows B1 to B5, B10, B14: the shared bottom sheet's wiring in a
-// DOM. happy-dom has no layout, so the viewport height is stubbed and the
-// snap decisions come from a stubbed runtime (src/lib/sheet-snap.test.ts
-// covers the real ones).
+// DOM, with the real snap decisions (src/shared/ui/sheet-snap.test.ts covers
+// them per mode). happy-dom has no layout, so the viewport and the content
+// heights are stubbed: a `fit` sheet with 400px of content rests at 400px.
+// Holding the list order is the caller's (sort-sheet.dom.test.tsx).
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -30,20 +28,12 @@ let root: Root
 let container: HTMLElement
 let main: HTMLElement
 let opener: HTMLButtonElement
-let snap: SheetSnap
-const release = vi.fn()
-const runtime: SheetRuntime = {
-  restHeight: vi.fn(() => REST),
-  settle: vi.fn(() => snap),
-  releaseVelocity: vi.fn(() => 0),
-  holdOrder: vi.fn(() => release),
-}
 const onOpenChange = vi.fn()
 
 function Harness({ initial = true }: { initial?: boolean }) {
   const [open, setOpen] = useState(initial)
   return (
-    <SheetRuntimeContext value={runtime}>
+    <>
       <button type="button" id="reopen" onClick={() => setOpen(true)}>
         open
       </button>
@@ -58,7 +48,7 @@ function Harness({ initial = true }: { initial?: boolean }) {
         <button type="button">第一個</button>
         <button type="button">最後一個</button>
       </BottomSheet>
-    </SheetRuntimeContext>
+    </>
   )
 }
 
@@ -96,12 +86,17 @@ function pointer(
   target.dispatchEvent(event)
 }
 
+/**
+ * A slow drag: the last move comes 500ms before the release, so the release
+ * speed is 0 and only the distance decides. The first move passes the slop
+ * (the drag counts from there).
+ */
 async function drag(target: Element, from: number, to: number) {
   await act(async () => {
     pointer(target, 'pointerdown', from)
     pointer(target, 'pointermove', from + Math.sign(to - from) * 10, 10)
-    pointer(target, 'pointermove', to, 20)
-    pointer(target, 'pointerup', to, 30)
+    pointer(target, 'pointermove', to, 500)
+    pointer(target, 'pointerup', to, 1000)
   })
 }
 
@@ -110,7 +105,6 @@ let reducedMotion = true
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   vi.clearAllMocks()
-  snap = 'rest'
   reducedMotion = true
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
@@ -121,10 +115,13 @@ beforeEach(() => {
         removeEventListener: () => {},
       }) as unknown as MediaQueryList,
   )
-  // The sheet is a fixed box as tall as the screen.
+  // The sheet is a fixed box as tall as the screen; its content is REST tall.
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
     function (this: HTMLElement) {
-      return this.getAttribute('role') === 'dialog' ? VIEWPORT : 0
+      if (this.getAttribute('role') === 'dialog') return VIEWPORT
+      return this.parentElement?.dataset.slot === 'bottom-sheet-content'
+        ? REST
+        : 0
     },
   )
   main = document.createElement('main')
@@ -164,21 +161,18 @@ describe('B1 open', () => {
     expect(sheet?.style.paddingBottom).toBe(`${VIEWPORT - REST}px`)
   })
 
-  it('holds the list order while open (B9) and locks the page scroll (B14)', async () => {
+  it('locks the page scroll while open (B14)', async () => {
     await mount()
-    expect(runtime.holdOrder).toHaveBeenCalledTimes(1)
-    expect(release).not.toHaveBeenCalled()
     for (const element of [document.documentElement, document.body, main]) {
       expect(element.style.overflow).toBe('hidden')
     }
     await act(async () => closeButton()?.click())
-    expect(release).toHaveBeenCalledTimes(1)
     for (const element of [document.documentElement, document.body, main]) {
       expect(element.style.overflow).toBe('')
     }
   })
 
-  it('a closed sheet renders nothing and needs no runtime', async () => {
+  it('a closed sheet renders nothing', async () => {
     await act(async () =>
       root.render(
         <BottomSheet open={false} onOpenChange={() => {}} title="排序">
@@ -241,7 +235,7 @@ describe('B3 to B5 drag', () => {
     await act(async () => {
       pointer(handle() as Element, 'pointerdown', 500)
       pointer(handle() as Element, 'pointermove', 510, 10)
-      pointer(sheet, 'pointermove', 600, 20)
+      pointer(sheet, 'pointermove', 600, 500)
     })
     expect(sheet.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST + 90}px, 0)`,
@@ -249,8 +243,12 @@ describe('B3 to B5 drag', () => {
     expect(sheet.style.paddingBottom).toBe(`${VIEWPORT - REST}px`)
     // No text selection while a drag is on.
     expect(sheet.className).toContain('select-none')
-    await act(async () => pointer(sheet, 'pointerup', 600, 30))
+    await act(async () => pointer(sheet, 'pointerup', 600, 1000))
     expect(sheet.className).not.toContain('select-none')
+    // 90px down and slow: back to the rest height.
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
   })
 
   it('a mouse whose button went up unseen ends the drag; hovering then moves nothing', async () => {
@@ -260,14 +258,13 @@ describe('B3 to B5 drag', () => {
     await act(async () => {
       pointer(handle() as Element, 'pointerdown', 500, 0, mouse(1))
       pointer(handle() as Element, 'pointermove', 510, 10, mouse(1))
-      pointer(sheet, 'pointermove', 530, 20, mouse(1))
+      pointer(sheet, 'pointermove', 530, 500, mouse(1))
     })
     expect(sheet.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST + 20}px, 0)`,
     )
     // The pointerup was lost (window blur); the next move has no button.
-    await act(async () => pointer(sheet, 'pointermove', 540, 30, mouse(0)))
-    expect(runtime.settle).toHaveBeenCalledTimes(1)
+    await act(async () => pointer(sheet, 'pointermove', 540, 1000, mouse(0)))
     expect(sheet.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST}px, 0)`,
     )
@@ -280,21 +277,13 @@ describe('B3 to B5 drag', () => {
 
   it('B3 released past the threshold closes; below it springs back', async () => {
     await mount()
-    snap = 'rest'
+    // 50px down: above the close line (a quarter of 400px), springs back.
     await drag(handle() as Element, 500, 560)
-    expect(runtime.settle).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        mode: 'fit',
-        expanded: false,
-        restHeight: REST,
-        viewportHeight: VIEWPORT,
-        distance: 50,
-      }),
-    )
+    expect(onOpenChange).not.toHaveBeenCalled()
     expect(dialog()?.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST}px, 0)`,
     )
-    snap = 'close'
+    // 190px down: past it, closes.
     await drag(handle() as Element, 500, 700)
     expect(onOpenChange).toHaveBeenLastCalledWith(false)
     expect(dialog()).toBeNull()
@@ -349,9 +338,14 @@ describe('B3 to B5 drag', () => {
         expanded: true,
       }),
     ).toBe(true)
-    expect(bodyTouchAction({ scrollTop: 0, canScroll: false })).toBe('none')
-    expect(bodyTouchAction({ scrollTop: 0, canScroll: true })).toBe('pan-down')
-    expect(bodyTouchAction({ scrollTop: 5, canScroll: true })).toBe('pan-y')
+    const touch = (scrollTop: number, canScroll: boolean, panDown: boolean) =>
+      bodyTouchAction({ scrollTop, canScroll, panDown })
+    expect(touch(0, false, true)).toBe('none')
+    expect(touch(0, true, true)).toBe('pan-down')
+    expect(touch(5, true, true)).toBe('pan-y')
+    // Safari has no pan-down: scrollable content always pans natively.
+    expect(touch(0, false, false)).toBe('none')
+    expect(touch(0, true, false)).toBe('pan-y')
   })
 
   it('B4 in the DOM: content scrolled down, a downward drag never settles', async () => {
@@ -362,7 +356,7 @@ describe('B3 to B5 drag', () => {
     vi.spyOn(body, 'clientHeight', 'get').mockReturnValue(300)
     const row = body.querySelector('button') as HTMLElement
     await drag(row, 300, 400)
-    expect(runtime.settle).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
     expect(dialog()?.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST}px, 0)`,
     )
@@ -392,7 +386,7 @@ describe('B3 to B5 drag', () => {
 
   it('B5 up to full screen: offset 0, corners 0, safe-area padding, handle stays', async () => {
     await mount()
-    snap = 'full'
+    // 190px up: past a quarter of 400px, full screen.
     await drag(handle() as Element, 500, 300)
     const sheet = dialog() as HTMLElement
     expect(sheet.style.transform).toBe('translate3d(0, 0px, 0)')
@@ -402,13 +396,15 @@ describe('B3 to B5 drag', () => {
     expect(sheet.className).not.toContain('rounded-t-sheet')
     expect(sheet.style.paddingBottom).toBe('0px')
     expect(handle()?.querySelector('span')).not.toBeNull()
-    // From full screen the next release reports `expanded`.
-    snap = 'rest'
+    // From full screen: 90px down stays full screen, 290px (past a quarter
+    // of the screen) goes back to the rest height.
     await drag(handle() as Element, 100, 200)
-    expect(runtime.settle).toHaveBeenLastCalledWith(
-      expect.objectContaining({ expanded: true, distance: 90 }),
-    )
+    expect(sheet.dataset.fullScreen).toBe('true')
+    await drag(handle() as Element, 100, 400)
     expect(sheet.dataset.fullScreen).toBeUndefined()
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
   })
 })
 
@@ -459,16 +455,18 @@ describe('B10 motion', () => {
     reducedMotion = true
     const { animate } = fakeAnimate()
     await mount()
-    snap = 'rest'
     await act(async () => {
       pointer(handle() as Element, 'pointerdown', 500)
       pointer(handle() as Element, 'pointermove', 520, 10)
-      pointer(handle() as Element, 'pointermove', 540, 20)
+      pointer(handle() as Element, 'pointermove', 540, 500)
     })
     expect(dialog()?.style.transform).toBe(
       `translate3d(0, ${VIEWPORT - REST + 20}px, 0)`,
     )
-    await act(async () => pointer(handle() as Element, 'pointerup', 540, 30))
+    await act(async () => pointer(handle() as Element, 'pointerup', 540, 1000))
+    expect(dialog()?.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
     // A later click (not the one the release makes) works again.
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
     await act(async () => closeButton()?.click())
@@ -518,14 +516,12 @@ describe('B10 motion', () => {
     expect(scrim()?.className).not.toContain('pointer-events-none')
     expect(dialog()?.contains(document.activeElement)).toBe(true)
     expect(dialog()?.hasAttribute('inert')).toBe(false)
-    // The whole session is back: scroll lock, inert page, order freeze.
+    // The whole session is back: scroll lock, inert page.
     for (const element of [document.documentElement, document.body, main]) {
       expect(element.style.overflow).toBe('hidden')
     }
     expect(main.hasAttribute('inert')).toBe(true)
     expect(opener.hasAttribute('inert')).toBe(true)
-    expect(runtime.holdOrder).toHaveBeenCalledTimes(2)
-    expect(release).toHaveBeenCalledTimes(1)
     // And it closes again.
     await act(async () =>
       document.dispatchEvent(
@@ -533,14 +529,12 @@ describe('B10 motion', () => {
       ),
     )
     expect(dialog()?.getAttribute('data-state')).toBe('closing')
-    expect(release).toHaveBeenCalledTimes(2)
   })
 
   it('B2 reopen while a full-screen sheet closes: it rests at its height again', async () => {
     reducedMotion = false
     fakeAnimate()
     await mount()
-    snap = 'full'
     await drag(handle() as Element, 500, 300)
     expect(dialog()?.dataset.fullScreen).toBe('true')
     // Past the release's own click.
@@ -581,10 +575,13 @@ describe('B10 motion', () => {
     )
     try {
       await mount()
-      snap = 'rest'
+      // Caught 200px below the rest and moved 30px: from the rest that would
+      // be 230px, past the close line; counted from the catch it springs back.
       await drag(handle() as Element, 500, 540)
-      expect(runtime.settle).toHaveBeenLastCalledWith(
-        expect.objectContaining({ distance: 30 }),
+      expect(onOpenChange).not.toHaveBeenCalled()
+      expect(dialog()?.getAttribute('data-state')).toBe('open')
+      expect(dialog()?.style.transform).toBe(
+        `translate3d(0, ${VIEWPORT - REST}px, 0)`,
       )
     } finally {
       vi.unstubAllGlobals()
@@ -593,10 +590,10 @@ describe('B10 motion', () => {
 })
 
 describe('page around the sheet', () => {
-  it('unmounted while open: the freeze ends and the scroll lock is undone', async () => {
+  it('unmounted while open: the scroll lock and inert are undone', async () => {
     await mount()
     await act(async () => root.unmount())
-    expect(release).toHaveBeenCalledTimes(1)
+    expect(main.hasAttribute('inert')).toBe(false)
     for (const element of [document.documentElement, document.body, main]) {
       expect(element.style.overflow).toBe('')
     }
@@ -622,19 +619,48 @@ describe('page around the sheet', () => {
     already.remove()
   })
 
+  function stubPanDown(supported: boolean) {
+    vi.stubGlobal('CSS', {
+      supports: (property: string, value: string) =>
+        property === 'touch-action' && value === 'pan-down' && supported,
+    })
+  }
+
   it("the content's touch-action: none when short, pan-down at the top, pan-y once scrolled", async () => {
-    await mount()
-    const body = content() as HTMLElement
-    expect(body.style.touchAction).toBe('none')
-    let top = 0
-    vi.spyOn(body, 'scrollTop', 'get').mockImplementation(() => top)
-    vi.spyOn(body, 'scrollHeight', 'get').mockReturnValue(2000)
-    vi.spyOn(body, 'clientHeight', 'get').mockReturnValue(300)
-    await act(async () => body.dispatchEvent(new Event('scroll')))
-    expect(body.style.touchAction).toBe('pan-down')
-    top = 40
-    await act(async () => body.dispatchEvent(new Event('scroll')))
-    expect(body.style.touchAction).toBe('pan-y')
+    stubPanDown(true)
+    try {
+      await mount()
+      const body = content() as HTMLElement
+      expect(body.style.touchAction).toBe('none')
+      let top = 0
+      vi.spyOn(body, 'scrollTop', 'get').mockImplementation(() => top)
+      vi.spyOn(body, 'scrollHeight', 'get').mockReturnValue(2000)
+      vi.spyOn(body, 'clientHeight', 'get').mockReturnValue(300)
+      await act(async () => body.dispatchEvent(new Event('scroll')))
+      expect(body.style.touchAction).toBe('pan-down')
+      top = 40
+      await act(async () => body.dispatchEvent(new Event('scroll')))
+      expect(body.style.touchAction).toBe('pan-y')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('without pan-down (Safari) content that grew scrollable gets pan-y, never stays none', async () => {
+    stubPanDown(false)
+    try {
+      await mount()
+      const body = content() as HTMLElement
+      expect(body.style.touchAction).toBe('none')
+      // 更多 opened: the content scrolls now, still at the top.
+      vi.spyOn(body, 'scrollTop', 'get').mockReturnValue(0)
+      vi.spyOn(body, 'scrollHeight', 'get').mockReturnValue(2000)
+      vi.spyOn(body, 'clientHeight', 'get').mockReturnValue(300)
+      await act(async () => body.dispatchEvent(new Event('scroll')))
+      expect(body.style.touchAction).toBe('pan-y')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('a press that turned into a scroll past the slop does not click its row', async () => {
@@ -653,6 +679,6 @@ describe('page around the sheet', () => {
       row.click()
     })
     expect(onClick).not.toHaveBeenCalled()
-    expect(runtime.settle).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 })

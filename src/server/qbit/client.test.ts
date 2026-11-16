@@ -69,7 +69,8 @@ describe('qBittorrent client', () => {
     expect([...(call?.query.entries() ?? [])]).toEqual([['rid', '7']])
     expect(Object.keys(raw.torrents ?? {})).toEqual([HASH_A])
     // The sort extras stay (story 2.1); the tracker only as its hostname,
-    // the magnet, download path and external addresses not at all.
+    // renamed tracker_domain; the magnet, download path and external
+    // addresses not at all.
     expect(raw.torrents?.[HASH_A]).toEqual({
       name: 'A',
       private: true,
@@ -78,7 +79,7 @@ describe('qBittorrent client', () => {
       root_path: LEAK_MARKERS.root_path,
       infohash_v1: LEAK_MARKERS.infohash_v1,
       infohash_v2: LEAK_MARKERS.infohash_v2,
-      tracker: 'fake-tracker-marker.invalid',
+      tracker_domain: 'fake-tracker-marker.invalid',
     })
     expect(Object.keys(raw.server_state ?? {}).sort()).toEqual(
       [

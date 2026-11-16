@@ -13,81 +13,65 @@ import type { ExtraSortFieldId } from '#/shared/sort-fields'
 // hostname is. comment, content_path, root_path and the infohashes leave
 // the container only here, each for its own field.
 
-/**
- * What the extras table keeps per torrent, raw (it floors a copy for its
- * change check only); `null` is "qBittorrent has not said".
- */
-export interface SortExtras {
-  time_active: number | null
-  last_activity: number | null
-  seen_complete: number | null
-  amount_left: number | null
-  availability: number | null
-  downloaded: number | null
-  uploaded: number | null
-  downloaded_session: number | null
-  uploaded_session: number | null
-  popularity: number | null
-  total_size: number | null
-  num_seeds: number | null
-  num_leechs: number | null
-  num_complete: number | null
-  num_incomplete: number | null
-  /** The tracker URL's hostname, computed when the answer is parsed. */
-  tracker_domain: string | null
-  trackers_count: number | null
-  content_path: string | null
-  root_path: string | null
-  dl_limit: number | null
-  up_limit: number | null
-  ratio_limit: number | null
-  /** Minutes, as qBittorrent sends it. */
-  seeding_time_limit: number | null
-  /** Minutes, as qBittorrent sends it. */
-  inactive_seeding_time_limit: number | null
-  priority: number | null
-  reannounce: number | null
-  infohash_v1: string | null
-  infohash_v2: string | null
-  has_metadata: boolean | null
-  comment: string | null
-  /** Seconds, as qBittorrent sends it; only for the average download speed. */
-  seeding_time: number | null
-}
+// A field qBittorrent left out, sent as null or sent in a shape this app
+// does not expect is `null` ("qBittorrent has not said"): a sort extra must
+// never make the answer unusable.
+const extraNumber = z.number().nullable().catch(null)
+const extraString = z.string().nullable().catch(null)
+const extraBoolean = z.boolean().nullable().catch(null)
 
-export const SORT_EXTRAS_FIELDS = Object.freeze([
-  'time_active',
-  'last_activity',
-  'seen_complete',
-  'amount_left',
-  'availability',
-  'downloaded',
-  'uploaded',
-  'downloaded_session',
-  'uploaded_session',
-  'popularity',
-  'total_size',
-  'num_seeds',
-  'num_leechs',
-  'num_complete',
-  'num_incomplete',
-  'tracker_domain',
-  'trackers_count',
-  'content_path',
-  'root_path',
-  'dl_limit',
-  'up_limit',
-  'ratio_limit',
-  'seeding_time_limit',
-  'inactive_seeding_time_limit',
-  'priority',
-  'reannounce',
-  'infohash_v1',
-  'infohash_v2',
-  'has_metadata',
-  'comment',
-  'seeding_time',
-] as const satisfies ReadonlyArray<keyof SortExtras>)
+/**
+ * The one list of sort extras: what the extras table keeps per torrent, raw
+ * (it floors a copy for its change check only). `SortExtras`,
+ * `SORT_EXTRAS_FIELDS`, the empty row and the raw qBittorrent schema
+ * (src/server/qbit/maindata-schema.ts) all come from it.
+ */
+export const sortExtrasSchema = z.object({
+  time_active: extraNumber,
+  last_activity: extraNumber,
+  seen_complete: extraNumber,
+  amount_left: extraNumber,
+  availability: extraNumber,
+  downloaded: extraNumber,
+  uploaded: extraNumber,
+  downloaded_session: extraNumber,
+  uploaded_session: extraNumber,
+  popularity: extraNumber,
+  total_size: extraNumber,
+  num_seeds: extraNumber,
+  num_leechs: extraNumber,
+  num_complete: extraNumber,
+  num_incomplete: extraNumber,
+  /** The tracker URL's hostname, computed when the answer is parsed. */
+  tracker_domain: extraString,
+  trackers_count: extraNumber,
+  content_path: extraString,
+  root_path: extraString,
+  dl_limit: extraNumber,
+  up_limit: extraNumber,
+  ratio_limit: extraNumber,
+  /** Minutes, as qBittorrent sends it. */
+  seeding_time_limit: extraNumber,
+  /** Minutes, as qBittorrent sends it. */
+  inactive_seeding_time_limit: extraNumber,
+  priority: extraNumber,
+  reannounce: extraNumber,
+  infohash_v1: extraString,
+  infohash_v2: extraString,
+  has_metadata: extraBoolean,
+  comment: extraString,
+  /** Seconds, as qBittorrent sends it; only for the average download speed. */
+  seeding_time: extraNumber,
+})
+
+export type SortExtras = z.output<typeof sortExtrasSchema>
+
+export const SORT_EXTRAS_FIELDS = sortExtrasSchema.keyof().options
+
+/** Every extra `null`: a torrent qBittorrent has said nothing about yet. */
+export function emptySortExtras(): SortExtras {
+  return sortExtrasSchema.parse({})
+}
 
 /** A sort value: a number, text, a yes/no, or nothing. */
 export type SortValue = number | string | boolean | null

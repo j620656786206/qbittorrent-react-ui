@@ -3,32 +3,17 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { releaseVelocity, settleSheet, sheetRestHeight } from '#/lib/sheet-snap'
 import type { SortView } from '#/shared/list-search'
-import type { SheetRuntime } from '#/shared/sheet'
-import { SheetRuntimeContext } from '#/shared/ui/bottom-sheet'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
-import {
-  freezeStore,
-  holdOrderForSheet,
-  resetOrderFreeze,
-} from '#/state/order-freeze'
+import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { DESKTOP_QUERY, PhoneSortPill } from '#/features/header/sort-sheet'
 
 // Spec 2.2 rows B1, B2, B9, B11 to B13: the phone sort pill and its sheet,
-// with the real snap functions and order freeze (src/router.tsx binds the
-// same ones).
+// with the real snap functions and order freeze.
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
-}
-
-const RUNTIME: SheetRuntime = {
-  restHeight: sheetRestHeight,
-  settle: settleSheet,
-  releaseVelocity,
-  holdOrder: holdOrderForSheet,
 }
 
 let desktop = false
@@ -44,11 +29,9 @@ const setView = vi.fn((next: SortView) => {
 
 function render() {
   root.render(
-    <SheetRuntimeContext value={RUNTIME}>
-      <ListViewContext value={{ view, setView }}>
-        <PhoneSortPill />
-      </ListViewContext>
-    </SheetRuntimeContext>,
+    <ListViewContext value={{ view, setView }}>
+      <PhoneSortPill />
+    </ListViewContext>,
   )
 }
 

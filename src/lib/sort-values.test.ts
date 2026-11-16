@@ -7,17 +7,14 @@ import {
   trackerDomainOf,
 } from '#/lib/sort-values'
 import { t } from '#/lib/testing'
-import { SORT_EXTRAS_FIELDS } from '#/shared/sort-keys'
+import { emptySortExtras } from '#/shared/sort-keys'
 import type { SortExtras } from '#/shared/sort-keys'
 
 // Spec 2.1: the value each sort compares, and the derived fields per
 // VueTorrent v2.37.0 (row S10 for the tracker domain).
 
 function extras(overrides: Partial<SortExtras> = {}): SortExtras {
-  const base = Object.fromEntries(
-    SORT_EXTRAS_FIELDS.map((name) => [name, null]),
-  ) as unknown as SortExtras
-  return { ...base, ...overrides }
+  return { ...emptySortExtras(), ...overrides }
 }
 
 describe('trackerDomainOf (S10)', () => {
