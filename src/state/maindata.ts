@@ -24,7 +24,7 @@ import { pollInterval } from '#/state/polling'
 // src/state may not import server functions, so src/router.tsx passes
 // `bindFetchMaindata(getMaindata)` to createQueryClient. Screens read the
 // data with `useMaindata(select)` and the stable selectors below; the header
-// alert uses `useConnectionAlert` from src/state/connection.ts.
+// alert uses `useConnectionAlert` from src/state/connection-alert.ts.
 
 export const MAINDATA_KEY = ['maindata'] as const
 export const MAINDATA_POLL_MS = 5000

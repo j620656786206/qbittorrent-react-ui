@@ -1,7 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CONNECTION_CODES } from '#/lib/app-error'
-import { FETCH_GRACE_MS, pickConnectionAlert } from '#/lib/connection-alert'
-import type { ConnectionAlertInput } from '#/lib/connection-alert'
+import {
+  FETCH_GRACE_MS,
+  alertAction,
+  alertIcon,
+  alertSurface,
+  barFor,
+  dimsContent,
+  pickConnectionAlert,
+  runBarAction,
+} from '#/lib/connection-alert'
+import type {
+  ConnectionAlertInput,
+  ConnectionAlertKind,
+} from '#/lib/connection-alert'
 
 // Spec 1.6 rows A1 to A3, plus the review rows A4 (suffix only when stale,
 // never-fetched, fetch in flight) and A5 (a fetch that hangs past the grace
@@ -232,5 +244,110 @@ describe('C6 every connection code has an alert', () => {
         input({ errorCodes: ['qbit_unreachable', 'home_unreachable'] }),
       )?.kind,
     ).toBe('qbit_unreachable')
+  })
+})
+
+describe('S1 stale while a fetch is in flight (spec 1.7)', () => {
+  const lastSuccessAt = NOW - 25_000
+  it.each([
+    [
+      'started just inside the grace time',
+      NOW - (FETCH_GRACE_MS - 1_000),
+      null,
+    ],
+    ['started past the grace time', NOW - (FETCH_GRACE_MS + 1_000), 'stale'],
+    ['no fetch', null, 'stale'],
+  ] as const)('%s', (_name, fetchStartedAt, kind) => {
+    const alert = pickConnectionAlert(input({ lastSuccessAt, fetchStartedAt }))
+    expect(alert === null ? null : alert.kind).toBe(kind)
+    if (alert) expect(alert.text).toBe('最後更新 25 秒前')
+  })
+})
+
+describe('spec 1.7 surface, action, icon and dim per kind', () => {
+  it.each([
+    ['cloudflare_expired', 'bar', 'reload', '重新登入', 'warning', false],
+    ['home_unreachable', 'bar', 'retry', '重試', 'offline', true],
+    ['qbit_unreachable', 'bar', 'retry', '重試', 'offline', true],
+    ['disconnected', 'speed', null, null, 'warning', false],
+    ['firewalled', 'speed', null, null, 'warning', false],
+    ['stale', 'stale', null, null, 'warning', false],
+  ] as const)(
+    '%s',
+    (kind: ConnectionAlertKind, surface, action, label, icon, dim) => {
+      expect(alertSurface(kind)).toBe(surface)
+      const decided = alertAction(kind)
+      expect(decided?.action ?? null).toBe(action)
+      expect(decided?.label ?? null).toBe(label)
+      expect(alertIcon(kind)).toBe(icon)
+      expect(dimsContent(kind)).toBe(dim)
+    },
+  )
+})
+
+describe('spec 1.7 barFor: the one bar decision for both screens', () => {
+  it('splits the ticking 「最後更新」 part out of the stable text', () => {
+    const alert = pickConnectionAlert(
+      input({ errorCodes: ['home_unreachable'], lastSuccessAt: THREE_MIN_AGO }),
+    )
+    expect(barFor(alert)).toEqual({
+      text: '連不到家裡的 NAS',
+      detail: '最後更新 3 分前',
+      icon: 'offline',
+      action: 'retry',
+      actionLabel: '重試',
+    })
+  })
+
+  it.each([
+    [
+      'cloudflare_expired',
+      'Cloudflare 登入過期了',
+      'warning',
+      'reload',
+      '重新登入',
+    ],
+    [
+      'qbit_unreachable',
+      '家裡的 qBittorrent 沒有回應',
+      'offline',
+      'retry',
+      '重試',
+    ],
+  ] as const)(
+    '%s, fresh data: no detail',
+    (code, text, icon, action, label) => {
+      expect(
+        barFor(pickConnectionAlert(input({ errorCodes: [code] }))),
+      ).toEqual({
+        text,
+        detail: null,
+        icon,
+        action,
+        actionLabel: label,
+      })
+    },
+  )
+
+  it.each([
+    input({ connectionStatus: 'firewalled' }),
+    input({ connectionStatus: 'disconnected' }),
+    input({ lastSuccessAt: TWENTY_S_AGO }),
+    input({}),
+  ])('no bar for the other kinds or no alert', (value) => {
+    expect(barFor(pickConnectionAlert(value))).toBeNull()
+  })
+})
+
+describe('spec 1.7 runBarAction', () => {
+  it('retry calls the retry handler once, reload calls reload', () => {
+    const retry = vi.fn()
+    const reload = vi.fn()
+    runBarAction('retry', { retry, reload })
+    expect(retry).toHaveBeenCalledTimes(1)
+    expect(reload).not.toHaveBeenCalled()
+    runBarAction('reload', { retry, reload })
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(retry).toHaveBeenCalledTimes(1)
   })
 })

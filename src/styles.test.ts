@@ -370,6 +370,25 @@ describe('Tailwind theme (row 20)', () => {
     expect(declarations(reduced[0].body).get('animation')).toBe('none')
   })
 
+  it('has the skeleton pulse, opacity only, off for reduced motion (spec 1.7)', () => {
+    const keyframes = byPrelude('@keyframes skeleton-pulse')
+    expect(keyframes).toHaveLength(1)
+    const steps = blocks(keyframes[0].body)
+    expect(steps.map((b) => b.prelude)).toEqual(['50%'])
+    expect([...declarations(steps[0].body)]).toEqual([['opacity', '0.55']])
+
+    const utility = byPrelude('@utility animate-skeleton')
+    expect(utility).toHaveLength(1)
+    expect(declarations(utility[0].body).get('animation')).toBe(
+      'skeleton-pulse 1.6s ease-in-out infinite',
+    )
+    const reduced = blocks(utility[0].body)
+    expect(reduced.map((b) => b.prelude)).toEqual([
+      '@media (prefers-reduced-motion: reduce)',
+    ])
+    expect(declarations(reduced[0].body).get('animation')).toBe('none')
+  })
+
   it('sets body, focus and disabled base rules', () => {
     const rule = (prelude: string) => {
       const found = BASE.filter((b) => b.prelude === prelude)

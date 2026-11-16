@@ -110,6 +110,27 @@ export function formatSpeed(bytesPerSecond: number | null | undefined): string {
   return NO_VALUE
 }
 
+/**
+ * FR-5: the limit in effect next to a global speed. 0, negative or missing
+ * is 「不限速」; otherwise 「上限」 plus `formatSpeed` with 「 MB/s」 dropped
+ * (「上限 32.7」 「上限 1.00」); other units stay (「上限 500 KB/s」).
+ */
+export function formatSpeedLimit(
+  bytesPerSecond: number | null | undefined,
+): string {
+  if (isMissing(bytesPerSecond) || !(bytesPerSecond > 0)) return '不限速'
+  const speed = formatSpeed(bytesPerSecond)
+  return `上限 ${speed.endsWith(' MB/s') ? speed.slice(0, -' MB/s'.length) : speed}`
+}
+
+/** The spoken form of `formatSpeedLimit`, unit kept: 「上限 32.7 MB/s」. */
+export function formatSpeedLimitFull(
+  bytesPerSecond: number | null | undefined,
+): string {
+  if (isMissing(bytesPerSecond) || !(bytesPerSecond > 0)) return '不限速'
+  return `上限 ${formatSpeed(bytesPerSecond)}`
+}
+
 /** A row's second line leaves the speed out when it is 0 or missing. */
 export function formatRowSpeed(
   bytesPerSecond: number | null | undefined,

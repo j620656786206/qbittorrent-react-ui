@@ -8,6 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockInstance } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { callFn } from '#/state/call-fn'
+import {
+  clearConnectionErrors,
+  getConnectionErrors,
+  markConnectionError,
+} from '#/state/connection'
 import { clearLoginRequired, loginStore } from '#/state/login-required'
 import { pollInterval } from '#/state/polling'
 import { createQueryClient } from '#/state/query-client'
@@ -219,6 +224,33 @@ describe('global onError', () => {
     expect(callsTo(fetchMock, MAINDATA_URL)).toBeGreaterThan(polls)
     expect(loginStore.state.loginRequired).toBeNull()
   })
+})
+
+describe('spec 1.7 row LA4: a login stop clears the connection codes', () => {
+  afterEach(() => clearConnectionErrors())
+
+  it.each(['not_logged_in', 'qbit_auth_failed'] as const)(
+    'a mutation getting %s clears cloudflare_expired and home_unreachable',
+    async (code) => {
+      const { client } = setup({
+        [MAINDATA_URL]: [okData(1)],
+        [PAUSE_URL]: [contractError(code)],
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      markConnectionError('cloudflare_expired')
+      markConnectionError('home_unreachable')
+      expect(getConnectionErrors()).toEqual([
+        'cloudflare_expired',
+        'home_unreachable',
+      ])
+
+      await pause(client)
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(getConnectionErrors()).toEqual([])
+      expect(loginStore.state.loginRequired?.reason).toBe(code)
+    },
+  )
 })
 
 describe('after a login stop', () => {

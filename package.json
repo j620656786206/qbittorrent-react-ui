@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke-built-server.mjs",
+    "fake-qbit": "node scripts/fake-qbit.mjs",
     "format": "prettier --write . && eslint --fix"
   },
   "dependencies": {

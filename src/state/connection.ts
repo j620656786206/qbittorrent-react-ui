@@ -1,12 +1,5 @@
 import { createStore, useSelector } from '@tanstack/react-store'
-import { pickConnectionAlert } from '#/lib/connection-alert'
 import type { ConnectionCode } from '#/lib/app-error'
-import type { ConnectionAlert } from '#/lib/connection-alert'
-import {
-  selectConnectionStatus,
-  useMaindata,
-  useMaindataFetchStartedAt,
-} from '#/state/maindata'
 
 // AR-35, FR-6: the connection-class failures behind the alert, fed by the
 // global `onError` in query-client.ts (queries and mutations).
@@ -17,7 +10,8 @@ import {
 //   home is reachable and clears the unreachable code.
 // - A maindata success clears everything (a session check says nothing about
 //   qBittorrent).
-// `pickConnectionAlert` in src/lib/connection-alert.ts applies the priority.
+// `pickConnectionAlert` in src/lib/connection-alert.ts applies the priority;
+// src/state/connection-alert.ts builds its input for the screens.
 
 type UnreachableCode = Exclude<ConnectionCode, 'cloudflare_expired'>
 
@@ -72,24 +66,4 @@ export function getConnectionErrors(): ReadonlyArray<ConnectionCode> {
 
 export function useConnectionErrors(): ReadonlyArray<ConnectionCode> {
   return useSelector(connectionStore, (state) => state.errors)
-}
-
-/**
- * The one connection alert for the header bar (Story 1.7), or `null`. Pass a
- * `now` that ticks (e.g. every second) so 「最後更新 N 秒前」 counts up.
- * Mounting it also mounts the `['maindata']` poll.
- */
-export function useConnectionAlert(now: number): ConnectionAlert | null {
-  const errorCodes = useConnectionErrors()
-  const { data: connectionStatus, dataUpdatedAt } = useMaindata(
-    selectConnectionStatus,
-  )
-  const fetchStartedAt = useMaindataFetchStartedAt()
-  return pickConnectionAlert({
-    errorCodes,
-    connectionStatus,
-    lastSuccessAt: dataUpdatedAt,
-    fetchStartedAt,
-    now,
-  })
 }

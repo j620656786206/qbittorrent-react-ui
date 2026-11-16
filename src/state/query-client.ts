@@ -81,6 +81,9 @@ export function createQueryClient({
       clearUnreachable()
     }
     if (isLoginStop(error)) {
+      // The container answered (spec 1.7 row LA4): any recorded Cloudflare
+      // or unreachable code is out of date.
+      clearConnectionErrors()
       markLoginRequired(error.code, currentPath())
       void client.cancelQueries()
       return
