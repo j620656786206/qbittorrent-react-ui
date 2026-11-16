@@ -16,6 +16,12 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # typescript-eslint only accepts typescript below 6.1 (Epic 1 retro A2;
+    # Dependabot PR #13 to typescript 7 was not merged). Lift this once
+    # typescript-eslint supports a newer typescript.
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=6.1.0']
     groups:
       production-dependencies:
         dependency-type: production

@@ -183,7 +183,7 @@ inputDocuments:
 **批次結果和測試**
 
 - AR-54：批次結果形狀：收多個 hash 或多筆輸入的 server function 一律回 `{ ok: true, data: { items: Array<{ key, ok: true } | { key, ok: false, code, message }> } }`，`key` 是 hash（新增是輸入序號）；一筆都沒做才回整體錯誤。刪除、暫停繼續送完就當全部成功；`renameFiles` 依序做、第一個失敗就停並回已改好的；重試前先等下一次 maindata。（AD-14）
-- AR-55：測試不碰真的 qBittorrent 寫入：自動流程、測試、CI 驗證一律用假的 qBittorrent 回應；對真的 qBittorrent 只能讀，而且只在本機開發。vitest 測 `src/lib`、`src/state` 和 server function；E2E 先不做。（AD-15、一致性慣例）
+- AR-55：測試不碰真的 qBittorrent 寫入：自動流程、測試、CI 驗證一律用假的 qBittorrent 回應；對真的 qBittorrent 只能讀，而且只在本機開發。vitest 測 `src/lib`、`src/state` 和 server function，畫面和接線用 happy-dom；CI 的瀏覽器 smoke（Playwright、只用 Chromium）只連假的 qBittorrent（2026-11-16 Epic 1 retro 決定，Story 2.0）。（AD-15、一致性慣例）
 - AR-56：http 退路：複製用暫時的 textarea 當退路；info hash 用純 JS 的 SHA-1。（AD-2、一致性慣例）
 
 **建造順序**
@@ -898,6 +898,30 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 - 共用畫面元件（底部面板、toast）放在 Epic 1 放 shadcn 元件和狀態圓圈的共用目錄，不放在任何一個 `features/` 底下。
 - 「☆ 加到常用」「改路徑」「改檔名」三顆，以及搜尋、新增、快捷鍵、設定、分類按鈕，在 Epic 2 照 Epic 1 的 disabled 做法留著。勾選框和選取列在 Epic 4。
 - 每分類記住排序、每分類上次看的種子、「（這個分類記住的）」、`↑` `↓` 和其他快捷鍵在 Epic 3。
+
+### Story 2.0：瀏覽器 smoke、中文找不到頁面、登入接線測試
+
+身為 Alex，我想要每個 PR 都在真的瀏覽器裡跑一次 App，這樣版面、安全標頭和焦點的問題不用靠人每次手動看；網址打錯時看到中文頁面。
+
+**由來：** 2026-11-16 Epic 1 retro（`_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md` 的 A4、A7、A8）。Epic 1 每張 story 都把版面、CSP、焦點延到「只能在瀏覽器看」，審查修正後也沒人重看。Alex 選了加 CI 瀏覽器 smoke、做中文找不到頁面。要在 Epic 2 第一個開對話框或底部面板的 story 之前做好。
+**涵蓋：** 架構底稿〔技術〕的 E2E 決定（2026-11-16 改）、AR-55 的瀏覽器部分、NFR-6、NFR-7、NFR-17
+**規格：** AD-10（CSP）、AD-15（只碰假的 qBittorrent）
+
+**Acceptance Criteria:**
+
+**Given** 開一個 PR
+**When** CI 跑完 build 和 smoke
+**Then** 用 Playwright 只跑 Chromium（精確版本），打 build 出來的伺服器加 `scripts/fake-qbit.mjs`，至少檢查：登入後看到列；`data=many` 捲動時 DOM 裡的列數有上限；整段 0 個 CSP 違規、0 個 console 錯誤；390px 寬沒有橫向捲動；`front=cloudflare` 出現 Cloudflare 提示條，`front=down` 時「重試」成功後焦點到 `main`
+**And** 淺色和深色截圖留在 CI artifact 給人看，不做像素比對；一律只連假的 qBittorrent
+**And** `scripts/fake-qbit.mjs` 拿掉「不准在 CI 跑」那一行，改寫成只准連假的 qBittorrent
+
+**Given** 打一個不存在的網址
+**When** 打開
+**Then** 置中顯示「找不到這個頁面」和一顆「回到種子列表」外框按鈕，借用「沒有結果」那塊置中版面，淺深色都對；瀏覽器 smoke 檢查一次
+
+**Given** happy-dom
+**When** 測登入畫面和 `_authed`
+**Then** 補 Epic 1 留下的接線測試：送錯密碼後清空並聚焦密碼欄、送出中按鈕換字、10 秒提示；沒登入進 `_authed` 頁面被導到 `/login?redirect=`
 
 ### Story 2.1：51 種排序和電腦排序選單
 

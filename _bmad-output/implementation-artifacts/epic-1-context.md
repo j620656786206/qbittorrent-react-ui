@@ -52,7 +52,7 @@ Rebuild react-torrent from the official TanStack Start template so Alex can open
 - **Logging:** only `src/server/log` (stdout, masks secrets and cookies, never logs bodies, full headers or env).
 - **Config:** env vars `QBIT_URL`, `QBIT_USERNAME`, `QBIT_PASSWORD`, `SESSION_SECRET`, `APP_ORIGINS`, `SAVE_ROOTS`, `CONFIG_DIR` (default `/config`, locally a gitignored `./config`). The container refuses to start when a required one is missing or the secret is weak; never use `VITE_` variables for secrets.
 - **Deployment:** non-root, read-only container on Unraid built only in CI; every PR runs lint, typecheck, vitest, `npm audit`, build, then image build and a `docker run` smoke test; main pushes to GHCR. Workflows never use `pull_request_target` and pin third-party actions by SHA.
-- **Testing:** vitest covers `src/lib`, `src/state` and server functions with fake qBittorrent responses; an auto-discovering test asserts every server function except `login` returns `not_logged_in` when unauthenticated. No E2E yet.
+- **Testing (updated after the Epic 1 retro, 2026-11-16):** happy-dom DOM tests (`// @vitest-environment happy-dom`, call `notifyManager.setScheduler(cb => cb())`) cover screen wiring; a Chromium-only Playwright browser smoke in PR CI against the built server plus `scripts/fake-qbit.mjs` (Story 2.0). Also: vitest covers `src/lib`, `src/state` and server functions with fake qBittorrent responses; an auto-discovering test asserts every server function except `login` returns `not_logged_in` when unauthenticated. No E2E yet.
 
 ## UX & Interaction Patterns
 

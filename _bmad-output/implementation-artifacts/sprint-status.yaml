@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-15-2026 23:31
-last_updated: 11-15-2026 23:31
+last_updated: 11-16-2026 15:14
 project: react-torrent
 project_key: NOKEY
 tracking_system: file-system
@@ -45,9 +45,10 @@ development_status:
   1-7-頁首-全域速度和連線提示條: done  # PR #10：頁首、速度膠囊、連線提示條、防火牆警告膠囊、登入畫面提示條
   1-8-種子列表-骨架和空狀態: done  # PR #11：虛擬列表、狀態圓圈、凍結順序、骨架、空狀態、讀不到加重試
   1-9-映像-ci-推送和-nas-部署範本: done  # PR #12：Dockerfile、映像檢查、GHCR 推送、Dependabot、Unraid 範本、部署說明
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: backlog
+  2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: backlog
   2-1-51-種排序和電腦排序選單: backlog
   2-2-底部面板和手機排序面板: backlog
   2-3-看板-電腦-5-欄和手機狀態分頁: backlog
@@ -90,3 +91,26 @@ development_status:
   5-7-改檔名畫面-整季批次: backlog
   5-8-單檔改名-接著改檔名-7-件事驗收: backlog
   epic-5-retrospective: optional
+action_items:
+  - id: "epic-1-retro-item-1-run-docs-deployment-md-section-7-on-the"
+    epic: 1
+    action: "Run docs/deployment.md section 7 on the NAS (Epic 1 acceptance); record
+      AR-59 Secure cookie, AR-60 response type and Tunnel compression; update the
+      spine if any differ"
+    owner: "Alex"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md"
+  - id: "epic-1-retro-item-2-story-2-0-ci-browser-smoke-playwright-ch"
+    epic: 1
+    action: "Story 2.0: CI browser smoke (Playwright, Chromium only, fake qBittorrent),
+      Chinese not-found page, login and _authed happy-dom wiring tests"
+    owner: "Claude"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md"
+  - id: "epic-1-retro-item-3-first-epic-2-story-that-renders-dialog-o"
+    epic: 1
+    action: "First Epic 2 story that renders Dialog or a sheet: pick style-src per
+      AR-31 and show zero CSP violations in the browser smoke"
+    owner: "Claude"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md"
