@@ -10,6 +10,13 @@ import type { ServerState } from '#/shared/maindata'
 /** Data older than this (strictly) reads 「最後更新 N 秒前」. */
 export const STALE_AFTER_MS = 10_000
 
+/**
+ * For this long after a fetch starts the stale line waits (the answer may be
+ * a moment away, e.g. on returning to the tab). A fetch that hangs longer
+ * (qBittorrent stuck: 25 to 35 s) shows it again.
+ */
+export const FETCH_GRACE_MS = 2_000
+
 export type ConnectionAlertKind =
   ConnectionCode | 'disconnected' | 'firewalled' | 'stale'
 
@@ -30,8 +37,11 @@ export interface ConnectionAlertInput {
    * less (Query's value before the first success), means never.
    */
   lastSuccessAt: number | null
-  /** A fetch is in flight (e.g. the refetch on returning to the tab). */
-  isFetching: boolean
+  /**
+   * Epoch ms when the maindata fetch in flight started; `null` when none is.
+   * From `useMaindataFetchStartedAt()` in src/state/maindata.ts.
+   */
+  fetchStartedAt: number | null
   /** Epoch ms. */
   now: number
 }
@@ -43,34 +53,53 @@ function lastUpdated(lastSuccessAt: number | null, now: number): string | null {
   return `最後更新 ${formatAgo(lastSuccessAt / 1000, now)}`
 }
 
-/** Unreachable codes, highest first; equal rank, so the order is stable. */
-const UNREACHABLE: ReadonlyArray<ConnectionCode> = [
-  'home_unreachable',
-  'qbit_unreachable',
-]
+/** Lower rank wins. Every ConnectionCode needs a row (a new code fails to compile). */
+type CodeRank = 0 | 1
+
+interface CodeAlert {
+  rank: CodeRank
+  /** Adds 「，最後更新 N 前」 once the data is stale. */
+  withLastUpdated: boolean
+}
+
+const CODE_ALERTS: Readonly<Record<ConnectionCode, CodeAlert>> = {
+  cloudflare_expired: { rank: 0, withLastUpdated: false },
+  home_unreachable: { rank: 1, withLastUpdated: true },
+  qbit_unreachable: { rank: 1, withLastUpdated: true },
+}
+
+/** The highest active code; on equal rank the one listed first. */
+function topCode(codes: ReadonlyArray<ConnectionCode>): ConnectionCode | null {
+  let top: ConnectionCode | null = null
+  for (const code of codes) {
+    if (top === null || CODE_ALERTS[code].rank < CODE_ALERTS[top].rank) {
+      top = code
+    }
+  }
+  return top
+}
+
+function isFetchStarting(fetchStartedAt: number | null, now: number): boolean {
+  return fetchStartedAt !== null && now - fetchStartedAt < FETCH_GRACE_MS
+}
 
 export function pickConnectionAlert({
   errorCodes,
   connectionStatus,
   lastSuccessAt,
-  isFetching,
+  fetchStartedAt,
   now,
 }: ConnectionAlertInput): ConnectionAlert | null {
   const updated = lastUpdated(lastSuccessAt, now)
-  if (errorCodes.includes('cloudflare_expired')) {
+  const code = topCode(errorCodes)
+  if (code) {
+    const text = errorText(code)
     return {
-      kind: 'cloudflare_expired',
-      text: errorText('cloudflare_expired'),
-      tone: 'warning',
-    }
-  }
-  const unreachable = UNREACHABLE.find((code) => errorCodes.includes(code))
-  if (unreachable) {
-    return {
-      kind: unreachable,
-      text: updated
-        ? `${errorText(unreachable)}，${updated}`
-        : errorText(unreachable),
+      kind: code,
+      text:
+        CODE_ALERTS[code].withLastUpdated && updated
+          ? `${text}，${updated}`
+          : text,
       tone: 'warning',
     }
   }
@@ -80,8 +109,7 @@ export function pickConnectionAlert({
   if (connectionStatus === 'firewalled') {
     return { kind: 'firewalled', text: '防火牆擋住了', tone: 'warning' }
   }
-  // While a fetch is in flight the data may be fresh in a moment.
-  if (updated && !isFetching) {
+  if (updated && !isFetchStarting(fetchStartedAt, now)) {
     return { kind: 'stale', text: updated, tone: 'muted' }
   }
   return null

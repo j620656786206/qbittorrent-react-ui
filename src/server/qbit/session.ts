@@ -9,21 +9,31 @@ import type { QbitPath } from '#/server/qbit/paths'
 //   `Set-Cookie` of a successful login as is (qBittorrent's name is a
 //   preference, `SID` by default), and neither is ever logged.
 // - One login at a time: every caller that needs one waits on the same
-//   promise, so a burst of 403s costs qBittorrent exactly one login.
-// - A login answered `Fails.` or 403 opens the breaker: from then on every
-//   call fails with `qbit_auth_failed` before any fetch, until the container
-//   restarts. Retrying a wrong password is exactly what gets the container IP
-//   banned.
+//   promise, so a burst of 403s costs qBittorrent exactly one login. That
+//   login runs on its own 25 s deadline, not on the caller's that started it,
+//   so a caller that joins later is not failed by an earlier one's deadline.
+// - A login answered `Fails.`, 403 or 401 opens the breaker: from then on
+//   every call fails with `qbit_auth_failed` before any fetch, until the
+//   container restarts. Retrying a wrong password is exactly what gets the
+//   container IP banned. qBittorrent 5.1.4 answers 401 when its Origin,
+//   Referer or Host check fails, so that one is logged `login_unauthorized`:
+//   QBIT_URL does not match what qBittorrent sees, the password may be fine.
+// - No redirects are followed (`redirect: 'manual'`). The qBittorrent API never
+//   redirects; a 3xx means a wrong QBIT_URL or something in between, and
+//   following a 307/308 would resend the login form somewhere else. It is
+//   answered `qbit_rejected`.
 // - Every request sends `Origin` and `Referer` of QBIT_URL (qBittorrent's CSRF
 //   check wants them to match the Host it sees) and never asks qBittorrent to
 //   relax CSRF, Host checks, bans or auth.
-// - One deadline per `send()`: login, request, re-login and resend share it,
-//   each step getting what is left. It is shorter than the factory's 30 s
-//   (`src/server/*` may not import that constant), so a shared pull fails
-//   with `timeout` and frees the syncer before any caller gives up on it.
+// - One deadline per `send()`: waiting for a login, the request, the re-login
+//   and the resend share it, each step getting what is left. It is shorter
+//   than the factory's 30 s (`src/server/*` may not import that constant), so
+//   a shared pull fails with `timeout` and frees the syncer before any caller
+//   gives up on it.
 // - When a 403 follows a login that was just accepted, logging in again would
-//   only open a new qBittorrent session per poll: for 60 s a 403 is answered
-//   `qbit_rejected` without a login.
+//   only open a new qBittorrent session per poll: the cookie is dropped and
+//   for 60 s every call is answered `qbit_rejected` without a login; after
+//   that the next call logs in once more.
 // Imported only by `src/server/qbit/*` (lint enforced); the rest of the app
 // uses the client's named methods.
 
@@ -112,16 +122,18 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     if (query) url.search = query.toString()
     const headers = new Headers({ Origin: origin, Referer: `${origin}/` })
     if (withCookie !== null) headers.set('Cookie', withCookie)
+    let response: Response
+    let body: string
     try {
-      const response = await fetchImpl(url, {
+      response = await fetchImpl(url, {
         method,
         headers,
         body: form,
         signal,
+        redirect: 'manual',
       })
       // Read the body inside the deadline: a stalled body is no answer.
-      const body = await response.text()
-      return { status: response.status, headers: response.headers, body }
+      body = await response.text()
     } catch (error) {
       // Decided by our own deadline, not by the rejection's type (Node
       // rejects an abort with whatever reason it was given).
@@ -131,9 +143,21 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
       logger.warn('qbit_unreachable', { path, cause: causeCode(error) })
       throw new ServerFailure('qbit_unreachable', `qbit ${path} unreachable`)
     }
+    if (response.status >= 300 && response.status <= 399) {
+      // The status only: `Location` may name a host.
+      logger.warn('qbit_bad_response', {
+        path,
+        status: response.status,
+        reason: 'redirect',
+      })
+      throw new ServerFailure('qbit_rejected', `qbit ${path}: redirect`)
+    }
+    return { status: response.status, headers: response.headers, body }
   }
 
-  function openBreaker(reason: 'login_failed' | 'login_forbidden'): never {
+  function openBreaker(
+    reason: 'login_failed' | 'login_forbidden' | 'login_unauthorized',
+  ): never {
     if (!breakerOpen) {
       breakerOpen = true
       logger.error('qbit_breaker_open', { reason })
@@ -156,8 +180,8 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
       signal,
     )
     if (response.status === 403) openBreaker('login_forbidden')
-    // Some setups answer a wrong password with 401 instead of `Fails.`.
-    if (response.status === 401) openBreaker('login_failed')
+    // Origin, Referer or Host check failed: see the header comment.
+    if (response.status === 401) openBreaker('login_unauthorized')
     if (response.status < 200 || response.status > 299) {
       logger.warn('qbit_bad_response', {
         path: LOGIN_PATH,
@@ -203,8 +227,9 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
   }
 
   /**
-   * Single flight: joins the login in progress, if any. A caller that joins
-   * still gives up at its own deadline.
+   * Single flight: joins the login in progress, if any. The login has its own
+   * deadline; every caller, the one that started it included, gives up at
+   * its own.
    */
   function login(reason: LoginReason, signal: AbortSignal): Promise<string> {
     // A call that was already past the check in send() when the breaker
@@ -214,9 +239,16 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
         new ServerFailure('qbit_auth_failed', 'qbit breaker open'),
       )
     }
-    pendingLogin ??= doLogin(reason, signal).finally(() => {
-      pendingLogin = null
-    })
+    // A caller already out of time starts nothing.
+    if (signal.aborted) return Promise.reject(timeoutFailure(LOGIN_PATH))
+    if (pendingLogin === null) {
+      const deadline = new AbortController()
+      const timer = setTimeout(() => deadline.abort(), QBIT_DEADLINE_MS)
+      pendingLogin = doLogin(reason, deadline.signal).finally(() => {
+        clearTimeout(timer)
+        pendingLogin = null
+      })
+    }
     return withinDeadline(pendingLogin, signal, LOGIN_PATH)
   }
 
@@ -235,8 +267,11 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
   function rejectedAfterLogin(
     path: QbitPath,
     response: { status: number; body: string },
+    used: string,
   ): never {
     reloginBlockedUntil = now() + RELOGIN_COOLDOWN_MS
+    // Drop the cookie qBittorrent refused, not a newer one another call got.
+    if (cookie === used) cookie = null
     logger.warn('qbit_bad_response', { path, status: response.status })
     throw new ServerFailure('qbit_rejected', `qbit ${path}: 403 after login`)
   }
@@ -251,12 +286,17 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     let loggedIn = false
     let used = cookie
     if (used === null) {
+      // Cooling down after a 403 that followed a login: no cookie to send
+      // and no login yet, already logged when the cooldown began.
+      if (now() < reloginBlockedUntil) {
+        throw new ServerFailure('qbit_rejected', `qbit ${path}: cooling down`)
+      }
       used = await login('initial', signal)
       loggedIn = true
     }
     const first = await request(path, sendOptions, used, signal)
     if (first.status !== 403) return expectOk(path, first)
-    if (loggedIn) return rejectedAfterLogin(path, first)
+    if (loggedIn) return rejectedAfterLogin(path, first, used)
     if (now() < reloginBlockedUntil) return expectOk(path, first)
 
     if (cookie !== null && cookie !== used) {
@@ -267,7 +307,7 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     }
     // Exactly one resend; a second 403 is qbit_rejected, not the breaker.
     const resent = await request(path, sendOptions, used, signal)
-    if (resent.status === 403) return rejectedAfterLogin(path, resent)
+    if (resent.status === 403) return rejectedAfterLogin(path, resent, used)
     return expectOk(path, resent)
   }
 

@@ -114,19 +114,23 @@ const qbitSessionBans = [
 }))
 
 // AR-39: only the maindata query function (through mergeMaindata) writes
-// `['maindata']`. The key is MAINDATA_KEY, `[...MAINDATA_KEY]` or an array
-// starting with 'maindata', bare or under `as const` / `satisfies`. Blocks
-// `setQueryData` / `setQueriesData` (also called as `client['setQueryData']`)
-// with that key or a filter whose `queryKey` is it, and a `queryFn` passed
-// with that key to useQuery / fetchQuery / prefetchQuery / ensureQueryData
-// (an override of the registered query function) outside
-// src/state/maindata.ts. AR-35: `refetchInterval` only ever takes
-// `pollInterval(...)`, which stops polling while login is required.
+// `['maindata']`, and only createQueryClient registers its options. What is
+// caught: the key written as MAINDATA_KEY, `[...MAINDATA_KEY]` or an array
+// starting with 'maindata', bare or under `as const` / `satisfies`, in
+// - `setQueryData` / `setQueriesData` (also `client['setQueryData']`), as the
+//   key or as a filter's `queryKey`;
+// - any options object with that `queryKey` and a `queryFn` (useQuery,
+//   useQueries, useInfiniteQuery, queryOptions, fetchQuery, ...): an override
+//   of the registered query function, outside src/state/maindata.ts;
+// - `setQueryDefaults` with that key, outside src/state/query-client.ts.
+// Not caught: the key through another variable (`const k = MAINDATA_KEY`) or
+// direct cache access; those stay review-time rules. AR-35: `refetchInterval`
+// only ever takes `pollInterval(...)`, which stops polling while login is
+// required.
 const SET_DATA = '/^set(Query|Queries)Data$/'
 const SET_DATA_CALL = `CallExpression:matches([callee.name=${SET_DATA}], [callee.property.name=${SET_DATA}], [callee.property.value=${SET_DATA}])`
-const QUERY_CALL_NAMES =
-  '/^(useQuery|useSuspenseQuery|fetchQuery|prefetchQuery|ensureQueryData)$/'
-const QUERY_CALL = `CallExpression:matches([callee.name=${QUERY_CALL_NAMES}], [callee.property.name=${QUERY_CALL_NAMES}])`
+const SET_DEFAULTS = "'setQueryDefaults'"
+const SET_DEFAULTS_CALL = `CallExpression:matches([callee.name=${SET_DEFAULTS}], [callee.property.name=${SET_DEFAULTS}], [callee.property.value=${SET_DEFAULTS}])`
 const MAINDATA_KEY_NODE = `:matches(Identifier[name='MAINDATA_KEY'], ArrayExpression[elements.0.value='maindata'], ArrayExpression[elements.0.type='SpreadElement'][elements.0.argument.name='MAINDATA_KEY'])`
 const TS_WRAPPER = ':matches(TSAsExpression, TSSatisfiesExpression)'
 const keyed = (name) =>
@@ -135,13 +139,22 @@ const MAINDATA_WRITE =
   "AR-39: only mergeMaindata (the ['maindata'] query function) writes ['maindata']. After an operation call refreshMaindata() from src/state/maindata.ts."
 const MAINDATA_QUERY_FN =
   "AR-39: ['maindata'] gets its queryFn from createQueryClient({ fetchMaindata }). Read it with useMaindata(select) from src/state/maindata.ts."
+const MAINDATA_DEFAULTS =
+  "AR-39: only createQueryClient (src/state/query-client.ts) registers ['maindata'] options."
 const ban = (message) => (selector) => ({ selector, message })
+/** The maindata key as the first child of `parent`, bare or wrapped. */
+const keyFirst = (parent) => [
+  `${parent} > ${MAINDATA_KEY_NODE}:first-child`,
+  `${parent} > ${TS_WRAPPER}:first-child > ${MAINDATA_KEY_NODE}.expression`,
+]
 const setMaindataBans = [
-  `${SET_DATA_CALL} > ${MAINDATA_KEY_NODE}:first-child`,
-  `${SET_DATA_CALL} > ${TS_WRAPPER}:first-child > ${MAINDATA_KEY_NODE}.expression`,
+  ...keyFirst(SET_DATA_CALL),
   `${SET_DATA_CALL} > ObjectExpression:first-child > ${keyed('queryKey')} > ${MAINDATA_KEY_NODE}.value`,
   `${SET_DATA_CALL} > ObjectExpression:first-child > ${keyed('queryKey')} > ${TS_WRAPPER}.value > ${MAINDATA_KEY_NODE}.expression`,
 ].map(ban(MAINDATA_WRITE))
+const setMaindataDefaultsBans = keyFirst(SET_DEFAULTS_CALL).map(
+  ban(MAINDATA_DEFAULTS),
+)
 // esquery's :has cannot follow a child chain (`:has(> A > B)`), so the key
 // is matched through attribute paths on the queryKey property instead.
 const MAINDATA_KEY_VALUE = [
@@ -153,7 +166,7 @@ const MAINDATA_KEY_VALUE = [
   "[value.expression.elements.0.argument.name='MAINDATA_KEY']",
 ].join(', ')
 const maindataQueryFnBans = [
-  `${QUERY_CALL} > ObjectExpression:has(> ${keyed('queryKey')}:matches(${MAINDATA_KEY_VALUE})):has(> ${keyed('queryFn')})`,
+  `ObjectExpression:has(> ${keyed('queryKey')}:matches(${MAINDATA_KEY_VALUE})):has(> ${keyed('queryFn')})`,
 ].map(ban(MAINDATA_QUERY_FN))
 const refetchIntervalBan = {
   selector: `${keyed('refetchInterval')}:not([value.type='CallExpression'][value.callee.name='pollInterval'])`,
@@ -163,13 +176,18 @@ const refetchIntervalBan = {
 const queryBans = [
   ...setMaindataBans,
   ...maindataQueryFnBans,
+  ...setMaindataDefaultsBans,
   refetchIntervalBan,
 ]
 
 // AR-41, AD-13: screens never read qBittorrent state codes themselves.
-// `x.state` (or `x?.state`) compared, switched on, passed to includes / has /
-// indexOf, used as a lookup key or called on (`x.state.endsWith()`), and
-// `{ state }` destructuring.
+// Caught: `x.state` (or `x?.state`) compared, switched on, passed to
+// includes / has / indexOf, used as a lookup key or called on
+// (`x.state.endsWith()`), and `{ state }` destructured from a value whose
+// name says torrent (`const { state } = torrent`, `= data.torrents[h]`) or a
+// parameter typed `...Torrent`. Not caught: copying it first
+// (`const s = t.state`); a review-time rule. `{ state }` from anything else
+// (useLocation(), a sidebar hook) is fine.
 const TORRENT_STATE_MESSAGE =
   'AR-41: do not read torrent.state. Use classify() / statusOf() from src/lib/torrent-status.ts.'
 const STATE_MEMBER = `MemberExpression:matches([computed=false][property.name='state'], [computed=true][property.value='state'])`
@@ -178,13 +196,21 @@ const stateAt = (parent, field = '') => [
   `${parent} > ${STATE_MEMBER}${field}`,
   `${parent} > ChainExpression${field} > ${STATE_MEMBER}.expression`,
 ]
+const TORRENTISH = '/torrent/i'
+const TORRENT_INIT = [
+  `[init.name=${TORRENTISH}]`,
+  `[init.property.name=${TORRENTISH}]`,
+  `[init.object.name=${TORRENTISH}]`,
+  `[init.object.property.name=${TORRENTISH}]`,
+].join(', ')
 const torrentStateBans = [
   ...stateAt('BinaryExpression[operator=/^[!=]==?$/]'),
   ...stateAt('SwitchStatement', '.discriminant'),
   ...stateAt('CallExpression[callee.property.name=/^(includes|has|indexOf)$/]'),
   ...stateAt('MemberExpression[computed=true]', '.property'),
   `CallExpression > MemberExpression.callee > ${STATE_MEMBER}.object`,
-  `ObjectPattern > ${keyed('state')}`,
+  `VariableDeclarator:matches(${TORRENT_INIT}) > ObjectPattern.id > ${keyed('state')}`,
+  `ObjectPattern[typeAnnotation.typeAnnotation.typeName.name=/Torrent$/] > ${keyed('state')}`,
 ].map(ban(TORRENT_STATE_MESSAGE))
 
 const CREATE_SERVER_FN_BAN = {
@@ -229,6 +255,8 @@ const restrictImports = (...patterns) => ({
 const CN_FILE = 'src/shared/ui/cn.ts'
 const DEFINE_FILE = 'src/server/functions/_define.ts'
 const SERVER_FUNCTIONS = 'src/server/functions/**'
+const SERVER_FUNCTION_NODE_ONLY =
+  'src/server/functions/**/{*.test.{ts,tsx},__fixtures__/**}'
 const SHARED_UI = 'src/shared/ui/**'
 const ZOD_FILE = 'src/shared/zod.ts'
 const NO_UI_LAYERS = [
@@ -293,17 +321,30 @@ export default [
         ...rawHtmlBans,
         ...qbitSessionBans,
         ...setMaindataBans,
+        ...setMaindataDefaultsBans,
+        refetchIntervalBan,
+      ],
+    },
+  },
+  // createQueryClient registers the maindata options here (AR-39).
+  {
+    files: ['src/state/query-client.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...rawHtmlBans,
+        ...qbitSessionBans,
+        ...setMaindataBans,
+        ...maindataQueryFnBans,
         refetchIntervalBan,
       ],
     },
   },
   // Screens map states only through src/lib/torrent-status.ts (AR-41).
+  // src/shared/ui is generic UI (shadcn) that never gets a torrent, and its
+  // components have a `state` of their own (sidebar, data-state).
   {
-    files: [
-      'src/features/**/*.{ts,tsx}',
-      'src/routes/**/*.{ts,tsx}',
-      'src/shared/ui/**/*.{ts,tsx}',
-    ],
+    files: ['src/features/**/*.{ts,tsx}', 'src/routes/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -390,9 +431,21 @@ export default [
       SHARED_UI_BAN,
     ),
   },
+  // Routes and features import server function files, so they reach the
+  // browser bundle: zod comes from src/shared/zod.ts there (AD-10). Tests
+  // and fixtures only run in Node.
   {
     files: [`${SERVER_FUNCTIONS}/*.{ts,tsx}`],
-    ignores: [DEFINE_FILE],
+    ignores: [DEFINE_FILE, SERVER_FUNCTION_NODE_ONLY],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      CN_BAN,
+      SHARED_UI_BAN,
+      ZOD_BAN,
+    ),
+  },
+  {
+    files: [SERVER_FUNCTION_NODE_ONLY],
     rules: restrictImports(CREATE_SERVER_FN_BAN, CN_BAN, SHARED_UI_BAN),
   },
   {

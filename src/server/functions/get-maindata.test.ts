@@ -108,11 +108,23 @@ describe('getMaindata server function', () => {
     })
   })
 
+  it('fresh: a new qBittorrent pull even right after one', async () => {
+    const qbit = useQbit()
+    const first = data(await run({}))
+    const calls = qbit.count('/api/v2/sync/maindata')
+    const plain = data(await run({ since: first.version }))
+    expect(qbit.count('/api/v2/sync/maindata')).toBe(calls)
+    const fresh = data(await run({ since: plain.version, fresh: true }))
+    expect(qbit.count('/api/v2/sync/maindata')).toBe(calls + 1)
+    expect(fresh.full).toBe(false)
+  })
+
   it.each([
     ['a non-version string', { since: 'abc' }],
     ['a number', { since: 5 }],
     ['an extra key', { since: '0123abcd.1', extra: 1 }],
     ['a counter with a leading zero', { since: '0123abcd.01' }],
+    ['fresh not a boolean', { fresh: 'yes' }],
   ])('G7 %s: invalid_input with no qBittorrent call', async (_name, value) => {
     const qbit = useQbit()
     expect(await run(value)).toEqual({

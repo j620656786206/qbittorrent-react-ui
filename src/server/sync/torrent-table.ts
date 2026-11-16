@@ -18,6 +18,13 @@ import type { Category, ServerState, SlimTorrent } from '#/shared/maindata'
 
 export const TOMBSTONE_MS = 600_000
 
+/**
+ * `seeding_time` is stored floored to whole minutes. qBittorrent moves it
+ * every second for every seeding torrent, which alone would put most of the
+ * library in each 5 s delta; the screen shows it in days.
+ */
+export const SEEDING_TIME_STEP_S = 60
+
 export interface TableChanges {
   full: boolean
   changed: Array<SlimTorrent>
@@ -86,6 +93,9 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
       if (removedList.has(hash)) continue
       const existing = rows.get(hash)
       const parsed = slimTorrentSchema.safeParse({
+        // A new torrent without `private` (a magnet with no metadata yet)
+        // reads as unknown, not as an unusable answer.
+        private: null,
         ...existing?.torrent,
         ...partial,
         hash,
@@ -96,7 +106,12 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
           issuePaths(parsed.error.issues, ['torrents', hash]),
         )
       }
-      const torrent = parsed.data
+      const torrent = {
+        ...parsed.data,
+        seeding_time:
+          Math.floor(parsed.data.seeding_time / SEEDING_TIME_STEP_S) *
+          SEEDING_TIME_STEP_S,
+      }
       const changed = !existing || !sameSlimFields(existing.torrent, torrent)
       updates.push({ hash, torrent, changed })
     }

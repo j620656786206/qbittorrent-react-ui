@@ -1,14 +1,28 @@
 import { createStore, useSelector } from '@tanstack/react-store'
+import { pickConnectionAlert } from '#/lib/connection-alert'
 import type { ConnectionCode } from '#/lib/app-error'
+import type { ConnectionAlert } from '#/lib/connection-alert'
+import {
+  selectConnectionStatus,
+  useMaindata,
+  useMaindataFetchStartedAt,
+} from '#/state/maindata'
 
-// AR-35, FR-6: the connection-class failures seen since the last successful
-// `['maindata']` fetch. The global `onError` adds codes (queries and
-// mutations); only a maindata success clears them (a session check says
-// nothing about qBittorrent). Every active code is kept, so
-// `pickConnectionAlert` in src/lib/connection-alert.ts can apply the
-// priority order instead of showing whichever failed last.
+// AR-35, FR-6: the connection-class failures behind the alert, fed by the
+// global `onError` in query-client.ts (queries and mutations).
+// - `home_unreachable` and `qbit_unreachable` say where the chain breaks, so
+//   at most one is active: the latest replaces the other.
+// - `cloudflare_expired` is its own flag and stays until a maindata success.
+// - A maindata failure with any other code (the container answered) proves
+//   home is reachable and clears the unreachable code.
+// - A maindata success clears everything (a session check says nothing about
+//   qBittorrent).
+// `pickConnectionAlert` in src/lib/connection-alert.ts applies the priority.
+
+type UnreachableCode = Exclude<ConnectionCode, 'cloudflare_expired'>
 
 interface ConnectionState {
+  /** Every active code: `cloudflare_expired` first, then the unreachable one. */
   errors: ReadonlyArray<ConnectionCode>
 }
 
@@ -16,16 +30,40 @@ const NONE: ReadonlyArray<ConnectionCode> = Object.freeze([])
 
 export const connectionStore = createStore<ConnectionState>({ errors: NONE })
 
+function isUnreachable(code: ConnectionCode): code is UnreachableCode {
+  return code !== 'cloudflare_expired'
+}
+
+function setErrors(errors: ReadonlyArray<ConnectionCode>) {
+  const prev = connectionStore.state.errors
+  const same =
+    prev.length === errors.length && prev.every((code, i) => code === errors[i])
+  if (same) return
+  connectionStore.setState(() => ({
+    errors: errors.length === 0 ? NONE : Object.freeze([...errors]),
+  }))
+}
+
 /** A no-op on the server: this module-level store would leak across requests. */
 export function markConnectionError(code: ConnectionCode) {
   if (typeof window === 'undefined') return
-  if (connectionStore.state.errors.includes(code)) return
-  connectionStore.setState((prev) => ({ errors: [...prev.errors, code] }))
+  const prev = connectionStore.state.errors
+  const cloudflare =
+    code === 'cloudflare_expired' || prev.includes('cloudflare_expired')
+  const unreachable = isUnreachable(code) ? code : prev.find(isUnreachable)
+  setErrors([
+    ...(cloudflare ? (['cloudflare_expired'] as const) : []),
+    ...(unreachable ? [unreachable] : []),
+  ])
+}
+
+/** The container answered: home and qBittorrent are reachable. */
+export function clearUnreachable() {
+  setErrors(connectionStore.state.errors.filter((code) => !isUnreachable(code)))
 }
 
 export function clearConnectionErrors() {
-  if (connectionStore.state.errors.length === 0) return
-  connectionStore.setState(() => ({ errors: NONE }))
+  setErrors(NONE)
 }
 
 export function getConnectionErrors(): ReadonlyArray<ConnectionCode> {
@@ -34,4 +72,24 @@ export function getConnectionErrors(): ReadonlyArray<ConnectionCode> {
 
 export function useConnectionErrors(): ReadonlyArray<ConnectionCode> {
   return useSelector(connectionStore, (state) => state.errors)
+}
+
+/**
+ * The one connection alert for the header bar (Story 1.7), or `null`. Pass a
+ * `now` that ticks (e.g. every second) so 「最後更新 N 秒前」 counts up.
+ * Mounting it also mounts the `['maindata']` poll.
+ */
+export function useConnectionAlert(now: number): ConnectionAlert | null {
+  const errorCodes = useConnectionErrors()
+  const { data: connectionStatus, dataUpdatedAt } = useMaindata(
+    selectConnectionStatus,
+  )
+  const fetchStartedAt = useMaindataFetchStartedAt()
+  return pickConnectionAlert({
+    errorCodes,
+    connectionStatus,
+    lastSuccessAt: dataUpdatedAt,
+    fetchStartedAt,
+    now,
+  })
 }

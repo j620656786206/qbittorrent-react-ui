@@ -7,7 +7,7 @@ import type { SlimTorrent } from '#/shared/maindata'
 // Spec 1.6 rows C1 to C5. Clock: 2026-11-16 12:00 in Asia/Taipei.
 
 const NOW = Date.UTC(2026, 10, 16, 4, 0, 0)
-const OPTIONS = { now: NOW, timeZone: 'Asia/Taipei' }
+const OPTIONS = { now: NOW, timeZone: 'Asia/Taipei', stateBeforeMove: {} }
 const TODAY_0912 = Date.UTC(2026, 10, 16, 1, 12) / 1000
 const MIB = 1024 ** 2
 const DAY = 86_400
@@ -133,7 +133,7 @@ describe('C1 the status table', () => {
         moving: false,
         showsProgress,
       })
-      expect(statusOf(torrent)).toBe(status)
+      expect(statusOf(torrent, {})).toBe(status)
     },
   )
 
@@ -173,7 +173,7 @@ describe('C2 missing files', () => {
       detail: '已整理',
       showsProgress: false,
     })
-    expect(statusOf(torrent)).toBe('archived')
+    expect(statusOf(torrent, {})).toBe('archived')
   })
 })
 
@@ -204,9 +204,13 @@ describe('C3 moving', () => {
     'without a remembered state at progress %d: %s',
     (progress, status, word, column) => {
       const torrent = t({ hash, state: 'moving', progress })
-      expect(
-        classify(torrent, { ...OPTIONS, stateBeforeMove: {} }),
-      ).toMatchObject({ status, word, column, detail: '搬移中', moving: true })
+      expect(classify(torrent, OPTIONS)).toMatchObject({
+        status,
+        word,
+        column,
+        detail: '搬移中',
+        moving: true,
+      })
     },
   )
 })
@@ -223,7 +227,7 @@ describe('C4 unlisted codes', () => {
   })
 
   it('an inherited object key is not a state', () => {
-    expect(statusOf(t({ state: 'toString' }))).toBe('error')
+    expect(statusOf(t({ state: 'toString' }), {})).toBe('error')
   })
 })
 

@@ -59,8 +59,10 @@ function pollMaindata(client: QueryClient) {
     'rt-maindata',
     'GET',
   )
+  // Its own key: these rows test the global onError and polling rules, not
+  // the registered ['maindata'] query (AR-39 bans a queryFn on that key).
   const observer = new QueryObserver(client, {
-    queryKey: ['maindata'],
+    queryKey: ['polled'],
     queryFn: ({ signal }) => callFn(getMaindata, { since: 0 }, { signal }),
     refetchInterval: pollInterval(5000),
   })

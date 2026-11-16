@@ -17,6 +17,12 @@ import type { MaindataResponse } from '#/shared/maindata'
 // changes nothing (the old table stays, NFR-2). An answer the table cannot
 // use resets `rid` to 0, so the next pull asks for a full update instead of
 // receiving the same unusable delta again.
+//
+// A `fresh` read (refreshMaindata after an operation) skips the 1 s reuse and
+// only joins a pull that started after the read arrived; a pull already in
+// flight is waited out first (still one pull at a time, so `rid` stays in
+// order). With a hung qBittorrent that wait can reach the server function's
+// own timeout, which answers `timeout` as a stuck pull would anyway.
 
 export const MIN_PULL_INTERVAL_MS = 1000
 
@@ -29,10 +35,15 @@ export interface SyncerOptions {
   logger?: Logger
 }
 
+export interface ReadOptions {
+  /** Answer from a pull that starts after this read arrives. */
+  fresh?: boolean
+}
+
 export interface Syncer {
   readonly instanceId: string
   /** `since` is a version this syncer handed out earlier, or nothing. */
-  read: (since?: string) => Promise<MaindataResponse>
+  read: (since?: string, options?: ReadOptions) => Promise<MaindataResponse>
 }
 
 interface LastPull {
@@ -49,7 +60,9 @@ export function createSyncer(options: SyncerOptions): Syncer {
 
   let rid = 0
   let lastPull: LastPull | null = null
-  let inflight: Promise<void> | null = null
+  /** Pulls started so far; `inflight.seq` orders a pull against a read. */
+  let pullCount = 0
+  let inflight: { seq: number; done: Promise<void> } | null = null
 
   async function runPull(): Promise<void> {
     try {
@@ -68,25 +81,42 @@ export function createSyncer(options: SyncerOptions): Syncer {
     }
   }
 
-  function pull(): Promise<void> {
-    if (inflight) return inflight
-    const startedAt = now()
-    if (lastPull && startedAt - lastPull.startedAt < MIN_PULL_INTERVAL_MS) {
-      return 'error' in lastPull
-        ? Promise.reject(lastPull.error)
-        : Promise.resolve()
-    }
-    const current: LastPull = { startedAt }
+  function startPull(): Promise<void> {
+    const current: LastPull = { startedAt: now() }
     lastPull = current
-    inflight = runPull()
+    pullCount += 1
+    const seq = pullCount
+    const done = runPull()
       .catch((error: unknown) => {
         current.error = error
         throw error
       })
       .finally(() => {
-        inflight = null
+        if (inflight?.seq === seq) inflight = null
       })
-    return inflight
+    inflight = { seq, done }
+    return done
+  }
+
+  function pull(): Promise<void> {
+    if (inflight) return inflight.done
+    if (lastPull && now() - lastPull.startedAt < MIN_PULL_INTERVAL_MS) {
+      return 'error' in lastPull
+        ? Promise.reject(lastPull.error)
+        : Promise.resolve()
+    }
+    return startPull()
+  }
+
+  async function pullFresh(): Promise<void> {
+    const seen = pullCount
+    if (inflight && inflight.seq <= seen) {
+      // Started before this read: its answer may predate the operation.
+      await inflight.done.catch(() => {})
+    }
+    // Another read may have started a pull after this one arrived: join it.
+    if (inflight) return inflight.done
+    return startPull()
   }
 
   /** The counter to diff from, or `null` for "send everything". */
@@ -99,8 +129,11 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return id === instanceId ? Number(counter) : null
   }
 
-  async function read(since?: string): Promise<MaindataResponse> {
-    await pull()
+  async function read(
+    since?: string,
+    { fresh = false }: ReadOptions = {},
+  ): Promise<MaindataResponse> {
+    await (fresh ? pullFresh() : pull())
     const { full, changed, removed } = table.changesSince(parseSince(since))
     return {
       version: `${instanceId}.${table.version}`,

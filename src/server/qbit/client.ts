@@ -1,4 +1,8 @@
-import { rawMaindataSchema } from '#/server/qbit/maindata-schema'
+import { log as defaultLog } from '#/server/log'
+import {
+  knownConnectionStatus,
+  rawMaindataSchema,
+} from '#/server/qbit/maindata-schema'
 import type { RawMaindata } from '#/server/qbit/maindata-schema'
 import { BadMaindata, issuePaths } from '#/server/qbit/bad-maindata'
 import { QBIT_PATHS } from '#/server/qbit/paths'
@@ -18,6 +22,8 @@ export interface QbitClient {
 
 export function createQbitClient(options: QbitSessionOptions): QbitClient {
   const session = createQbitSession(options)
+  const logger = options.logger ?? defaultLog
+  let warnedUnknownStatus = false
 
   async function syncMaindata(rid: number): Promise<RawMaindata> {
     const path = QBIT_PATHS.syncMaindata
@@ -34,6 +40,18 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     const parsed = rawMaindataSchema.safeParse(json)
     if (!parsed.success) {
       throw new BadMaindata('schema', issuePaths(parsed.error.issues))
+    }
+    // Read as `disconnected` by the schema; said once per container, without
+    // the value (qBittorrent's own word, but nothing needs it in a log).
+    const status = (json as { server_state?: { connection_status?: unknown } })
+      .server_state?.connection_status
+    if (
+      !warnedUnknownStatus &&
+      typeof status === 'string' &&
+      knownConnectionStatus(status) !== status
+    ) {
+      warnedUnknownStatus = true
+      logger.warn('qbit_unknown_connection_status')
     }
     return parsed.data
   }

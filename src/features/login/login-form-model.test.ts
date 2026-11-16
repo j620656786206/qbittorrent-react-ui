@@ -22,19 +22,17 @@ describe('afterSubmitError', () => {
     (code) => {
       expect(afterSubmitError(code)).toEqual({
         message: errorText(code),
-        clearPassword: true,
-        focusPassword: true,
+        wrongCredentials: true,
       })
     },
   )
 
-  it.each(['invalid_input', 'qbit_rejected', 'timeout'] as const)(
-    'F2 %s: same as F1',
+  it.each(['invalid_input', 'qbit_rejected', 'timeout', 'bad_origin'] as const)(
+    'F2 %s: message, password kept',
     (code) => {
       expect(afterSubmitError(code)).toEqual({
         message: errorText(code),
-        clearPassword: true,
-        focusPassword: true,
+        wrongCredentials: false,
       })
     },
   )
@@ -43,18 +41,17 @@ describe('afterSubmitError', () => {
     'home_unreachable',
     'cloudflare_expired',
     'qbit_unreachable',
-    'bad_origin',
   ] as const)('F3 %s: nothing, both fields kept', (code) => {
     expect(afterSubmitError(code)).toEqual({
       message: null,
-      clearPassword: false,
-      focusPassword: false,
+      wrongCredentials: false,
     })
   })
 
-  it('lists exactly the five inline codes', () => {
+  it('lists exactly the six inline codes', () => {
     expect([...INLINE_ERROR_CODES].sort()).toEqual(
       [
+        'bad_origin',
         'invalid_input',
         'login_failed',
         'login_locked',
@@ -90,20 +87,29 @@ describe('screenMessage (F4)', () => {
     expect(screenMessage({ submitError: null, loginRequired: null })).toBeNull()
   })
 
-  it('a submit error replaces the stored reason', () => {
-    expect(
-      screenMessage({
-        submitError: 'login_failed',
-        loginRequired: stored('qbit_auth_failed'),
-      }),
-    ).toEqual({ text: errorText('login_failed'), passwordInvalid: true })
-  })
+  it.each([
+    ['login_failed', true],
+    ['login_locked', true],
+    ['invalid_input', false],
+    ['qbit_rejected', false],
+    ['timeout', false],
+    ['bad_origin', false],
+  ] as const)(
+    'a submit error %s replaces the stored reason (password invalid: %s)',
+    (code, passwordInvalid) => {
+      for (const loginRequired of [stored('qbit_auth_failed'), null]) {
+        expect(screenMessage({ submitError: code, loginRequired })).toEqual({
+          text: errorText(code),
+          passwordInvalid,
+        })
+      }
+    },
+  )
 
   it.each([
     'home_unreachable',
     'cloudflare_expired',
     'qbit_unreachable',
-    'bad_origin',
   ] as const)(
     'a connection-class submit error (%s) keeps the stored qbit_auth_failed text',
     (code: ErrorCode) => {

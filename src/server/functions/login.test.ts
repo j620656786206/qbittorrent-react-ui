@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  consecutiveFailures,
-  resetLoginLockout,
-} from '#/server/auth/login-lockout'
+import { consecutiveFailures } from '#/server/auth/login-lockout'
+import { resetLoginLockout } from '#/server/auth/testing'
 import { setSessionCookie, verifySession } from '#/server/auth/session'
 import { resetEnvCache } from '#/server/env'
 import { GUARDED, input } from '#/server/functions/_define'

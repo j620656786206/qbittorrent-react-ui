@@ -5,12 +5,14 @@ import {
   sessionQueryOptions,
   sessionStaleTime,
 } from '#/features/login/session-query'
+import { clearLoginRequired, loginStore } from '#/state/login-required'
 
 const T0 = Date.UTC(2026, 10, 16, 1, 0, 0)
 const EXP = T0 / 1000 + 60
 
 afterEach(() => {
   vi.useRealTimers()
+  clearLoginRequired()
 })
 
 describe('session staleTime', () => {
@@ -35,6 +37,24 @@ describe('session staleTime', () => {
     expect(queryFn).not.toHaveBeenCalled()
 
     vi.setSystemTime(EXP * 1000)
+    expect(await client.fetchQuery(options)).toEqual({ exp: EXP + 3600 })
+    expect(queryFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('C2 while the login store is set, fetchQuery asks the server even with an unexpired session', async () => {
+    vi.useFakeTimers({ now: T0 })
+    const client = new QueryClient()
+    client.setQueryData(SESSION_QUERY_KEY, { exp: EXP })
+    const queryFn = vi.fn(async () => ({ exp: EXP + 3600 }))
+    const options = { ...sessionQueryOptions(), queryFn }
+
+    loginStore.setState(() => ({
+      loginRequired: { reason: 'not_logged_in', returnTo: '/' },
+    }))
+    expect(await client.fetchQuery(options)).toEqual({ exp: EXP + 3600 })
+    expect(queryFn).toHaveBeenCalledTimes(1)
+
+    clearLoginRequired()
     expect(await client.fetchQuery(options)).toEqual({ exp: EXP + 3600 })
     expect(queryFn).toHaveBeenCalledTimes(1)
   })

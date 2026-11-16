@@ -43,8 +43,12 @@ export interface ClassifyOptions {
   now: number
   /** IANA zone for dates; the runtime's local zone when left out. */
   timeZone?: string
-  /** `Maindata.stateBeforeMove`. */
-  stateBeforeMove?: Readonly<Record<string, string>>
+  /**
+   * `Maindata.stateBeforeMove`. Required so a caller cannot forget it: without
+   * it a paused torrent that is moving reads as 下載中. Pass `{}` only when
+   * there is no Maindata (tests).
+   */
+  stateBeforeMove: Readonly<Record<string, string>>
 }
 
 const WORDS: Readonly<Record<TorrentStatusId, string>> = {
@@ -150,11 +154,9 @@ function statusOfKind(kind: StateKind, torrent: SlimTorrent): TorrentStatusId {
 /** The state a moving torrent had before, when the merge remembered one. */
 function rememberedKind(
   torrent: SlimTorrent,
-  stateBeforeMove: Readonly<Record<string, string>> | undefined,
+  stateBeforeMove: Readonly<Record<string, string>>,
 ): StateKind | null {
-  if (!stateBeforeMove || !Object.hasOwn(stateBeforeMove, torrent.hash)) {
-    return null
-  }
+  if (!Object.hasOwn(stateBeforeMove, torrent.hash)) return null
   const kind = kindOf(stateBeforeMove[torrent.hash])
   return kind === 'moving' ? null : kind
 }
@@ -162,7 +164,7 @@ function rememberedKind(
 /** The effective kind: a move keeps the kind it had before. */
 function effectiveKind(
   torrent: SlimTorrent,
-  stateBeforeMove: Readonly<Record<string, string>> | undefined,
+  stateBeforeMove: Readonly<Record<string, string>>,
 ): { kind: StateKind; moving: boolean } {
   const kind = kindOf(torrent.state)
   if (kind !== 'moving') return { kind, moving: false }
@@ -175,7 +177,7 @@ function effectiveKind(
 /** The status alone (no text): for filters and counts. */
 export function statusOf(
   torrent: SlimTorrent,
-  stateBeforeMove?: Readonly<Record<string, string>>,
+  stateBeforeMove: Readonly<Record<string, string>>,
 ): TorrentStatusId {
   return statusOfKind(effectiveKind(torrent, stateBeforeMove).kind, torrent)
 }

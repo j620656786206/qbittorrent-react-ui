@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { pickConnectionAlert } from '#/lib/connection-alert'
+import { CONNECTION_CODES } from '#/lib/app-error'
+import { FETCH_GRACE_MS, pickConnectionAlert } from '#/lib/connection-alert'
 import type { ConnectionAlertInput } from '#/lib/connection-alert'
 
 // Spec 1.6 rows A1 to A3, plus the review rows A4 (suffix only when stale,
-// never-fetched, fetch in flight). Clock: 2026-11-16 12:00 in Asia/Taipei.
+// never-fetched, fetch in flight) and A5 (a fetch that hangs past the grace
+// time). Clock: 2026-11-16 12:00 in Asia/Taipei.
 
 const NOW = Date.UTC(2026, 10, 16, 4, 0, 0)
 const FRESH = NOW - 1_000
@@ -16,7 +18,7 @@ const input = (
   errorCodes: [],
   connectionStatus: 'connected',
   lastSuccessAt: FRESH,
-  isFetching: false,
+  fetchStartedAt: null,
   now: NOW,
   ...overrides,
 })
@@ -176,10 +178,10 @@ describe('A4 when the 「最後更新」 part shows', () => {
     ).toBe('連不到家裡的 NAS')
   })
 
-  it('no stale line while a fetch is in flight', () => {
+  it('no stale line while a fetch has just started', () => {
     expect(
       pickConnectionAlert(
-        input({ lastSuccessAt: TWENTY_S_AGO, isFetching: true }),
+        input({ lastSuccessAt: TWENTY_S_AGO, fetchStartedAt: NOW - 500 }),
       ),
     ).toBeNull()
   })
@@ -190,14 +192,45 @@ describe('A4 when the 「最後更新」 part shows', () => {
         input({
           errorCodes: ['home_unreachable'],
           lastSuccessAt: TWENTY_S_AGO,
-          isFetching: true,
+          fetchStartedAt: NOW - 500,
         }),
       )?.text,
     ).toBe('連不到家裡的 NAS，最後更新 20 秒前')
     expect(
       pickConnectionAlert(
-        input({ connectionStatus: 'firewalled', isFetching: true }),
+        input({ connectionStatus: 'firewalled', fetchStartedAt: NOW - 500 }),
       )?.kind,
     ).toBe('firewalled')
+  })
+})
+
+describe('A5 a fetch that hangs (qBittorrent stuck) still shows the stale line', () => {
+  it.each([
+    ['just started', NOW, null],
+    ['1.999 s ago', NOW - (FETCH_GRACE_MS - 1), null],
+    ['exactly the grace time ago', NOW - FETCH_GRACE_MS, '最後更新 20 秒前'],
+    ['hung for 15 s', NOW - 15_000, '最後更新 20 秒前'],
+  ] as const)('fetch started %s', (_name, fetchStartedAt, text) => {
+    const alert = pickConnectionAlert(
+      input({ lastSuccessAt: TWENTY_S_AGO, fetchStartedAt }),
+    )
+    expect(alert === null ? null : alert.text).toBe(text)
+  })
+})
+
+describe('C6 every connection code has an alert', () => {
+  it.each(CONNECTION_CODES)('%s alone shows as itself', (code) => {
+    expect(pickConnectionAlert(input({ errorCodes: [code] }))).toMatchObject({
+      kind: code,
+      tone: 'warning',
+    })
+  })
+
+  it('home and qBittorrent rank equal: the one listed first wins', () => {
+    expect(
+      pickConnectionAlert(
+        input({ errorCodes: ['qbit_unreachable', 'home_unreachable'] }),
+      )?.kind,
+    ).toBe('qbit_unreachable')
   })
 })

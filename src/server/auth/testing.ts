@@ -1,3 +1,4 @@
+import { recordSuccess } from '#/server/auth/login-lockout'
 import { issueSession, verifySession } from '#/server/auth/session'
 import type { SessionPayload } from '#/server/auth/session'
 
@@ -11,4 +12,9 @@ export function testSession(now = 1_000): SessionPayload {
   const session = verifySession(token, { now, secret: TEST_SECRET })
   if (!session) throw new Error('testSession: could not verify its own token')
   return session
+}
+
+/** Clears the global login lockout between tests. */
+export function resetLoginLockout(): void {
+  recordSuccess()
 }

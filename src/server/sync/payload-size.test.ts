@@ -9,22 +9,34 @@ import { ok } from '#/shared/errors'
 
 // Spec 1.6 deferred item (a): a budget for what `getMaindata` sends, for a
 // library shaped like the NAS one (4167 torrents, long CJK names, the
-// code-name categories): the full read, and a delta where 300 seeding
-// torrents only tick `seeding_time`. Fake hashes, fake names, no real paths.
+// code-name categories): the full read, and a delta of the worst case for
+// `seeding_time`. Fake hashes, fake names, no real paths.
 //
-// Two measurements. The spec's budgets (2 MiB / 160 KiB) apply to the data as
+// Measured 2026-11-16, read only, two `sync/maindata` calls 5 s apart, twice:
+// 4170 torrents, 110 in a seeding state (3844 missingFiles); 47 and 44
+// torrents in the delta, 43 and 40 of them with `seeding_time`, 32 and 28
+// with no other slim field changed. About 45% of the seeders that can tick
+// moved it within 5 s, so with the missingFiles ones seeding again a delta
+// would carry about 1800 torrents. Hence the table floors `seeding_time` to
+// whole minutes (SEEDING_TIME_STEP_S): each torrent then changes it at most
+// once a minute, and the worst case is every torrent seeding, 4167 * 5 / 60,
+// about 348 per pull, here 350. The other seeders move inside their minute
+// and must not show up.
+//
+// Two sizes. The spec's budgets (2 MiB / 160 KiB) apply to the data as
 // plain JSON. What reaches the browser is the `ok(...)` envelope encoded by
 // Start with seroval, about 50% larger; measured 2026-11-16: about 2,641 KiB
-// full and 191 KiB delta on the wire, against 1,760 KiB and 128 KiB as plain
-// JSON (before compression). The wire budgets keep about 15% headroom.
+// full and 223 KiB delta on the wire, against 1,760 KiB and 149 KiB as plain
+// JSON (before compression). The wire budgets keep about 15% headroom; the
+// delta's plain JSON keeps about 7% under the spec's 160 KiB.
 // Start's own limits are far above (32 MiB pending output, 16 MiB a frame).
 
 const TORRENTS = 4167
-const TICKING_SEEDERS = 300
+const TICKING_SEEDERS = 350
 const FULL_JSON_BUDGET = 2 * 1024 * 1024
 const DELTA_JSON_BUDGET = 160 * 1024
 const FULL_WIRE_BUDGET = 3 * 1024 * 1024
-const DELTA_WIRE_BUDGET = 224 * 1024
+const DELTA_WIRE_BUDGET = 256 * 1024
 
 const CATEGORIES = ['X', 'mteam-X', 'mteam-tv'] as const
 const STATES = [
@@ -93,14 +105,20 @@ function fullUpdate(): RawMaindata {
   })
 }
 
+/** 350 seeders cross into the next minute; every other seeder stays inside its own. */
 function seedingTick(): RawMaindata {
   const torrents: Record<string, unknown> = {}
   let ticked = 0
-  for (let index = 0; ticked < TICKING_SEEDERS; index += 1) {
+  for (let index = 0; index < TORRENTS; index += 1) {
     if (!isSeeding(index)) continue
-    torrents[hashOf(index)] = { seeding_time: 3_456_789 + index + 5 }
+    const before = 3_456_789 + index
+    const sameMinute = Math.floor(before / 60) * 60 + 59
+    torrents[hashOf(index)] = {
+      seeding_time: ticked < TICKING_SEEDERS ? before + 60 : sameMinute,
+    }
     ticked += 1
   }
+  expect(Object.keys(torrents).length).toBeGreaterThan(TICKING_SEEDERS * 3)
   return rawMaindataSchema.parse({
     rid: 2,
     torrents,
@@ -124,7 +142,7 @@ async function wireBytes(data: unknown): Promise<number> {
 }
 
 describe('getMaindata payload size', () => {
-  it('full read and a 300-seeder seeding_time tick stay inside the budgets', async ({
+  it('full read and a worst-case seeding_time tick (350 torrents) stay inside the budgets', async ({
     annotate,
   }) => {
     let clock = 0
