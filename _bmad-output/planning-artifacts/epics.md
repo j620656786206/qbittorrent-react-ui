@@ -711,7 +711,7 @@ Alex 在 NAS 上打開新版（在家用電腦走 http、在外面用手機經 C
 **Given** `src/lib/torrent-status.ts` 的 `classify()`
 **When** 輸入 EXPERIENCE 狀態對應表的每一種 qBittorrent 狀態
 **Then** 回狀態用語（7 個之一）、看板欄、第二行小字，跟表一致；vitest 每一列都有，包括 `stoppedUP`、私人和一般的 `missingFiles`、`unknown`、`moving`
-**And** `error` 的原因當純文字字串回傳；功能程式裡沒有 `torrent.state ===`
+**And** `error` 的第二行先固定回傳「qBittorrent 回報錯誤」（qBittorrent 5.1.4 沒有錯誤原因欄位，2026-11-16 Alex 決定；真的原因在 Story 2.10）；功能程式裡沒有 `torrent.state ===`
 
 **Given** `src/lib/format.ts`
 **When** 格式化數字、大小、速度、剩餘時間、日期、離現在多久、長度、分享率、百分比
@@ -1395,6 +1395,26 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 **Then** 同時轉的圓圈只有看得到的那些，PR 附 Chrome Performance 錄的一段打開 App，沒有長於 50 毫秒的工作
 **And** （Alex 在手機上驗收）列表和看板打開時進度環轉進來、列進場不掉格，目標 60fps
 **And** PR 附一段螢幕錄影或連續截圖，電腦和手機各一組
+
+### Story 2.10：出錯種子的原因
+
+身為 Alex，我想要出錯的種子顯示 qBittorrent 給的原因，這樣不用打開 qBittorrent 的 log 也知道怎麼處理。
+
+**由來：** 2026-11-16 Story 1.6 查到 qBittorrent 5.1.4 的 `sync/maindata` 和其他 WebUI API 都沒有錯誤原因欄位，原因只寫在 qBittorrent 自己的 log 文字裡。Alex 選了「先固定，之後加一張 story」：Story 1.6 起第二行先寫固定的「qBittorrent 回報錯誤」，這張再換成真的原因。
+**涵蓋：** FR-8（錯誤原因那一行）、EXPERIENCE〔qBittorrent 狀態對應〕的 `error` 列
+**規格：** AD-5（只加有名字的唯讀方法，不做通用轉送）、AD-15（只讀）、AD-16（log 不漏秘密）
+
+**Acceptance Criteria:**
+
+**Given** 一個 `error` 狀態的種子
+**When** 容器用唯讀的 qBittorrent log API 找到這個種子最近一筆錯誤
+**Then** 第二行和詳情摘要顯示整理過的原因；找不到時維持「qBittorrent 回報錯誤」
+**And** 原因裡的路徑、IP、帳號一律拿掉或換成代稱，私人分類只寫 X、mteam-X；vitest 用假的 log 測
+
+**Given** qBittorrent client
+**When** 加這個功能
+**Then** 只新增一個有名字的唯讀方法，路徑加進型別白名單；不碰任何寫入或設定
+**And** 讀 log 有頻率上限，不跟著每 5 秒輪詢
 
 ## Epic 3：找得到、記得住
 

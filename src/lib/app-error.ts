@@ -29,6 +29,22 @@ export function isLoginStopCode(code: ErrorCode): code is LoginStopReason {
   return (LOGIN_STOP_CODES as ReadonlyArray<ErrorCode>).includes(code)
 }
 
+/**
+ * AR-35, FR-6: the connection alert's codes. The global `onError` records
+ * them in src/state/connection.ts; a successful maindata fetch clears them.
+ */
+export const CONNECTION_CODES = [
+  'cloudflare_expired',
+  'home_unreachable',
+  'qbit_unreachable',
+] as const satisfies ReadonlyArray<ErrorCode>
+
+export type ConnectionCode = (typeof CONNECTION_CODES)[number]
+
+export function isConnectionCode(code: ErrorCode): code is ConnectionCode {
+  return (CONNECTION_CODES as ReadonlyArray<ErrorCode>).includes(code)
+}
+
 function isHtml(response: Response): boolean {
   const type = response.headers.get('content-type') ?? ''
   return type.toLowerCase().includes('text/html')

@@ -41,7 +41,7 @@ describe('completeLogin', () => {
 
   it('invalidates every query except the seeded session', () => {
     const queryClient = createQueryClient()
-    queryClient.setQueryData(['maindata'], { version: 1 })
+    queryClient.setQueryData(['torrent-files'], { files: 1 })
     queryClient.setQueryData(SESSION_QUERY_KEY, { exp: 1 })
     completeLogin({
       data: { exp: 123 },
@@ -49,7 +49,9 @@ describe('completeLogin', () => {
       queryClient,
       navigate: () => {},
     })
-    expect(queryClient.getQueryState(['maindata'])?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(['torrent-files'])?.isInvalidated).toBe(
+      true,
+    )
     expect(queryClient.getQueryState(SESSION_QUERY_KEY)?.isInvalidated).toBe(
       false,
     )

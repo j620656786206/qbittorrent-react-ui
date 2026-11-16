@@ -1,0 +1,207 @@
+import { describe, expect, it } from 'vitest'
+import {
+  NO_VALUE,
+  QBIT_ETA_INFINITY,
+  formatAgo,
+  formatCount,
+  formatDate,
+  formatDuration,
+  formatEta,
+  formatPercent,
+  formatRatio,
+  formatRowSpeed,
+  formatSize,
+  formatSpeed,
+  isGoodRatio,
+} from '#/lib/format'
+
+// Spec 1.6 rows F1 to F10. The clock is passed in: 2026-11-16 12:00 in
+// Asia/Taipei (04:00 UTC).
+
+const TAIPEI = 'Asia/Taipei'
+const NOW = Date.UTC(2026, 10, 16, 4, 0, 0)
+const unix = (ms: number) => ms / 1000
+
+const KIB = 1024
+const MIB = KIB ** 2
+const GIB = KIB ** 3
+const TIB = KIB ** 4
+
+const MINUTE = 60
+const HOUR = 3600
+const DAY = 86_400
+
+describe('F1 formatCount', () => {
+  it.each([
+    [3631, '3,631'],
+    [0, '0'],
+  ])('%d -> %s', (value, expected) => {
+    expect(formatCount(value)).toBe(expected)
+  })
+})
+
+describe('F2 formatSize', () => {
+  it.each([
+    ['0', 0, '0 B'],
+    ['512 B', 512, '512 B'],
+    ['1 KiB', KIB, '1 KB'],
+    ['85 GiB', 85 * GIB, '85 GB'],
+    ['301.2 GiB', 301.2 * GIB, '301.2 GB'],
+    ['1,023 GiB', 1023 * GIB, '1,023 GB'],
+    ['1,024 GiB', 1024 * GIB, '1 TB'],
+    ['22.1 TiB', 22.1 * TIB, '22.1 TB'],
+    ['1023.96 GiB (unit after rounding)', 1023.96 * GIB, '1 TB'],
+  ])('%s -> %s', (_name, bytes, expected) => {
+    expect(formatSize(bytes)).toBe(expected)
+  })
+})
+
+describe('F3 formatSpeed', () => {
+  it.each([
+    ['0', 0, '0 KB/s'],
+    ['300 B/s', 300, '1 KB/s'],
+    ['1,023 KiB/s', 1023 * KIB, '1,023 KB/s'],
+    ['1,024 KiB/s', 1024 * KIB, '1.00 MB/s'],
+    ['6.21 MiB/s', 6.21 * MIB, '6.21 MB/s'],
+    ['9.999 MiB/s', 9.999 * MIB, '10.0 MB/s'],
+    ['10 MiB/s', 10 * MIB, '10.0 MB/s'],
+    ['32.7 MiB/s', 32.7 * MIB, '32.7 MB/s'],
+  ])('%s -> %s', (_name, value, expected) => {
+    expect(formatSpeed(value)).toBe(expected)
+  })
+
+  it('formatRowSpeed leaves 0 out', () => {
+    expect(formatRowSpeed(0)).toBeNull()
+    expect(formatRowSpeed(6.21 * MIB)).toBe('6.21 MB/s')
+  })
+
+  it.each([null, undefined])('formatRowSpeed(%s) leaves it out', (value) => {
+    expect(formatRowSpeed(value)).toBeNull()
+  })
+})
+
+describe('F4 formatEta', () => {
+  const SPEED = 6.21 * MIB
+  it.each([
+    ['30 s', 30, SPEED, '剩不到 1 分'],
+    ['34 min', 34 * MINUTE, SPEED, '剩 34 分'],
+    ['3 h 12 min', 3 * HOUR + 12 * MINUTE, SPEED, '剩 3 小時 12 分'],
+    ['2 d 5 h', 2 * DAY + 5 * HOUR, SPEED, '剩 2 天 5 小時'],
+    ['3 h exactly', 3 * HOUR, SPEED, '剩 3 小時'],
+    ['infinite eta', QBIT_ETA_INFINITY, SPEED, '剩餘時間不明'],
+    ['-1', -1, SPEED, '剩餘時間不明'],
+    ['speed 0', 34 * MINUTE, 0, '剩餘時間不明'],
+  ])('%s -> %s', (_name, eta, dlspeed, expected) => {
+    expect(formatEta(eta, dlspeed)).toBe(expected)
+  })
+})
+
+describe('F5 formatDate', () => {
+  it.each([
+    ['today 09:12', Date.UTC(2026, 10, 16, 1, 12), '今天 09:12'],
+    ['yesterday 21:40', Date.UTC(2026, 10, 15, 13, 40), '昨天 21:40'],
+    ['2026-11-05', Date.UTC(2026, 10, 5, 4, 0), '11/05'],
+    ['2025-07-18', Date.UTC(2025, 6, 18, 4, 0), '2025/07/18'],
+  ])('%s -> %s', (_name, ms, expected) => {
+    expect(formatDate(unix(ms), NOW, TAIPEI)).toBe(expected)
+  })
+
+  it.each([0, -1])('%d -> 沒有', (value) => {
+    expect(formatDate(value, NOW, TAIPEI)).toBe('沒有')
+  })
+
+  it('the day label follows the given zone across midnight', () => {
+    // 2026-11-15 23:30 UTC is 2026-11-16 07:30 in Taipei.
+    const instant = unix(Date.UTC(2026, 10, 15, 23, 30))
+    expect(formatDate(instant, NOW, TAIPEI)).toBe('今天 07:30')
+    expect(formatDate(instant, NOW, 'UTC')).toBe('昨天 23:30')
+  })
+
+  it.each([
+    ['later today', Date.UTC(2026, 10, 16, 8, 30), '今天 16:30'],
+    ['tomorrow (NAS clock ahead)', Date.UTC(2026, 10, 17, 1, 0), '今天 09:00'],
+  ])('%s reads as today', (_name, ms, expected) => {
+    expect(formatDate(unix(ms), NOW, TAIPEI)).toBe(expected)
+  })
+
+  it('an unknown zone falls back to the runtime zone instead of throwing', () => {
+    const instant = unix(Date.UTC(2026, 10, 16, 1, 12))
+    expect(() => formatDate(instant, NOW, 'Not/AZone')).not.toThrow()
+    expect(formatDate(instant, NOW, 'Not/AZone')).toBe(formatDate(instant, NOW))
+  })
+
+  it('writes midnight as 00, not 24', () => {
+    const midnight = unix(Date.UTC(2026, 10, 15, 16, 0))
+    expect(formatDate(midnight, NOW, TAIPEI)).toBe('今天 00:00')
+  })
+})
+
+describe('F6 formatAgo', () => {
+  it.each([
+    ['3 s', 3, '剛剛'],
+    ['20 s', 20, '20 秒前'],
+    ['5 min', 5 * MINUTE, '5 分前'],
+    ['3 h', 3 * HOUR, '3 小時前'],
+    ['3 d', 3 * DAY, '3 天前'],
+    ['future', -120, '剛剛'],
+  ])('%s ago -> %s', (_name, secondsAgo, expected) => {
+    expect(formatAgo(unix(NOW) - secondsAgo, NOW)).toBe(expected)
+  })
+})
+
+describe('F7 formatDuration', () => {
+  it.each([
+    ['41 d', 41 * DAY, '41 天'],
+    ['5 h', 5 * HOUR, '5 小時'],
+    ['12 min', 12 * MINUTE, '12 分'],
+    ['30 s', 30, '不到 1 分'],
+    ['412 d', 412 * DAY, '412 天'],
+  ])('%s -> %s', (_name, seconds, expected) => {
+    expect(formatDuration(seconds)).toBe(expected)
+  })
+})
+
+describe('F8 formatRatio and isGoodRatio', () => {
+  it.each([
+    [3.123, '3.12', true],
+    [0.999, '0.99', false],
+    [1, '1.00', true],
+    [-1, '∞', true],
+    [1 - 1e-11, '1.00', true],
+    [0.995, '0.99', false],
+  ])('%d -> %s, good %s', (ratio, text, good) => {
+    expect(formatRatio(ratio)).toBe(text)
+    expect(isGoodRatio(ratio)).toBe(good)
+  })
+})
+
+describe('F9 formatPercent', () => {
+  it.each([
+    [0.87, '87%'],
+    [0.29, '29%'],
+    [0.999, '99%'],
+    [1, '100%'],
+    [0, '0%'],
+  ])('%d -> %s', (progress, expected) => {
+    expect(formatPercent(progress)).toBe(expected)
+  })
+})
+
+describe('F10 no value', () => {
+  const formatters: Array<[string, (value: null | undefined) => string]> = [
+    ['formatCount', formatCount],
+    ['formatSize', formatSize],
+    ['formatSpeed', formatSpeed],
+    ['formatDate', (value) => formatDate(value, NOW, TAIPEI)],
+    ['formatAgo', (value) => formatAgo(value, NOW)],
+    ['formatDuration', formatDuration],
+    ['formatRatio', formatRatio],
+    ['formatPercent', formatPercent],
+  ]
+
+  it.each(formatters)('%s(null | undefined) -> 沒有', (_name, format) => {
+    expect(NO_VALUE).toBe('沒有')
+    expect(format(null)).toBe(NO_VALUE)
+    expect(format(undefined)).toBe(NO_VALUE)
+  })
+})

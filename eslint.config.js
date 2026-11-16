@@ -113,6 +113,80 @@ const qbitSessionBans = [
   message: QBIT_SESSION_MESSAGE,
 }))
 
+// AR-39: only the maindata query function (through mergeMaindata) writes
+// `['maindata']`. The key is MAINDATA_KEY, `[...MAINDATA_KEY]` or an array
+// starting with 'maindata', bare or under `as const` / `satisfies`. Blocks
+// `setQueryData` / `setQueriesData` (also called as `client['setQueryData']`)
+// with that key or a filter whose `queryKey` is it, and a `queryFn` passed
+// with that key to useQuery / fetchQuery / prefetchQuery / ensureQueryData
+// (an override of the registered query function) outside
+// src/state/maindata.ts. AR-35: `refetchInterval` only ever takes
+// `pollInterval(...)`, which stops polling while login is required.
+const SET_DATA = '/^set(Query|Queries)Data$/'
+const SET_DATA_CALL = `CallExpression:matches([callee.name=${SET_DATA}], [callee.property.name=${SET_DATA}], [callee.property.value=${SET_DATA}])`
+const QUERY_CALL_NAMES =
+  '/^(useQuery|useSuspenseQuery|fetchQuery|prefetchQuery|ensureQueryData)$/'
+const QUERY_CALL = `CallExpression:matches([callee.name=${QUERY_CALL_NAMES}], [callee.property.name=${QUERY_CALL_NAMES}])`
+const MAINDATA_KEY_NODE = `:matches(Identifier[name='MAINDATA_KEY'], ArrayExpression[elements.0.value='maindata'], ArrayExpression[elements.0.type='SpreadElement'][elements.0.argument.name='MAINDATA_KEY'])`
+const TS_WRAPPER = ':matches(TSAsExpression, TSSatisfiesExpression)'
+const keyed = (name) =>
+  `Property:matches([key.name='${name}'], [key.value='${name}'])`
+const MAINDATA_WRITE =
+  "AR-39: only mergeMaindata (the ['maindata'] query function) writes ['maindata']. After an operation call refreshMaindata() from src/state/maindata.ts."
+const MAINDATA_QUERY_FN =
+  "AR-39: ['maindata'] gets its queryFn from createQueryClient({ fetchMaindata }). Read it with useMaindata(select) from src/state/maindata.ts."
+const ban = (message) => (selector) => ({ selector, message })
+const setMaindataBans = [
+  `${SET_DATA_CALL} > ${MAINDATA_KEY_NODE}:first-child`,
+  `${SET_DATA_CALL} > ${TS_WRAPPER}:first-child > ${MAINDATA_KEY_NODE}.expression`,
+  `${SET_DATA_CALL} > ObjectExpression:first-child > ${keyed('queryKey')} > ${MAINDATA_KEY_NODE}.value`,
+  `${SET_DATA_CALL} > ObjectExpression:first-child > ${keyed('queryKey')} > ${TS_WRAPPER}.value > ${MAINDATA_KEY_NODE}.expression`,
+].map(ban(MAINDATA_WRITE))
+// esquery's :has cannot follow a child chain (`:has(> A > B)`), so the key
+// is matched through attribute paths on the queryKey property instead.
+const MAINDATA_KEY_VALUE = [
+  "[value.name='MAINDATA_KEY']",
+  "[value.elements.0.value='maindata']",
+  "[value.elements.0.argument.name='MAINDATA_KEY']",
+  "[value.expression.name='MAINDATA_KEY']",
+  "[value.expression.elements.0.value='maindata']",
+  "[value.expression.elements.0.argument.name='MAINDATA_KEY']",
+].join(', ')
+const maindataQueryFnBans = [
+  `${QUERY_CALL} > ObjectExpression:has(> ${keyed('queryKey')}:matches(${MAINDATA_KEY_VALUE})):has(> ${keyed('queryFn')})`,
+].map(ban(MAINDATA_QUERY_FN))
+const refetchIntervalBan = {
+  selector: `${keyed('refetchInterval')}:not([value.type='CallExpression'][value.callee.name='pollInterval'])`,
+  message:
+    'AR-35: refetchInterval must be pollInterval(ms) from src/state/polling.ts (it stops while login is required).',
+}
+const queryBans = [
+  ...setMaindataBans,
+  ...maindataQueryFnBans,
+  refetchIntervalBan,
+]
+
+// AR-41, AD-13: screens never read qBittorrent state codes themselves.
+// `x.state` (or `x?.state`) compared, switched on, passed to includes / has /
+// indexOf, used as a lookup key or called on (`x.state.endsWith()`), and
+// `{ state }` destructuring.
+const TORRENT_STATE_MESSAGE =
+  'AR-41: do not read torrent.state. Use classify() / statusOf() from src/lib/torrent-status.ts.'
+const STATE_MEMBER = `MemberExpression:matches([computed=false][property.name='state'], [computed=true][property.value='state'])`
+/** `x.state` as the child of `parent`, plain or inside an optional chain. */
+const stateAt = (parent, field = '') => [
+  `${parent} > ${STATE_MEMBER}${field}`,
+  `${parent} > ChainExpression${field} > ${STATE_MEMBER}.expression`,
+]
+const torrentStateBans = [
+  ...stateAt('BinaryExpression[operator=/^[!=]==?$/]'),
+  ...stateAt('SwitchStatement', '.discriminant'),
+  ...stateAt('CallExpression[callee.property.name=/^(includes|has|indexOf)$/]'),
+  ...stateAt('MemberExpression[computed=true]', '.property'),
+  `CallExpression > MemberExpression.callee > ${STATE_MEMBER}.object`,
+  `ObjectPattern > ${keyed('state')}`,
+].map(ban(TORRENT_STATE_MESSAGE))
+
 const CREATE_SERVER_FN_BAN = {
   group: ['@tanstack/*start*', '@tanstack/*start*/**'],
   importNames: ['createServerFn'],
@@ -194,14 +268,51 @@ export default [
       // Framework hooks (route handlers, server functions) are async by
       // signature even when the body does not await.
       '@typescript-eslint/require-await': 'off',
-      'no-restricted-syntax': ['error', ...rawHtmlBans, ...qbitSessionBans],
+      // A later block replaces this list for the files it matches instead of
+      // merging, so every no-restricted-syntax group repeats what applies.
+      'no-restricted-syntax': [
+        'error',
+        ...rawHtmlBans,
+        ...qbitSessionBans,
+        ...queryBans,
+      ],
     },
   },
   // The qBittorrent session is for src/server/qbit only; everyone else goes
   // through the client's named methods (AD-5).
   {
     files: ['src/server/qbit/**/*.{ts,tsx}'],
-    rules: { 'no-restricted-syntax': ['error', ...rawHtmlBans] },
+    rules: { 'no-restricted-syntax': ['error', ...rawHtmlBans, ...queryBans] },
+  },
+  // The registered maindata query function lives here (AR-39).
+  {
+    files: ['src/state/maindata.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...rawHtmlBans,
+        ...qbitSessionBans,
+        ...setMaindataBans,
+        refetchIntervalBan,
+      ],
+    },
+  },
+  // Screens map states only through src/lib/torrent-status.ts (AR-41).
+  {
+    files: [
+      'src/features/**/*.{ts,tsx}',
+      'src/routes/**/*.{ts,tsx}',
+      'src/shared/ui/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...rawHtmlBans,
+        ...qbitSessionBans,
+        ...queryBans,
+        ...torrentStateBans,
+      ],
+    },
   },
   {
     files: ['src/**/*.{ts,tsx}'],
