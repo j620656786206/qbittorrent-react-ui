@@ -13,6 +13,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { createQueryClient } from '#/state/query-client'
 import { AppShell, ShellLayout } from '#/features/header/app-shell'
+import { ListViewContext } from '#/state/list-view'
 import { HeaderContext } from '#/features/header/header-context'
 import { headerModel } from '#/features/header/header-model'
 
@@ -134,7 +135,6 @@ describe('the shell markup', () => {
         '搜尋',
         '新增種子',
         '分類：全部',
-        '排序：加入時間，新的在前，列表',
       ])
       // Only the desktop sort pill has a tooltip (story 2.1).
       expect(html.match(/\stitle="[^"]*"/g)).toEqual([
@@ -155,6 +155,70 @@ describe('the shell markup', () => {
     )
     expect(text(html)).toContain('排序：加入時間 ↓')
   })
+
+  it('the phone sort pill is enabled and opens a dialog (story 2.2)', () => {
+    const html = CASES.H1()
+    const pill = openTags(html, 'button').find(
+      (tag) => tag.includes('aria-haspopup="dialog"') && tag.includes('排序：'),
+    )
+    expect(pill).toBeDefined()
+    expect(pill).not.toMatch(/\sdisabled=""/)
+    expect(pill).toContain('aria-expanded="false"')
+    expect(pill).toContain('h-11')
+    expect(attr(pill ?? '', 'aria-label')).toBe(
+      '排序：加入時間，新的在前，列表',
+    )
+    // Closed: no sheet in the markup.
+    expect(html).not.toContain('role="dialog"')
+  })
+
+  it.each([
+    [
+      { sort: 'seeding_time', dir: 'asc' },
+      '做種時間 ↑',
+      '排序：做種時間，短的在前，列表',
+    ],
+    [
+      { sort: 'num_seeds', dir: 'desc' },
+      '做種人數（連上的） ↓',
+      '排序：做種人數（連上的），大的在前，列表',
+    ],
+    [{ sort: 'state', dir: 'desc' }, '狀態', '排序：狀態，列表'],
+  ] as const)(
+    'the phone pill follows a non-default view: %o',
+    (view, pillText, label) => {
+      const html = renderToStaticMarkup(
+        <ListViewContext value={{ view, setView: () => {} }}>
+          <HeaderContext
+            value={{
+              model: headerModel({
+                serverState: normal,
+                alert: null,
+                allCount: 4,
+                loadFailed: false,
+              }),
+              retrying: false,
+              onBarAction: () => {},
+            }}
+          >
+            <ShellLayout>
+              <p>page content</p>
+            </ShellLayout>
+          </HeaderContext>
+        </ListViewContext>,
+      )
+      const pill = openTags(html, 'button').find(
+        (tag) =>
+          tag.includes('aria-haspopup="dialog"') && tag.includes('排序：'),
+      )
+      const pillHtml = html.slice(html.indexOf(pill ?? '<none>'))
+      const shown = /<b class="font-bold">([^<]*)<\/b>/.exec(pillHtml)?.[1]
+      expect(shown).toBe(pillText)
+      expect(attr(pill ?? '', 'aria-label')).toBe(label)
+      // 狀態 has no arrow, on the phone too.
+      if (view.sort === 'state') expect(shown).not.toMatch(/[↑↓]/)
+    },
+  )
 
   it('the selected 「全部」 tab is not disabled', () => {
     const html = CASES.H1()

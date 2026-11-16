@@ -24,7 +24,7 @@ import { useMaindataRetry } from '#/state/maindata-retry'
 import { useNow } from '#/state/now'
 import {
   noteScroll,
-  resetOrderFreeze,
+  resetListFreeze,
   setPointerInList,
   touchScrollEnd,
   touchScrollStart,
@@ -198,7 +198,7 @@ function TorrentRows({
       main.removeEventListener('touchend', onTouchEnd)
       main.removeEventListener('touchcancel', onTouchEnd)
       main.removeEventListener('scroll', noteScroll)
-      resetOrderFreeze()
+      resetListFreeze()
     }
   }, [])
 

@@ -13,7 +13,11 @@ import { clearConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
-import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
+import {
+  freezeStore,
+  holdOrderForSheet,
+  resetOrderFreeze,
+} from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
 import type { SortView } from '#/shared/list-search'
@@ -264,15 +268,18 @@ describe('the freeze', () => {
     expect(freezeStore.state.pointerInList).toBe(true)
   })
 
-  it('unmounting the list clears every reason', async () => {
+  it("unmounting the list clears the list's reasons, not an open sheet", async () => {
     await render(fakeResponse({ changed: many(5) }))
     await act(async () => pointer('pointerover', section()))
     await act(async () => main.dispatchEvent(new TouchEvent('touchstart')))
+    const releaseSheet = holdOrderForSheet()
     await act(async () => root.unmount())
     expect(freezeStore.state).toEqual({
       pointerInList: false,
       touchScroll: false,
+      sheetOpen: true,
     })
+    releaseSheet()
     root = createRoot(document.createElement('div'))
   })
 })

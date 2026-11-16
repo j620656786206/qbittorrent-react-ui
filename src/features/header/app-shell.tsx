@@ -6,7 +6,8 @@ import { cn } from '#/shared/ui/cn'
 import { MAIN_ID, getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
-import { DesktopSortMenu, PhoneSortPill } from '#/features/header/sort-menu'
+import { DesktopSortMenu } from '#/features/header/sort-menu'
+import { PhoneSortPill } from '#/features/header/sort-sheet'
 import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 
 // The app shell for every logged-in page (FR-4; mockups S01-list-mode-
@@ -16,9 +17,10 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // is the only scroll container. Desktop from `lg` (1024px), phone below;
 // both are rendered and the other one is `display: none`.
 //
-// The desktop sort pill opens the sort menu (story 2.1, sort-menu.tsx).
-// Epic 1 placeholders (search, 新增, shortcuts, settings, phone category,
-// phone sort) carry the native `disabled`: 50% and not-allowed from the base rule,
+// The desktop sort pill opens the sort menu (story 2.1, sort-menu.tsx); the
+// phone one opens the sort sheet (story 2.2, sort-sheet.tsx).
+// Epic 1 placeholders (search, 新增, shortcuts, settings, phone category)
+// carry the native `disabled`: 50% and not-allowed from the base rule,
 // no hover, not focusable, and no `title` (their shortcuts do not exist yet).
 //
 // The header model is computed once per tick in HeaderProvider; the layout

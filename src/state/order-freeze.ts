@@ -10,9 +10,9 @@ import { createStore, useSelector } from '@tanstack/react-store'
 // Alex's own sort change is not data: it reorders at once, frozen or not
 // (story 2.1). Reasons in Epic 1: the mouse resting on the desktop list, and a phone
 // finger scrolling it (from `touchstart` until TOUCH_SETTLE_MS after the
-// last scroll once the finger lifted, so momentum scrolling counts). The
-// selection, an open bottom sheet and running animations join this store
-// later as further reasons.
+// last scroll once the finger lifted, so momentum scrolling counts). Story
+// 2.2: an open bottom sheet (EXPERIENCE 「底部面板開著」). The selection and
+// running animations join this store later as further reasons.
 
 /** Quiet time after the last scroll before a touch scroll counts as over. */
 export const TOUCH_SETTLE_MS = 300
@@ -22,10 +22,12 @@ export interface FreezeReasons {
   pointerInList: boolean
   /** A finger is on the list, or its scroll has not settled yet. */
   touchScroll: boolean
+  /** A bottom sheet is open (story 2.2). */
+  sheetOpen: boolean
 }
 
 export function isOrderFrozen(reasons: FreezeReasons): boolean {
-  return reasons.pointerInList || reasons.touchScroll
+  return reasons.pointerInList || reasons.touchScroll || reasons.sheetOpen
 }
 
 /** Spec 1.8 row F6: still touching, or the last scroll is under 300 ms old. */
@@ -125,6 +127,7 @@ export function shownOrderReducer(
 export const freezeStore = createStore<FreezeReasons>({
   pointerInList: false,
   touchScroll: false,
+  sheetOpen: false,
 })
 
 function setReason(name: keyof FreezeReasons, value: boolean): void {
@@ -134,6 +137,26 @@ function setReason(name: keyof FreezeReasons, value: boolean): void {
 
 export function setPointerInList(inside: boolean): void {
   setReason('pointerInList', inside)
+}
+
+/** Open sheets; a count so two at once (a later story) end the reason last. */
+let openSheets = 0
+
+/**
+ * Counts an open bottom sheet as a reason until the returned function is
+ * called (once; later calls do nothing). The sheet gets this through
+ * `SheetRuntime.holdOrder` (src/router.tsx).
+ */
+export function holdOrderForSheet(): () => void {
+  openSheets += 1
+  setReason('sheetOpen', true)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    openSheets = Math.max(0, openSheets - 1)
+    setReason('sheetOpen', openSheets > 0)
+  }
 }
 
 // The touch session: `touching` while a finger is down, `lastScrollAt` for
@@ -183,12 +206,23 @@ export function noteScroll(): void {
   if (!touch.touching) settle()
 }
 
-/** Clears every reason (the list unmounts, tests). */
-export function resetOrderFreeze(): void {
+/** Clears the list's own reasons (the list unmounts); an open sheet stays. */
+export function resetListFreeze(): void {
   clearSettleTimer()
   touch.touching = false
   touch.lastScrollAt = null
-  freezeStore.setState(() => ({ pointerInList: false, touchScroll: false }))
+  freezeStore.setState((state) => ({
+    ...state,
+    pointerInList: false,
+    touchScroll: false,
+  }))
+}
+
+/** Clears every reason (tests). */
+export function resetOrderFreeze(): void {
+  resetListFreeze()
+  openSheets = 0
+  setReason('sheetOpen', false)
 }
 
 export function useOrderFrozen(): boolean {

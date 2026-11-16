@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   TOUCH_SETTLE_MS,
   freezeStore,
+  holdOrderForSheet,
   isOrderFrozen,
   nextShownOrder,
   noteScroll,
+  resetListFreeze,
   resetOrderFreeze,
   setPointerInList,
   keepWithNewOnTop,
@@ -208,5 +210,46 @@ describe('F6 freeze reasons', () => {
     expect(frozenNow()).toBe(true)
     setPointerInList(false)
     expect(frozenNow()).toBe(false)
+  })
+
+  it('B9 an open sheet freezes until it is released; two sheets end with the last', () => {
+    const release = holdOrderForSheet()
+    expect(frozenNow()).toBe(true)
+    const second = holdOrderForSheet()
+    release()
+    expect(frozenNow()).toBe(true)
+    // A second call of the same release does not end the other sheet.
+    release()
+    expect(frozenNow()).toBe(true)
+    second()
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('B9 the list unmounting keeps an open sheet as a reason', () => {
+    const release = holdOrderForSheet()
+    setPointerInList(true)
+    resetListFreeze()
+    expect(freezeStore.state).toEqual({
+      pointerInList: false,
+      touchScroll: false,
+      sheetOpen: true,
+    })
+    release()
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('B9 a poll reorders under an open sheet: positions hold, then one reorder', () => {
+    let shown = shownOrderReducer(null, { live: ['a', 'b'], frozen: false })
+    const release = holdOrderForSheet()
+    const held = shown
+    shown = shownOrderReducer(shown, {
+      live: ['b', 'a'],
+      frozen: frozenNow(),
+    })
+    expect(shown).toBe(held)
+    release()
+    const live = ['b', 'a']
+    shown = shownOrderReducer(shown, { live, frozen: frozenNow() })
+    expect(shown).toBe(live)
   })
 })

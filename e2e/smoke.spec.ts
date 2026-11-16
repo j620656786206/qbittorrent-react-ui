@@ -391,3 +391,264 @@ test('S3 sorted lists and the menu in light and dark', async ({
     }
   }
 })
+
+// Story 2.2: the phone sort pill, the shared bottom sheet and its sort
+// content at 390px, with the same CSP and console watch as every test.
+
+const PHONE = WIDTHS[1]
+
+const phonePill = (page: Page) =>
+  page
+    .getByRole('button', { name: /^排序：.*，列表$/ })
+    .filter({ visible: true })
+const sortSheet = (page: Page) => page.getByRole('dialog', { name: '排序' })
+const mainScrollTop = (page: Page) =>
+  page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop)
+
+/** Waits until no animation runs (the sheet's slide, the scrim's fade). */
+async function settled(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((animation) => animation.playState !== 'running'),
+  )
+}
+
+async function openPhoneSheet(page: Page) {
+  await phonePill(page).click()
+  await expect(sortSheet(page)).toBeVisible()
+  await settled(page)
+}
+
+async function sheetBox(page: Page) {
+  const box = await sortSheet(page).evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return { top: rect.top, bottom: rect.bottom }
+  })
+  return box
+}
+
+/** Drags the sheet's handle by `dy` px with the mouse (pointer events). */
+async function dragHandle(page: Page, dy: number) {
+  const { top } = await sheetBox(page)
+  const x = PHONE.width / 2
+  await page.mouse.move(x, top + 10)
+  await page.mouse.down()
+  await page.mouse.move(x, top + 10 + dy, { steps: 12 })
+  await page.mouse.up()
+}
+
+test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'many' })
+  await page.setViewportSize(PHONE)
+  await login(page)
+  const historyLength = () => page.evaluate(() => history.length)
+  const entries = await historyLength()
+  const pill = phonePill(page)
+  await expect(pill).toHaveText('加入時間 ↓')
+  await expect(pill).toHaveAccessibleName('排序：加入時間，新的在前，列表')
+  expect((await pill.boundingBox())?.height).toBe(44)
+
+  await openPhoneSheet(page)
+  const sheet = sortSheet(page)
+  await expect(sheet).toHaveAttribute('aria-modal', 'true')
+  const items = sheet.getByRole('menuitemradio')
+  await expect(items).toHaveCount(5)
+  await expect(items.first()).toBeDisabled()
+  const checked = sheet.getByRole('menuitemradio', { checked: true })
+  await expect(checked).toHaveAccessibleName('加入時間，新的在前')
+  await expect(checked).toBeFocused()
+  expect((await checked.boundingBox())?.height).toBe(52)
+  // Fit: rests on the bottom edge, shorter than the screen.
+  const box = await sheetBox(page)
+  expect(Math.round(box.bottom)).toBeGreaterThanOrEqual(PHONE.height)
+  expect(box.top).toBeGreaterThan(PHONE.height * 0.1)
+  await hasNoHorizontalScroll(page)
+
+  // B14: the page behind does not scroll.
+  await page.mouse.move(PHONE.width / 2, 40)
+  await page.mouse.wheel(0, 800)
+  expect(await mainScrollTop(page)).toBe(0)
+  expect(
+    await page
+      .locator(`#${MAIN_ID}`)
+      .evaluate((main) => getComputedStyle(main).overflowY),
+  ).toBe('hidden')
+
+  await sheet.getByRole('menuitem', { name: '更多' }).click()
+  await expect(items).toHaveCount(51)
+  // Fit grows with the content up to 90% of the screen.
+  await expect
+    .poll(async () => (await sheetBox(page)).top)
+    .toBeLessThan(PHONE.height * 0.11)
+  await settled(page)
+  await hasNoHorizontalScroll(page)
+
+  // ✕, Esc and the scrim each close it and give focus back to the pill.
+  await sheet.getByRole('button', { name: '關閉' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(pill).toBeFocused()
+  await openPhoneSheet(page)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(pill).toBeFocused()
+  await openPhoneSheet(page)
+  await page.mouse.click(PHONE.width / 2, 30)
+  await expect(sheet).toBeHidden()
+  await expect(pill).toBeFocused()
+
+  // B11 the selected row flips the direction; the sheet stays.
+  await openPhoneSheet(page)
+  await checked.click()
+  await expect(page).toHaveURL(/[?&]dir=asc/)
+  await expect(sheet).toBeVisible()
+  await expect(checked).toHaveText(/^加入時間\u3000舊的在前 ↑$/)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+
+  // B12 another row: default direction, closes, the list at the top.
+  await scrollMain(page, 'middle')
+  expect(await mainScrollTop(page)).toBeGreaterThan(0)
+  await openPhoneSheet(page)
+  await sheet.getByRole('menuitemradio', { name: '做種時間' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(page).toHaveURL(/[?&]sort=seeding_time/)
+  await expect(page).toHaveURL(/[?&]dir=desc/)
+  await expect(pill).toHaveText('做種時間 ↓')
+  await expect(pill).toBeFocused()
+  expect(await mainScrollTop(page)).toBe(0)
+
+  // B13 a sort under 更多: opens expanded with it in view.
+  await page.goto('/?sort=num_seeds&dir=asc')
+  await expect(rows(page).first()).toBeVisible()
+  await openPhoneSheet(page)
+  await expect(items).toHaveCount(51)
+  const current = sheet.getByRole('menuitemradio', { checked: true })
+  await expect(current).toHaveAccessibleName('做種人數（連上的），小的在前')
+  await expect(current).toBeInViewport({ ratio: 1 })
+  await expect(current).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  expect(await historyLength()).toBe(entries + 1)
+})
+
+test('B3 B5 dragging: down closes, a short drag springs back, up goes full screen', async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE)
+  await login(page)
+  await openPhoneSheet(page)
+  const sheet = sortSheet(page)
+  const rest = await sheetBox(page)
+
+  await dragHandle(page, 30)
+  await settled(page)
+  expect(Math.round((await sheetBox(page)).top)).toBe(Math.round(rest.top))
+  await expect(sheet).toBeVisible()
+
+  await dragHandle(page, -250)
+  await settled(page)
+  await expect(sheet).toHaveAttribute('data-full-screen', 'true')
+  const full = await sheetBox(page)
+  expect(full.top).toBe(0)
+  expect(
+    await sheet.evaluate(
+      (element) => getComputedStyle(element).borderTopLeftRadius,
+    ),
+  ).toBe('0px')
+
+  await dragHandle(page, 300)
+  await settled(page)
+  await expect(sheet).not.toHaveAttribute('data-full-screen', 'true')
+  expect(Math.round((await sheetBox(page)).top)).toBe(Math.round(rest.top))
+
+  await dragHandle(page, 250)
+  await expect(sheet).toBeHidden()
+  await expect(phonePill(page)).toBeFocused()
+})
+
+test('B9 the list keeps its order while the sheet is open', async ({
+  page,
+  request,
+}) => {
+  await page.setViewportSize(PHONE)
+  await login(page)
+  const setSize = () => rows(page).first().getAttribute('aria-setsize')
+  const before = await setSize()
+  await openPhoneSheet(page)
+  // Each poll now adds a newer torrent; the sheet holds them back. Wait for
+  // two maindata answers (the only server function polled on this sort).
+  await setModes(request, { grow: '1' })
+  for (let poll = 0; poll < 2; poll += 1) {
+    await page.waitForResponse(
+      async (response) =>
+        response.url().includes('/_serverFn/') &&
+        (await response.text()).includes('serverState'),
+      { timeout: POLL_WAIT },
+    )
+  }
+  expect(await setSize()).toBe(before)
+  await page.keyboard.press('Escape')
+  await expect(sortSheet(page)).toBeHidden()
+  await expect.poll(setSize).not.toBe(before)
+})
+
+test('B10 reduced motion: the sheet opens and closes without animations', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize(PHONE)
+  await login(page)
+  await phonePill(page).click()
+  await expect(sortSheet(page)).toBeVisible()
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  await dragHandle(page, 30)
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  await page.keyboard.press('Escape')
+  await expect(sortSheet(page)).toHaveCount(0)
+})
+
+test('B1 sheet screenshots at 390px, light and dark', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'many' })
+  await page.setViewportSize(PHONE)
+  await login(page)
+  for (const scheme of SCHEMES) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await page.goto('/?sort=seeding_time')
+    await expect(rows(page).first()).toBeVisible()
+    await openPhoneSheet(page)
+    await hasNoHorizontalScroll(page)
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/sort-sheet-phone-${scheme}.png`,
+      animations: 'disabled',
+    })
+    await sortSheet(page).getByRole('menuitem', { name: '更多' }).click()
+    await expect
+      .poll(async () => (await sheetBox(page)).top)
+      .toBeLessThan(PHONE.height * 0.11)
+    await settled(page)
+    // No hover look on the row the mouse clicked.
+    await page.mouse.move(0, 0)
+    await hasNoHorizontalScroll(page)
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/sort-sheet-more-phone-${scheme}.png`,
+      animations: 'disabled',
+    })
+    await dragHandle(page, -200)
+    await settled(page)
+    await expect(sortSheet(page)).toHaveAttribute('data-full-screen', 'true')
+    await hasNoHorizontalScroll(page)
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/sort-sheet-full-phone-${scheme}.png`,
+      animations: 'disabled',
+    })
+    await page.keyboard.press('Escape')
+    await expect(sortSheet(page)).toBeHidden()
+  }
+})

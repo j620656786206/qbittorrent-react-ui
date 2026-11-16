@@ -92,6 +92,7 @@ describe('shadcn components (row 21)', () => {
     )
     expect(files.sort()).toEqual([
       'alert-bar.tsx',
+      'bottom-sheet.tsx',
       'button.tsx',
       'checkbox.tsx',
       'dialog.tsx',
@@ -115,6 +116,7 @@ describe('shadcn components (row 21)', () => {
   it('uses the token-aware cn and Chinese close text', () => {
     for (const file of [
       'alert-bar.tsx',
+      'bottom-sheet.tsx',
       'button.tsx',
       'checkbox.tsx',
       'dialog.tsx',
@@ -160,6 +162,39 @@ describe('DropdownMenu (story 2.1, DESIGN sort-menu)', () => {
     expect(source).toContain('rounded-row')
     expect(source).toContain('data-highlighted:bg-surface-muted')
     expect(source).toContain('text-tag text-text-muted')
+  })
+})
+
+describe('BottomSheet (story 2.2, DESIGN bottom-sheet)', () => {
+  const source = read('bottom-sheet.tsx')
+
+  it('uses the brand surface, sheet radius, sheet shadow and scrim', () => {
+    for (const token of [
+      'bg-surface',
+      'rounded-t-sheet',
+      'shadow-sheet',
+      'bg-scrim-sheet',
+      'pt-[env(safe-area-inset-top)]',
+      'h-[5px] w-11 rounded-full',
+      'h-5 justify-center pt-2',
+      'text-[16px] leading-[1.2] font-bold',
+      'aria-label="關閉"',
+      'size-11',
+      'role="dialog"',
+      'aria-modal="true"',
+    ]) {
+      expect(source, token).toContain(token)
+    }
+  })
+
+  it('has the mockup motion and never adds a <style> element (CSP)', () => {
+    expect(source).toContain('SHEET_MOTION_MS = 550')
+    expect(source).toContain("SHEET_EASING = 'cubic-bezier(.2,.85,.25,1)'")
+    expect(source).toContain('SHEET_START_SHARE = 0.6')
+    const code = source.replace(/^\s*\/\/.*$/gm, '')
+    expect(code).not.toMatch(/createElement\(\s*['"]style/)
+    expect(code).not.toContain('<style')
+    expect(code).not.toContain("setAttribute('style'")
   })
 })
 
