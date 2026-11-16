@@ -4,7 +4,8 @@ import { ESLint } from 'eslint'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 // Guards the layer boundaries, the AD-10 raw-HTML bans, the AD-5
-// createServerFn ban and the AD-16 no-console rule in eslint.config.js.
+// createServerFn ban, the cn and src/shared/ui bans and the AD-16
+// no-console rule in eslint.config.js.
 // If a plugin or resolver change silently disables them, these tests go red.
 
 const ROOT = join(import.meta.dirname, '..')
@@ -61,17 +62,38 @@ const FIXTURES: Record<string, string> = {
     "import { createServerFn } from '@tanstack/react-start'\n\nexport const x = createServerFn\n",
   'src/server/qbit/lint-probe-create-server-fn.ts':
     "import { createServerFn as make } from '@tanstack/start-client-core'\n\nexport const x = make\n",
-  'src/server/qbit/lint-probe-console.ts': "console.log('x')\n\nexport const x = 1\n",
+  'src/server/qbit/lint-probe-console.ts':
+    "console.log('x')\n\nexport const x = 1\n",
   'src/lib/lint-probe-define-alias.ts':
     "import { serverGet } from '#/server/functions/_define'\n\nexport const x = serverGet\n",
   'src/routes/-lint-probe-define-relative.ts':
     "import { serverPost } from '../server/functions/_define.ts'\n\nexport const x = serverPost\n",
+  'src/routes/-lint-probe-cn.tsx':
+    "import { cn } from 'cn'\n\nexport const x = cn\n",
+  'src/server/qbit/lint-probe-ui.ts':
+    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
+  'src/server/qbit/lint-probe-ui-relative.ts':
+    "import { cn } from '../../shared/ui/cn'\n\nexport const x = cn\n",
+  'src/lib/lint-probe-ui.ts':
+    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
+  'src/state/lint-probe-ui.ts':
+    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
+  // Subfolder so server function discovery never picks it up.
+  'src/server/functions/lint-probe/ui.ts':
+    "import { Button } from '#/shared/ui/button'\nimport { cn } from 'cn'\n\nexport const x = [Button, cn]\n",
+  'src/lib/lint-probe-cn.ts':
+    "import { cn } from 'cn'\n\nexport const x = cn\n",
+  'src/shared/lint-probe-ui.ts':
+    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
+  'src/routes/-lint-probe-ui.tsx':
+    "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
 }
 
 // Real files linted alongside the probes (read only).
 const REAL_FILES = [
   'src/server/functions/_define.ts',
   'src/server/functions/__fixtures__/sample.ts',
+  'src/shared/ui/cn.ts',
 ]
 
 const createdDirs: Array<string> = []
@@ -97,14 +119,18 @@ beforeAll(async () => {
   }
 
   const eslint = new ESLint({ cwd: ROOT })
-  const lintResults = await eslint.lintFiles([...Object.keys(FIXTURES), ...REAL_FILES])
+  const lintResults = await eslint.lintFiles([
+    ...Object.keys(FIXTURES),
+    ...REAL_FILES,
+  ])
   for (const result of lintResults) {
     results.set(relative(ROOT, result.filePath), result.messages)
   }
 }, 120_000)
 
 afterAll(() => {
-  for (const file of Object.keys(FIXTURES)) rmSync(join(ROOT, file), { force: true })
+  for (const file of Object.keys(FIXTURES))
+    rmSync(join(ROOT, file), { force: true })
   for (const dir of createdDirs) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -114,7 +140,10 @@ describe('layer boundaries', () => {
     ['lib -> root file (router)', 'src/lib/lint-probe-to-root.ts'],
     ['state -> server', 'src/state/lint-probe-to-server.ts'],
     ['route -> server', 'src/routes/-lint-probe-to-server.ts'],
-    ['feature a -> feature b (relative)', 'src/features/lint-probe-a/relative.ts'],
+    [
+      'feature a -> feature b (relative)',
+      'src/features/lint-probe-a/relative.ts',
+    ],
     ['feature a -> feature b (#/ alias)', 'src/features/lint-probe-a/alias.ts'],
   ])('blocks %s', (_name, file) => {
     expect(ruleIds(file)).toContain('boundaries/dependencies')
@@ -154,33 +183,79 @@ describe('AD-10 raw HTML bans', () => {
 describe('AD-5 createServerFn only in _define.ts', () => {
   it.each([
     ['@tanstack/react-start', 'src/lib/lint-probe-create-server-fn.ts'],
-    ['@tanstack/start-client-core (renamed)', 'src/server/qbit/lint-probe-create-server-fn.ts'],
+    [
+      '@tanstack/start-client-core (renamed)',
+      'src/server/qbit/lint-probe-create-server-fn.ts',
+    ],
   ])('blocks importing it from %s outside _define.ts', (_name, file) => {
     expect(ruleIds(file)).toContain('no-restricted-imports')
   })
 
   it('allows it in src/server/functions/_define.ts', () => {
-    expect(ruleIds('src/server/functions/_define.ts')).not.toContain('no-restricted-imports')
+    expect(ruleIds('src/server/functions/_define.ts')).not.toContain(
+      'no-restricted-imports',
+    )
   })
 })
 
 describe('AD-5 the factory is imported only under src/server/functions', () => {
   it.each([
     ['#/ alias from src/lib', 'src/lib/lint-probe-define-alias.ts'],
-    ['relative path from src/routes', 'src/routes/-lint-probe-define-relative.ts'],
+    [
+      'relative path from src/routes',
+      'src/routes/-lint-probe-define-relative.ts',
+    ],
   ])('blocks %s', (_name, file) => {
     expect(ruleIds(file)).toContain('no-restricted-imports')
   })
 
   it('allows it inside src/server/functions', () => {
-    expect(ruleIds('src/server/functions/__fixtures__/sample.ts')).not.toContain(
-      'no-restricted-imports',
-    )
+    expect(
+      ruleIds('src/server/functions/__fixtures__/sample.ts'),
+    ).not.toContain('no-restricted-imports')
   })
 })
 
 describe('AD-16 only src/server/log writes logs', () => {
   it('blocks console in src/server', () => {
-    expect(ruleIds('src/server/qbit/lint-probe-console.ts')).toContain('no-console')
+    expect(ruleIds('src/server/qbit/lint-probe-console.ts')).toContain(
+      'no-console',
+    )
+  })
+})
+
+describe('cn only through src/shared/ui/cn.ts', () => {
+  it.each([
+    ['a route', 'src/routes/-lint-probe-cn.tsx'],
+    ['src/lib', 'src/lib/lint-probe-cn.ts'],
+  ])('blocks the cn package in %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('blocks both cn and src/shared/ui under src/server/functions', () => {
+    const hits = ruleIds('src/server/functions/lint-probe/ui.ts').filter(
+      (id) => id === 'no-restricted-imports',
+    )
+    expect(hits).toHaveLength(2)
+  })
+
+  it('allows it in src/shared/ui/cn.ts', () => {
+    expect(ruleIds('src/shared/ui/cn.ts')).toEqual([])
+  })
+})
+
+describe('src/shared/ui only from screens', () => {
+  it.each([
+    ['src/server (#/ alias)', 'src/server/qbit/lint-probe-ui.ts'],
+    ['src/server (relative)', 'src/server/qbit/lint-probe-ui-relative.ts'],
+    ['src/lib', 'src/lib/lint-probe-ui.ts'],
+    ['src/state', 'src/state/lint-probe-ui.ts'],
+    ['src/shared outside ui/', 'src/shared/lint-probe-ui.ts'],
+  ])('blocks it from %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('allows it from a route', () => {
+    expect(ruleIds('src/routes/-lint-probe-ui.tsx')).toEqual([])
   })
 })

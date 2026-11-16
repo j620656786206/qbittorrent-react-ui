@@ -1,6 +1,7 @@
 // Smoke test for the built server (.output). No dependencies.
-// 1. Boots with fake valid env and checks the HTML nonce plumbing, /healthz,
-//    the static-asset CSP and that no access-control-* header is sent.
+// 1. Boots with fake valid env and checks the HTML nonce plumbing, that the
+//    HTML has no inline styles, /healthz, the static-asset CSP and that no
+//    access-control-* header is sent.
 // 2. Boots without SESSION_SECRET and checks it refuses to start.
 // Never talks to a real qBittorrent: QBIT_URL is a .invalid host.
 import { spawn } from 'node:child_process'
@@ -123,6 +124,11 @@ async function checkValidBoot(configDir) {
         `/: script without the nonce: ${tag}`,
       )
     }
+
+    // AR-31: the CSP has no style-src, so the page must not need inline
+    // styles (spec 1.3, CSP style-src finding).
+    check(!/<style\b/i.test(html), '/: has a <style> tag')
+    check(!/ style="/i.test(html), '/: has an inline style attribute')
 
     const health = await fetch(`${base}/healthz`)
     const healthBody = await health.text()

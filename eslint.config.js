@@ -30,7 +30,14 @@ const allow = (from, to) => ({
 })
 
 const layerPolicies = [
-  allow('route', ['route', 'feature', 'state', 'lib', 'shared', 'server-functions']),
+  allow('route', [
+    'route',
+    'feature',
+    'state',
+    'lib',
+    'shared',
+    'server-functions',
+  ]),
   allow('feature', ['state', 'lib', 'shared', 'server-functions']),
   // A feature may import itself, never another feature.
   {
@@ -61,7 +68,8 @@ const layerPolicies = [
 // `.document.write` (`window.document.write`, `globalThis.document.write`).
 const prop = (names) =>
   `:matches([property.name=/^(${names})$/], [property.value=/^(${names})$/])`
-const DANGEROUS_HTML = 'AD-10: dangerouslySetInnerHTML is banned. Render text as plain text.'
+const DANGEROUS_HTML =
+  'AD-10: dangerouslySetInnerHTML is banned. Render text as plain text.'
 
 const rawHtmlBans = [
   {
@@ -75,7 +83,8 @@ const rawHtmlBans = [
   },
   {
     selector: `AssignmentExpression > MemberExpression.left${prop('innerHTML|outerHTML')}`,
-    message: 'AD-10: assigning innerHTML / outerHTML is banned. Use textContent.',
+    message:
+      'AD-10: assigning innerHTML / outerHTML is banned. Use textContent.',
   },
   {
     selector: `CallExpression > MemberExpression.callee${prop('write|writeln')}:matches([object.name='document'], [object.property.name='document'], [object.property.value='document'])`,
@@ -100,6 +109,34 @@ const DEFINE_BAN = {
   message:
     'AD-5: only files under src/server/functions may import the server function factory.',
 }
+// shadcn's class merger only through src/shared/ui/cn.ts, which knows the
+// brand's type, radius and shadow tokens.
+const CN_BAN = {
+  regex: '^cn(/|$)',
+  message: 'Import cn from #/shared/ui/cn, which knows the design tokens.',
+}
+// UI components belong to screens; server, lib and state never import them.
+const SHARED_UI_BAN = {
+  regex: '(^|/)shared/ui(/|$)',
+  message: 'src/shared/ui is for routes and features only.',
+}
+
+// A later flat-config block replaces `no-restricted-imports` for the files it
+// matches instead of merging, so the file groups below are disjoint and each
+// lists every ban that applies to it.
+const restrictImports = (...patterns) => ({
+  'no-restricted-imports': ['error', { patterns }],
+})
+const CN_FILE = 'src/shared/ui/cn.ts'
+const DEFINE_FILE = 'src/server/functions/_define.ts'
+const SERVER_FUNCTIONS = 'src/server/functions/**'
+const SHARED_UI = 'src/shared/ui/**'
+const NO_UI_LAYERS = [
+  'src/server/**/*.{ts,tsx}',
+  'src/lib/**/*.{ts,tsx}',
+  'src/state/**/*.{ts,tsx}',
+  'src/shared/**/*.{ts,tsx}',
+]
 
 export default [
   {
@@ -159,23 +196,40 @@ export default [
     },
   },
   // AD-5: every server function comes from the factory in _define.ts, and
-  // only files under src/server/functions may use that factory.
+  // only files under src/server/functions may use that factory. Plus the cn
+  // and src/shared/ui bans above.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/server/functions/**'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        { patterns: [CREATE_SERVER_FN_BAN, DEFINE_BAN] },
-      ],
-    },
+    ignores: NO_UI_LAYERS,
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN),
   },
   {
-    files: ['src/server/functions/**/*.{ts,tsx}'],
-    ignores: ['src/server/functions/_define.ts'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [CREATE_SERVER_FN_BAN] }],
-    },
+    files: [`${SHARED_UI}/*.{ts,tsx}`],
+    ignores: [CN_FILE],
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN),
+  },
+  {
+    files: [CN_FILE],
+    rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN),
+  },
+  {
+    files: NO_UI_LAYERS,
+    ignores: [SERVER_FUNCTIONS, SHARED_UI],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      SHARED_UI_BAN,
+    ),
+  },
+  {
+    files: [`${SERVER_FUNCTIONS}/*.{ts,tsx}`],
+    ignores: [DEFINE_FILE],
+    rules: restrictImports(CREATE_SERVER_FN_BAN, CN_BAN, SHARED_UI_BAN),
+  },
+  {
+    files: [DEFINE_FILE],
+    rules: restrictImports(CN_BAN, SHARED_UI_BAN),
   },
   // AD-16: only src/server/log writes logs.
   {
