@@ -35,7 +35,7 @@ import {
 // 46 in the same menu under group headers (no submenu). It opens already
 // expanded and scrolled to the current sort when that sort is under 更多.
 // 「狀態」 shows but stays disabled until the board (Story 2.3). The phone
-// pill stays disabled until Story 2.2.
+// pill and its sort sheet are in sort-sheet.tsx (Story 2.2).
 
 export function DesktopSortMenu() {
   const { view, setView } = useListView()
@@ -163,26 +163,5 @@ export function DesktopSortMenu() {
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-/** Disabled until Story 2.2; shows the current sort. */
-export function PhoneSortPill() {
-  const { view } = useListView()
-  const pill = sortPillModel(view)
-  return (
-    <button
-      type="button"
-      disabled
-      aria-haspopup="dialog"
-      aria-label={pill.ariaLabel}
-      className="inline-flex h-11 flex-none items-center gap-2 rounded-full border bg-surface pr-2.5 pl-1.5 whitespace-nowrap hover-outline"
-    >
-      <span className="inline-flex items-center rounded-full bg-surface-muted px-2 py-1">
-        <List size={16} strokeWidth={2.2} aria-hidden="true" />
-      </span>
-      <b className="font-bold">{pill.shortText}</b>
-      <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
-    </button>
   )
 }

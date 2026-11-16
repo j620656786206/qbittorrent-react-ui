@@ -3,8 +3,12 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { getGlobalStartContext } from '@tanstack/react-start'
 import { routeTree } from './routeTree.gen'
 import { watchLoginRequired } from '#/features/login/watch-login-required'
+import { releaseVelocity, settleSheet, sheetRestHeight } from '#/lib/sheet-snap'
 import { getMaindata } from '#/server/functions/get-maindata'
+import type { SheetRuntime } from '#/shared/sheet'
+import { SheetRuntimeContext } from '#/shared/ui/bottom-sheet'
 import { bindFetchMaindata } from '#/state/maindata'
+import { holdOrderForSheet } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 
 // AD-10: the request middleware's per-request CSP nonce goes on Start's inline
@@ -19,6 +23,15 @@ function cspNonce(): string | undefined {
   }
 }
 
+// Story 2.2: src/shared may not import src/lib or src/state, so the bottom
+// sheet's snap decisions and its order freeze are bound here.
+const SHEET_RUNTIME: SheetRuntime = {
+  restHeight: sheetRestHeight,
+  settle: settleSheet,
+  releaseVelocity,
+  holdOrder: holdOrderForSheet,
+}
+
 export function getRouter() {
   // src/state may not import server functions, so the maindata call is bound
   // here. This import is also what bundles getMaindata (smoke B9, B10).
@@ -29,7 +42,11 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     Wrap: ({ children }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <SheetRuntimeContext value={SHEET_RUNTIME}>
+          {children}
+        </SheetRuntimeContext>
+      </QueryClientProvider>
     ),
     scrollRestoration: true,
     defaultPreload: 'intent',
