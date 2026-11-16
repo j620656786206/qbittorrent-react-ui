@@ -2,9 +2,9 @@ import { memo } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { StatusCircle } from '#/shared/ui/status-circle'
 import { ROW_HEIGHT, rowModel } from '#/features/list/list-model'
 import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
-import { StatusCircle } from '#/features/list/status-circle'
 
 // DESIGN list-row (mockups S01-list-mode-desktop, S02-list-mode-phone).
 // Epic 1 rows have no click, no hover, no cursor change and are not

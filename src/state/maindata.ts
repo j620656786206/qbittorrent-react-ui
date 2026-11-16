@@ -3,7 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, QueryFunctionContext } from '@tanstack/react-query'
 import { createStore, useSelector } from '@tanstack/react-store'
 import { mergeMaindata } from '#/lib/maindata-merge'
-import { selectVisibleTorrents } from '#/lib/visible-torrents'
+import {
+  selectBoardColumns,
+  selectVisibleTorrents,
+} from '#/lib/visible-torrents'
 import type { Maindata } from '#/lib/maindata-merge'
 import type { SortKeys, TorrentView } from '#/lib/visible-torrents'
 import type {
@@ -184,6 +187,16 @@ export function useVisibleTorrents(view: TorrentView, sortKeys?: SortKeys) {
     [view, sortKeys],
   )
   return useMaindata(select)
+}
+
+/**
+ * Story 2.3: the board's five columns (`selectBoardColumns`), each in its
+ * fixed order. Live, never frozen (EXPERIENCE 「看板不受影響」). Query's
+ * structural sharing keeps a column's array when its hashes did not change,
+ * so an unchanged column does not re-render.
+ */
+export function useBoardColumns() {
+  return useMaindata(selectBoardColumns)
 }
 
 /**

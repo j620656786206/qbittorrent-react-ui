@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Check, ChevronDown, List } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import {
   MORE_SORT_GROUPS,
   TOP_SORT_FIELDS,
@@ -8,6 +8,7 @@ import {
 } from '#/shared/sort-fields'
 import type { SortFieldDef, SortFieldId } from '#/shared/sort-fields'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { cn } from '#/shared/ui/cn'
 import { getMain } from '#/shared/ui/main-scroll'
 import { useListView } from '#/state/list-view'
@@ -17,6 +18,7 @@ import {
   pickSort,
   sortPillModel,
 } from '#/features/header/sort-model'
+import { ViewIcon } from '#/features/header/view-icon'
 
 // Story 2.2, UX-DR21, DESIGN sort-pill and sort-menu (phone part), mockup
 // S03-sort-sheet-phone. Below 1024px the sort pill is 44px tall and shows
@@ -27,13 +29,11 @@ import {
 // the direction words and arrow. The rules are the desktop menu's
 // (sort-model.ts): the selected row flips the direction and the sheet stays;
 // another row takes its default direction and closes it; both scroll the
-// list to the top. 「狀態」 shows but stays disabled until the board. Rows
+// list to the top. 「狀態」 shows the board (story 2.3; the pill then shows
+// the board icon and no arrow: 「▦ 狀態 ▾」). Rows
 // are plain buttons in lists (the selected one has `aria-current`), not a
 // menu: in a dialog, Tab and the screen reader's own list navigation work
 // without the menu keyboard model.
-
-/** Tailwind `lg`, where the desktop header and its sort menu take over. */
-export const DESKTOP_QUERY = '(min-width: 1024px)'
 
 const LIST_CLASS = 'm-0 flex list-none flex-col p-0'
 
@@ -62,7 +62,7 @@ export function PhoneSortPill() {
         className="inline-flex h-11 flex-none items-center gap-2 rounded-full border bg-surface pr-2.5 pl-1.5 whitespace-nowrap hover-outline"
       >
         <span className="inline-flex items-center rounded-full bg-surface-muted px-2 py-1">
-          <List size={16} strokeWidth={2.2} aria-hidden="true" />
+          <ViewIcon kind={pill.kind} />
         </span>
         <b className="font-bold">{pill.shortText}</b>
         <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
@@ -147,7 +147,6 @@ export function PhoneSortSheet({
           aria-label={
             selected && words ? `${field.label}，${words}` : field.label
           }
-          disabled={id === 'state'}
           onClick={() => onPick(id)}
           className={ROW_CLASS}
         >

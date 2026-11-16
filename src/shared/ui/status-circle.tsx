@@ -1,17 +1,48 @@
 import type { ReactNode } from 'react'
-import type { TorrentStatusId } from '#/lib/torrent-status'
-import {
-  RING_CIRCUMFERENCE,
-  RING_RADIUS,
-  ringOffset,
-} from '#/features/list/list-model'
+import type { TorrentStatusId } from '#/shared/torrent-status'
 
-// DESIGN status-circle, row size (36px; mockups S01-list-mode-desktop,
-// S02-list-mode-phone). A progress ring drawn with SVG stroke-dashoffset
-// over a `track` ring for downloading, paused and stalled; a full ring in
-// the status color otherwise. Inner circle at 80% filled with the status
-// color, the mockup's icon (42%) in `status-icon`. Display only: not
-// clickable, labelled for screen readers (「停滯，87%」). No spin-in in Epic 1.
+// DESIGN status-circle (mockups S01-list-mode-desktop, S02-list-mode-phone,
+// S01-list-desktop, S02-list-phone): 36px in list rows, 32px on board cards,
+// 28px in board column headers. A progress ring drawn with SVG
+// stroke-dashoffset over a `track` ring for downloading, paused and
+// stalled; a full ring in the status color otherwise. Inner circle at 80%
+// filled with the status color, the mockup's icon (about 42%) in
+// `status-icon`. Display only: not clickable, labelled for screen readers
+// (「停滯，87%」) or hidden when it only decorates a labelled box. No
+// spin-in yet (Story 2.9). Shared: the list and the board both draw it
+// (story 2.3 moved it out of features/list).
+
+export type StatusCircleSize = 28 | 32 | 36
+
+interface Geometry {
+  /** Ring radius: the circle minus half the 3px stroke. */
+  ring: number
+  /** Inner filled circle: 80% of the size. */
+  inner: number
+  /** Icon box, px, and where it starts. */
+  icon: number
+  iconAt: number
+}
+
+/** The mockups' numbers per size. */
+const GEOMETRY: Readonly<Record<StatusCircleSize, Geometry>> = {
+  36: { ring: 16.5, inner: 14.4, icon: 15, iconAt: 10.5 },
+  32: { ring: 14.5, inner: 12.8, icon: 13, iconAt: 9.5 },
+  28: { ring: 12.5, inner: 11.2, icon: 12, iconAt: 8 },
+}
+
+/** The ring's circumference for a size. */
+export function ringCircumference(size: StatusCircleSize = 36): number {
+  return 2 * Math.PI * GEOMETRY[size].ring
+}
+
+/** The ring's `stroke-dashoffset` for a fraction: C x (1 - fraction). */
+export function ringOffset(
+  arcFraction: number,
+  size: StatusCircleSize = 36,
+): number {
+  return ringCircumference(size) * (1 - arcFraction)
+}
 
 /** Tailwind needs whole class names; every status maps to its tokens. */
 const COLORS: Readonly<
@@ -75,31 +106,37 @@ const ICONS: Readonly<Record<TorrentStatusId, ReactNode>> = {
 
 export interface StatusCircleProps {
   status: TorrentStatusId
-  label: string
+  /** Screen reader text; left out, the circle is decorative (`aria-hidden`). */
+  label?: string
   /** 0 to 1: progress ring; `null`: full ring. */
   arcFraction: number | null
+  size?: StatusCircleSize
 }
 
 export function StatusCircle({
   status,
   label,
   arcFraction,
+  size = 36,
 }: StatusCircleProps) {
   const color = COLORS[status]
+  const { ring, inner, icon, iconAt } = GEOMETRY[size]
+  const center = size / 2
   return (
     <svg
-      width="36"
-      height="36"
-      viewBox="0 0 36 36"
-      role="img"
-      aria-label={label}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      {...(label === undefined
+        ? { 'aria-hidden': true }
+        : { role: 'img', 'aria-label': label })}
       className="block flex-none"
     >
       {arcFraction === null ? (
         <circle
-          cx="18"
-          cy="18"
-          r={RING_RADIUS}
+          cx={center}
+          cy={center}
+          r={ring}
           fill="none"
           strokeWidth="3"
           className={color.stroke}
@@ -107,9 +144,9 @@ export function StatusCircle({
       ) : (
         <>
           <circle
-            cx="18"
-            cy="18"
-            r={RING_RADIUS}
+            cx={center}
+            cy={center}
+            r={ring}
             fill="none"
             strokeWidth="3"
             className="stroke-track"
@@ -117,26 +154,26 @@ export function StatusCircle({
           {/* Progress 0 draws no arc: a round cap would show a dot. */}
           {arcFraction > 0 && (
             <circle
-              cx="18"
-              cy="18"
-              r={RING_RADIUS}
+              cx={center}
+              cy={center}
+              r={ring}
               fill="none"
               strokeWidth="3"
               strokeLinecap="round"
-              strokeDasharray={RING_CIRCUMFERENCE}
-              strokeDashoffset={ringOffset(arcFraction)}
-              transform="rotate(-90 18 18)"
+              strokeDasharray={ringCircumference(size)}
+              strokeDashoffset={ringOffset(arcFraction, size)}
+              transform={`rotate(-90 ${center} ${center})`}
               className={color.stroke}
             />
           )}
         </>
       )}
-      <circle cx="18" cy="18" r="14.4" className={color.fill} />
+      <circle cx={center} cy={center} r={inner} className={color.fill} />
       <svg
-        x="10.5"
-        y="10.5"
-        width="15"
-        height="15"
+        x={iconAt}
+        y={iconAt}
+        width={icon}
+        height={icon}
         viewBox="0 0 24 24"
         fill="none"
         strokeWidth="2.8"

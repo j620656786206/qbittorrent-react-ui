@@ -6,6 +6,7 @@ import {
   MAIN_ID,
   expect,
   login,
+  openList,
   setModes,
   test,
 } from './fixtures'
@@ -68,7 +69,7 @@ async function hasNoHorizontalScroll(page: Page, selector = ':root') {
   expect(scrollWidth, selector).toBeLessThanOrEqual(clientWidth)
 }
 
-test('P1 login with the fake credentials lands on the list', async ({
+test('P1 login with the fake credentials lands on the board', async ({
   page,
 }) => {
   await page.goto('/login')
@@ -76,12 +77,14 @@ test('P1 login with the fake credentials lands on the list', async ({
   await page.getByLabel('密碼', { exact: true }).fill(FAKE_PASS)
   await page.getByRole('button', { name: '登入', exact: true }).click()
   await page.waitForURL('/')
+  // No sort in the URL: 狀態, the board (story 2.3); its cards are listitems.
   await expect(rows(page).first()).toBeVisible()
 })
 
 test('P2 4165 torrents keep the DOM virtualized', async ({ page, request }) => {
   await setModes(request, { data: 'many' })
   await login(page)
+  await openList(page)
   await expect(rows(page).first()).toHaveAttribute('aria-setsize', '4165')
   expect(await rows(page).count()).toBeLessThan(MAX_ROWS_IN_DOM)
 
@@ -111,8 +114,7 @@ test('P4 no horizontal scroll at 390px; light and dark screenshots', async ({
       await page.setViewportSize(size)
       const suffix = `${size.name}-${scheme}`
 
-      await page.goto('/')
-      await expect(rows(page).first()).toBeVisible()
+      await openList(page)
       if (size.name === 'phone') {
         await hasNoHorizontalScroll(page)
         // `main` scrolls on its own: a too-wide row would scroll in there.
@@ -215,7 +217,7 @@ const DESKTOP = WIDTHS[0]
 
 const sortPill = (page: Page) =>
   page
-    .getByRole('button', { name: /^排序：.*，列表$/ })
+    .getByRole('button', { name: /^排序：.*，(列表|看板)$/ })
     .filter({ visible: true })
 const sortMenu = (page: Page) => page.getByRole('menu', { name: '排序' })
 
@@ -243,6 +245,7 @@ test('S1 the sort menu: 更多, an extra sort, flip, reopen at the item', async 
   await setModes(request, { data: 'many' })
   await page.setViewportSize(DESKTOP)
   await login(page)
+  await openList(page)
   // Every sort change uses `replace`: no new history entries.
   const historyLength = () => page.evaluate(() => history.length)
   const entries = await historyLength()
@@ -259,7 +262,8 @@ test('S1 the sort menu: 更多, an extra sort, flip, reopen at the item', async 
   await expect(menu).toBeVisible()
   const items = menu.getByRole('menuitemradio')
   await expect(items).toHaveCount(5)
-  await expect(items.first()).toHaveAttribute('aria-disabled', 'true')
+  // 狀態 (the board) is enabled since story 2.3.
+  await expect(items.first()).not.toHaveAttribute('aria-disabled', 'true')
   // Announced without the arrow and the shortcut digit.
   await expect(
     menu.getByRole('menuitemradio', { checked: true }),
@@ -328,9 +332,8 @@ test('S2 a bad sort in the URL falls back and the URL is fixed', async ({
   await login(page)
   await page.goto('/?sort=nope&dir=up')
   await page.waitForURL('/')
-  await expect(sortPill(page)).toHaveAccessibleName(
-    '排序：加入時間，新的在前，列表',
-  )
+  // Back to the default: 狀態, the board (story 2.3).
+  await expect(sortPill(page)).toHaveAccessibleName('排序：狀態，看板')
   await page.goto('/?sort=ratio&dir=sideways')
   await page.waitForURL('/?sort=ratio')
   await expect(sortPill(page)).toHaveAccessibleName(
@@ -399,7 +402,7 @@ const PHONE = WIDTHS[1]
 
 const phonePill = (page: Page) =>
   page
-    .getByRole('button', { name: /^排序：.*，列表$/ })
+    .getByRole('button', { name: /^排序：.*，(列表|看板)$/ })
     .filter({ visible: true })
 const sortSheet = (page: Page) => page.getByRole('dialog', { name: '排序' })
 /** The sheet's sort rows: plain buttons in lists (no menu roles). */
@@ -462,6 +465,7 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await setModes(request, { data: 'many' })
   await page.setViewportSize(PHONE)
   await login(page)
+  await openList(page)
   const historyLength = () => page.evaluate(() => history.length)
   const entries = await historyLength()
   const pill = phonePill(page)
@@ -474,7 +478,7 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await expect(sheet).toHaveAttribute('aria-modal', 'true')
   const items = sheetRows(page)
   await expect(items).toHaveCount(5)
-  await expect(items.first()).toBeDisabled()
+  await expect(items.first()).toBeEnabled()
   await expect(sheet.getByRole('menu')).toHaveCount(0)
   const checked = currentRow(page)
   await expect(checked).toHaveAccessibleName('加入時間，新的在前')
@@ -591,6 +595,7 @@ test('B9 the list keeps its order while the sheet is open', async ({
 }) => {
   await page.setViewportSize(PHONE)
   await login(page)
+  await openList(page)
   const setSize = () => rows(page).first().getAttribute('aria-setsize')
   const before = await setSize()
   await openPhoneSheet(page)

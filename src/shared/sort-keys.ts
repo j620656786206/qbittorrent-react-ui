@@ -28,7 +28,6 @@ const extraBoolean = z.boolean().nullable().catch(null)
  */
 export const sortExtrasSchema = z.object({
   time_active: extraNumber,
-  last_activity: extraNumber,
   seen_complete: extraNumber,
   amount_left: extraNumber,
   availability: extraNumber,

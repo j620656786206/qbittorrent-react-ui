@@ -1,6 +1,7 @@
 import { slimSortValue, sortKeyOf } from '#/lib/sort-values'
-import { statusOf } from '#/lib/torrent-status'
+import { columnOf, statusOf } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
+import type { BoardColumn } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import { isExtraSortField, sortField } from '#/shared/sort-fields'
 import type { SortView } from '#/shared/list-search'
@@ -63,6 +64,20 @@ function tieBreak(a: Entry, b: Entry): number {
   return a.hash < b.hash ? -1 : 1
 }
 
+/** No value last in both directions, then the field, then the tie rule. */
+function compareEntries(
+  a: Entry,
+  b: Entry,
+  sign: 1 | -1,
+  plain: boolean,
+): number {
+  if (a.key === null || b.key === null) {
+    if (a.key !== b.key) return a.key === null ? 1 : -1
+    return tieBreak(a, b)
+  }
+  return sign * compareKeys(a.key, b.key, plain) || tieBreak(a, b)
+}
+
 export function selectVisibleTorrents(
   maindata: Maindata,
   view: TorrentView,
@@ -87,14 +102,65 @@ export function selectVisibleTorrents(
       added: torrent.added_on,
     })
   }
-  entries.sort((a, b) => {
-    if (a.key === null || b.key === null) {
-      if (a.key !== b.key) return a.key === null ? 1 : -1
-      return tieBreak(a, b)
-    }
-    return sign * compareKeys(a.key, b.key, plain) || tieBreak(a, b)
-  })
+  entries.sort((a, b) => compareEntries(a, b, sign, plain))
   return entries.map((entry) => entry.hash)
+}
+
+/** The board's five columns, each a hash array in its fixed order. */
+export type BoardColumns = Readonly<Record<BoardColumn, ReadonlyArray<string>>>
+
+/**
+ * EXPERIENCE 排序和檢視 (memlog #116, #125): each column's fixed order, a
+ * time field newest (or longest) first. Not user-editable.
+ */
+export const BOARD_COLUMN_ORDER = {
+  attention: 'last_activity',
+  downloading: 'added_on',
+  seeding: 'seeding_time',
+  done: 'completion_on',
+  archived: 'completion_on',
+} as const satisfies Record<BoardColumn, keyof SlimTorrent>
+
+/** A time or duration: 0 or negative (qBittorrent's "never") is no value. */
+function boardKey(value: number): number | null {
+  return value > 0 && Number.isFinite(value) ? value : null
+}
+
+/**
+ * Story 2.3, AR-41: the board's columns. A torrent's column is classify()'s
+ * (`statusOf` + `columnOf`, never `torrent.state`); inside a column the
+ * column's field orders it, newest or longest first, no value last, ties
+ * like `selectVisibleTorrents` (`added_on` newest, then `hash`). Archived
+ * torrents get their own column here: only the desktop board shows them.
+ */
+export function selectBoardColumns(maindata: Maindata): BoardColumns {
+  const { torrents, stateBeforeMove } = maindata
+  const entries: Record<BoardColumn, Array<Entry>> = {
+    attention: [],
+    downloading: [],
+    seeding: [],
+    done: [],
+    archived: [],
+  }
+  for (const torrent of Object.values(torrents)) {
+    const column = columnOf(statusOf(torrent, stateBeforeMove))
+    entries[column].push({
+      hash: torrent.hash,
+      key: boardKey(torrent[BOARD_COLUMN_ORDER[column]]),
+      added: torrent.added_on,
+    })
+  }
+  const ordered = (column: BoardColumn) =>
+    entries[column]
+      .sort((a, b) => compareEntries(a, b, 1, false))
+      .map((entry) => entry.hash)
+  return {
+    attention: ordered('attention'),
+    downloading: ordered('downloading'),
+    seeding: ordered('seeding'),
+    done: ordered('done'),
+    archived: ordered('archived'),
+  }
 }
 
 /** The 「全部」 count: every torrent except archived ones. */

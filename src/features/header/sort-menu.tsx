@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { ChevronDown, List } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import {
   MORE_SORT_GROUPS,
   TOP_SORT_FIELDS,
@@ -26,16 +26,18 @@ import {
   pickSort,
   sortPillModel,
 } from '#/features/header/sort-model'
+import { ViewIcon } from '#/features/header/view-icon'
 
 // UX-DR20, UX-DR22 (mockup S03-sort-menu-desktop): the desktop sort pill
-// and its menu. The pill: the 「列表」 capsule, the bold 「排序：做種時間 ↓」
-// and a chevron; the arrow is not a button of its own. The menu: 260px,
-// at most 70vh with its own scroll; the top five with 1 to 5 (text only,
-// the keys come in Epic 3), a separator and 「更多」, which opens the other
-// 46 in the same menu under group headers (no submenu). It opens already
-// expanded and scrolled to the current sort when that sort is under 更多.
-// 「狀態」 shows but stays disabled until the board (Story 2.3). The phone
-// pill and its sort sheet are in sort-sheet.tsx (Story 2.2).
+// and its menu. The pill: the 「列表」 capsule (「看板」 with the board icon
+// for 「狀態」, story 2.3), the bold 「排序：做種時間 ↓」 and a chevron; the
+// arrow is not a button of its own. The menu: 260px, at most 70vh with its
+// own scroll; the top five with 1 to 5 (text only, the keys come in Epic
+// 3), a separator and 「更多」, which opens the other 46 in the same menu
+// under group headers (no submenu). It opens already expanded and scrolled
+// to the current sort when that sort is under 更多. Picking 「狀態」 shows
+// the board (story 2.3). The phone pill and its sort sheet are in
+// sort-sheet.tsx (Story 2.2).
 
 export function DesktopSortMenu() {
   const { view, setView } = useListView()
@@ -68,7 +70,8 @@ export function DesktopSortMenu() {
     }
     const { view: next, keepOpen } = picked
     if (keepOpen) event.preventDefault()
-    // Any sort change, a flip too, goes back to the top of the list.
+    // Any sort change, a flip too, goes back to the top of the list (and
+    // between the board and the list).
     const main = getMain()
     if (main) main.scrollTop = 0
     setView(next)
@@ -86,7 +89,6 @@ export function DesktopSortMenu() {
           selected && words ? `${field.label}，${words}` : field.label
         }
         ref={selected ? selectedRef : undefined}
-        disabled={id === 'state'}
         onSelect={(event) => onPick(id, event)}
       >
         <span className="min-w-0 flex-1 truncate">
@@ -121,8 +123,8 @@ export function DesktopSortMenu() {
           className="inline-flex h-10 flex-none items-center gap-2 rounded-full border bg-surface pr-2.5 pl-1.5 whitespace-nowrap hover-outline data-[state=open]:border-text-faint"
         >
           <span className="inline-flex items-center gap-[5px] rounded-full bg-surface-muted px-2 py-[3px] text-[12px] font-semibold">
-            <List size={16} strokeWidth={2.2} aria-hidden="true" />
-            列表
+            <ViewIcon kind={pill.kind} />
+            {pill.viewWord}
           </span>
           <b className="font-bold">{pill.text}</b>
           <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />

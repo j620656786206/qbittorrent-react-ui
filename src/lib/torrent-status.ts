@@ -6,6 +6,7 @@ import {
   formatSpeed,
 } from '#/lib/format'
 import type { SlimTorrent } from '#/shared/maindata'
+import type { TorrentStatusId } from '#/shared/torrent-status'
 
 // FR-8, AR-41, AD-13: the only mapping from qBittorrent's state codes to the
 // 7 status words, the board column and the second line (EXPERIENCE
@@ -13,15 +14,7 @@ import type { SlimTorrent } from '#/shared/maindata'
 // (lint blocks it in src/features and src/routes). All text is plain text;
 // numbers and times come from format.ts only.
 
-/** Matches the `status-*` design tokens. */
-export type TorrentStatusId =
-  | 'downloading'
-  | 'seeding'
-  | 'done'
-  | 'paused'
-  | 'stalled'
-  | 'error'
-  | 'archived'
+export type { TorrentStatusId }
 
 export type BoardColumn =
   'attention' | 'downloading' | 'seeding' | 'done' | 'archived'
@@ -71,11 +64,21 @@ const COLUMNS: Readonly<Record<TorrentStatusId, BoardColumn>> = {
   archived: 'archived',
 }
 
+/** The board column a status goes in. */
+export function columnOf(status: TorrentStatusId): BoardColumn {
+  return COLUMNS[status]
+}
+
 const SHOWS_PROGRESS: ReadonlySet<TorrentStatusId> = new Set([
   'downloading',
   'paused',
   'stalled',
 ])
+
+/** The status circle draws a progress ring (and a board card a bar). */
+export function showsProgress(status: TorrentStatusId): boolean {
+  return SHOWS_PROGRESS.has(status)
+}
 
 /** What a state means, before any text is built. */
 type StateKind =
@@ -235,6 +238,6 @@ export function classify(
     column: COLUMNS[status],
     detail: moving ? '搬移中' : detailOf(kind, torrent, options),
     moving,
-    showsProgress: SHOWS_PROGRESS.has(status),
+    showsProgress: showsProgress(status),
   }
 }

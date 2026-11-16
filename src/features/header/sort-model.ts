@@ -5,15 +5,31 @@ import type { SortView } from '#/shared/list-search'
 // EXPERIENCE 排序方向, DESIGN sort-pill and sort-menu: the pill shows only the
 // arrow (「排序：做種時間 ↓」); its `aria-label` and tooltip spell out the
 // words (「排序：做種時間，久的在前」). 「狀態」 has no direction and no arrow.
+// Story 2.3: 「狀態」 is the board (EXPERIENCE 「排序決定長相」), so the pill's
+// view word is 「看板」 there and 「列表」 for every other sort.
+
+/** The view a sort shows: 「狀態」 is the board, every other sort the list. */
+export type ViewKind = 'board' | 'list'
+
+export function viewKindOf(view: SortView): ViewKind {
+  return view.sort === 'state' ? 'board' : 'list'
+}
 
 export interface SortPillModel {
+  /** Which icon and capsule word the pill shows. */
+  kind: ViewKind
+  /** The capsule: 「看板」 or 「列表」. */
+  viewWord: string
   /** Desktop pill: 「排序：做種時間 ↓」. */
   text: string
   /** Phone pill: 「做種時間 ↓」. */
   shortText: string
   /** Tooltip: 「排序：做種時間，久的在前」. */
   title: string
-  /** 「排序：做種時間，久的在前，列表」 (the view label last, as the mockup). */
+  /**
+   * 「排序：做種時間，久的在前，列表」 or 「排序：狀態，看板」 (the view word
+   * last, as the mockups).
+   */
   ariaLabel: string
 }
 
@@ -28,11 +44,15 @@ export function sortPillModel(view: SortView): SortPillModel {
   const words = directionWords(view)
   const arrow = field.directional ? ` ${dirArrow(view.dir)}` : ''
   const title = `排序：${field.label}${words ? `，${words}` : ''}`
+  const kind = viewKindOf(view)
+  const viewWord = kind === 'board' ? '看板' : '列表'
   return {
+    kind,
+    viewWord,
     text: `排序：${field.label}${arrow}`,
     shortText: `${field.label}${arrow}`,
     title,
-    ariaLabel: `${title}，列表`,
+    ariaLabel: `${title}，${viewWord}`,
   }
 }
 

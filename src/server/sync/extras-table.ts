@@ -18,8 +18,8 @@ import type {
 // getSortKeys answers only the torrents whose value for the asked field (or
 // the fields a derived one is computed from) changed. Fields that move all
 // the time are quantized for that change check only, so a torrent changes at
-// most once a minute for them: `time_active`, `last_activity`, `reannounce`
-// and `seeding_time` floored to 60 s; `availability` and `popularity`
+// most once a minute for them: `time_active`, `reannounce` and
+// `seeding_time` floored to 60 s; `availability` and `popularity`
 // rounded to 2 decimals. Values sent (derived ones too) come from the raw,
 // unquantized copy. A field qBittorrent never sent, or sent in a shape this
 // app does not expect, is `null`. A full update starts each torrent from
@@ -32,7 +32,6 @@ export const EXTRAS_TIME_STEP_S = 60
 
 const FLOORED: ReadonlySet<keyof SortExtras> = new Set<keyof SortExtras>([
   'time_active',
-  'last_activity',
   'reannounce',
   'seeding_time',
 ])

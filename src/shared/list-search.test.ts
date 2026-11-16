@@ -30,9 +30,9 @@ describe('listSearchSchema', () => {
 })
 
 describe('sortViewOf', () => {
-  it('no sort: added time, newest first', () => {
+  it('K1 no sort: 狀態 (the board), with its default direction', () => {
     expect(sortViewOf({})).toBe(DEFAULT_SORT_VIEW)
-    expect(DEFAULT_SORT_VIEW).toEqual({ sort: 'added_on', dir: 'desc' })
+    expect(DEFAULT_SORT_VIEW).toEqual({ sort: 'state', dir: 'desc' })
   })
 
   it('a sort without dir takes its default direction', () => {
@@ -46,8 +46,8 @@ describe('sortViewOf', () => {
     })
   })
 
-  it('a dir alone applies to the default sort', () => {
-    expect(sortViewOf({ dir: 'asc' })).toEqual({ sort: 'added_on', dir: 'asc' })
+  it('a dir alone is ignored: the default 狀態 has no direction', () => {
+    expect(sortViewOf({ dir: 'asc' })).toBe(DEFAULT_SORT_VIEW)
   })
 })
 
@@ -71,6 +71,11 @@ describe('fixListSearch (S5)', () => {
       sort: 'state',
     })
     expect(fixListSearch({ sort: 'state' })).toBeNull()
+  })
+
+  it('a dir without a sort goes: the default 狀態 has no direction', () => {
+    expect(fixListSearch({ dir: 'asc', q: 'x' })).toEqual({ q: 'x' })
+    expect(fixListSearch({ dir: 'up' })).toEqual({})
   })
 
   it('a bad dir alone goes alone; other params stay', () => {

@@ -188,7 +188,6 @@ describe('extras table', () => {
       delta(2, {
         [HASH_A]: {
           time_active: base.time_active + 5,
-          last_activity: base.last_activity + 10,
           reannounce: base.reannounce - 30,
           availability: 1.4612,
           popularity: 0.1249,

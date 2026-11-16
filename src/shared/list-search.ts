@@ -18,12 +18,13 @@ export interface SortView {
 }
 
 /**
- * No `sort` in the URL: added time, newest first (Story 2.3 changes this to
- * `state`, Epic 3 to the category's remembered sort).
+ * No `sort` in the URL: 「狀態」, the board (story 2.3; Epic 3 changes this to
+ * the category's remembered sort). 「狀態」 has no direction: `dir` is its
+ * default and a `dir` in the URL is ignored and removed.
  */
 export const DEFAULT_SORT_VIEW: SortView = Object.freeze({
-  sort: 'added_on',
-  dir: 'desc',
+  sort: 'state',
+  dir: sortField('state').defaultDir,
 })
 
 export const listSearchSchema = z.object({
@@ -39,7 +40,8 @@ export type ListSearch = z.infer<typeof listSearchSchema>
  */
 export function sortViewOf(search: ListSearch): SortView {
   if (search.sort === undefined) {
-    return search.dir === undefined
+    return search.dir === undefined ||
+      !sortField(DEFAULT_SORT_VIEW.sort).directional
       ? DEFAULT_SORT_VIEW
       : { sort: DEFAULT_SORT_VIEW.sort, dir: search.dir }
   }
@@ -66,11 +68,16 @@ export function fixListSearch(
   raw: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> | null {
   const badSort = 'sort' in raw && !isSortFieldId(raw.sort)
+  // The field `dir` applies to: the URL's, or the default when it has none.
+  const sortId = isSortFieldId(raw.sort)
+    ? raw.sort
+    : 'sort' in raw
+      ? null
+      : DEFAULT_SORT_VIEW.sort
   // A field without a direction (狀態) ignores `dir`, so it goes too.
   const badDir =
     'dir' in raw &&
-    (!isDir(raw.dir) ||
-      (isSortFieldId(raw.sort) && !sortField(raw.sort).directional))
+    (!isDir(raw.dir) || (sortId !== null && !sortField(sortId).directional))
   if (!badSort && !badDir) return null
   const { sort: _sort, dir: _dir, ...rest } = raw
   return {

@@ -16,9 +16,9 @@ import {
   ListLoadError,
   ListSkeleton,
 } from '#/features/list/list-states'
-import { StatusCircle } from '#/features/list/status-circle'
 import { TorrentList } from '#/features/list/torrent-list'
 import { RowContent, TorrentRow } from '#/features/list/torrent-row'
+import { StatusCircle } from '#/shared/ui/status-circle'
 
 // Spec 1.8: static markup (node, no DOM) of a row, the circle, the
 // skeleton, the empty and the error block from fixed models. Layout, the
@@ -224,6 +224,33 @@ describe('the status circle', () => {
       expect(html).toMatch(/<(path|rect) /)
     }
   })
+
+  it.each([
+    // [size, ring radius, inner radius, icon box, icon start]
+    [32, 14.5, 12.8, 13, 9.5],
+    [28, 12.5, 11.2, 12, 8],
+  ] as const)(
+    'the %ipx board size: ring %d, inner %d, icon %d at %d',
+    (size, ring, inner, icon, at) => {
+      const html = renderToStaticMarkup(
+        <StatusCircle status="stalled" arcFraction={0.5} size={size} />,
+      )
+      const svgs = openTags(html, 'svg')
+      expect(svgs[0]).toContain(`width="${size}"`)
+      // No label: decorative.
+      expect(svgs[0]).toContain('aria-hidden="true"')
+      expect(svgs[0]).not.toContain('role="img"')
+      const circles: Array<string> = openTags(html, 'circle')
+      expect(attr(circles[0], 'r')).toBe(String(ring))
+      expect(Number(attr(circles[1], 'stroke-dasharray'))).toBeCloseTo(
+        2 * Math.PI * ring,
+        9,
+      )
+      expect(attr(circles[2], 'r')).toBe(String(inner))
+      expect(svgs[1]).toContain(`width="${icon}"`)
+      expect(svgs[1]).toContain(`x="${at}"`)
+    },
+  )
 })
 
 describe('the list states', () => {

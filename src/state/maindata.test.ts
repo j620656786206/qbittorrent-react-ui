@@ -29,7 +29,11 @@ import {
 import type { FetchMaindata } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
 import { fakeServerFn } from '#/state/testing'
-import { selectVisibleTorrents } from '#/lib/visible-torrents'
+import {
+  selectBoardColumns,
+  selectVisibleTorrents,
+} from '#/lib/visible-torrents'
+import type { BoardColumns } from '#/lib/visible-torrents'
 import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 
 // Spec 1.6 rows Q1 to Q6: the `['maindata']` query registered by
@@ -342,6 +346,37 @@ describe('the maindata query', () => {
     await vi.advanceTimersByTimeAsync(5_000)
     expect(fetchMaindata).toHaveBeenCalledTimes(2)
     expect(observer.getCurrentResult().data).toBe(first)
+  })
+
+  it('board columns: an unchanged column keeps its array across polls', async () => {
+    const seed = t({ hash: fakeHash(2), state: 'uploading', progress: 1 })
+    const fetchMaindata = fakeFetch([
+      async () => answer({ changed: [t({ hash: fakeHash(1) }), seed] }),
+      async () => answer({ changed: [] }),
+      async () =>
+        answer({
+          changed: [t({ hash: fakeHash(3), added_on: 1_800_000_000 })],
+        }),
+    ])
+    const { client } = setup(fetchMaindata)
+    // The same select useBoardColumns() passes.
+    const observer = new QueryObserver<Maindata, Error, BoardColumns>(client, {
+      queryKey: MAINDATA_KEY,
+      select: selectBoardColumns,
+    })
+    cleanups.push(observer.subscribe(() => {}))
+    await vi.advanceTimersByTimeAsync(0)
+    const first = observer.getCurrentResult().data
+    expect(first?.downloading).toEqual([fakeHash(1)])
+    expect(first?.seeding).toEqual([fakeHash(2)])
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(observer.getCurrentResult().data).toBe(first)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    const third = observer.getCurrentResult().data
+    expect(third?.downloading).toEqual([fakeHash(3), fakeHash(1)])
+    expect(third?.seeding).toBe(first?.seeding)
   })
 
   it('Q5 refresh during a call aborts it and starts a new one at once', async () => {

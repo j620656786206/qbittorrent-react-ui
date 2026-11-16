@@ -6,7 +6,6 @@ import {
   useState,
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { formatDayKey } from '#/lib/format'
 import type { SortKeys } from '#/lib/visible-torrents'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
@@ -21,7 +20,7 @@ import {
 } from '#/state/maindata'
 import { useMaindataFailure } from '#/state/maindata-failure'
 import { useMaindataRetry } from '#/state/maindata-retry'
-import { useNow } from '#/state/now'
+import { useDayClock } from '#/state/now'
 import {
   noteScroll,
   resetListFreeze,
@@ -57,9 +56,6 @@ import { TorrentRow } from '#/features/list/torrent-row'
 // and the React adapter (https://tanstack.com/virtual/latest/docs/api/virtualizer,
 // https://tanstack.com/virtual/latest/docs/framework/react/react-virtual).
 
-/** Checks the local date once a minute; rows only see it change at midnight. */
-const DAY_CHECK_MS = 60_000
-
 const estimateSize = () => ROW_HEIGHT
 
 /**
@@ -72,23 +68,6 @@ function mouseRestsOn(element: HTMLElement | null): boolean {
     window.matchMedia('(hover: hover) and (pointer: fine)').matches &&
     element.matches(':hover')
   )
-}
-
-/**
- * `today`: epoch ms that changes only when the local date does
- * (setState-in-render); `now`: the same minute tick, for 「3 小時前」.
- */
-function useClock(): { today: number; now: number } {
-  const now = useNow(DAY_CHECK_MS)
-  // Rows take a `today` that changes only at local midnight, so dates never
-  // re-render a row every minute.
-  const key = formatDayKey(now)
-  const [today, setToday] = useState(() => ({ key, now }))
-  if (today.key !== key) {
-    setToday({ key, now })
-    return { today: now, now }
-  }
-  return { today: today.now, now }
 }
 
 const fetchSortKeys = bindFetchSortKeys(getSortKeys)
@@ -152,7 +131,7 @@ function TorrentRows({
 }) {
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
-  const clock = useClock()
+  const clock = useDayClock()
   // Only a sort shown as 「N 前」 makes the rows read the minute tick.
   const today = rowClock(sort, clock.today, clock.now)
   const listRef = useRef<HTMLDivElement>(null)

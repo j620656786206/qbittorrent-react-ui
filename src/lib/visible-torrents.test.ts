@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { SlimTorrent } from '#/shared/maindata'
 import { SORT_FIELD_IDS, isExtraSortField } from '#/shared/sort-fields'
 import type { SortValue } from '#/shared/sort-keys'
-import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
-import { countAll, selectVisibleTorrents } from '#/lib/visible-torrents'
+import {
+  countAll,
+  selectBoardColumns,
+  selectVisibleTorrents,
+} from '#/lib/visible-torrents'
 
+const ADDED_NEWEST = { sort: 'added_on', dir: 'desc' } as const
 // Spec 1.6 rows V1, V2.
 
 const H1 = fakeHash(1)
@@ -33,11 +37,7 @@ const maindata = mergeMaindata(
 
 describe('selectVisibleTorrents', () => {
   it('V1 newest first, ties by hash ascending, archived left out', () => {
-    expect(selectVisibleTorrents(maindata, DEFAULT_SORT_VIEW)).toEqual([
-      H1,
-      H2,
-      H3,
-    ])
+    expect(selectVisibleTorrents(maindata, ADDED_NEWEST)).toEqual([H1, H2, H3])
   })
 
   it('V2 countAll leaves archived out', () => {
@@ -64,7 +64,7 @@ describe('selectVisibleTorrents', () => {
       }),
     )
     expect(moving.stateBeforeMove).toEqual({ [H5]: 'missingFiles' })
-    expect(selectVisibleTorrents(moving, DEFAULT_SORT_VIEW)).toEqual([H1])
+    expect(selectVisibleTorrents(moving, ADDED_NEWEST)).toEqual([H1])
     expect(countAll(moving)).toBe(1)
   })
 })
@@ -100,6 +100,13 @@ const SLIM_CASES: Partial<Record<Field, Case>> = {
       { completion_on: -1 },
     ],
   },
+  last_activity: {
+    slim: [
+      { last_activity: T0 + 60 },
+      { last_activity: T0 },
+      { last_activity: 0 },
+    ],
+  },
   eta: { slim: [{ eta: 7200 }, { eta: 60 }, { eta: 8_640_000 }] },
   progress: { slim: [{ progress: 0.9 }, { progress: 0.1 }] },
   dlspeed: { slim: [{ dlspeed: 2 }, { dlspeed: 1 }] },
@@ -126,7 +133,6 @@ const SLIM_CASES: Partial<Record<Field, Case>> = {
 
 const number2 = { keys: [2, 1, null] } satisfies Case
 const KEY_CASES: Partial<Record<Field, Case>> = {
-  last_activity: { keys: [T0 + 10, T0, 0] },
   seen_complete: { keys: [T0 + 10, T0, -1] },
   availability: { keys: [1.5, 0.5, -1] },
   num_complete: { keys: [9, 0, -1] },
@@ -310,5 +316,181 @@ describe('hash fields compare as hex code units', () => {
       mid,
       high,
     ])
+  })
+})
+
+// Spec 2.3 rows K3 to K7: the board's columns and their fixed orders.
+
+describe('selectBoardColumns', () => {
+  const data = (torrents: Array<SlimTorrent>) =>
+    mergeMaindata(undefined, fakeResponse({ changed: torrents }))
+  const h = (n: number) => fakeHash(0x100 + n)
+
+  it('K3 each column in its order, no value last, ties by added_on then hash', () => {
+    const columns = selectBoardColumns(
+      data([
+        // 下載中 (downloading and paused): added_on newest first.
+        t({ hash: h(1), state: 'downloading', added_on: T0 + 1 }),
+        t({ hash: h(2), state: 'pausedDL', added_on: T0 + 3 }),
+        t({ hash: h(3), state: 'queuedDL', added_on: T0 + 2 }),
+        // 做種中: seeding_time longest first; 0 last.
+        t({ hash: h(4), state: 'uploading', progress: 1, seeding_time: 60 }),
+        t({ hash: h(5), state: 'stalledUP', progress: 1, seeding_time: 600 }),
+        t({ hash: h(6), state: 'uploading', progress: 1, seeding_time: 0 }),
+        // 完成: completion_on newest first; -1 last; a tie by added_on.
+        t({
+          hash: h(7),
+          state: 'stoppedUP',
+          progress: 1,
+          completion_on: T0,
+          added_on: T0 - 10,
+        }),
+        t({
+          hash: h(8),
+          state: 'stoppedUP',
+          progress: 1,
+          completion_on: T0,
+          added_on: T0 - 5,
+        }),
+        t({ hash: h(9), state: 'stoppedUP', progress: 1, completion_on: -1 }),
+        t({
+          hash: h(10),
+          state: 'pausedUP',
+          progress: 1,
+          completion_on: T0 + 100,
+        }),
+      ]),
+    )
+    expect(columns.downloading).toEqual([h(2), h(3), h(1)])
+    expect(columns.seeding).toEqual([h(5), h(4), h(6)])
+    expect(columns.done).toEqual([h(10), h(8), h(7), h(9)])
+    expect(columns.attention).toEqual([])
+    expect(columns.archived).toEqual([])
+  })
+
+  it('K3 a full tie (same value, same added_on) goes by hash ascending', () => {
+    const same = { state: 'uploading', progress: 1, seeding_time: 60 }
+    const columns = selectBoardColumns(
+      data([
+        t({ ...same, hash: h(3), added_on: T0 }),
+        t({ ...same, hash: h(1), added_on: T0 }),
+        t({ ...same, hash: h(2), added_on: T0 }),
+      ]),
+    )
+    expect(columns.seeding).toEqual([h(1), h(2), h(3)])
+  })
+
+  it('K4 要處理: stalled and errored, newest activity first, 0 last', () => {
+    const columns = selectBoardColumns(
+      data([
+        t({ hash: h(1), state: 'stalledDL', last_activity: T0 }),
+        t({ hash: h(2), state: 'error', last_activity: T0 + 120 }),
+        t({ hash: h(3), state: 'unknown', last_activity: 0 }),
+        t({
+          hash: h(4),
+          state: 'missingFiles',
+          private: true,
+          last_activity: T0 + 60,
+        }),
+      ]),
+    )
+    expect(columns.attention).toEqual([h(2), h(4), h(1), h(3)])
+  })
+
+  it('K5 archived only in its own column, never counted in 全部', () => {
+    const torrents = [
+      t({
+        hash: h(1),
+        state: 'missingFiles',
+        private: false,
+        completion_on: T0,
+      }),
+      t({
+        hash: h(2),
+        state: 'missingFiles',
+        private: null,
+        completion_on: T0 + 1,
+      }),
+      t({
+        hash: h(3),
+        state: 'missingFiles',
+        private: false,
+        completion_on: 0,
+      }),
+      t({ hash: h(4), state: 'downloading' }),
+    ]
+    const columns = selectBoardColumns(data(torrents))
+    expect(columns.archived).toEqual([h(2), h(1), h(3)])
+    expect(columns.downloading).toEqual([h(4)])
+    expect(countAll(data(torrents))).toBe(1)
+  })
+
+  it('K6 only archived: 全部 0, the four work columns empty', () => {
+    const only = data([
+      t({ hash: h(1), state: 'missingFiles', private: false }),
+      t({ hash: h(2), state: 'missingFiles', private: false }),
+    ])
+    const columns = selectBoardColumns(only)
+    expect(countAll(only)).toBe(0)
+    expect(columns.attention).toEqual([])
+    expect(columns.downloading).toEqual([])
+    expect(columns.seeding).toEqual([])
+    expect(columns.done).toEqual([])
+    expect(columns.archived).toHaveLength(2)
+  })
+
+  it('K7 nothing stalled or errored: 要處理 is empty', () => {
+    const columns = selectBoardColumns(
+      data([
+        t({ hash: h(1) }),
+        t({ hash: h(2), state: 'uploading', progress: 1 }),
+      ]),
+    )
+    expect(columns.attention).toEqual([])
+  })
+
+  it('a moving torrent keeps the column of the state it moved from', () => {
+    const before = data([
+      t({ hash: h(1), state: 'stoppedUP', progress: 1, completion_on: T0 }),
+    ])
+    const moving = mergeMaindata(
+      before,
+      fakeResponse({
+        version: 'abcdef12.2',
+        full: false,
+        changed: [
+          t({ hash: h(1), state: 'moving', progress: 1, completion_on: T0 }),
+        ],
+      }),
+    )
+    expect(selectBoardColumns(moving).done).toEqual([h(1)])
+  })
+
+  it('4165 torrents in under 100 ms', () => {
+    const states = [
+      'downloading',
+      'uploading',
+      'stoppedUP',
+      'stalledDL',
+      'error',
+    ]
+    const torrents = Array.from({ length: 4165 }, (_, i) =>
+      t({
+        hash: fakeHash(0x10000 + i),
+        state: states[i % states.length],
+        progress: i % 5 === 0 ? 0.5 : 1,
+        added_on: T0 + (i % 97),
+        seeding_time: (i % 400) * 60,
+        completion_on: T0 + (i % 53),
+        last_activity: T0 + (i % 31),
+      }),
+    )
+    const big = data(torrents)
+    const start = performance.now()
+    const columns = selectBoardColumns(big)
+    const ms = performance.now() - start
+    const total = Object.values(columns).reduce((n, c) => n + c.length, 0)
+    expect(total).toBe(4165)
+    expect(ms).toBeLessThan(100)
   })
 })

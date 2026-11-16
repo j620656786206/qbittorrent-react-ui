@@ -7,7 +7,8 @@ import type { SortView } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
-import { DESKTOP_QUERY, PhoneSortPill } from '#/features/header/sort-sheet'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
+import { PhoneSortPill } from '#/features/header/sort-sheet'
 
 // Spec 2.2 rows B1, B2, B9, B11 to B13: the phone sort pill and its sheet,
 // with the real snap functions and order freeze.
@@ -116,15 +117,16 @@ describe('the phone sort pill', () => {
     expect(pill().getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('狀態 has no arrow', async () => {
+  it('狀態 has no arrow and shows the board icon', async () => {
     await mount({ sort: 'state', dir: 'desc' })
     expect(pill().textContent).toBe('狀態')
-    expect(pill().getAttribute('aria-label')).toBe('排序：狀態，列表')
+    expect(pill().getAttribute('aria-label')).toBe('排序：狀態，看板')
+    expect(pill().querySelector('[data-icon="board"]')).not.toBeNull()
   })
 })
 
 describe('the phone sort sheet', () => {
-  it('B1 opens 「排序」: five rows, 52px, no digits, 狀態 disabled, then 更多', async () => {
+  it('B1 opens 「排序」: five rows, 52px, no digits, 狀態 enabled, then 更多', async () => {
     await mount({ sort: 'seeding_time', dir: 'desc' })
     await open()
     expect(sheet()).not.toBeNull()
@@ -139,7 +141,7 @@ describe('the phone sort sheet', () => {
       '完成時間',
     ])
     for (const item of radios()) expect(item.className).toContain('h-[52px]')
-    expect(radio('狀態').disabled).toBe(true)
+    expect(radio('狀態').disabled).toBe(false)
     expect(radio('做種時間').getAttribute('aria-current')).toBe('true')
     expect(radio('加入時間').hasAttribute('aria-current')).toBe(false)
     // Plain buttons in lists, no menu roles.
@@ -229,8 +231,19 @@ describe('the phone sort sheet', () => {
     expect(radios()).toHaveLength(5)
   })
 
-  it('狀態 cannot be picked', async () => {
+  it('K2 狀態 picks the board and closes the sheet', async () => {
     await mount({ sort: 'added_on', dir: 'desc' })
+    main.scrollTop = 500
+    await open()
+    await click(radio('狀態'))
+    expect(setView).toHaveBeenCalledWith({ sort: 'state', dir: 'desc' })
+    expect(sheet()).toBeNull()
+    expect(main.scrollTop).toBe(0)
+    expect(pill().getAttribute('aria-label')).toBe('排序：狀態，看板')
+  })
+
+  it('the selected 狀態 does nothing and the sheet stays', async () => {
+    await mount({ sort: 'state', dir: 'desc' })
     await open()
     await click(radio('狀態'))
     expect(setView).not.toHaveBeenCalled()

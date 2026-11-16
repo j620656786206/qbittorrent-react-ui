@@ -142,7 +142,7 @@ export const SORT_FIELDS = [
   field('completion_on', '完成時間', 'time', 'date', W.newest, 'slim', 5),
   // 時間
   field('time_active', '活動時間', 'time', 'duration', W.long, 'extra'),
-  field('last_activity', '最後活動', 'time', 'ago', W.newest, 'extra'),
+  field('last_activity', '最後活動', 'time', 'ago', W.newest, 'slim'),
   field('seen_complete', '最後看到完整', 'time', 'ago', W.newest, 'extra'),
   field('eta', '剩餘時間', 'time', 'duration', W.long, 'slim'),
   // 進度

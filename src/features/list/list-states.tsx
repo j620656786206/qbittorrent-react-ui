@@ -1,18 +1,12 @@
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
-import {
-  CENTER_BLOCK_BUTTON_CLASS,
-  CENTER_BLOCK_CLASS,
-  CENTER_BLOCK_TEXT_CLASS,
-} from '#/shared/ui/center-block'
-import { getMain } from '#/shared/ui/main-scroll'
-import { useRestoreFocusOnUnmount } from '#/shared/ui/restore-focus'
+import { ListLoadError as LoadErrorBlock } from '#/shared/ui/list-blocks'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { ROW_HEIGHT, SKELETON_ROWS } from '#/features/list/list-model'
 
 // The list's states other than rows (FR-15, UX-DR88, UX-DR90): row-sized
 // skeletons on the first load (no spinner), the centered empty block and
-// the first-load error block (spec 1.8 option A). The blocks follow
-// S01-no-result-desktop / S02-no-result-phone.
+// the first-load error block (spec 1.8 option A). The two blocks live in
+// src/shared/ui/list-blocks.tsx since story 2.3 (the board shows them too).
 
 /**
  * The list section box (S01/S02 list-mode), shared with the rows. Phone:
@@ -61,52 +55,9 @@ export function ListSkeleton() {
   )
 }
 
-/** S01/S02 no-result block; phone edges and corners like the list section. */
-const BLOCK_CLASS = `${CENTER_BLOCK_CLASS} max-lg:-mx-1 max-lg:rounded-b-none`
+export { ListEmpty } from '#/shared/ui/list-blocks'
 
-/** No visible torrent: 「這個分類沒有種子」 and the disabled 「新增種子」. */
-export function ListEmpty() {
-  return (
-    <section aria-label="種子列表，共 0 個" className={BLOCK_CLASS}>
-      <p role="status" className={CENTER_BLOCK_TEXT_CLASS}>
-        這個分類沒有種子
-      </p>
-      {/* Epic 1 placeholder: native `disabled` like the header's 新增. */}
-      <button type="button" disabled className={CENTER_BLOCK_BUTTON_CLASS}>
-        新增種子
-      </button>
-    </section>
-  )
-}
-
-/**
- * The first load failed with no alert of its own (option A). 「重試」 fetches
- * once; when the block goes while its button has focus, focus moves to
- * `main` (not `body`).
- */
-export function ListLoadError({
-  onRetry,
-  busy,
-}: {
-  onRetry: () => void
-  busy: boolean
-}) {
-  const focusProps = useRestoreFocusOnUnmount(getMain)
-
-  return (
-    <section aria-label="種子列表" className={BLOCK_CLASS}>
-      <p role="alert" className={CENTER_BLOCK_TEXT_CLASS}>
-        {LIST_LOAD_FAILED}
-      </p>
-      <button
-        {...focusProps}
-        type="button"
-        onClick={onRetry}
-        aria-busy={busy || undefined}
-        className={CENTER_BLOCK_BUTTON_CLASS}
-      >
-        重試
-      </button>
-    </section>
-  )
+/** The first-load error block with the list's text. */
+export function ListLoadError(props: { onRetry: () => void; busy: boolean }) {
+  return <LoadErrorBlock message={LIST_LOAD_FAILED} {...props} />
 }

@@ -137,9 +137,7 @@ describe('the shell markup', () => {
         '分類：全部',
       ])
       // Only the desktop sort pill has a tooltip (story 2.1).
-      expect(html.match(/\stitle="[^"]*"/g)).toEqual([
-        ' title="排序：加入時間，新的在前"',
-      ])
+      expect(html.match(/\stitle="[^"]*"/g)).toEqual([' title="排序：狀態"'])
     },
   )
 
@@ -150,10 +148,11 @@ describe('the shell markup', () => {
     )
     expect(pill).toBeDefined()
     expect(pill).not.toMatch(/\sdisabled=""/)
-    expect(attr(pill ?? '', 'aria-label')).toBe(
-      '排序：加入時間，新的在前，列表',
-    )
-    expect(text(html)).toContain('排序：加入時間 ↓')
+    // K1 the default is the board (story 2.3).
+    expect(attr(pill ?? '', 'aria-label')).toBe('排序：狀態，看板')
+    expect(text(html)).toMatch(/看板\s+排序：狀態/)
+    expect(text(html)).not.toMatch(/排序：狀態\s*[↑↓]/)
+    expect(html).toContain('data-icon="board"')
   })
 
   it('the phone sort pill is enabled and opens a dialog (story 2.2)', () => {
@@ -165,9 +164,7 @@ describe('the shell markup', () => {
     expect(pill).not.toMatch(/\sdisabled=""/)
     expect(pill).toContain('aria-expanded="false"')
     expect(pill).toContain('h-11')
-    expect(attr(pill ?? '', 'aria-label')).toBe(
-      '排序：加入時間，新的在前，列表',
-    )
+    expect(attr(pill ?? '', 'aria-label')).toBe('排序：狀態，看板')
     // Closed: no sheet in the markup.
     expect(html).not.toContain('role="dialog"')
   })
@@ -183,7 +180,12 @@ describe('the shell markup', () => {
       '做種人數（連上的） ↓',
       '排序：做種人數（連上的），大的在前，列表',
     ],
-    [{ sort: 'state', dir: 'desc' }, '狀態', '排序：狀態，列表'],
+    [
+      { sort: 'added_on', dir: 'desc' },
+      '加入時間 ↓',
+      '排序：加入時間，新的在前，列表',
+    ],
+    [{ sort: 'state', dir: 'desc' }, '狀態', '排序：狀態，看板'],
   ] as const)(
     'the phone pill follows a non-default view: %o',
     (view, pillText, label) => {
