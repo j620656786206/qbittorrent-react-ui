@@ -221,6 +221,7 @@ export function BottomSheet({
   const [expanded, setExpanded] = useState(false)
   const [restOffset, setRestOffset] = useState(0)
   const [openedSeq, setOpenedSeq] = useState(0)
+  const [dragging, setDragging] = useState(false)
 
   const scrimRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -379,14 +380,16 @@ export function BottomSheet({
       }
       const offset = measure()
       const rest = metricsRef.current.rest
+      // A fresh open rests at the mode's height, even if it closed from
+      // full screen.
+      expandedRef.current = false
+      setExpanded(false)
       if (!shownRef.current) {
         shownRef.current = true
-        expandedRef.current = false
-        setExpanded(false)
         animate(offset + rest * SHEET_START_SHARE, offset)
       } else {
         // Reopened during the close slide: back up from where it is.
-        animate(currentOffset(), expandedRef.current ? 0 : offset)
+        animate(currentOffset(), offset)
       }
       fadeScrim(true)
       // Either way a fresh open: the caller's scroll and the first focus.
@@ -399,6 +402,7 @@ export function BottomSheet({
     setClosing(true)
     trapRef.current = false
     dragRef.current = null
+    setDragging(false)
     endSession(true)
     fadeScrim(false)
     animate(currentOffset(), metricsRef.current.viewport, () => {
@@ -548,8 +552,14 @@ export function BottomSheet({
 
   const onPointerMove = (event: PointerEvent) => {
     const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId || drag.state === 'skip')
+    if (!drag || drag.pointerId !== event.pointerId) return
+    // The mouse button went up where we could not see it (window blur, a
+    // context menu): the press is over.
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      endDrag(event)
       return
+    }
+    if (drag.state === 'skip') return
     const dy = event.clientY - drag.startY
     if (drag.state === 'pending') {
       if (Math.abs(dy) < DRAG_SLOP_PX) return
@@ -567,6 +577,7 @@ export function BottomSheet({
         return
       }
       drag.state = 'drag'
+      setDragging(true)
       drag.base = currentOffset()
       drag.startY = event.clientY
       stopAnimation()
@@ -591,6 +602,7 @@ export function BottomSheet({
     if (drag.pointerId !== event.pointerId) return
     dragRef.current = null
     listenOnWindow(false)
+    setDragging(false)
     if (drag.state === 'pending') return
     // The click that follows this release (same task) is not a tap.
     suppressClickRef.current = true
@@ -605,7 +617,9 @@ export function BottomSheet({
       expanded: drag.expandedAtStart,
       restHeight: rest,
       viewportHeight: viewport,
-      distance: from - (drag.expandedAtStart ? 0 : restAt),
+      // A drag caught mid slide (still below its rest) counts from where it
+      // was caught, not from the rest position.
+      distance: from - (drag.expandedAtStart ? 0 : Math.max(drag.base, restAt)),
       velocity:
         event.type === 'pointercancel'
           ? 0
@@ -651,6 +665,7 @@ export function BottomSheet({
         data-full-screen={fullScreen || undefined}
         className={cn(
           'fixed inset-x-0 top-0 z-50 flex h-dvh flex-col bg-surface text-text shadow-sheet',
+          dragging && 'select-none',
           fullScreen
             ? 'rounded-none pt-[env(safe-area-inset-top)]'
             : 'rounded-t-sheet',

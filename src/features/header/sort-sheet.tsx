@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Check, ChevronDown, List } from 'lucide-react'
 import {
   MORE_SORT_GROUPS,
@@ -27,10 +26,15 @@ import {
 // the direction words and arrow. The rules are the desktop menu's
 // (sort-model.ts): the selected row flips the direction and the sheet stays;
 // another row takes its default direction and closes it; both scroll the
-// list to the top. 「狀態」 shows but stays disabled until the board.
+// list to the top. 「狀態」 shows but stays disabled until the board. Rows
+// are plain buttons in lists (the selected one has `aria-current`), not a
+// menu: in a dialog, Tab and the screen reader's own list navigation work
+// without the menu keyboard model.
 
 /** Tailwind `lg`, where the desktop header and its sort menu take over. */
 export const DESKTOP_QUERY = '(min-width: 1024px)'
+
+const LIST_CLASS = 'm-0 flex list-none flex-col p-0'
 
 const ROW_CLASS =
   'flex h-[52px] w-full flex-none items-center gap-2.5 rounded-row px-3 text-left hover-row'
@@ -126,61 +130,41 @@ export function PhoneSortSheet({
     content.scrollTop += offset - (content.clientHeight - item.offsetHeight) / 2
   }
 
-  // Arrow keys move between the rows, like the desktop menu.
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End']
-    if (!keys.includes(event.key)) return
-    const items = [
-      ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        'button:not([disabled])',
-      ),
-    ]
-    if (items.length === 0) return
-    event.preventDefault()
-    const index = items.indexOf(document.activeElement as HTMLButtonElement)
-    const next =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? items.length - 1
-          : event.key === 'ArrowDown'
-            ? (index + 1) % items.length
-            : (index - 1 + items.length) % items.length
-    items[next].focus()
-  }
-
   const item = (field: SortFieldDef) => {
     const id = field.id as SortFieldId
     const selected = id === view.sort
     return (
-      <button
-        key={id}
-        ref={selected ? selectedRef : undefined}
-        type="button"
-        role="menuitemradio"
-        aria-checked={selected}
-        // Read as 「做種時間，久的在前」, without the arrow.
-        aria-label={
-          selected && words ? `${field.label}，${words}` : field.label
-        }
-        disabled={id === 'state'}
-        onClick={() => onPick(id)}
-        className={ROW_CLASS}
-      >
-        <span className="flex size-4 flex-none items-center justify-center">
-          {selected && <Check size={16} strokeWidth={2.6} aria-hidden="true" />}
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          {field.label}
-          {selected && words && (
-            <span className="text-text-muted">
-              <span aria-hidden="true">{'　'}</span>
-              {words}
-              <span aria-hidden="true">{` ${dirArrow(view.dir)}`}</span>
-            </span>
-          )}
-        </span>
-      </button>
+      <li key={id} className="flex flex-col">
+        <button
+          ref={selected ? selectedRef : undefined}
+          type="button"
+          data-sort-id={id}
+          aria-current={selected || undefined}
+          // Read as 「做種時間，久的在前」, without the arrow.
+          aria-label={
+            selected && words ? `${field.label}，${words}` : field.label
+          }
+          disabled={id === 'state'}
+          onClick={() => onPick(id)}
+          className={ROW_CLASS}
+        >
+          <span className="flex size-4 flex-none items-center justify-center">
+            {selected && (
+              <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+            )}
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            {field.label}
+            {selected && words && (
+              <span className="text-text-muted">
+                <span aria-hidden="true">{'　'}</span>
+                {words}
+                <span aria-hidden="true">{` ${dirArrow(view.dir)}`}</span>
+              </span>
+            )}
+          </span>
+        </button>
+      </li>
     )
   }
 
@@ -197,17 +181,14 @@ export function PhoneSortSheet({
       returnFocus={returnFocus}
       onOpened={onOpened}
     >
-      <div
-        role="menu"
-        aria-label="排序"
-        onKeyDown={onKeyDown}
-        className="flex flex-col px-2 pb-6"
-      >
-        {TOP_SORT_FIELDS.map(item)}
-        <div role="separator" className="mx-3 my-1 h-px flex-none bg-border" />
+      <div className="flex flex-col px-2 pb-6">
+        <ul className={LIST_CLASS}>{TOP_SORT_FIELDS.map(item)}</ul>
+        <div
+          aria-hidden="true"
+          className="mx-3 my-1 h-px flex-none bg-border"
+        />
         <button
           type="button"
-          role="menuitem"
           aria-expanded={expanded}
           onClick={() => onExpandedChange(!expanded)}
           className={ROW_CLASS}
@@ -223,19 +204,19 @@ export function PhoneSortSheet({
         </button>
         {expanded &&
           MORE_SORT_GROUPS.map((group) => (
-            <div
-              key={group.group}
-              role="group"
-              aria-labelledby={`${groupIdPrefix}-${group.group}`}
-              className="flex flex-col"
-            >
+            <div key={group.group} className="flex flex-col">
               <p
                 id={`${groupIdPrefix}-${group.group}`}
                 className="m-0 pt-3 pr-3 pb-1 pl-[38px] text-tag text-text-muted"
               >
                 {group.label}
               </p>
-              {group.fields.map(item)}
+              <ul
+                aria-labelledby={`${groupIdPrefix}-${group.group}`}
+                className={LIST_CLASS}
+              >
+                {group.fields.map(item)}
+              </ul>
             </div>
           ))}
       </div>

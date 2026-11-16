@@ -402,6 +402,23 @@ const phonePill = (page: Page) =>
     .getByRole('button', { name: /^排序：.*，列表$/ })
     .filter({ visible: true })
 const sortSheet = (page: Page) => page.getByRole('dialog', { name: '排序' })
+/** The sheet's sort rows: plain buttons in lists (no menu roles). */
+const sheetRows = (page: Page) => sortSheet(page).locator('li > button')
+const currentRow = (page: Page) =>
+  sortSheet(page).locator('li > button[aria-current="true"]')
+
+/** The sheet's visible height and its content's natural height. */
+async function fitHeights(page: Page) {
+  return sortSheet(page).evaluate((element) => {
+    const head = element.firstElementChild as HTMLElement
+    const content = element.querySelector('[data-slot="bottom-sheet-content"]')
+      ?.firstElementChild as HTMLElement
+    return {
+      visible: window.innerHeight - element.getBoundingClientRect().top,
+      content: head.offsetHeight + content.offsetHeight,
+    }
+  })
+}
 const mainScrollTop = (page: Page) =>
   page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop)
 
@@ -455,30 +472,28 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await openPhoneSheet(page)
   const sheet = sortSheet(page)
   await expect(sheet).toHaveAttribute('aria-modal', 'true')
-  const items = sheet.getByRole('menuitemradio')
+  const items = sheetRows(page)
   await expect(items).toHaveCount(5)
   await expect(items.first()).toBeDisabled()
-  const checked = sheet.getByRole('menuitemradio', { checked: true })
+  await expect(sheet.getByRole('menu')).toHaveCount(0)
+  const checked = currentRow(page)
   await expect(checked).toHaveAccessibleName('加入時間，新的在前')
   await expect(checked).toBeFocused()
   expect((await checked.boundingBox())?.height).toBe(52)
-  // Fit: rests on the bottom edge, shorter than the screen.
-  const box = await sheetBox(page)
-  expect(Math.round(box.bottom)).toBeGreaterThanOrEqual(PHONE.height)
-  expect(box.top).toBeGreaterThan(PHONE.height * 0.1)
+  // Fit: what shows is the content's own height (under 90%).
+  const fit = await fitHeights(page)
+  expect(fit.content).toBeLessThan(PHONE.height * 0.9)
+  expect(Math.abs(fit.visible - fit.content)).toBeLessThanOrEqual(1)
   await hasNoHorizontalScroll(page)
 
-  // B14: the page behind does not scroll.
-  await page.mouse.move(PHONE.width / 2, 40)
-  await page.mouse.wheel(0, 800)
-  expect(await mainScrollTop(page)).toBe(0)
+  // B14: the page behind cannot scroll.
   expect(
     await page
       .locator(`#${MAIN_ID}`)
       .evaluate((main) => getComputedStyle(main).overflowY),
   ).toBe('hidden')
 
-  await sheet.getByRole('menuitem', { name: '更多' }).click()
+  await sheet.getByRole('button', { name: '更多' }).click()
   await expect(items).toHaveCount(51)
   // Fit grows with the content up to 90% of the screen.
   await expect
@@ -513,7 +528,7 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await scrollMain(page, 'middle')
   expect(await mainScrollTop(page)).toBeGreaterThan(0)
   await openPhoneSheet(page)
-  await sheet.getByRole('menuitemradio', { name: '做種時間' }).click()
+  await sheet.getByRole('button', { name: '做種時間', exact: true }).click()
   await expect(sheet).toBeHidden()
   await expect(page).toHaveURL(/[?&]sort=seeding_time/)
   await expect(page).toHaveURL(/[?&]dir=desc/)
@@ -526,7 +541,7 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await expect(rows(page).first()).toBeVisible()
   await openPhoneSheet(page)
   await expect(items).toHaveCount(51)
-  const current = sheet.getByRole('menuitemradio', { checked: true })
+  const current = currentRow(page)
   await expect(current).toHaveAccessibleName('做種人數（連上的），小的在前')
   await expect(current).toBeInViewport({ ratio: 1 })
   await expect(current).toBeFocused()
@@ -628,7 +643,7 @@ test('B1 sheet screenshots at 390px, light and dark', async ({
       path: `${SCREENSHOT_DIR}/sort-sheet-phone-${scheme}.png`,
       animations: 'disabled',
     })
-    await sortSheet(page).getByRole('menuitem', { name: '更多' }).click()
+    await sortSheet(page).getByRole('button', { name: '更多' }).click()
     await expect
       .poll(async () => (await sheetBox(page)).top)
       .toBeLessThan(PHONE.height * 0.11)

@@ -61,7 +61,9 @@ const pill = () =>
   container.querySelector('button[aria-haspopup="dialog"]') as HTMLButtonElement
 const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]')
 const radios = () => [
-  ...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+  ...document.querySelectorAll<HTMLButtonElement>(
+    '[role="dialog"] li > button[data-sort-id]',
+  ),
 ]
 const radio = (label: string) =>
   radios().find((item) =>
@@ -69,7 +71,7 @@ const radio = (label: string) =>
   ) as HTMLButtonElement
 const more = () =>
   document.querySelector<HTMLButtonElement>(
-    'button[aria-expanded][role="menuitem"]',
+    '[role="dialog"] button[aria-expanded]',
   )
 const frozen = () => freezeStore.state.sheetOpen
 
@@ -155,7 +157,11 @@ describe('the phone sort sheet', () => {
     ])
     for (const item of radios()) expect(item.className).toContain('h-[52px]')
     expect(radio('狀態').disabled).toBe(true)
-    expect(radio('做種時間').getAttribute('aria-checked')).toBe('true')
+    expect(radio('做種時間').getAttribute('aria-current')).toBe('true')
+    expect(radio('加入時間').hasAttribute('aria-current')).toBe(false)
+    // Plain buttons in lists, no menu roles.
+    expect(document.querySelector('[role^="menu"]')).toBeNull()
+    expect(radio('做種時間').hasAttribute('role')).toBe(false)
     expect(radio('做種時間').getAttribute('aria-label')).toBe(
       '做種時間，久的在前',
     )
@@ -184,7 +190,7 @@ describe('the phone sort sheet', () => {
     expect(more()?.getAttribute('aria-expanded')).toBe('true')
     expect(radios()).toHaveLength(51)
     const groups = [
-      ...document.querySelectorAll('[role="group"][aria-labelledby]'),
+      ...document.querySelectorAll('[role="dialog"] ul[aria-labelledby]'),
     ]
     expect(groups).toHaveLength(10)
     expect(
@@ -225,7 +231,7 @@ describe('the phone sort sheet', () => {
     expect(more()?.getAttribute('aria-expanded')).toBe('true')
     expect(radios()).toHaveLength(51)
     const current = radio('做種人數（連上的）')
-    expect(current.getAttribute('aria-checked')).toBe('true')
+    expect(current.getAttribute('aria-current')).toBe('true')
     expect(current.textContent).toBe('做種人數（連上的）　小的在前 ↑')
     expect(document.activeElement).toBe(current)
   })
@@ -246,28 +252,6 @@ describe('the phone sort sheet', () => {
     await click(radio('狀態'))
     expect(setView).not.toHaveBeenCalled()
     expect(sheet()).not.toBeNull()
-  })
-
-  it('arrow keys move between rows', async () => {
-    await mount({ sort: 'added_on', dir: 'desc' })
-    await open()
-    expect(document.activeElement).toBe(radio('加入時間'))
-    const press = (key: string) =>
-      act(async () => {
-        document.activeElement?.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key,
-            bubbles: true,
-            cancelable: true,
-          }),
-        )
-      })
-    await press('ArrowDown')
-    expect(document.activeElement).toBe(radio('分享率'))
-    await press('Home')
-    expect(document.activeElement).toBe(radio('做種時間'))
-    await press('End')
-    expect(document.activeElement).toBe(more())
   })
 
   it('crossing to desktop width closes the sheet; focus falls back to main', async () => {

@@ -3,8 +3,9 @@
 // port, opens the phone sort sheet in headless Chromium at 390px, records a
 // Chrome trace (devtools.timeline) while the mouse drags the sheet's handle
 // down in small steps, and prints how many Layout and UpdateLayoutTree
-// events happened during the drag frames. The trace stops before the
-// release, so the snap's one-time padding change is not counted.
+// events happened during the drag frames; it exits 1 when any Layout or
+// Paint happened. The trace stops before the release, so the snap's
+// one-time padding change is not counted.
 //
 // Usage: npm run build && node scripts/trace-sheet-drag.mjs [--keep trace.json]
 
@@ -69,8 +70,15 @@ try {
 
   await page.mouse.move(195, top + 10)
   await page.mouse.down()
-  // The first move decides the drag (reads the scroll position once).
+  // The first move decides the drag (reads the scroll position once and
+  // turns on `select-none`, one repaint); let that commit and paint first.
   await page.mouse.move(195, top + 20)
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  )
   await browser.startTracing(page, { categories: ['devtools.timeline'] })
   for (let i = 1; i <= STEPS; i += 1) {
     await page.mouse.move(195, top + 20 + (DISTANCE * i) / STEPS)
@@ -92,14 +100,18 @@ try {
       event.args?.data?.type === 'pointermove',
   ).length
   const transform = await sheet.evaluate((element) => element.style.transform)
+  const layout = count('Layout')
+  const paint = count('Paint')
+  // The drag must stay on the compositor: any layout or paint fails the run.
+  if (layout > 0 || paint > 0) process.exitCode = 1
   console.log(
     JSON.stringify(
       {
         steps: STEPS,
         pointermoveDispatched: moves,
-        layout: count('Layout'),
+        layout,
         updateLayoutTree: count('UpdateLayoutTree'),
-        paint: count('Paint'),
+        paint,
         sheetTransformAtEnd: transform,
       },
       null,

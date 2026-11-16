@@ -5,7 +5,7 @@ created: '2026-11-16'
 status: 'done'
 baseline_revision: '394ae0cac8d885a055eaaf58895ad13c438c6fa7'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -148,6 +148,41 @@ deferred:
   - `[maybe-false]` `[reject]` (intent) the safe-area padding is only a class in tests. Settled on a notched phone. If true, low.
   - `[maybe-false]` `[reject]` (intent) the 1024px switch relies on existing CSS. Unchanged CSS from Epic 1, covered by its tests. If true, low.
 
+### 2026-11-16 Review pass (follow-up)
+- verdicts: 31 findings: high 0, medium 2, low 21, false 3, maybe-false 5
+- findings:
+  - `[low]` `[reject]` (intent) open slide base is the visible height. carried.
+  - `[maybe-false]` `[reject]` (intent) 40 style recalcs vs composite only. carried.
+  - `[low]` `[reject]` (intent) B4 content scroll never asserted in a browser. carried: phone check by Alex, DOM touch-action test.
+  - `[low]` `[reject]` (intent) fixed90 and full thresholds chosen by Claude. Listed under Claude 代決.
+  - `[low]` `[reject]` (intent) flip also scrolls to the top. Same rule as the desktop menu (epic: changing sort scrolls to the top).
+  - `[low]` `[reject]` (intent) phone pill icon is the list icon, not ▦. The view is the list until Story 2.3; same icon as desktop.
+  - `[maybe-false]` `[reject]` (intent) B14 touch scroll lock untested. Settled on the phone. If true, low.
+  - `[low]` `[reject]` (intent) B9 "reorders once" not asserted. Reducer tests cover the single reorder.
+  - `[medium]` `[patch]` (verification-gap) reopen during close never checks the session comes back. Patch: test extended (overflow, inert, freeze, Esc).
+  - `[low]` `[patch]` (blind) the B14 wheel check cannot fail. Patch: wheel part removed, overflow assertion kept.
+  - `[low]` `[patch]` (blind) the fit bottom-edge check cannot fail. Patch: measures the visible part.
+  - `[low]` `[patch]` (blind) reopen during the close slide of a full-screen sheet reopens full screen. Patch: expanded reset on reopen.
+  - `[medium]` `[patch]` (blind) the phone sheet uses menu roles without the menu keyboard model. Patch: plain buttons with `aria-current`.
+  - `[low]` `[reject]` (blind) sort-sheet copies desktop menu logic. A refactor; both use the same sort model functions.
+  - `[false]` `[reject]` (blind) spec B11 not updated. Fix edits this build's spec.
+  - `[false]` `[reject]` (blind) spec metadata contradicts itself. Fix edits this build's spec; `review_loop_iteration` counts bad_spec loops only.
+  - `[low]` `[reject]` (blind) inert snapshot misses later portals and silences live regions. No portal or alert mounts while the phone sort sheet is open in this story; revisit with toasts (Story 2.6).
+  - `[low]` `[reject]` (blind) ResizeObserver path has no unit test. Covered by the e2e expand check.
+  - `[maybe-false]` `[reject]` (blind) real touch could run in Playwright. Worth it when the detail sheet lands; the phone check covers it now. If true, low.
+  - `[low]` `[patch]` (blind) trace script always exits 0. Patch: exit code 1 on Layout or Paint; stale-build and thread filtering rejected as low.
+  - `[low]` `[reject]` (blind) `PhoneSortSheet` exported. Harmless.
+  - `[low]` `[patch]` (blind) mouse drags select text. Patch: `select-none` while dragging.
+  - `[low]` `[patch]` (edge) a drag during the open slide counts the slide as distance. Patch: distance from max(base, rest).
+  - `[false]` `[reject]` (edge) snap close with a parent that keeps open true. The only parent closes on `onOpenChange(false)`; controlled refusal is not a supported use.
+  - `[low]` `[patch]` (edge) lost mouse pointerup leaves a pending drag. Patch: end on `buttons === 0`.
+  - `[low]` `[reject]` (edge) trace script health wait. Local-only script.
+  - `[maybe-false]` `[reject]` (edge) freeze released at the start of the close slide. The sheet is leaving and inert; a reorder under a fading scrim is acceptable. If true, low.
+  - `[low]` `[reject]` (intent) the CSP claim depends on `_authed` `ssr: false`. Confirmed outside the diff; unchanged.
+  - `[low]` `[reject]` (intent) no-animation close checked only in happy-dom. Same code path as open; browser checks open and drag.
+  - `[maybe-false]` `[reject]` (intent) safe-area padding resolves to 0 in headless Chromium. Settled on a notched phone. If true, low.
+  - `[low]` `[reject]` (intent) the PR text is outside the diff. Handled in the PR.
+
 ## Design Notes
 
 - Docs to read first (AD-11): MDN Pointer Events and `setPointerCapture`, `touch-action`, `overscroll-behavior`, `prefers-reduced-motion`, `env(safe-area-inset-top)`; WAI-ARIA dialog (modal) pattern `https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/`. Radix `FocusScope` from the installed `radix-ui` may be used for the focus trap if it injects no `<style>`; otherwise a small own trap. Record the URLs actually read.
@@ -157,6 +192,8 @@ deferred:
 - CSP decision (Epic 1 retro action item 3, AR-31): keep the current CSP, no `style-src`, no `'unsafe-inline'`. The sheet never adds a `<style>` element; inline values go through the CSSOM (React `style`, `element.style.transform`, `element.animate`), which CSP does not govern, and `_authed` renders only in the browser (`ssr: false`), so no `style=` attribute is served. The browser smoke saw 0 CSP violations with the sheet open, dragged, full screen and closed.
 - Esc: the sheet listens on `document` while open (component-local like Radix's own Esc; the shortcut registry arrives with Story 2.4). The dialog is `tabIndex={-1}` so a press on the handle keeps focus inside.
 - Drag trace (`node scripts/trace-sheet-drag.mjs`, local only, after `npm run build`): headless Chromium at 390px, 40 mouse steps over 160px on the handle, one frame each, trace category `devtools.timeline`, stopped before the release: 40 `pointermove` dispatched, 0 `Layout`, 0 `Paint`, 40 `UpdateLayoutTree` (style recalc for the inline transform). Alex still verifies the feel on a real phone.
+- Sort rows are plain buttons in lists with `aria-current="true"` on the selected one, not the mockup's `role="menu"`/`menuitemradio` (review: a menu inside a dialog needs the full menu keyboard model; plain buttons work with Tab and the screen reader's list navigation). Each row keeps its accessible name (「做種時間，久的在前」).
+- The drag trace waits one painted frame after the drag starts: starting a drag turns on `select-none` (one repaint), which is not part of the drag frames. The script exits 1 if any Layout or Paint happens during the drag.
 - Release and close reuse the open motion (0.55 s, same curve); the scrim fades in and out in 0.2 s ease-out (mockup `fade`). The open slide starts 60% of the visible sheet height below its rest position.
 - Closes the Story 2.1 deferred item: the phone pill is now rendered with non-default views in `app-shell.test.tsx` and `sort-sheet.dom.test.tsx`.
 - Claude 代決 (Alex may veto), implementation detail: `detail` closes on distance only (no flick close, per EXPERIENCE 「往下拉超過一半就關」); the up threshold is a quarter of the smaller of the rest height and the room above it, so a 90% sheet can reach full screen; from full screen a flick down or a drag past a quarter of the screen returns to the rest height and below the rest height's close line it closes; a 6px slop before a press counts as a drag; in the content a drag up expands the sheet only while nothing scrolls.
@@ -182,3 +219,7 @@ Status: done
 **Verification:** lint, typecheck clean; `npm test` 73 files, 1406 tests; build, smoke ok; `CI=1 npm run smoke:browser` 16 of 16, 0 CSP violations; check.sh all ok. Drag trace (`node scripts/trace-sheet-drag.mjs`, local only): 40 drag steps, 0 Layout, 0 Paint.
 
 **Residual risks:** touch drag feel, scroll handoff, safe area and iOS Safari are not verified on a real phone; phone back gesture does not close the sheet (decide in the detail sheet story).
+
+### Follow-up pass (2026-11-16)
+
+Patched: reopen test checks the session comes back (medium); phone sheet rows are plain buttons with `aria-current` instead of menu roles (medium); reopen of a full-screen sheet rests at its height; a drag caught mid-slide measures only its own distance; a lost mouse pointerup ends the drag; `select-none` while dragging; e2e B14 and fit checks now able to fail; trace script exits 1 on Layout or Paint. Deferred: none new. Follow-up review recommendation: false (no high patched on a follow-up pass). Verification: lint, typecheck clean; `npm test` 1408 pass; build, smoke ok; `CI=1 npm run smoke:browser` 16 of 16; trace 0 Layout, 0 Paint; check.sh all ok.

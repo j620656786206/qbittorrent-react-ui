@@ -81,6 +81,7 @@ function pointer(
   type: string,
   clientY: number,
   timeStamp = 0,
+  init: PointerEventInit = {},
 ) {
   const event = new PointerEvent(type, {
     bubbles: true,
@@ -89,6 +90,7 @@ function pointer(
     pointerId: 1,
     isPrimary: true,
     pointerType: 'touch',
+    ...init,
   })
   Object.defineProperty(event, 'timeStamp', { value: timeStamp })
   target.dispatchEvent(event)
@@ -245,6 +247,35 @@ describe('B3 to B5 drag', () => {
       `translate3d(0, ${VIEWPORT - REST + 90}px, 0)`,
     )
     expect(sheet.style.paddingBottom).toBe(`${VIEWPORT - REST}px`)
+    // No text selection while a drag is on.
+    expect(sheet.className).toContain('select-none')
+    await act(async () => pointer(sheet, 'pointerup', 600, 30))
+    expect(sheet.className).not.toContain('select-none')
+  })
+
+  it('a mouse whose button went up unseen ends the drag; hovering then moves nothing', async () => {
+    await mount()
+    const sheet = dialog() as HTMLElement
+    const mouse = (buttons: number) => ({ pointerType: 'mouse', buttons })
+    await act(async () => {
+      pointer(handle() as Element, 'pointerdown', 500, 0, mouse(1))
+      pointer(handle() as Element, 'pointermove', 510, 10, mouse(1))
+      pointer(sheet, 'pointermove', 530, 20, mouse(1))
+    })
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST + 20}px, 0)`,
+    )
+    // The pointerup was lost (window blur); the next move has no button.
+    await act(async () => pointer(sheet, 'pointermove', 540, 30, mouse(0)))
+    expect(runtime.settle).toHaveBeenCalledTimes(1)
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
+    await act(async () => pointer(sheet, 'pointermove', 700, 40, mouse(0)))
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
+    expect(sheet.className).not.toContain('select-none')
   })
 
   it('B3 released past the threshold closes; below it springs back', async () => {
@@ -487,6 +518,77 @@ describe('B10 motion', () => {
     expect(scrim()?.className).not.toContain('pointer-events-none')
     expect(dialog()?.contains(document.activeElement)).toBe(true)
     expect(dialog()?.hasAttribute('inert')).toBe(false)
+    // The whole session is back: scroll lock, inert page, order freeze.
+    for (const element of [document.documentElement, document.body, main]) {
+      expect(element.style.overflow).toBe('hidden')
+    }
+    expect(main.hasAttribute('inert')).toBe(true)
+    expect(opener.hasAttribute('inert')).toBe(true)
+    expect(runtime.holdOrder).toHaveBeenCalledTimes(2)
+    expect(release).toHaveBeenCalledTimes(1)
+    // And it closes again.
+    await act(async () =>
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    )
+    expect(dialog()?.getAttribute('data-state')).toBe('closing')
+    expect(release).toHaveBeenCalledTimes(2)
+  })
+
+  it('B2 reopen while a full-screen sheet closes: it rests at its height again', async () => {
+    reducedMotion = false
+    fakeAnimate()
+    await mount()
+    snap = 'full'
+    await drag(handle() as Element, 500, 300)
+    expect(dialog()?.dataset.fullScreen).toBe('true')
+    // Past the release's own click.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    await act(async () => closeButton()?.click())
+    expect(dialog()?.getAttribute('data-state')).toBe('closing')
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('#reopen')?.click(),
+    )
+    const sheet = dialog() as HTMLElement
+    expect(sheet.getAttribute('data-state')).toBe('open')
+    expect(sheet.dataset.fullScreen).toBeUndefined()
+    expect(sheet.className).toContain('rounded-t-sheet')
+    expect(sheet.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST}px, 0)`,
+    )
+    expect(sheet.style.paddingBottom).toBe(`${VIEWPORT - REST}px`)
+  })
+
+  it('a drag caught during the open slide counts only its own distance', async () => {
+    reducedMotion = false
+    fakeAnimate()
+    // The open slide is drawn 200px below the rest position right now.
+    const caughtAt = VIEWPORT - REST + 200
+    vi.stubGlobal(
+      'DOMMatrixReadOnly',
+      class {
+        m42 = caughtAt
+      },
+    )
+    const real = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) =>
+      element.getAttribute('role') === 'dialog'
+        ? ({
+            transform: `matrix(1, 0, 0, 1, 0, ${caughtAt})`,
+          } as CSSStyleDeclaration)
+        : real(element),
+    )
+    try {
+      await mount()
+      snap = 'rest'
+      await drag(handle() as Element, 500, 540)
+      expect(runtime.settle).toHaveBeenLastCalledWith(
+        expect.objectContaining({ distance: 30 }),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 
