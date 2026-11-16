@@ -34,6 +34,8 @@ Turn the Epic 1 list into the real daily view. The "state" sort shows a board (d
 
 ## Technical Decisions
 
+- Sort keys outside the slim table (Alex, 2026-11-16, Story 2.1): sorts on fields the slim torrent table does not carry (peer counts, limits, traffic, comment, content path, infohash and similar) are fetched on demand with `getSortKeys({ field, since })`, query key `['sort-keys', field]`, polled every 5 s only while that sort is active. The container stores those fields in a second table and computes derived values with `src/lib` pure functions. The tracker is stored and sent only as its hostname; the full tracker URL (it carries the passkey) and magnet links never leave the container.
+
 - Layers are lint-enforced: features never import each other. Shared UI (bottom sheet, toast) goes in the shared component directory beside the Epic 1 shadcn components and status circle, not under `features/`.
 - URL search params own `sort`, `dir`, `hash` (zod schema in `src/shared`); changes use `replace`, invalid values reset to defaults and the URL is corrected.
 - `selectVisibleTorrents` in `src/lib` is the only sorter, including board columns; no `sort()` in features. `classify()` is the only state mapping (no `torrent.state ===`); special values only in `src/lib/format.ts`. Sort ids in `src/shared/sort-fields.ts`; derived fields as `src/lib` pure functions following VueTorrent v2.37.0.

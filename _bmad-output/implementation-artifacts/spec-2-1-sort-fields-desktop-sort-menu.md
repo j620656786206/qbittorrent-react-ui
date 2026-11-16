@@ -1,0 +1,150 @@
+---
+title: 'Story 2.1: 51 sorts and the desktop sort menu'
+type: 'feature'
+created: '2026-11-16'
+status: 'draft'
+baseline_revision: ''
+review_loop_iteration: 0
+followup_review_recommended: false
+context:
+  - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
+  - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
+  - '{project-root}/_bmad-output/implementation-artifacts/spec-2-0-browser-smoke-not-found-login-wiring.md'
+warnings: ['oversized']
+deferred: []
+---
+
+<intent-contract>
+
+## Intent
+
+**Problem:** The list is hard-wired to "added time, newest first" and the desktop sort pill is disabled. Alex needs 51 sorts so the torrents he should deal with float to the top, with the big number on each row following the sort.
+
+**Approach:** A single `src/shared/sort-fields.ts` table of 51 sort ids; `sort`/`dir` in the URL search params (zod); `selectVisibleTorrents` sorts by the view; an enabled desktop sort pill plus a 260px Radix `DropdownMenu`; the row's big number follows the sort. Sorts whose values the slim table does not carry are fetched on demand with a new `getSortKeys({ field, since })` server function (Alex, 2026-11-16, now written into AD-6). The tracker is stored and sent only as its hostname.
+
+## Boundaries & Constraints
+
+**Always:**
+- Exactly 51 sort ids in `src/shared/sort-fields.ts`, ids snake_case, qBittorrent's own name where one exists (AR-6). The list, in order (top 5 first, then groups):
+  - Top 5: `state` 狀態, `seeding_time` 做種時間, `added_on` 加入時間, `ratio` 分享率, `completion_on` 完成時間.
+  - 時間: `time_active`, `last_activity`, `seen_complete`, `eta`.
+  - 進度: `progress`, `amount_left`, `availability`.
+  - 速度: `dlspeed`, `upspeed`, `avg_dlspeed`, `avg_upspeed`, `global_speed`.
+  - 流量和分享率: `uploaded`, `downloaded`, `uploaded_session`, `downloaded_session`, `global_volume`, `popularity`.
+  - 大小: `size`, `total_size`.
+  - 人數: `num_seeds`, `num_leechs`, `num_complete`, `num_incomplete` (VueTorrent's swarm seeds and peers).
+  - 名稱和分類: `name`, `category`, `tracker_domain`, `trackers_count`, `private`.
+  - 路徑: `save_path`, `content_path`, `root_path`, `content_path_basename`, `save_path_basename`.
+  - 限制和設定: `dl_limit`, `up_limit`, `ratio_limit`, `seeding_time_limit`, `inactive_seeding_time_limit`, `priority`, `reannounce`.
+  - 技術資訊: `hash`, `infohash_v1`, `infohash_v2`, `has_metadata`, `comment`.
+  - The top-5 entries that also belong to a group (state, seeding_time, added_on, ratio, completion_on) appear only once, in the top 5; the "更多" list therefore has 46 entries. Never `download_path`, `basename_download_path`, `tags`.
+- Each field has: Chinese name, group, default direction, the two direction words, big-number kind, and `source: 'slim' | 'extra'`. Default directions per EXPERIENCE: seeding time long first, added and completed newest first, ratio high first, size large first, name A to Z, other numbers large first. Direction words per EXPERIENCE; text fields use A 到 Z / Z 到 A; booleans 是在前 / 否在前.
+- Fields already in the slim table (`source: 'slim'`): state, seeding_time, added_on, ratio, completion_on, eta, progress, dlspeed, upspeed, global_speed (dlspeed + upspeed), size, name, category, private, save_path, save_path_basename, hash. Every other id is `source: 'extra'`.
+- `getSortKeys({ field, since? })`: session-gated server function made with the existing factory (`src/server/functions/_define.ts`), zod input with `field` restricted to the `extra` ids. It answers `{ version, full, keys: Record<hash, value | null> }` for that one field: everything when `since` is missing or too old, otherwise only torrents whose extra fields changed after `since`. Values are computed in the container by `src/lib` pure functions (derived ones per VueTorrent v2.37.0: avg speed = downloaded or uploaded / time_active, global volume = downloaded + uploaded, basename = last path segment, tracker domain = hostname of the tracker URL).
+- The container keeps the extra fields in a second in-memory table next to the slim table, fed from the same `sync/maindata` pulls (same allowlist-by-zod approach). It stores `tracker_domain` only; the raw `tracker` string and `magnet_uri` are never stored or sent by any server function. Churning extras are quantized before change detection: `time_active`, `last_activity`, `reannounce` floored to 60 s; `availability`, `popularity` rounded to 2 decimals.
+- `getMaindata`'s output and `TORRENT_FIELDS` are unchanged. The G9 leak test keeps passing for `getMaindata`; add the same leak check for `getSortKeys` that the tracker URL (passkey marker) and magnet never appear for any field, while comment, content_path, root_path, infohash may appear only from `getSortKeys` for their own field. Update the comments in `src/shared/maindata.ts` and `src/server/qbit/testing.ts` to say exactly this.
+- Browser: `['sort-keys', field]` query, polled every 5 s through the existing polling helper only while the active sort is `extra`; merged with a pure function in `src/lib`; torrents removed from maindata are ignored.
+- URL: a zod search schema in `src/shared` for `sort` (one of the 51 ids) and `dir` (`asc` | `desc`). Invalid `sort` or `dir`: fall back to the default and fix the URL with `replace`. No `sort` in the URL: added_on, newest first (Story 2.3 changes this to state). Changing sort or direction uses `replace`.
+- `selectVisibleTorrents(maindata, view, sortKeys?)` is the only sorter; archived excluded; reversing the direction reverses the order; ties: `added_on` newest first, then `hash`, never reversed; torrents with no value go last in both directions. "No value" checks (infinite `eta`, `completion_on` -1, unset limits -1/-2 and similar, `seen_complete` 0, an extra key not loaded) live only in `src/lib/format.ts`. The Epic 1 hard-coded order is removed.
+- Desktop pill (UX-DR20, mockup S03-sort-menu-desktop): enabled; left `surface-muted` capsule 「列表」 with icon, right bold 「排序：做種時間 ↓」 plus chevron; the arrow is not separately clickable; `aria-label` and tooltip with the full words, e.g. 「排序：做種時間，久的在前」. Phone pill stays disabled.
+- Menu: shadcn-style wrapper of Radix `DropdownMenu` in `src/shared/ui/dropdown-menu.tsx`, 260px wide, max 70vh with internal scroll; top 5 rows show 1 to 5 in `text-muted` (text only); separator; 「更多 ▾」 expands the 46 grouped items inside the same menu (group headers `tag` 11px `text-muted`, no submenu); selected row has a check on the left and `text-muted` direction words plus arrow after the name; when the current sort is under 更多, the menu opens expanded and scrolled to it; 「狀態」 shows but is disabled. Clicking the selected item flips the direction and keeps the menu open; clicking another item switches to it with its default direction, closes the menu and scrolls the list to the top.
+- 0 CSP violations in the browser smoke with the menu open (Radix modal menus inject a `<style>` through react-remove-scroll; avoid it, e.g. `modal={false}`, without loosening CSP).
+- A user sort change re-sorts immediately even while the order is frozen; the freeze only holds data-driven moves.
+- Row big number per the EXPERIENCE big-number table, through `format.ts`; text kinds (category, paths, hash, comment, tracker domain) in `body` 13px `text-muted`, max 160px, truncated, paths truncated from the front; hash first 8 characters in the `path` font; the 分享率 column hidden when sorting by ratio; name sort shows progress or the status word (13px); save path shows the location label; unset limits 「不限速」; incomplete completion 「沒有」; speed 0 「0」 in `text-muted`; untrusted strings as plain text. Fields the table does not name follow the closest kind (points in time as dates, durations as lengths, booleans 「是」「否」). While an extra field's first keys are loading, rows keep the previous order and the big number shows a small skeleton bar.
+- No em dash anywhere. `check.sh` before every commit. Fake data only (AD-15); add fake values for every extra field to `scripts/fake-qbit.mjs`.
+
+**Never:**
+- No phone sort sheet (Story 2.2), no board (Story 2.3), no per-category remembered sort, no 「（這個分類記住的）」, no keyboard shortcuts (Epic 3).
+- Never send the full tracker URL or magnet to the browser; never add the extra fields to the slim table or `TORRENT_FIELDS`.
+- No `'unsafe-inline'` or other CSP loosening; no new runtime dependency beyond what `radix-ui` 1.8.1 already ships.
+- Features never call `.sort()` on torrents.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| S1 fields | `SORT_FIELDS` | 51 ids, top 5 in order, none of the 3 dropped, 46 under 更多 | n/a |
+| S2 sort slim | sort=seeding_time desc / asc | longest first / shortest first; ties by added_on desc then hash in both | n/a |
+| S3 missing last | completion_on with -1 values, both directions | incomplete ones last both ways | n/a |
+| S4 extra loading | sort=num_seeds, keys not yet loaded | previous order kept, big number skeleton; after keys arrive, sorted | getSortKeys error: previous order kept, existing connection alert handles the code |
+| S5 URL invalid | `?sort=nope&dir=up` | default order, URL replaced without the bad params | n/a |
+| S6 menu flip | click the selected item | direction flips, menu stays open, list order reverses | n/a |
+| S7 menu switch | click another item | its default direction, menu closes, `main` scrollTop 0 | n/a |
+| S8 more open | current sort under 更多 | menu opens expanded, current item scrolled into view | n/a |
+| S9 frozen | pointer over list (frozen), user changes sort | re-sorted at once | n/a |
+| S10 tracker | raw tracker `https://tracker.example/announce?passkey=SECRET` | `tracker_domain` = `tracker.example`; `SECRET` never in any server function output | malformed URL: null (no value) |
+| S11 delta | getSortKeys with recent `since`, one torrent's extras changed | only that hash in `keys`, `full: false` | `since` unknown or too old: `full: true` |
+| S12 perf | 4165 fake torrents, switch sort | select plus repaint under 100 ms on the dev machine | n/a |
+
+</intent-contract>
+
+## Code Map
+
+- `src/shared/maindata.ts:7-35` -- slim schema, `TORRENT_FIELDS`; comment says trackers, comments, content paths never leave: rewrite per the new rule; fields unchanged.
+- `src/server/qbit/maindata-schema.ts:10-42` -- raw schema = slim omit hash, partial; add the extra raw fields (incl. `tracker` for deriving the domain) to a separate raw extras schema; keep the allowlist approach.
+- `src/server/sync/torrent-table.ts:26,58-60,95-117` -- slim table, `SEEDING_TIME_STEP_S`, change detection, `BadMaindata('incomplete_torrent')`. The extras table must not throw when qBittorrent omits an extra field (default to null).
+- `src/server/sync/syncer.ts`, `src/server/sync/index.ts` -- where pulls feed the table and `version` comes from.
+- `src/server/functions/get-maindata.ts`, `_define.ts`, `discover.test.ts` -- pattern for the new `get-sort-keys.ts`; discovery test requires every function to be gated.
+- `src/server/functions/get-maindata.test.ts:149-165`, `src/server/qbit/testing.ts:16-57` -- G9 leak test, `LEAK_MARKERS`, `rawTorrent` fixture.
+- `src/server/sync/payload-size.test.ts` -- budgets for getMaindata: must stay green (fields unchanged).
+- `src/lib/visible-torrents.ts:14-47` -- `TorrentView`, `EPIC1_VIEW`, hard-coded `byAddedOnDesc`; replace.
+- `src/lib/format.ts` -- `NO_VALUE`, `QBIT_ETA_INFINITY`, all formatters; add the missing-value predicates and the new big-number formatters here.
+- `src/lib/torrent-status.ts:178,226`, `src/lib/paths.ts:9` -- status word for the name sort, `locationLabel` for save path.
+- `src/lib/maindata-merge.ts` -- merge pattern for the new sort-keys merge.
+- `src/state/maindata.ts:180-186` -- `useVisibleTorrents(view)` needs a stable view; `src/state/polling.ts` -- the only way to set `refetchInterval`.
+- `src/state/order-freeze.ts:19-60,157-173` -- `useFrozenOrder(live)`: needs to reset on a view change.
+- `src/features/list/list-model.ts:64-170` -- `RowModel.value` fixed to added time (L131), `rowProps`; add sort-driven value and ratio-column hiding.
+- `src/features/list/torrent-row.tsx:50-65` -- ratio column and big value with the hard-coded 「加入 」 screen-reader prefix.
+- `src/features/list/torrent-list.tsx:83-180` -- `useVisibleTorrents(EPIC1_VIEW)`, freeze, virtualizer on `getMain()`.
+- `src/features/header/app-shell.tsx:25-27,102-152` -- disabled desktop and phone pills, `SORT_LABEL`; `app-shell.test.tsx:136-138` asserts the label.
+- `src/routes/_authed.tsx`, `src/routes/_authed/index.tsx` -- the shell is in the `_authed` layout, so the search schema must be readable there (validate on the layout or use `useSearch({ strict: false })`).
+- `src/shared/login.ts:15-17`, `src/routes/login.tsx` -- existing zod search pattern (`.catch(undefined)` drops but does not fix the URL).
+- `src/shared/ui/dialog.tsx`, `checkbox.tsx`, `ui.test.ts:11-37` -- Radix wrapper pattern and token checks.
+- `src/shared/csp.ts` -- no `style-src`; React `style={}` via CSSOM is fine, injected `<style>` is blocked.
+- `scripts/fake-qbit.mjs:124-302` -- fake torrents; add extra fields (fake tracker URLs on `.example` hosts with a fake `passkey=` marker, fake comments, fake content paths under `/data/...`, code-name categories only).
+- `e2e/smoke.spec.ts`, `e2e/fixtures.ts` -- add a smoke test: open the menu, expand 更多, pick an extra sort, check 0 CSP violations and the order changes.
+- UX sources: `_bmad-output/planning-artifacts/ux-designs/ux-react-torrent-2026-11-13/EXPERIENCE.md:238-286` (sort rules, number writing, big-number table), `DESIGN.md:195-206,613-623` (sort-pill, sort-menu, list-row), `mockups/S03-sort-menu-desktop.dc.html` (pill and collapsed menu, line 28), `.working/vuetorrent-sort-fields.md` (VueTorrent ids).
+
+## Tasks & Acceptance
+
+**Execution:**
+- `src/shared/sort-fields.ts` (+ test) -- the 51-field table per Always; vitest: count 51, top-5 order, dropped 3 absent, 46 in 更多, every field has every attribute.
+- `src/shared/list-search.ts` (+ test) -- zod schema for `sort` and `dir`, defaults, and a helper telling whether the raw search needs fixing.
+- `src/lib/format.ts` (+ tests) -- missing-value predicates per field kind; big-number formatters for every kind (date, length, ratio, percent, speed with 「0」, size, count, limit with 「不限速」, boolean 「是」「否」, text, hash first 8).
+- `src/lib/sort-values.ts` (+ tests) -- pure functions: slim sort value per id; derived extras (avg speeds, global volume, basenames, tracker domain from a URL) with the VueTorrent v2.37.0 formulas cited in comments.
+- `src/lib/visible-torrents.ts` (+ tests) -- view-driven sort with ties and missing-last rules; every field tested in both directions at least once, plus ties and missing values; one perf test or script for 4165 torrents.
+- `src/lib/sort-keys-merge.ts` (+ test) -- merge full/delta sort-key responses.
+- `src/server/qbit/maindata-schema.ts`, `src/server/sync/extras-table.ts` (+ tests), `src/server/sync/syncer.ts` -- second table with quantization, versioned changes, raw tracker reduced to its hostname at ingest.
+- `src/server/functions/get-sort-keys.ts` (+ tests) -- gated function per Always; leak test for the tracker passkey marker and magnet.
+- `src/shared/maindata.ts`, `src/server/qbit/testing.ts` -- comment updates; fixtures gain extra fields.
+- `src/state/sort-keys.ts` (+ test) -- query options for `['sort-keys', field]`, polling only while active.
+- `src/state/order-freeze.ts` (+ test) -- reset the shown order when the view changes.
+- `src/shared/ui/dropdown-menu.tsx` -- Radix wrapper with brand tokens, non-modal.
+- `src/features/header/sort-menu.tsx`, `app-shell.tsx` (+ tests) -- enabled desktop pill and menu per Always; phone pill unchanged.
+- `src/features/list/list-model.ts`, `torrent-row.tsx`, `torrent-list.tsx` (+ tests) -- sort-driven big number, ratio column hiding, scroll to top on a sort switch, view from the URL.
+- `src/routes/_authed.tsx` and/or `src/routes/_authed/index.tsx` -- search validation and URL fixing with `replace`.
+- `scripts/fake-qbit.mjs` -- fake extra fields.
+- `e2e/smoke.spec.ts` -- menu smoke with an extra sort; existing tests stay green.
+
+**Acceptance Criteria:**
+- Given the desktop app with fake data, when Alex opens the sort menu, expands 更多 and picks a field, then the list re-sorts, the pill shows the new name and arrow, and the big numbers follow the sort, with 0 CSP violations and 0 console errors in the browser smoke.
+- Given any `getMaindata` or `getSortKeys` response, then no full tracker URL, passkey or magnet appears, and `getMaindata`'s fields are exactly as before this story.
+- Given `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run smoke`, `npm run smoke:browser` and `check.sh`, then all pass.
+- Given the PR, then it carries the 51-field table (Chinese name, group, default direction, direction words, big-number kind), each derived field's formula, the perf measurement method and numbers, the doc URLs read, and desktop light and dark screenshots: menu collapsed, 更多 expanded, an item under 更多 selected; list sorted by seeding time, ratio, name, save path and hash.
+
+## Spec Change Log
+
+## Review Triage Log
+
+## Design Notes
+
+- Docs to read first (AD-11), matching locked versions: Radix DropdownMenu `https://www.radix-ui.com/primitives/docs/components/dropdown-menu` (check `modal`, `onSelect` with `preventDefault` to keep it open, `DropdownMenu.RadioGroup`/`RadioItem`); shadcn dropdown-menu `https://ui.shadcn.com/docs/components/dropdown-menu`; TanStack Router search params `https://tanstack.com/router/latest/docs/framework/react/guide/search-params` and validation with zod; TanStack Query polling `https://tanstack.com/query/v5/docs/framework/react/reference/useQuery`; VueTorrent v2.37.0 source for derived fields (`https://github.com/VueTorrent/VueTorrent/tree/v2.37.0`). Record the URLs actually read here.
+- Alex's decisions (2026-11-16): tracker only as hostname, full tracker URL and magnet never leave the container; extra fields fetched on demand through `getSortKeys` instead of widening the slim table. Both are in AD-6 and the architecture memlog.
+- Claude 代決 (Alex may veto): sort ids are qBittorrent names, derived ones snake_case (`avg_dlspeed`, `global_volume`, `tracker_domain`, `content_path_basename`); churn quantization steps (60 s; 2 decimals); keys-loading state keeps the previous order with a skeleton big number; booleans sort 是 first by default; the top-5 fields that also belong to a group are listed only in the top 5.
+
+## Verification
+
+**Commands:**
+- `source ~/.nvm/nvm.sh && nvm use && npm run lint && npm run typecheck && npm test` -- expected: all pass.
+- `source ~/.nvm/nvm.sh && nvm use && npm run build && npm run smoke && npm run smoke:browser` -- expected: all pass.
+- `bash .claude/skills/next-story/check.sh` -- expected: every line ok.
