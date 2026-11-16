@@ -105,7 +105,7 @@ action_items:
     action: "Story 2.0: CI browser smoke (Playwright, Chromium only, fake qBittorrent),
       Chinese not-found page, login and _authed happy-dom wiring tests"
     owner: "Claude"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-16.md"
   - id: "epic-1-retro-item-3-first-epic-2-story-that-renders-dialog-o"
     epic: 1
