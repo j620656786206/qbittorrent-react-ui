@@ -38,6 +38,21 @@ export function isLoginRequired(): boolean {
   return loginStore.state.loginRequired !== null
 }
 
+/**
+ * Calls `listener` each time the store goes from `null` to set (not when the
+ * reason changes while it is already set). Returns the unsubscribe function.
+ */
+export function onLoginRequired(listener: () => void): () => void {
+  let previous = loginStore.state.loginRequired
+  const subscription = loginStore.subscribe(() => {
+    const next = loginStore.state.loginRequired
+    const started = previous === null && next !== null
+    previous = next
+    if (started) listener()
+  })
+  return () => subscription.unsubscribe()
+}
+
 export function useLoginRequired(): LoginRequired | null {
   return useSelector(loginStore, (state) => state.loginRequired)
 }

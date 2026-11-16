@@ -45,9 +45,55 @@ describe('shadcn components (row 21)', () => {
     expect(source).not.toContain('disabled:pointer-events-none')
   })
 
+  it('Button is a capsule and the default variant is button-primary (spec 1.4)', () => {
+    const source = read('button.tsx')
+    expect(source).not.toContain('rounded-md')
+    expect(source).toContain('rounded-full')
+    expect(source).toContain(
+      "default: 'bg-primary font-bold text-primary-foreground hover-solid'",
+    )
+    expect(source).not.toContain('hover:bg-primary/90')
+  })
+
+  it('Input and Checkbox use the DESIGN text-input and checkbox looks (spec 1.4)', () => {
+    const input = read('input.tsx')
+    for (const token of [
+      'rounded-full',
+      'border-input',
+      'bg-card',
+      'px-4',
+      'text-body',
+      'aria-invalid:border-destructive',
+    ]) {
+      expect(input, token).toContain(token)
+    }
+    expect(input).not.toMatch(/\bh-\d/)
+    expect(input).not.toContain('shadow')
+    expect(input).not.toContain('disabled:opacity')
+    const checkbox = read('checkbox.tsx')
+    for (const token of [
+      'size-5',
+      'rounded-xs',
+      'border-2 border-text-faint',
+      'data-[state=checked]:border-0',
+      'data-[state=checked]:bg-primary',
+      'data-[state=checked]:text-primary-foreground',
+      'strokeWidth={3}',
+      'size-3.5',
+    ]) {
+      expect(checkbox, token).toContain(token)
+    }
+    expect(checkbox).not.toContain('disabled:opacity')
+  })
+
   it('leaves keyboard focus to the global :focus-visible outline', () => {
     const files = readdirSync(UI_DIR).filter((file) => file.endsWith('.tsx'))
-    expect(files.sort()).toEqual(['button.tsx', 'dialog.tsx'])
+    expect(files.sort()).toEqual([
+      'button.tsx',
+      'checkbox.tsx',
+      'dialog.tsx',
+      'input.tsx',
+    ])
     for (const file of files) {
       const source = read(file)
       for (const banned of [
@@ -62,7 +108,12 @@ describe('shadcn components (row 21)', () => {
   })
 
   it('uses the token-aware cn and Chinese close text', () => {
-    for (const file of ['button.tsx', 'dialog.tsx']) {
+    for (const file of [
+      'button.tsx',
+      'checkbox.tsx',
+      'dialog.tsx',
+      'input.tsx',
+    ]) {
       expect(read(file)).toContain("from '#/shared/ui/cn'")
       expect(read(file)).not.toMatch(/from ['"]cn['"]/)
     }

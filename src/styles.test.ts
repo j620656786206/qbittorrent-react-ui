@@ -348,6 +348,28 @@ describe('Tailwind theme (row 20)', () => {
     }
   })
 
+  it('has the rise entrance, off for reduced motion (spec 1.4)', () => {
+    const keyframes = byPrelude('@keyframes rise')
+    expect(keyframes).toHaveLength(1)
+    const from = blocks(keyframes[0].body)
+    expect(from.map((b) => b.prelude)).toEqual(['from'])
+    const fromDecl = declarations(from[0].body)
+    expect(fromDecl.get('opacity')).toBe('0')
+    expect(fromDecl.get('transform')).toBe('translateY(10px)')
+    expect([...fromDecl.keys()].sort()).toEqual(['opacity', 'transform'])
+
+    const utility = byPrelude('@utility animate-rise')
+    expect(utility).toHaveLength(1)
+    expect(declarations(utility[0].body).get('animation')).toBe(
+      'rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both',
+    )
+    const reduced = blocks(utility[0].body)
+    expect(reduced.map((b) => b.prelude)).toEqual([
+      '@media (prefers-reduced-motion: reduce)',
+    ])
+    expect(declarations(reduced[0].body).get('animation')).toBe('none')
+  })
+
   it('sets body, focus and disabled base rules', () => {
     const rule = (prelude: string) => {
       const found = BASE.filter((b) => b.prelude === prelude)

@@ -65,6 +65,15 @@ describe('server function discovery', () => {
     expect(await auditServerFunctions(realModules)).toEqual([])
   })
 
+  it('finds the real login and getSession functions', () => {
+    const found = Object.entries(realModules).flatMap(([file, exports]) =>
+      Object.keys(exports).map((name) => `${file}#${name}`),
+    )
+    expect(found).toContain('./login.ts#login')
+    expect(found).toContain('./get-session.ts#getSession')
+    expect(guardedOf(realModules['./login.ts'].login)?.spec.auth).toBe('public')
+  })
+
   it('the glob skips _define.ts, tests and fixtures', () => {
     for (const file of Object.keys(realModules)) {
       expect(file).not.toMatch(/(^|\/)_[^/]*$|\.test\.tsx?$|__fixtures__/)

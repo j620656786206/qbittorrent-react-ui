@@ -87,6 +87,14 @@ const FIXTURES: Record<string, string> = {
     "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
   'src/routes/-lint-probe-ui.tsx':
     "import { Button } from '#/shared/ui/button'\n\nexport const x = Button\n",
+  'src/lib/lint-probe-zod.ts':
+    "import { z } from 'zod'\n\nexport const x = z\n",
+  'src/routes/-lint-probe-zod.ts':
+    "import { z } from 'zod/v4'\n\nexport const x = z\n",
+  'src/shared/lint-probe-zod.ts':
+    "import { z } from 'zod'\n\nexport const x = z\n",
+  'src/server/qbit/lint-probe-zod.ts':
+    "import { z } from 'zod'\n\nexport const x = z\n",
 }
 
 // Real files linted alongside the probes (read only).
@@ -94,6 +102,7 @@ const REAL_FILES = [
   'src/server/functions/_define.ts',
   'src/server/functions/__fixtures__/sample.ts',
   'src/shared/ui/cn.ts',
+  'src/shared/zod.ts',
 ]
 
 const createdDirs: Array<string> = []
@@ -257,5 +266,22 @@ describe('src/shared/ui only from screens', () => {
 
   it('allows it from a route', () => {
     expect(ruleIds('src/routes/-lint-probe-ui.tsx')).toEqual([])
+  })
+})
+
+describe('AD-10 zod only through src/shared/zod.ts outside src/server', () => {
+  it.each([
+    ['src/lib', 'src/lib/lint-probe-zod.ts'],
+    ['a route (zod/v4 subpath)', 'src/routes/-lint-probe-zod.ts'],
+    ['src/shared', 'src/shared/lint-probe-zod.ts'],
+  ])('blocks importing zod from %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('allows it in src/server and in src/shared/zod.ts', () => {
+    expect(ruleIds('src/server/qbit/lint-probe-zod.ts')).not.toContain(
+      'no-restricted-imports',
+    )
+    expect(ruleIds('src/shared/zod.ts')).toEqual([])
   })
 })
