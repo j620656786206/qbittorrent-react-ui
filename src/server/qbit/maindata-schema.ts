@@ -7,6 +7,7 @@ import {
   slimTorrentSchema,
 } from '#/shared/maindata'
 import type { ServerState } from '#/shared/maindata'
+import { sortExtrasSchema } from '#/shared/sort-keys'
 
 // The raw `sync/maindata` answer of qBittorrent 5.1.4, limited to what the
 // two tables read: the slim fields (`src/shared/maindata.ts`) and the sort
@@ -30,13 +31,6 @@ export function knownConnectionStatus(
   return known.success ? known.data : 'disconnected'
 }
 
-// A sort extra must never make the answer unusable (sorting must not break
-// the torrent list): a key qBittorrent leaves out is "unchanged"
-// (`undefined`), a key it sends as null or in a shape this app does not
-// expect is "no value" (`null`).
-const extraNumber = z.number().nullable().optional().catch(null)
-const extraString = z.string().nullable().optional().catch(null)
-
 /**
  * The hostname only, never the URL. An empty tracker (no working tracker
  * right now) is "unchanged": the last known domain stays.
@@ -45,52 +39,31 @@ function trackerDomainOrKeep(tracker: string): string | null | undefined {
   return tracker === '' ? undefined : trackerDomainOf(tracker)
 }
 
-/** The sort extras as qBittorrent names them (`tracker` already a hostname). */
-export const rawSortExtrasSchema = z.object({
-  time_active: extraNumber,
-  last_activity: extraNumber,
-  seen_complete: extraNumber,
-  amount_left: extraNumber,
-  availability: extraNumber,
-  downloaded: extraNumber,
-  uploaded: extraNumber,
-  downloaded_session: extraNumber,
-  uploaded_session: extraNumber,
-  popularity: extraNumber,
-  total_size: extraNumber,
-  num_seeds: extraNumber,
-  num_leechs: extraNumber,
-  num_complete: extraNumber,
-  num_incomplete: extraNumber,
-  /** The hostname only (`null` for a malformed URL); never the URL. */
-  tracker: z
-    .string()
-    .transform(trackerDomainOrKeep)
-    .nullable()
-    .optional()
-    .catch(null),
-  trackers_count: extraNumber,
-  content_path: extraString,
-  root_path: extraString,
-  dl_limit: extraNumber,
-  up_limit: extraNumber,
-  ratio_limit: extraNumber,
-  seeding_time_limit: extraNumber,
-  inactive_seeding_time_limit: extraNumber,
-  priority: extraNumber,
-  reannounce: extraNumber,
-  infohash_v1: extraString,
-  infohash_v2: extraString,
-  has_metadata: z.boolean().nullable().optional().catch(null),
-  comment: extraString,
-})
+// The sort extras as qBittorrent sends them, built from the one list in
+// src/shared/sort-keys.ts. `.partial()`: a key qBittorrent leaves out is
+// "unchanged" (`undefined`); a null or unexpected shape is still "no value"
+// (`null`, the shared schema's catch). `seeding_time` is a slim field and
+// comes from the slim schema. qBittorrent calls the tracker `tracker` and
+// sends the URL: it is reduced to its hostname here and renamed to
+// `tracker_domain` on the torrent, so the URL never leaves this parse.
+const rawSortExtrasSchema = sortExtrasSchema
+  .omit({ tracker_domain: true, seeding_time: true })
+  .extend({
+    /** The hostname only (`null` for a malformed URL); never the URL. */
+    tracker: z.string().transform(trackerDomainOrKeep).nullable().catch(null),
+  })
+  .partial()
 
 export const rawTorrentSchema = slimTorrentSchema
   .omit({ hash: true })
   .partial()
   .extend(rawSortExtrasSchema.shape)
+  .transform(({ tracker, ...torrent }) => ({
+    ...torrent,
+    tracker_domain: tracker,
+  }))
 
-export type RawTorrent = z.infer<typeof rawTorrentSchema>
+export type RawTorrent = z.output<typeof rawTorrentSchema>
 
 export const rawMaindataSchema = z.object({
   rid: z.number().int(),

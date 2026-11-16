@@ -1,6 +1,6 @@
 import { extraSortSources, extraSortValue } from '#/lib/sort-values'
 import type { RawMaindata, RawTorrent } from '#/server/qbit/maindata-schema'
-import { SORT_EXTRAS_FIELDS } from '#/shared/sort-keys'
+import { SORT_EXTRAS_FIELDS, emptySortExtras } from '#/shared/sort-keys'
 import type {
   ExtraSortFieldId,
   SortExtras,
@@ -60,19 +60,13 @@ export interface ExtrasTable {
 interface Row {
   /** As qBittorrent sent them: what values are computed from. */
   raw: SortExtras
-  /** Quantized: only for the change check. */
-  quantized: SortExtras
+  /** Quantized, in `SORT_EXTRAS_FIELDS` order: only for the change check. */
+  quantized: ReadonlyArray<SortValue>
   /** Per field, the version that last changed it. */
   changedAt: Record<keyof SortExtras, number>
 }
 
-function emptyExtras(): SortExtras {
-  return Object.fromEntries(
-    SORT_EXTRAS_FIELDS.map((name) => [name, null]),
-  ) as unknown as SortExtras
-}
-
-function quantize(name: keyof SortExtras, value: unknown): unknown {
+function quantize(name: keyof SortExtras, value: SortValue): SortValue {
   if (typeof value !== 'number') return value
   if (FLOORED.has(name)) {
     return Math.floor(value / EXTRAS_TIME_STEP_S) * EXTRAS_TIME_STEP_S
@@ -81,33 +75,31 @@ function quantize(name: keyof SortExtras, value: unknown): unknown {
   return value
 }
 
-/** The raw key each extra comes from. */
-function rawValue(partial: RawTorrent, name: keyof SortExtras): unknown {
-  if (name === 'tracker_domain') return partial.tracker
-  return (partial as Record<string, unknown>)[name]
+/** `name`'s new value from a partial answer; `undefined` keeps the old. */
+function mergeField<TField extends keyof SortExtras>(
+  next: SortExtras,
+  partial: Partial<SortExtras>,
+  name: TField,
+): void {
+  const value = partial[name]
+  if (value !== undefined) next[name] = value
 }
 
 function mergeExtras(base: SortExtras, partial: RawTorrent): SortExtras {
-  const next = { ...base } as Record<keyof SortExtras, unknown>
-  for (const name of SORT_EXTRAS_FIELDS) {
-    const value = rawValue(partial, name)
-    if (value !== undefined) next[name] = value
-  }
-  return next as SortExtras
+  const next = { ...base }
+  for (const name of SORT_EXTRAS_FIELDS) mergeField(next, partial, name)
+  return next
 }
 
-function quantizeAll(extras: SortExtras): SortExtras {
-  const next = { ...extras } as Record<keyof SortExtras, unknown>
-  for (const name of SORT_EXTRAS_FIELDS) {
-    next[name] = quantize(name, extras[name])
-  }
-  return next as SortExtras
+/** The change-check copy, in `SORT_EXTRAS_FIELDS` order. */
+function quantizeAll(extras: SortExtras): Array<SortValue> {
+  return SORT_EXTRAS_FIELDS.map((name) => quantize(name, extras[name]))
 }
 
 /** A full update's starting point: empty, but the tracker domain stays. */
 function freshExtras(existing: Row | undefined): SortExtras {
   return {
-    ...emptyExtras(),
+    ...emptySortExtras(),
     tracker_domain: existing?.raw.tracker_domain ?? null,
   }
 }
@@ -128,7 +120,7 @@ export function createExtrasTable(): ExtrasTable {
     const updates: Array<{
       hash: string
       raw: SortExtras
-      quantized: SortExtras
+      quantized: ReadonlyArray<SortValue>
       changed: Array<keyof SortExtras>
     }> = []
     for (const [hash, partial] of Object.entries(incoming)) {
@@ -136,12 +128,12 @@ export function createExtrasTable(): ExtrasTable {
       const existing = rows.get(hash)
       const base = full
         ? freshExtras(existing)
-        : (existing?.raw ?? emptyExtras())
+        : (existing?.raw ?? emptySortExtras())
       const next = mergeExtras(base, partial)
       const quantized = quantizeAll(next)
       const changed = existing
         ? SORT_EXTRAS_FIELDS.filter(
-            (name) => existing.quantized[name] !== quantized[name],
+            (_, index) => existing.quantized[index] !== quantized[index],
           )
         : [...SORT_EXTRAS_FIELDS]
       updates.push({ hash, raw: next, quantized, changed })

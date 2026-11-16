@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { rawMaindataSchema } from '#/server/qbit/maindata-schema'
-import type { RawMaindata } from '#/server/qbit/maindata-schema'
+import type { RawMaindata, RawTorrent } from '#/server/qbit/maindata-schema'
 import {
   FAKE_PASSKEY,
   FAKE_TRACKER_DOMAIN,
@@ -16,6 +16,8 @@ import {
   createExtrasTable,
 } from '#/server/sync/extras-table'
 import { EXTRA_SORT_FIELD_IDS } from '#/shared/sort-fields'
+import { SORT_EXTRAS_FIELDS, emptySortExtras } from '#/shared/sort-keys'
+import type { SortExtras } from '#/shared/sort-keys'
 
 // Spec 2.1 rows S10 and S11 at table level: the second table, quantized
 // change detection, deltas by version, the tracker reduced to its hostname.
@@ -249,5 +251,28 @@ describe('extras table', () => {
     expect(Object.keys(table.keysSince('num_seeds', since).keys)).toEqual([
       HASH_A,
     ])
+  })
+})
+
+describe('one list of sort extras (src/shared/sort-keys.ts)', () => {
+  it('the parsed raw torrent carries every extra, the tracker as tracker_domain', () => {
+    // A field added to the list but not read from the raw answer fails here.
+    expectTypeOf<Exclude<keyof SortExtras, keyof RawTorrent>>().toBeNever()
+    expectTypeOf<RawTorrent>().not.toHaveProperty('tracker')
+  })
+
+  it('the empty row is every field, all null', () => {
+    const empty = emptySortExtras()
+    expect(Object.keys(empty).sort()).toEqual([...SORT_EXTRAS_FIELDS].sort())
+    expect(Object.values(empty).every((value) => value === null)).toBe(true)
+  })
+
+  it('a value qBittorrent left out is unchanged; an unexpected shape is no value', () => {
+    const table = setup()
+    const before = table.keysSince('num_seeds', null).keys[HASH_A]
+    table.apply(delta(2, { [HASH_A]: { comment: 'x' } }))
+    expect(table.keysSince('num_seeds', null).keys[HASH_A]).toBe(before)
+    table.apply(delta(3, { [HASH_A]: { num_seeds: 'many' } }))
+    expect(table.keysSince('num_seeds', null).keys[HASH_A]).toBeNull()
   })
 })

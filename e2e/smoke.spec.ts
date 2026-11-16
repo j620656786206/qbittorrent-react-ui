@@ -626,6 +626,83 @@ test('B10 reduced motion: the sheet opens and closes without animations', async 
   await expect(sortSheet(page)).toHaveCount(0)
 })
 
+/**
+ * A finger drag of `dy` px from `(x, y)` through the DevTools protocol, so
+ * Chromium runs its real touch pipeline: `touch-action`, native scrolling
+ * and the pointer events it sends instead.
+ * https://chromedevtools.github.io/devtools-protocol/tot/Input/#method-dispatchTouchEvent
+ */
+async function touchDrag(page: Page, x: number, y: number, dy: number) {
+  const cdp = await page.context().newCDPSession(page)
+  const steps = 12
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x, y }],
+  })
+  for (let step = 1; step <= steps; step += 1) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x, y: y + (dy * step) / steps }],
+    })
+  }
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  })
+  await cdp.detach()
+}
+
+test.describe('with a touch screen', () => {
+  test.use({ hasTouch: true })
+
+  test('B4 touch: the expanded 更多 list scrolls by finger; from its top a finger drags the sheet', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await openPhoneSheet(page)
+    const sheet = sortSheet(page)
+    await sheet.getByRole('button', { name: '更多' }).click()
+    // The taller content moves the sheet up to its 90% cap.
+    const top = async () => Math.round((await sheetBox(page)).top)
+    await expect.poll(top).toBe(Math.round(PHONE.height * 0.1))
+    await settled(page)
+    const content = sheet.locator('[data-slot="bottom-sheet-content"]')
+    const scrollTop = () => content.evaluate((element) => element.scrollTop)
+    const rest = await top()
+    const box = await content.boundingBox()
+    if (!box) throw new Error('no sheet content')
+    const x = PHONE.width / 2
+
+    // A finger moving up scrolls the list; the sheet stays where it rests.
+    await touchDrag(page, x, box.y + box.height - 40, -300)
+    await expect.poll(scrollTop).toBeGreaterThan(0)
+    // Let the fling's momentum run out.
+    let last = -1
+    await expect
+      .poll(async () => {
+        const now = await scrollTop()
+        const still = now === last
+        last = now
+        return still
+      })
+      .toBe(true)
+    await settled(page)
+    await expect(sheet).not.toHaveAttribute('data-full-screen', 'true')
+    expect(await top()).toBe(rest)
+
+    // Back at the top, a finger moving down drags the sheet closed.
+    await content.evaluate((element) => {
+      element.scrollTop = 0
+    })
+    const touchAction = () =>
+      content.evaluate((element) => element.style.touchAction)
+    await expect.poll(touchAction).toBe('pan-down')
+    await touchDrag(page, x, box.y + 40, 400)
+    await expect(sheet).toBeHidden()
+  })
+})
+
 test('B1 sheet screenshots at 390px, light and dark', async ({
   page,
   request,

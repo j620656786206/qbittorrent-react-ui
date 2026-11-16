@@ -144,8 +144,7 @@ let openSheets = 0
 
 /**
  * Counts an open bottom sheet as a reason until the returned function is
- * called (once; later calls do nothing). The sheet gets this through
- * `SheetRuntime.holdOrder` (src/router.tsx).
+ * called (once; later calls do nothing).
  */
 export function holdOrderForSheet(): () => void {
   openSheets += 1
@@ -157,6 +156,15 @@ export function holdOrderForSheet(): () => void {
     openSheets = Math.max(0, openSheets - 1)
     setReason('sheetOpen', openSheets > 0)
   }
+}
+
+/**
+ * Holds the list order while a bottom sheet over it is `open`: each
+ * feature that opens one calls this next to its `<BottomSheet>`. A layout
+ * effect, so the hold starts in the same commit as the sheet's own open.
+ */
+export function useSheetOrderHold(open: boolean): void {
+  useLayoutEffect(() => (open ? holdOrderForSheet() : undefined), [open])
 }
 
 // The touch session: `touching` while a finger is down, `lastScrollAt` for

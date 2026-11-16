@@ -1,12 +1,8 @@
-import type {
-  DragSample,
-  SheetMode,
-  SheetRelease,
-  SheetSnap,
-} from '#/shared/sheet'
-
 // Story 2.2: where the bottom sheet settles after a drag. Pure: the sheet
-// (src/shared/ui/bottom-sheet.tsx) measures, this decides.
+// (src/shared/ui/bottom-sheet.tsx) measures, this decides. It sits next to
+// the sheet because it is the sheet's own geometry, not torrent logic
+// (Claude 代決, epic 2 review: it was in src/lib, which src/shared may not
+// import, and reaching it took a router-level context).
 //
 // Heights per DESIGN bottom-sheet: `fit` its content up to 90%, `fixed90`
 // 90%, `detail` 70%, `full` the screen. Thresholds (Claude 代決, spec 2.2):
@@ -21,6 +17,38 @@ import type {
 //   closes.
 // - A flick against the drag's direction goes back to where the drag
 //   started (the rest height, or full screen when it started there).
+
+/**
+ * How tall the sheet rests (DESIGN bottom-sheet): `fit` its content, at most
+ * 90% of the screen; `fixed90` 90% (add torrent); `detail` 70% (detail);
+ * `full` the whole screen (rename). Any of them can be dragged up to full
+ * screen.
+ */
+export type SheetMode = 'fit' | 'fixed90' | 'detail' | 'full'
+
+/** Where a released drag ends: closed, the mode's rest height, or full screen. */
+export type SheetSnap = 'close' | 'rest' | 'full'
+
+export interface SheetRelease {
+  mode: SheetMode
+  /** The sheet was full screen when the drag started. */
+  expanded: boolean
+  /** The mode's rest height in px (`sheetRestHeight`). */
+  restHeight: number
+  viewportHeight: number
+  /** How far the finger moved, px; positive is down. */
+  distance: number
+  /** Speed at release, px/ms; positive is down. */
+  velocity: number
+}
+
+/** One pointer position during a drag. */
+export interface DragSample {
+  /** `event.timeStamp`, ms. */
+  time: number
+  /** `event.clientY`, px. */
+  y: number
+}
 
 export const FIT_MAX_SHARE = 0.9
 export const FIXED90_SHARE = 0.9
