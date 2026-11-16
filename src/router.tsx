@@ -1,6 +1,8 @@
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { getGlobalStartContext } from '@tanstack/react-start'
 import { routeTree } from './routeTree.gen'
+import { createQueryClient } from '#/state/query-client'
 
 // AD-10: the request middleware's per-request CSP nonce goes on Start's inline
 // scripts. It must be passed here, at router creation (TanStack/router#8789).
@@ -15,8 +17,13 @@ function cspNonce(): string | undefined {
 }
 
 export function getRouter() {
+  const queryClient = createQueryClient()
   const router = createTanStackRouter({
     routeTree,
+    context: { queryClient },
+    Wrap: ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,

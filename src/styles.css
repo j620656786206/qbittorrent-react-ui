@@ -1,16 +1,325 @@
+@import 'tailwindcss';
 
-@import "tailwindcss";
+/*
+ * Design tokens. Every value is copied from the UX DESIGN.md frontmatter
+ * (_bmad-output/planning-artifacts/ux-designs/ux-react-torrent-2026-11-13).
+ * Change a value there first, then here. Dark mode follows the system
+ * (prefers-color-scheme) only: no toggle, no class.
+ */
 
-* {
-  box-sizing: border-box;
+/* 1. Brand color roles (UX-DR1 to UX-DR3). Prefixed `--rt-` so the brand
+ *    `accent` does not clash with shadcn's `--accent`. */
+:root {
+  color-scheme: light dark;
+
+  --rt-surface-page: #f6f6f4;
+  --rt-surface: #ffffff;
+  --rt-surface-muted: #efefec;
+  --rt-border: #e4e4e0;
+  --rt-track: #e7e7e3;
+  --rt-text: #141414;
+  --rt-text-muted: #65655f;
+  --rt-text-faint: #8c8c87;
+  --rt-accent: #141414;
+  --rt-accent-foreground: #ffffff;
+  --rt-selection-row: #eef4ff;
+  --rt-selection-bar: #141414;
+  --rt-selection-bar-foreground: #ffffff;
+  --rt-delete: #d93a3a;
+  --rt-delete-foreground: #ffffff;
+  --rt-good: #18753f;
+  --rt-media-library: #6a45c8;
+  --rt-media-library-tint: #6a45c81f;
+  --rt-status-downloading: #2f6fdf;
+  --rt-status-seeding: #278a4f;
+  --rt-status-done: #141414;
+  --rt-status-paused: #b26f0c;
+  --rt-status-stalled: #c9581e;
+  --rt-status-error: #d93a3a;
+  --rt-status-archived: #65655f;
+  --rt-status-icon: #ffffff;
 }
 
-html,
-body {
-  min-height: 100%;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rt-surface-page: #1f2937;
+    --rt-surface: #18202c;
+    --rt-surface-muted: #263243;
+    --rt-border: #2d3a4d;
+    --rt-track: #334155;
+    --rt-text: #e9eef5;
+    --rt-text-muted: #95a1b2;
+    --rt-text-faint: #67758a;
+    --rt-accent: #6cb4e4;
+    --rt-accent-foreground: #0f1720;
+    --rt-selection-row: #25344a;
+    --rt-selection-bar: #e9eef5;
+    --rt-selection-bar-foreground: #0f1720;
+    --rt-delete: #e0707f;
+    --rt-delete-foreground: #0f1720;
+    --rt-good: #8fd19e;
+    --rt-media-library: #a48fe0;
+    --rt-media-library-tint: #6a45c81f;
+    --rt-status-downloading: #5aa9e0;
+    --rt-status-seeding: #7fbf8e;
+    --rt-status-done: #7d8ba0;
+    --rt-status-paused: #e0ad62;
+    --rt-status-stalled: #e3925f;
+    --rt-status-error: #e0707f;
+    --rt-status-archived: #95a1b2;
+    --rt-status-icon: #0f1720;
+  }
 }
 
-body {
-  margin: 0;
+/* 2. shadcn variables mapped onto the brand roles (UX-DR4). Dark mode needs
+ *    no second mapping: the roles above already switch. */
+:root {
+  --background: var(--rt-surface-page);
+  --foreground: var(--rt-text);
+  --card: var(--rt-surface);
+  --card-foreground: var(--rt-text);
+  --popover: var(--rt-surface);
+  --popover-foreground: var(--rt-text);
+  --primary: var(--rt-accent);
+  --primary-foreground: var(--rt-accent-foreground);
+  --secondary: var(--rt-surface-muted);
+  --secondary-foreground: var(--rt-text);
+  --muted: var(--rt-surface-muted);
+  --muted-foreground: var(--rt-text-muted);
+  --accent: var(--rt-surface-muted);
+  --accent-foreground: var(--rt-text);
+  --destructive: var(--rt-delete);
+  --destructive-foreground: var(--rt-delete-foreground);
+  --border: var(--rt-border);
+  --input: var(--rt-border);
+  --ring: var(--rt-accent);
 }
 
+/* 3. Tailwind colors: only the roles, plus black and white (UX-DR5).
+ *    The dialog overlay uses `bg-scrim-dialog`. */
+@theme {
+  --color-*: initial;
+  --color-black: #000;
+  --color-white: #fff;
+  --color-scrim-sheet: rgba(0, 0, 0, 0.18);
+  --color-scrim-dialog: rgba(0, 0, 0, 0.5);
+}
+
+/* The brand accent is reachable only as `primary` (DESIGN: the brand accent
+ * is wired to `--primary`); `accent` here is shadcn's. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-surface-page: var(--rt-surface-page);
+  --color-surface: var(--rt-surface);
+  --color-surface-muted: var(--rt-surface-muted);
+  --color-track: var(--rt-track);
+  --color-text: var(--rt-text);
+  --color-text-muted: var(--rt-text-muted);
+  --color-text-faint: var(--rt-text-faint);
+  --color-selection-row: var(--rt-selection-row);
+  --color-selection-bar: var(--rt-selection-bar);
+  --color-selection-bar-foreground: var(--rt-selection-bar-foreground);
+  --color-delete: var(--rt-delete);
+  --color-delete-foreground: var(--rt-delete-foreground);
+  --color-good: var(--rt-good);
+  --color-media-library: var(--rt-media-library);
+  --color-media-library-tint: var(--rt-media-library-tint);
+  --color-status-downloading: var(--rt-status-downloading);
+  --color-status-seeding: var(--rt-status-seeding);
+  --color-status-done: var(--rt-status-done);
+  --color-status-paused: var(--rt-status-paused);
+  --color-status-stalled: var(--rt-status-stalled);
+  --color-status-error: var(--rt-status-error);
+  --color-status-archived: var(--rt-status-archived);
+  --color-status-icon: var(--rt-status-icon);
+}
+
+/* 4. Type, radius, spacing, size and shadow tokens (UX-DR7 to UX-DR11).
+ *    Desktop is Tailwind's default `lg` breakpoint (64rem = 1024px); the
+ *    4 to 16px spacing scale is Tailwind's default `--spacing: 0.25rem`. */
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang TC',
+    'Noto Sans TC', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, Menlo, monospace;
+
+  --text-page-title: 26px;
+  --text-page-title--line-height: 1.2;
+  --text-page-title--font-weight: 700;
+  --text-detail-hero: 28px;
+  --text-detail-hero--line-height: 1.2;
+  --text-detail-hero--font-weight: 700;
+  --text-stat-value: 20px;
+  --text-stat-value--line-height: 1.2;
+  --text-stat-value--font-weight: 700;
+  --text-row-value: 18px;
+  --text-row-value--line-height: 1.2;
+  --text-row-value--font-weight: 700;
+  --text-detail-name: 16px;
+  --text-detail-name--line-height: 1.2;
+  --text-detail-name--font-weight: 700;
+  --text-column-title: 15px;
+  --text-column-title--line-height: 1.2;
+  --text-column-title--font-weight: 700;
+  --text-body: 13px;
+  --text-body--line-height: 1.4;
+  --text-body--font-weight: 400;
+  --text-row-name: 13px;
+  --text-row-name--line-height: 1.4;
+  --text-row-name--font-weight: 600;
+  --text-meta: 12px;
+  --text-meta--line-height: 1.4;
+  --text-meta--font-weight: 400;
+  --text-tag: 11px;
+  --text-tag--line-height: 1.4;
+  --text-tag--font-weight: 400;
+  /* Use together with `font-mono`. */
+  --text-path: 12px;
+  --text-path--line-height: 1.5;
+  --text-path--font-weight: 400;
+
+  --radius-xs: 6px;
+  --radius-bar: 9px;
+  --radius-row: 14px;
+  --radius-card: 16px;
+  --radius-panel: 22px;
+  --radius-sheet: 28px;
+  --radius-full: 9999px;
+
+  /* Named spacings; the two-value ones work with `p-*` only. */
+  --spacing-page-desktop: 22px 28px;
+  --spacing-page-desktop-bottom: 110px;
+  --spacing-page-phone: 18px 16px;
+  --spacing-page-phone-list: 18px 12px;
+  --spacing-board-gap: 14px;
+  --spacing-card-padding: 12px 14px;
+  --spacing-row-padding-desktop: 9px 12px;
+  --spacing-row-padding-phone: 9px 10px;
+  --spacing-panel-padding: 18px 22px;
+
+  --container-content-max: 1240px;
+  --container-list-column-max: 560px;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* Board card percentage: 22px on phone, 17px from desktop. */
+@utility text-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+
+  @media (width >= 64rem) {
+    font-size: 17px;
+  }
+}
+
+/* 5. Hover looks (UX-DR12). Real hover only on devices that hover; a press
+ *    (`:active`) shows the same look on phones. Never on disabled things. */
+@utility hover-row {
+  @media (hover: hover) {
+    &:hover:not(:disabled, [aria-disabled='true']) {
+      background-color: var(--color-surface-muted);
+    }
+  }
+  &:active:not(:disabled, [aria-disabled='true']) {
+    background-color: var(--color-surface-muted);
+  }
+}
+
+@utility hover-ring {
+  @media (hover: hover) {
+    &:hover:not(:disabled, [aria-disabled='true']) {
+      box-shadow: inset 0 0 0 1px var(--color-text-faint);
+    }
+  }
+  &:active:not(:disabled, [aria-disabled='true']) {
+    box-shadow: inset 0 0 0 1px var(--color-text-faint);
+  }
+}
+
+@utility hover-outline {
+  @media (hover: hover) {
+    &:hover:not(:disabled, [aria-disabled='true']) {
+      border-color: var(--color-text-faint);
+    }
+  }
+  &:active:not(:disabled, [aria-disabled='true']) {
+    border-color: var(--color-text-faint);
+  }
+}
+
+@utility hover-solid {
+  @media (hover: hover) {
+    &:hover:not(:disabled, [aria-disabled='true']) {
+      opacity: 0.9;
+    }
+  }
+  &:active:not(:disabled, [aria-disabled='true']) {
+    opacity: 0.9;
+  }
+}
+
+/* 6. Base rules (UX-DR7, UX-DR75, NFR-6, NFR-7). */
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Lines and outlines use the `border` role (shadcn's base rule). */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  /* Keyboard focus only; follows the element's border radius. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  :disabled,
+  [aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Inside a disabled group only the group is dimmed, not 50% of 50%. */
+  [aria-disabled='true'] :is(:disabled, [aria-disabled='true']),
+  fieldset:disabled :is(:disabled, [aria-disabled='true']) {
+    opacity: 1;
+  }
+}
