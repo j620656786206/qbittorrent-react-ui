@@ -1,0 +1,74 @@
+name: Image
+
+# AR-12 / AR-13: after a merge to main, run the same checks as CI on the
+# commit that landed, build the amd64 image, run the same image smoke as the
+# PR, and only then push the commit sha tag to GHCR. `latest` moves only when
+# this commit is still the tip of main, so re-running an old run never moves
+# it back. This job is the only one in the repo allowed to write packages.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-main
+  cancel-in-progress: false
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The squash commit on main was never tested as such: check it again.
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+      - run: npm run smoke
+
+      # GHCR names must be lowercase.
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/react-torrent" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: docker build --platform linux/amd64 --build-arg COMMIT_SHA="$GITHUB_SHA" -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+
+      - name: Image smoke
+        run: node scripts/smoke-image.mjs "$IMAGE:$GITHUB_SHA" "$GITHUB_SHA"
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push sha tag
+        run: docker push "$IMAGE:$GITHUB_SHA"
+
+      # Only the current tip of main may become `latest`.
+      - name: Push latest
+        run: |
+          git fetch --quiet origin main
+          tip=$(git rev-parse origin/main)
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "main is now at $tip, not $GITHUB_SHA: latest stays where it is."
+            exit 0
+          fi
+          docker push "$IMAGE:latest"

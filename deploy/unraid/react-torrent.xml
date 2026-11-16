@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- AR-16: Unraid template. Put it in /boot/config/plugins/dockerMan/templates-user/ (see docs/deployment.md). Do not add variables, paths or parameters beyond these. -->
+<Container version="2">
+  <Name>react-torrent</Name>
+  <Repository>ghcr.io/j620656786206/react-torrent:latest</Repository>
+  <Registry>https://github.com/j620656786206/qbittorrent-react-ui/pkgs/container/react-torrent</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/j620656786206/qbittorrent-react-ui</Support>
+  <Project>https://github.com/j620656786206/qbittorrent-react-ui</Project>
+  <Overview>Self-hosted web UI for qBittorrent. The container serves the page and is the only thing that talks to qBittorrent. Runs as 99:100 with a read-only filesystem; settings live in /config.</Overview>
+  <Category>Downloaders:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams>--cap-drop=ALL --security-opt=no-new-privileges --read-only --tmpfs /tmp</ExtraParams>
+  <Config Name="WebUI port" Target="3000" Default="3000" Mode="tcp" Description="Port the browser uses at home. APP_ORIGINS must use the same port." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/react-torrent" Mode="rw" Description="settings.json lives here. Create the folder and chown 99:100 first." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/react-torrent</Config>
+  <Config Name="QBIT_URL" Target="QBIT_URL" Default="" Mode="" Description="qBittorrent WebUI as seen from inside this container: http://NAS-address:qBittorrent-host-port (container names do not resolve on bridge). See docs/deployment.md." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="QBIT_USERNAME" Target="QBIT_USERNAME" Default="" Mode="" Description="qBittorrent WebUI username. Also the login for this app." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="QBIT_PASSWORD" Target="QBIT_PASSWORD" Default="" Mode="" Description="qBittorrent WebUI password. Also the login for this app." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="Output of openssl rand -base64 32. Changing it logs every device out." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="APP_ORIGINS" Target="APP_ORIGINS" Default="" Mode="" Description="Comma-separated addresses the browser uses, no trailing slash, e.g. http://nas.example:3000,https://torrent.example.com" Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="SAVE_ROOTS" Target="SAVE_ROOTS" Default="" Mode="" Description="Comma-separated download roots as seen inside the qBittorrent container, e.g. /downloads" Type="Variable" Display="always" Required="true" Mask="false"/>
+</Container>

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,3 +45,9 @@ jobs:
       - run: npm run smoke
       # The build regenerates the route tree; a stale committed copy fails here.
       - run: git diff --exit-code src/routeTree.gen.ts
+      # AR-11: the image built from this PR's merge commit (github.sha), with
+      # the same Dockerfile and smoke as main, run with fake env and the
+      # hardened Unraid flags. Never pushed or logged in to a registry here.
+      - run: node --check scripts/smoke-image.mjs
+      - run: docker build --platform linux/amd64 --build-arg COMMIT_SHA=${{ github.sha }} -t react-torrent:ci .
+      - run: node scripts/smoke-image.mjs react-torrent:ci ${{ github.sha }}

@@ -1,0 +1,18 @@
+# AR-9 / AD-16: nothing secret or unneeded reaches the build context.
+# `**/` because a bare `.env*` only matches the context root, and
+# `.auto-claude/` holds a `.env`.
+**/.env*
+!.env.example
+.git
+**/node_modules
+_bmad-output
+_bmad
+.claude
+config
+.output
+.nitro
+.tanstack
+coverage
+.auto-claude
+.wrangler
+**/.DS_Store
