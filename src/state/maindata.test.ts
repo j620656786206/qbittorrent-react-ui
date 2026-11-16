@@ -29,7 +29,8 @@ import {
 import type { FetchMaindata } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
 import { fakeServerFn } from '#/state/testing'
-import { EPIC1_VIEW, selectVisibleTorrents } from '#/lib/visible-torrents'
+import { selectVisibleTorrents } from '#/lib/visible-torrents'
+import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 
 // Spec 1.6 rows Q1 to Q6: the `['maindata']` query registered by
 // createQueryClient, with a fake fetcher and fake timers.
@@ -331,7 +332,7 @@ describe('the maindata query', () => {
     const { client } = setup(fetchMaindata)
     const observer = new QueryObserver<Maindata, Error, Array<string>>(client, {
       queryKey: MAINDATA_KEY,
-      select: (data) => selectVisibleTorrents(data, EPIC1_VIEW),
+      select: (data) => selectVisibleTorrents(data, DEFAULT_SORT_VIEW),
     })
     cleanups.push(observer.subscribe(() => {}))
     await vi.advanceTimersByTimeAsync(0)

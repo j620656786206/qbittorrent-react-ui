@@ -95,6 +95,7 @@ describe('shadcn components (row 21)', () => {
       'button.tsx',
       'checkbox.tsx',
       'dialog.tsx',
+      'dropdown-menu.tsx',
       'input.tsx',
       'skeleton.tsx',
     ])
@@ -117,6 +118,7 @@ describe('shadcn components (row 21)', () => {
       'button.tsx',
       'checkbox.tsx',
       'dialog.tsx',
+      'dropdown-menu.tsx',
       'input.tsx',
     ]) {
       expect(read(file)).toContain("from '#/shared/ui/cn'")
@@ -124,6 +126,40 @@ describe('shadcn components (row 21)', () => {
     }
     expect(read('dialog.tsx')).not.toMatch(/>\s*Close\s*</)
     expect(read('dialog.tsx').match(/關閉/g)).toHaveLength(2)
+  })
+})
+
+describe('DropdownMenu (story 2.1, DESIGN sort-menu)', () => {
+  const source = read('dropdown-menu.tsx')
+
+  it('is non-modal by default, so no injected <style> meets the CSP', () => {
+    expect(source).toContain('modal = false')
+    expect(source).toContain('modal={modal}')
+  })
+
+  it('uses the brand surface, radius, shadow and the 70vh cap', () => {
+    const content = source.slice(
+      source.indexOf('function DropdownMenuContent('),
+      source.indexOf('function DropdownMenuGroup('),
+    )
+    for (const token of [
+      'bg-surface',
+      'rounded-card',
+      'shadow-float',
+      'border',
+      'overflow-y-auto',
+      'max-h-[min(70vh,',
+    ]) {
+      expect(content, token).toContain(token)
+    }
+    expect(content).not.toMatch(/\bshadow-md\b|\brounded-md\b|bg-popover/)
+  })
+
+  it('rows are 36px with the row radius and a surface-muted highlight', () => {
+    expect(source).toContain('h-9')
+    expect(source).toContain('rounded-row')
+    expect(source).toContain('data-highlighted:bg-surface-muted')
+    expect(source).toContain('text-tag text-text-muted')
   })
 })
 

@@ -3,10 +3,12 @@ import { log as defaultLog } from '#/server/log'
 import type { Logger } from '#/server/log'
 import { BadMaindata } from '#/server/qbit/bad-maindata'
 import type { QbitClient } from '#/server/qbit/client'
+import { createExtrasTable } from '#/server/sync/extras-table'
 import { createTorrentTable } from '#/server/sync/torrent-table'
 import type { TorrentTable } from '#/server/sync/torrent-table'
 import { MAINDATA_VERSION_PATTERN } from '#/shared/maindata'
 import type { MaindataResponse } from '#/shared/maindata'
+import type { ExtraSortFieldId, SortKeysResponse } from '#/shared/sort-keys'
 
 // AD-6 / AR-37 / AR-38: pull-through sync. The container talks to
 // qBittorrent only while it is serving a `getMaindata` call, with its own
@@ -23,6 +25,10 @@ import type { MaindataResponse } from '#/shared/maindata'
 // flight is waited out first (still one pull at a time, so `rid` stays in
 // order). With a hung qBittorrent that wait can reach the server function's
 // own timeout, which answers `timeout` as a stuck pull would anyway.
+//
+// The same pulls feed the sort extras table (story 2.1). `readSortKeys`
+// pulls like `read` (so it joins or reuses the same pull) and answers one
+// extra sort's values, with versions of the extras table's own counter.
 
 export const MIN_PULL_INTERVAL_MS = 1000
 
@@ -44,6 +50,11 @@ export interface Syncer {
   readonly instanceId: string
   /** `since` is a version this syncer handed out earlier, or nothing. */
   read: (since?: string, options?: ReadOptions) => Promise<MaindataResponse>
+  /** `since` is a sort-keys version this syncer handed out earlier, or nothing. */
+  readSortKeys: (
+    field: ExtraSortFieldId,
+    since?: string,
+  ) => Promise<SortKeysResponse>
 }
 
 interface LastPull {
@@ -57,6 +68,7 @@ export function createSyncer(options: SyncerOptions): Syncer {
   const instanceId = options.instanceId ?? randomBytes(4).toString('hex')
   const logger = options.logger ?? defaultLog
   const table: TorrentTable = createTorrentTable(now)
+  const extras = createExtrasTable()
 
   let rid = 0
   let lastPull: LastPull | null = null
@@ -68,6 +80,8 @@ export function createSyncer(options: SyncerOptions): Syncer {
     try {
       const raw = await options.client.syncMaindata(rid)
       table.apply(raw)
+      // Only after the slim table accepted the answer; never throws.
+      extras.apply(raw)
       rid = raw.rid
     } catch (error) {
       if (error instanceof BadMaindata) {
@@ -145,5 +159,14 @@ export function createSyncer(options: SyncerOptions): Syncer {
     }
   }
 
-  return { instanceId, read }
+  async function readSortKeys(
+    field: ExtraSortFieldId,
+    since?: string,
+  ): Promise<SortKeysResponse> {
+    await pull()
+    const { full, keys } = extras.keysSince(field, parseSince(since))
+    return { version: `${instanceId}.${extras.version}`, full, keys }
+  }
+
+  return { instanceId, read, readSortKeys }
 }

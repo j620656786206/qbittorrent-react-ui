@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { formatSize } from '#/lib/format'
+import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
-import {
-  EPIC1_VIEW,
-  countAll,
-  selectVisibleTorrents,
-} from '#/lib/visible-torrents'
+import { countAll, selectVisibleTorrents } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
 import {
   RING_CIRCUMFERENCE,
@@ -48,7 +45,7 @@ describe('R1 seeding row', () => {
     expect(row.size).toBe('170.2 GB')
     expect(row.speed).toEqual({ direction: 'up', text: '2.38 MB/s' })
     expect(row.ratio).toEqual({ text: '3.12', good: true })
-    expect(row.value).toBe('今天 09:12')
+    expect(row.value.text).toBe('今天 09:12')
     expect(row.errorDetail).toBeNull()
     expect(row.movingDetail).toBeNull()
   })
@@ -86,7 +83,7 @@ describe('R5 dates', () => {
     [taipei(2026, 11, 5, 10), '11/05'],
     [taipei(2025, 7, 18, 10), '2025/07/18'],
   ])('%d -> %s', (added_on, value) => {
-    expect(model({ added_on }).value).toBe(value)
+    expect(model({ added_on }).value.text).toBe(value)
   })
 })
 
@@ -220,7 +217,7 @@ describe('V1 to V4 listView', () => {
       }),
     )
     for (const data of [none, archived]) {
-      const visible = selectVisibleTorrents(data, EPIC1_VIEW)
+      const visible = selectVisibleTorrents(data, DEFAULT_SORT_VIEW)
       expect(
         listView({ hasData: true, visibleCount: visible.length, error: null }),
       ).toBe('empty')
@@ -287,5 +284,128 @@ describe('M1 memo', () => {
   it('a hash without data has no props', () => {
     const data = mergeMaindata(undefined, fakeResponse())
     expect(rowProps(data, fakeHash(9), NOW)).toBeNull()
+  })
+})
+
+// Spec 2.1: the big number follows the sort (EXPERIENCE big-number table).
+describe('the big number by sort', () => {
+  const big = (
+    sort: Parameters<typeof rowModel>[1]['sort'],
+    overrides: Partial<SlimTorrent> = {},
+    sortValue?: Parameters<typeof rowModel>[1]['sortValue'],
+  ) => rowModel(t(overrides), { ...OPTIONS, sort, sortValue }).value
+
+  it('seeding time in days, a number', () => {
+    expect(big('seeding_time', { seeding_time: 41 * 86_400 })).toEqual({
+      label: '做種時間',
+      text: '41 天',
+      style: 'number',
+      muted: false,
+      loading: false,
+    })
+  })
+
+  it('completion: a date, or a muted 沒有', () => {
+    expect(big('completion_on', { completion_on: -1 })).toMatchObject({
+      text: '沒有',
+      muted: true,
+    })
+  })
+
+  it('ratio: the value, and the ratio column hides', () => {
+    const byRatio = rowModel(t({ ratio: 3.129 }), {
+      ...OPTIONS,
+      sort: 'ratio',
+    })
+    expect(byRatio.value.text).toBe('3.12')
+    expect(byRatio.value.good).toBe(true)
+    expect(byRatio.showRatio).toBe(false)
+    expect(big('ratio', { ratio: 0.5 }).good).toBe(false)
+    expect(rowModel(t(), OPTIONS).showRatio).toBe(true)
+  })
+
+  it('a speed of 0 is a muted 0', () => {
+    expect(big('dlspeed', { dlspeed: 0 })).toMatchObject({
+      text: '0',
+      style: 'number',
+      muted: true,
+    })
+  })
+
+  it('name: the progress where the row draws one, else the status word (13px)', () => {
+    expect(big('name', { state: 'downloading', progress: 0.87 })).toMatchObject(
+      { text: '87%', style: 'number' },
+    )
+    expect(big('name', { state: 'uploading', progress: 1 })).toMatchObject({
+      text: '做種中',
+      style: 'text',
+      muted: true,
+    })
+  })
+
+  it('save path: the location label as text', () => {
+    expect(big('save_path', { save_path: '/data/media/tv/' })).toMatchObject({
+      text: 'media/tv',
+      style: 'text',
+      muted: true,
+    })
+  })
+
+  it('category and hash: text styles; hash first 8', () => {
+    expect(big('category', { category: 'mteam-tv' })).toMatchObject({
+      text: 'mteam-tv',
+      style: 'text',
+    })
+    expect(big('hash', { hash: fakeHash('ab') })).toMatchObject({
+      text: 'abababab',
+      style: 'hash',
+      muted: true,
+    })
+  })
+
+  it('extra sorts: the key, a path cut from the front, a skeleton while loading', () => {
+    expect(big('num_seeds', {}, 12)).toMatchObject({ text: '12' })
+    expect(big('content_path', {}, '/data/media/tv/Show')).toMatchObject({
+      text: '/data/media/tv/Show',
+      style: 'path',
+    })
+    expect(big('dl_limit', {}, -1)).toMatchObject({
+      text: '不限速',
+      muted: true,
+    })
+    expect(big('num_seeds', {}, null)).toMatchObject({
+      text: '沒有',
+      muted: true,
+    })
+    expect(big('num_seeds')).toMatchObject({ loading: true })
+  })
+
+  it('rowProps passes only an extra sort key; a hash the keys lack is still loading', () => {
+    const data = mergeMaindata(
+      undefined,
+      fakeResponse({ changed: [t({ hash: fakeHash(1) })] }),
+    )
+    expect(rowProps(data, fakeHash(1), NOW, 'seeding_time')?.sortValue).toBe(
+      undefined,
+    )
+    expect(rowProps(data, fakeHash(1), NOW, 'num_seeds')?.sortValue).toBe(
+      undefined,
+    )
+    expect(
+      rowProps(data, fakeHash(1), NOW, 'num_seeds', { [fakeHash(1)]: 4 })
+        ?.sortValue,
+    ).toBe(4)
+    expect(
+      rowProps(data, fakeHash(1), NOW, 'num_seeds', { [fakeHash(1)]: null })
+        ?.sortValue,
+    ).toBeNull()
+    // Added since the last sort-keys poll: loading, not 「沒有」.
+    expect(
+      rowProps(data, fakeHash(1), NOW, 'num_seeds', {})?.sortValue,
+    ).toBeUndefined()
+    // The first keys failed: no value.
+    expect(
+      rowProps(data, fakeHash(1), NOW, 'num_seeds', undefined, true)?.sortValue,
+    ).toBeNull()
   })
 })

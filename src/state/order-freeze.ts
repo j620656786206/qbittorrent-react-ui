@@ -7,7 +7,8 @@ import { createStore, useSelector } from '@tanstack/react-store'
 // that left the data (deleted, archived) leave at once; new ones wait for
 // the unfreeze.
 //
-// Reasons in Epic 1: the mouse resting on the desktop list, and a phone
+// Alex's own sort change is not data: it reorders at once, frozen or not
+// (story 2.1). Reasons in Epic 1: the mouse resting on the desktop list, and a phone
 // finger scrolling it (from `touchstart` until TOUCH_SETTLE_MS after the
 // last scroll once the finger lifted, so momentum scrolling counts). The
 // selection, an open bottom sheet and running animations join this store
@@ -61,18 +62,32 @@ export function nextShownOrder(
 /** What the list showed last; `null` before any data. */
 export type ShownOrder = ReadonlyArray<string> | null
 
+export interface ShownOrderInput {
+  live: ReadonlyArray<string> | undefined
+  frozen: boolean
+  /**
+   * Alex changed the sort since the order shown last was taken (story 2.1):
+   * his own action applies at once, frozen or not.
+   */
+  viewChanged?: boolean
+  /**
+   * The new sort's values are still loading (an extra sort's first keys):
+   * keep the order shown, like a freeze, until they arrive.
+   */
+  hold?: boolean
+}
+
 /**
  * The hook's update, pure: one step from the order shown last to the order
- * to show for this `live` and `frozen`. No data resets it.
+ * to show. No data resets it; a sort change does, once its values are there.
  */
 export function shownOrderReducer(
   shown: ShownOrder,
-  {
-    live,
-    frozen,
-  }: { live: ReadonlyArray<string> | undefined; frozen: boolean },
+  { live, frozen, viewChanged = false, hold = false }: ShownOrderInput,
 ): ShownOrder {
   if (live === undefined) return null
+  if (hold) return nextShownOrder(shown, live, true)
+  if (viewChanged) return live
   return nextShownOrder(shown, live, frozen)
 }
 
@@ -150,22 +165,41 @@ export function useOrderFrozen(): boolean {
   return useSelector(freezeStore, isOrderFrozen)
 }
 
+export interface FrozenOrderOptions {
+  /** Changes when Alex picks another sort or direction (e.g. `sort:dir`). */
+  viewKey?: string
+  /** The view's values are still loading: keep the order shown. */
+  hold?: boolean
+}
+
 /**
  * The order to show: `live` (from `useVisibleTorrents`) passed through the
  * freeze. Keeps the last committed order in a ref; `undefined` before data.
+ * A new `viewKey` applies at once even while frozen, as soon as `hold` ends.
  */
 export function useFrozenOrder(
   live: ReadonlyArray<string> | undefined,
+  { viewKey = '', hold = false }: FrozenOrderOptions = {},
 ): ReadonlyArray<string> | undefined {
   const frozen = useOrderFrozen()
   const shownRef = useRef<ShownOrder>(null)
+  // The view the order shown last was sorted by; `null` until one was (a
+  // first load that waits for an extra sort's keys must still apply them).
+  const appliedKeyRef = useRef<string | null>(null)
   const shown = useMemo(
-    () => shownOrderReducer(shownRef.current, { live, frozen }),
-    [live, frozen],
+    () =>
+      shownOrderReducer(shownRef.current, {
+        live,
+        frozen,
+        hold,
+        viewChanged: appliedKeyRef.current !== viewKey,
+      }),
+    [live, frozen, hold, viewKey],
   )
   // Only a committed order counts as "shown".
   useLayoutEffect(() => {
     shownRef.current = shown
-  }, [shown])
+    if (!hold && shown !== null) appliedKeyRef.current = viewKey
+  }, [shown, hold, viewKey])
   return shown ?? undefined
 }

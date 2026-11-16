@@ -5,8 +5,14 @@ import { z } from '#/shared/zod'
 // browser's merge all follow this file. Names, units and values stay
 // qBittorrent 5.1.4's own: snake_case, Unix seconds, bytes, bytes/s.
 // Parsing with these schemas is the allowlist (zod strips unknown keys), so
-// nothing outside them (the home public IP, magnet links, trackers, comments,
-// content paths) ever leaves the container.
+// nothing outside them leaves the container through getMaindata. The sort
+// fields the slim table does not carry are never added here (AD-6, story
+// 2.1): they leave only through getSortKeys, one field per call
+// (src/shared/sort-keys.ts). comment, content_path, root_path and the
+// infohashes leave only that way, each for its own field. The tracker leaves
+// only as its hostname (tracker_domain). The full tracker URL (it carries
+// the passkey), the magnet link and the home public IP never leave the
+// container through any server function.
 
 export const slimTorrentSchema = z.object({
   /** The maindata key, lowercased; qBittorrent's torrent object has no hash. */

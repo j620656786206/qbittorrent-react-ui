@@ -15,6 +15,8 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
+import { ListViewContext } from '#/state/list-view'
+import type { SortView } from '#/shared/list-search'
 import type * as ListModel from '#/features/list/list-model'
 import { TorrentList } from '#/features/list/torrent-list'
 
@@ -35,6 +37,17 @@ vi.mock('#/features/list/list-model', async (importOriginal) => {
     },
   }
 })
+
+// getSortKeys never reaches a server here: each call waits for the test.
+const sortKeyCalls = vi.hoisted(
+  () => [] as Array<{ data: unknown; resolve: (value: unknown) => void }>,
+)
+vi.mock('#/server/functions/get-sort-keys', () => ({
+  getSortKeys: (options: { data: unknown }) =>
+    new Promise((resolve) => {
+      sortKeyCalls.push({ data: options.data, resolve })
+    }),
+}))
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -71,6 +84,24 @@ function mountMain() {
   document.body.append(main)
 }
 
+let view: SortView = { sort: 'added_on', dir: 'desc' }
+
+function app() {
+  return (
+    <QueryClientProvider client={client}>
+      <ListViewContext value={{ view, setView: () => {} }}>
+        <TorrentList />
+      </ListViewContext>
+    </QueryClientProvider>
+  )
+}
+
+/** Alex picks another sort (the URL changes). */
+async function setView(next: SortView) {
+  view = next
+  await act(async () => root.render(app()))
+}
+
 async function render(first: MaindataResponse | AppError) {
   answers = [first]
   fetchCount = 0
@@ -89,11 +120,7 @@ async function render(first: MaindataResponse | AppError) {
   main.append(container)
   root = createRoot(container)
   await act(async () => {
-    root.render(
-      <QueryClientProvider client={client}>
-        <TorrentList />
-      </QueryClientProvider>,
-    )
+    root.render(app())
   })
 }
 
@@ -150,6 +177,8 @@ beforeEach(() => {
   // should land before the assertions.
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
+  sortKeyCalls.length = 0
+  view = { sort: 'added_on', dir: 'desc' }
   clearLoginRequired()
   clearConnectionErrors()
   clearMaindataFailure()
@@ -269,5 +298,133 @@ describe('重試 on the load error', () => {
     await act(async () => release(fakeResponse({ changed: many(3) })))
     expect(shownNames()[0]).toBe('T2')
     expect(document.activeElement).toBe(main)
+  })
+})
+
+// Spec 2.1 rows S4 and S9: the list follows the view; an extra sort holds
+// the order with skeleton big numbers until its first keys arrive.
+const bigCells = () =>
+  [...main.querySelectorAll('[role="listitem"]')].map(
+    (item) =>
+      item.querySelector(':scope > div > div > span:last-child') as HTMLElement,
+  )
+
+describe('sorting', () => {
+  it('S9 a sort change re-sorts at once while the mouse freezes the order', async () => {
+    await render(
+      fakeResponse({
+        changed: [
+          torrent(0, { name: 'b' }),
+          torrent(1, { name: 'c' }),
+          torrent(2, { name: 'a' }),
+        ],
+      }),
+    )
+    expect(shownNames()).toEqual(['a', 'c', 'b'])
+    await act(async () => pointer('pointerover', section()))
+    await setView({ sort: 'name', dir: 'desc' })
+    expect(shownNames()).toEqual(['a', 'b', 'c'])
+    await setView({ sort: 'name', dir: 'asc' })
+    expect(shownNames()).toEqual(['c', 'b', 'a'])
+    // Data-driven moves stay frozen.
+    await poll(delta([torrent(3, { name: 'z' })]))
+    expect(shownNames()).toEqual(['c', 'b', 'a'])
+  })
+
+  it('S4 an extra sort keeps the order with skeletons until its keys arrive', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    expect(shownNames()).toEqual(['T2', 'T1', 'T0'])
+    await setView({ sort: 'num_seeds', dir: 'desc' })
+    expect(sortKeyCalls.map((call) => call.data)).toEqual([
+      { field: 'num_seeds' },
+    ])
+    expect(shownNames()).toEqual(['T2', 'T1', 'T0'])
+    for (const cell of bigCells()) {
+      expect(cell.querySelector('[data-slot="skeleton"]')).not.toBeNull()
+      expect(cell.querySelector('.sr-only')?.textContent).toBe(
+        '做種人數（連上的） ',
+      )
+    }
+    await act(async () => {
+      sortKeyCalls[0].resolve({
+        ok: true,
+        data: {
+          version: 'abcdef12.1',
+          full: true,
+          keys: { [fakeHash(1)]: 9, [fakeHash(2)]: 1, [fakeHash(3)]: null },
+        },
+      })
+    })
+    expect(shownNames()).toEqual(['T0', 'T1', 'T2'])
+    expect(bigCells().map((cell) => cell.textContent)).toEqual([
+      '做種人數（連上的） 9',
+      '做種人數（連上的） 1',
+      '做種人數（連上的） 沒有',
+    ])
+  })
+
+  it('S4 a first load on an extra sort applies its keys even while frozen', async () => {
+    view = { sort: 'num_seeds', dir: 'asc' }
+    await render(fakeResponse({ changed: many(2) }))
+    expect(shownNames()).toEqual(['T1', 'T0'])
+    await act(async () => pointer('pointerover', section()))
+    await act(async () => {
+      sortKeyCalls[0].resolve({
+        ok: true,
+        data: {
+          version: 'abcdef12.1',
+          full: true,
+          keys: { [fakeHash(1)]: 1, [fakeHash(2)]: 5 },
+        },
+      })
+    })
+    expect(shownNames()).toEqual(['T0', 'T1'])
+  })
+
+  it('S4 the first keys fail: no more waiting, values read 沒有', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await render(fakeResponse({ changed: many(2) }))
+    await setView({ sort: 'num_seeds', dir: 'desc' })
+    expect(bigCells()[0].querySelector('[data-slot="skeleton"]')).not.toBeNull()
+    await act(async () => {
+      sortKeyCalls[0].resolve({
+        ok: false,
+        error: { code: 'qbit_rejected', message: 'x' },
+      })
+    })
+    expect(bigCells().map((cell) => cell.textContent)).toEqual([
+      '做種人數（連上的） 沒有',
+      '做種人數（連上的） 沒有',
+    ])
+  })
+
+  it('a torrent added since the last keys shows a skeleton, not 沒有', async () => {
+    await render(fakeResponse({ changed: many(1) }))
+    await setView({ sort: 'num_seeds', dir: 'desc' })
+    await act(async () => {
+      sortKeyCalls[0].resolve({
+        ok: true,
+        data: { version: 'abcdef12.1', full: true, keys: { [fakeHash(1)]: 4 } },
+      })
+    })
+    await poll(delta([torrent(5)]))
+    const cells = bigCells()
+    expect(cells.map((cell) => cell.textContent)).toEqual([
+      '做種人數（連上的） 4',
+      '做種人數（連上的） ',
+    ])
+    expect(cells[1].querySelector('[data-slot="skeleton"]')).not.toBeNull()
+  })
+
+  it('sorting by ratio hides the ratio column', async () => {
+    const columns = () => main.querySelectorAll('[class*="w-[76px]"]').length
+    await render(fakeResponse({ changed: many(2) }))
+    expect(columns()).toBe(2)
+    await setView({ sort: 'ratio', dir: 'desc' })
+    expect(columns()).toBe(0)
+    expect(bigCells().map((cell) => cell.textContent)).toEqual([
+      '分享率 0.00',
+      '分享率 0.00',
+    ])
   })
 })

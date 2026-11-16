@@ -1,3 +1,7 @@
+import { sortField } from '#/shared/sort-fields'
+import type { SortFieldId } from '#/shared/sort-fields'
+import type { SortValue } from '#/shared/sort-keys'
+
 // FR-9, AR-41: the one rule set for every number, size, speed, time and
 // ratio on screen (EXPERIENCE 數字寫法). qBittorrent's special values (the
 // infinite `eta`, the "at or above max" ratio) are handled here and nowhere
@@ -303,4 +307,124 @@ export function formatPercent(progress: number | null | undefined): string {
   if (progress >= 1) return '100%'
   const percent = Math.min(99, Math.floor(Math.max(0, progress) * 100 + 1e-9))
   return `${percent}%`
+}
+
+// Story 2.1: the row's big number follows the sort (EXPERIENCE 列表右邊的大
+// 數字), and "no value" decides what sorts last in both directions. Both
+// are by field, from the kind in src/shared/sort-fields.ts plus the
+// qBittorrent special values below; nothing else decides what "no value" is.
+
+/** qBittorrent's `-1` (no limit) and `-2` (use the global one) and similar. */
+const NEGATIVE_IS_UNSET: ReadonlySet<SortFieldId> = new Set<SortFieldId>([
+  'ratio_limit',
+  'seeding_time_limit',
+  'inactive_seeding_time_limit',
+  // -1 when qBittorrent cannot tell (not downloading, no tracker scrape).
+  'availability',
+  'num_seeds',
+  'num_leechs',
+  'num_complete',
+  'num_incomplete',
+  'trackers_count',
+  'reannounce',
+  'time_active',
+  'popularity',
+])
+
+/** 0 or less: a speed limit of 0 is "no limit", queue position 0 is "not queued". */
+const ZERO_IS_UNSET: ReadonlySet<SortFieldId> = new Set<SortFieldId>([
+  'dl_limit',
+  'up_limit',
+  'priority',
+])
+
+/**
+ * True when the torrent has no value for this sort: it goes last in both
+ * directions and the big number reads 「沒有」 (「不限速」 for speed limits).
+ * `undefined` is an extra key not loaded yet.
+ */
+export function hasNoSortValue(
+  field: SortFieldId,
+  value: SortValue | undefined,
+): boolean {
+  if (value === null || value === undefined || value === '') return true
+  if (typeof value !== 'number') return false
+  if (Number.isNaN(value)) return true
+  // A time of 0 or less is qBittorrent's "never" (completion_on -1,
+  // seen_complete 0 or -1, last_activity 0).
+  const { kind } = sortField(field)
+  if (kind === 'date' || kind === 'ago') return value <= 0
+  if (field === 'eta') return value < 0 || value >= QBIT_ETA_INFINITY
+  if (ZERO_IS_UNSET.has(field)) return value <= 0
+  if (NEGATIVE_IS_UNSET.has(field)) return value < 0
+  return false
+}
+
+/** The ratio as the sort compares it: qBittorrent's -1 ("∞") is the largest. */
+export function sortableRatio(ratio: number): number {
+  return ratio === QBIT_RATIO_INFINITY ? Infinity : ratio
+}
+
+/**
+ * A seeding limit in seconds; qBittorrent sends minutes. Its unset values
+ * (-1 no limit, -2 the global one) stay as they are, so they read as unset.
+ */
+export function seedingLimitSeconds(minutes: number | null): number | null {
+  if (minutes === null) return null
+  return minutes >= 0 ? minutes * 60 : minutes
+}
+
+export interface FormattedSortValue {
+  text: string
+  /** `text-muted`: no value, a speed of 0, no limit. */
+  muted: boolean
+}
+
+/**
+ * The big number for a sort value. `location` and `status` kinds come back
+ * as the raw text: the list builds those from the torrent itself.
+ */
+export function formatSortValue(
+  field: SortFieldId,
+  value: SortValue | undefined,
+  now: number,
+  timeZone?: string,
+): FormattedSortValue {
+  const { kind } = sortField(field)
+  if (hasNoSortValue(field, value)) {
+    return { text: kind === 'speed_limit' ? '不限速' : NO_VALUE, muted: true }
+  }
+  if (typeof value === 'boolean') {
+    return { text: value ? '是' : '否', muted: false }
+  }
+  if (typeof value === 'string') {
+    return { text: kind === 'hash' ? value.slice(0, 8) : value, muted: false }
+  }
+  // Only numbers left (value is never null here).
+  const number = value as number
+  switch (kind) {
+    case 'date':
+      return { text: formatDate(number, now, timeZone), muted: false }
+    case 'ago':
+      return { text: formatAgo(number, now), muted: false }
+    case 'duration':
+      return { text: formatDuration(number), muted: false }
+    case 'ratio':
+      return { text: formatRatio(number), muted: false }
+    case 'decimal':
+      return { text: decimals(roundTo(number, 2), 2, 2), muted: false }
+    case 'percent':
+      return { text: formatPercent(number), muted: false }
+    case 'speed':
+      // EXPERIENCE: as the big number a speed of 0 is a muted 「0」.
+      return number > 0
+        ? { text: formatSpeed(number), muted: false }
+        : { text: '0', muted: true }
+    case 'speed_limit':
+      return { text: formatSpeed(number), muted: false }
+    case 'size':
+      return { text: formatSize(number), muted: false }
+    default:
+      return { text: formatCount(number), muted: false }
+  }
 }

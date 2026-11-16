@@ -1,15 +1,17 @@
 import { memo } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cn } from '#/shared/ui/cn'
+import { Skeleton } from '#/shared/ui/skeleton'
 import { ROW_HEIGHT, rowModel } from '#/features/list/list-model'
-import type { RowModel, RowProps } from '#/features/list/list-model'
+import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 import { StatusCircle } from '#/features/list/status-circle'
 
 // DESIGN list-row (mockups S01-list-mode-desktop, S02-list-mode-phone).
 // Epic 1 rows have no click, no hover, no cursor change and are not
 // focusable: plain boxes, Epic 2 adds the click. Desktop: the 20px
 // checkbox slot (empty, `aria-hidden`), the circle, name and second line,
-// the 「分享率」 column and the added time. Phone: no slot, no visible ratio
+// the 「分享率」 column (hidden while sorting by ratio) and the big number,
+// which follows the sort (story 2.1). Phone: no slot, no visible ratio
 // column (screen readers keep it); the second line wraps inside a one-line
 // box, so the speed drops first, then the size; the location tag always
 // stays (at most half the line).
@@ -20,10 +22,14 @@ export const TorrentRow = memo(function Row({
   torrent,
   stateBeforeMove,
   today,
+  sort,
+  sortValue,
 }: RowProps) {
   const model = rowModel(torrent, {
     now: today,
     stateBeforeMove: stateBeforeMove ? { [torrent.hash]: stateBeforeMove } : {},
+    sort,
+    sortValue,
   })
   return <RowContent model={model} />
 })
@@ -47,24 +53,61 @@ export function RowContent({ model }: { model: RowModel }) {
           </span>
           <SecondLine model={model} />
         </div>
-        {/* Phone has no column but screen readers still get the ratio. */}
-        <span className="w-[76px] flex-none text-right text-[12px] leading-[1.4] whitespace-nowrap text-text-muted tabular-nums max-lg:sr-only">
-          分享率{' '}
-          <b
-            className={cn(
-              'font-semibold',
-              model.ratio.good ? 'text-good' : 'text-text',
-            )}
-          >
-            {model.ratio.text}
-          </b>
-        </span>
-        <span className="max-w-[160px] flex-none truncate text-right text-row-value tabular-nums">
-          <span className="sr-only">加入 </span>
-          {model.value}
-        </span>
+        {/* Phone has no column but screen readers still get the ratio.
+            Sorting by ratio: the big number is the ratio, no column. */}
+        {model.showRatio && (
+          <span className="w-[76px] flex-none text-right text-[12px] leading-[1.4] whitespace-nowrap text-text-muted tabular-nums max-lg:sr-only">
+            分享率{' '}
+            <b
+              className={cn(
+                'font-semibold',
+                model.ratio.good ? 'text-good' : 'text-text',
+              )}
+            >
+              {model.ratio.text}
+            </b>
+          </span>
+        )}
+        <BigValueCell value={model.value} />
       </div>
     </div>
+  )
+}
+
+const BIG_VALUE_CLASS: Record<BigValue['style'], string> = {
+  number: 'text-row-value tabular-nums',
+  text: 'text-body',
+  path: 'text-body',
+  hash: 'font-mono text-path',
+}
+
+/**
+ * The big number (DESIGN list-row): at most 160px, cut with 「…」. A path
+ * is cut from the front: the box runs right to left and the path inside is
+ * an isolated left-to-right run, so the overflow drops its start.
+ */
+function BigValueCell({ value }: { value: BigValue }) {
+  const isPath = value.style === 'path'
+  return (
+    <span
+      dir={isPath ? 'rtl' : undefined}
+      title={value.style === 'number' || value.loading ? undefined : value.text}
+      className={cn(
+        'max-w-[160px] flex-none truncate text-right',
+        BIG_VALUE_CLASS[value.style],
+        value.muted && 'text-text-muted',
+        value.good && 'text-good',
+      )}
+    >
+      <span className="sr-only">{value.label} </span>
+      {value.loading ? (
+        <Skeleton className="inline-block h-2.5 w-12 rounded-[5px] align-middle" />
+      ) : isPath ? (
+        <bdi dir="ltr">{value.text}</bdi>
+      ) : (
+        value.text
+      )}
+    </span>
   )
 }
 

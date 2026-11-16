@@ -14,7 +14,11 @@ import {
   formatSize,
   formatSpeed,
   formatSpeedLimit,
+  formatSortValue,
+  seedingLimitSeconds,
+  sortableRatio,
   formatSpeedLimitFull,
+  hasNoSortValue,
   isGoodRatio,
 } from '#/lib/format'
 
@@ -249,5 +253,124 @@ describe('formatDayKey', () => {
       '2026-11-17',
     )
     expect(formatDayKey(NOW, 'UTC')).toBe('2026-11-16')
+  })
+})
+
+// Spec 2.1: "no value" for sorting and the big number per field kind.
+describe('hasNoSortValue', () => {
+  it.each([
+    ['completion_on', -1],
+    ['completion_on', 0],
+    ['seen_complete', 0],
+    ['seen_complete', -1],
+    ['last_activity', 0],
+    ['eta', QBIT_ETA_INFINITY],
+    ['eta', -1],
+    ['dl_limit', -1],
+    ['dl_limit', 0],
+    ['up_limit', 0],
+    ['ratio_limit', -1],
+    ['ratio_limit', -2],
+    ['seeding_time_limit', -2],
+    ['inactive_seeding_time_limit', -1],
+    ['availability', -1],
+    ['num_complete', -1],
+    ['priority', 0],
+    ['category', ''],
+    ['comment', ''],
+    ['private', null],
+    ['num_seeds', undefined],
+    ['size', Number.NaN],
+  ] as const)('%s %s: no value', (field, value) => {
+    expect(hasNoSortValue(field, value)).toBe(true)
+  })
+
+  it.each([
+    ['completion_on', 1_790_000_000],
+    ['eta', 0],
+    ['eta', QBIT_ETA_INFINITY - 1],
+    ['dl_limit', 1],
+    ['ratio_limit', 0],
+    ['seeding_time_limit', 0],
+    ['availability', 0],
+    ['num_seeds', 0],
+    ['priority', 1],
+    ['seeding_time', 0],
+    ['ratio', -1],
+    ['ratio', 0],
+    ['dlspeed', 0],
+    ['private', false],
+    ['has_metadata', false],
+    ['name', 'x'],
+  ] as const)('%s %s: a value', (field, value) => {
+    expect(hasNoSortValue(field, value)).toBe(false)
+  })
+})
+
+describe('formatSortValue (EXPERIENCE big-number table)', () => {
+  const NOW_MS = Date.UTC(2026, 10, 16, 4, 0, 0)
+  const at = (field: Parameters<typeof formatSortValue>[0], value: unknown) =>
+    formatSortValue(field, value as never, NOW_MS, 'Asia/Taipei')
+
+  it.each([
+    ['seeding_time', 41 * 86_400, '41 天'],
+    ['time_active', 5 * 3600, '5 小時'],
+    ['eta', 12 * 60, '12 分'],
+    ['seeding_time_limit', 7 * 86_400, '7 天'],
+    ['added_on', Date.UTC(2026, 10, 16, 1, 12) / 1000, '今天 09:12'],
+    ['last_activity', (NOW_MS - 3 * 3600_000) / 1000, '3 小時前'],
+    ['seen_complete', (NOW_MS - 5 * 86_400_000) / 1000, '5 天前'],
+    ['ratio', 3.129, '3.12'],
+    ['ratio', -1, '∞'],
+    ['availability', 1.456, '1.46'],
+    ['progress', 0.879, '87%'],
+    ['dlspeed', 6_510_000, '6.21 MB/s'],
+    ['uploaded', 323_406_081_638, '301.2 GB'],
+    ['num_seeds', 12, '12'],
+    ['trackers_count', 3631, '3,631'],
+    ['dl_limit', 512 * 1024, '512 KB/s'],
+    ['private', true, '是'],
+    ['has_metadata', false, '否'],
+    ['category', 'mteam-tv', 'mteam-tv'],
+    ['hash', 'abcdef0123456789', 'abcdef01'],
+    ['infohash_v2', 'e'.repeat(64), 'eeeeeeee'],
+  ] as const)('%s %s -> %s', (field, value, text) => {
+    expect(at(field, value)).toEqual({ text, muted: false })
+  })
+
+  it('a speed of 0 is a muted 「0」', () => {
+    expect(at('upspeed', 0)).toEqual({ text: '0', muted: true })
+    expect(at('avg_dlspeed', 0)).toEqual({ text: '0', muted: true })
+  })
+
+  it('an unset speed limit is a muted 「不限速」', () => {
+    expect(at('dl_limit', -1)).toEqual({ text: '不限速', muted: true })
+    expect(at('up_limit', 0)).toEqual({ text: '不限速', muted: true })
+  })
+
+  it('last_activity 0 and seen_complete -1 are a muted 「沒有」', () => {
+    expect(at('last_activity', 0)).toEqual({ text: NO_VALUE, muted: true })
+    expect(at('seen_complete', -1)).toEqual({ text: NO_VALUE, muted: true })
+  })
+
+  it('no value is a muted 「沒有」', () => {
+    expect(at('completion_on', -1)).toEqual({ text: NO_VALUE, muted: true })
+    expect(at('ratio_limit', -2)).toEqual({ text: NO_VALUE, muted: true })
+    expect(at('comment', '')).toEqual({ text: NO_VALUE, muted: true })
+    expect(at('num_seeds', null)).toEqual({ text: NO_VALUE, muted: true })
+  })
+})
+
+describe('qBittorrent special values for sorting', () => {
+  it('ratio -1 sorts as the largest', () => {
+    expect(sortableRatio(-1)).toBe(Infinity)
+    expect(sortableRatio(2.5)).toBe(2.5)
+  })
+
+  it('seeding limits: minutes to seconds, -1 and -2 kept', () => {
+    expect(seedingLimitSeconds(60)).toBe(3600)
+    expect(seedingLimitSeconds(-1)).toBe(-1)
+    expect(seedingLimitSeconds(-2)).toBe(-2)
+    expect(seedingLimitSeconds(null)).toBeNull()
   })
 })

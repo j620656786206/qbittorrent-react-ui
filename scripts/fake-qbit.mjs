@@ -10,7 +10,10 @@
 // 1. Starts a fake qBittorrent on a free loopback port:
 //    POST /api/v2/auth/login answers `Ok.` with `Set-Cookie: SID=fake`;
 //    GET /api/v2/sync/maindata answers the torrents of the `data` mode and a
-//    mode-driven server_state, always as a full update.
+//    mode-driven server_state, always as a full update. Every torrent also
+//    carries the sort extras (story 2.1): fake `.example` tracker URLs with
+//    a fake `passkey=`, fake comments, content paths under /data, fake
+//    magnet links, and qBittorrent's special values (-1, -2, 0).
 // 2. Boots the built server (.output/server/index.mjs) with fake env, the
 //    inherited app variables removed (like scripts/smoke-built-server.mjs).
 // 3. Runs a front proxy on http://localhost:<port> (default 3100) that
@@ -121,10 +124,67 @@ const hash = (n) => n.toString(16).padStart(40, '0')
 const HOUR = 3600
 const DAY = 24 * HOUR
 const BASE_TIME = Math.floor(Date.UTC(2026, 10, 15, 1, 0, 0) / 1000)
+const TRACKERS = [
+  'https://tracker.example/announce?passkey=fake-passkey-0000',
+  'udp://open.tracker.example:1337/announce',
+  'https://pt.mteam.example/announce.php?passkey=fake-passkey-1111',
+  '',
+]
+
+/**
+ * The sort extras (story 2.1), varied by `n` so every extra sort orders
+ * something: fake `.example` trackers with a fake `passkey=` (the container
+ * must reduce them to the hostname), fake comments, fake content paths under
+ * /data, and qBittorrent's special values (-1, -2, 0) on some torrents.
+ */
+function extras(n, fields) {
+  const name = fields.name ?? `Fake.Show.S01E0${n}.1080p`
+  const savePath = fields.save_path ?? '/data/media/X/incompleted'
+  const size = fields.size ?? 4 * 1024 ** 3
+  const progress = fields.progress ?? 0.5
+  const timeActive = (n % 97) * HOUR + (n % 13) * 60
+  return {
+    total_size: size + (n % 5) * 1024 ** 3,
+    amount_left: Math.round(size * (1 - progress)),
+    downloaded: Math.round(size * progress),
+    uploaded: Math.round(size * (fields.ratio ?? 0)),
+    downloaded_session: (n % 7) * 1024 ** 2,
+    uploaded_session: (n % 11) * 1024 ** 2,
+    time_active: timeActive,
+    last_activity: BASE_TIME - (n % 50) * HOUR,
+    seen_complete: n % 6 === 0 ? 0 : BASE_TIME - (n % 30) * DAY,
+    availability: progress >= 1 ? -1 : ((n * 37) % 300) / 100,
+    popularity: ((n * 13) % 500) / 100,
+    num_seeds: n % 9,
+    num_leechs: n % 4,
+    num_complete: n % 10 === 0 ? -1 : (n * 7) % 120,
+    num_incomplete: (n * 3) % 40,
+    tracker: TRACKERS[n % TRACKERS.length],
+    trackers_count: n % TRACKERS.length === 3 ? 0 : 1 + (n % 3),
+    content_path: `${savePath.replace(/\/$/, '')}/${name}`,
+    root_path: n % 4 === 0 ? '' : `${savePath.replace(/\/$/, '')}/${name}`,
+    dl_limit: n % 5 === 0 ? 2 * 1024 ** 2 : -1,
+    up_limit: n % 7 === 0 ? 512 * 1024 : 0,
+    ratio_limit: n % 3 === 0 ? 2 : -2,
+    seeding_time_limit: n % 4 === 0 ? 7 * 24 * 60 : -2,
+    inactive_seeding_time_limit: n % 6 === 0 ? 24 * 60 : -1,
+    priority: progress < 1 ? (n % 12) + 1 : 0,
+    reannounce: (n * 61) % 1800,
+    infohash_v1: hash(n),
+    infohash_v2: n % 2 === 0 ? n.toString(16).padStart(64, 'e') : '',
+    has_metadata: fields.state !== 'metaDL',
+    comment: n % 3 === 0 ? '' : `Fake comment ${n}`,
+    magnet_uri: `magnet:?xt=urn:btih:${hash(n)}&tr=fake-magnet-tracker`,
+    download_path: '',
+    tags: '',
+  }
+}
+
 function torrent(n, fields) {
   return [
     hash(n),
     {
+      ...extras(n, fields),
       name: `Fake.Show.S01E0${n}.1080p`,
       state: 'downloading',
       progress: 0.5,

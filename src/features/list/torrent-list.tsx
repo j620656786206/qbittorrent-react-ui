@@ -7,8 +7,12 @@ import {
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatDayKey } from '#/lib/format'
-import { EPIC1_VIEW } from '#/lib/visible-torrents'
+import type { SortKeys } from '#/lib/visible-torrents'
+import { getSortKeys } from '#/server/functions/get-sort-keys'
+import { isExtraSortField } from '#/shared/sort-fields'
+import type { SortFieldId } from '#/shared/sort-fields'
 import { getMain } from '#/shared/ui/main-scroll'
+import { useListView, viewKeyOf } from '#/state/list-view'
 import {
   selectStateBeforeMove,
   selectTorrents,
@@ -26,6 +30,7 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
+import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
 import {
   ROW_GAP,
   ROW_HEIGHT,
@@ -41,7 +46,10 @@ import {
 import { TorrentRow } from '#/features/list/torrent-row'
 
 // FR-15, NFR-1, AR-7, AR-50: the torrent list. Order only from
-// `useVisibleTorrents(EPIC1_VIEW)` through the freeze (`useFrozenOrder`);
+// `useVisibleTorrents(view, sortKeys)` through the freeze (`useFrozenOrder`);
+// the view is the URL's sort (`useListView`). An extra sort's keys come from
+// `['sort-keys', field]`, polled only while that sort is active; until its
+// first keys arrive the order shown stays and the big numbers are skeletons.
 // rows are virtualized with `main` (the shell's scroll container) as the
 // scroll element, fixed height, keyed by hash. Only the rows in view plus
 // 10 above and below exist. Docs: TanStack Virtual `Virtualizer` options
@@ -79,25 +87,60 @@ function useToday(): number {
   return today.now
 }
 
+const fetchSortKeys = bindFetchSortKeys(getSortKeys)
+
 export function TorrentList() {
-  const { data: live } = useVisibleTorrents(EPIC1_VIEW)
+  const { view } = useListView()
+  const extraField = isExtraSortField(view.sort) ? view.sort : null
+  const { data: sortKeysData, isError: keysError } = useSortKeys(
+    extraField,
+    fetchSortKeys,
+  )
+  const sortKeys = extraField ? sortKeysData?.keys : undefined
+  // The first keys failed: stop waiting, every value reads 「沒有」 (the
+  // connection alert, if any, explains why) until a later poll succeeds.
+  const keysFailed = extraField !== null && sortKeys === undefined && keysError
+  const { data: live } = useVisibleTorrents(view, sortKeys)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()
-  const shown = useFrozenOrder(live)
+  const shown = useFrozenOrder(live, {
+    viewKey: viewKeyOf(view),
+    hold: extraField !== null && sortKeys === undefined && !keysFailed,
+  })
   const { retry, retrying } = useMaindataRetry()
 
-  const view = listView({
+  const state = listView({
     hasData: shown !== undefined,
     visibleCount: shown?.length ?? 0,
     error: failure,
   })
-  if (view === 'skeleton') return <ListSkeleton />
-  if (view === 'error') return <ListLoadError onRetry={retry} busy={retrying} />
-  if (view === 'empty' || !shown) return <ListEmpty />
-  return <TorrentRows shown={shown} />
+  if (state === 'skeleton') return <ListSkeleton />
+  if (state === 'error')
+    return <ListLoadError onRetry={retry} busy={retrying} />
+  if (state === 'empty' || !shown) return <ListEmpty />
+  return (
+    <TorrentRows
+      shown={shown}
+      sort={view.sort}
+      sortKeys={sortKeys}
+      keysFailed={keysFailed}
+    />
+  )
 }
 
-function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
+function TorrentRows({
+  shown,
+  sort,
+  sortKeys,
+  keysFailed,
+}: {
+  shown: ReadonlyArray<string>
+  sort: SortFieldId
+  /** The active extra sort's keys; `undefined` while loading or for a slim sort. */
+  sortKeys: SortKeys | undefined
+  /** The first keys failed: values read 「沒有」 instead of skeletons. */
+  keysFailed: boolean
+}) {
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   const today = useToday()
@@ -189,7 +232,14 @@ function TorrentRows({ shown }: { shown: ReadonlyArray<string> }) {
           const hash = shown[item.index]
           const props =
             torrents && stateBeforeMove
-              ? rowProps({ torrents, stateBeforeMove }, hash, today)
+              ? rowProps(
+                  { torrents, stateBeforeMove },
+                  hash,
+                  today,
+                  sort,
+                  sortKeys,
+                  keysFailed,
+                )
               : null
           return (
             <div

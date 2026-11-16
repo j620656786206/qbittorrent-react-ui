@@ -1,11 +1,4 @@
-import {
-  ChevronDown,
-  Keyboard,
-  List,
-  Plus,
-  Search,
-  Settings,
-} from 'lucide-react'
+import { ChevronDown, Keyboard, Plus, Search, Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { formatCount } from '#/lib/format'
 import { AlertBar } from '#/shared/ui/alert-bar'
@@ -13,6 +6,7 @@ import { cn } from '#/shared/ui/cn'
 import { MAIN_ID, getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
+import { DesktopSortMenu, PhoneSortPill } from '#/features/header/sort-menu'
 import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 
 // The app shell for every logged-in page (FR-4; mockups S01-list-mode-
@@ -22,8 +16,9 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // is the only scroll container. Desktop from `lg` (1024px), phone below;
 // both are rendered and the other one is `display: none`.
 //
+// The desktop sort pill opens the sort menu (story 2.1, sort-menu.tsx).
 // Epic 1 placeholders (search, 新增, shortcuts, settings, phone category,
-// sort) carry the native `disabled`: 50% and not-allowed from the base rule,
+// phone sort) carry the native `disabled`: 50% and not-allowed from the base rule,
 // no hover, not focusable, and no `title` (their shortcuts do not exist yet).
 //
 // The header model is computed once per tick in HeaderProvider; the layout
@@ -99,20 +94,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
               <AllTab />
             </div>
           </div>
-          <button
-            type="button"
-            disabled
-            aria-haspopup="menu"
-            aria-label={SORT_LABEL}
-            className="inline-flex h-10 flex-none items-center gap-2 rounded-full border bg-surface pr-2.5 pl-1.5 whitespace-nowrap hover-outline"
-          >
-            <span className="inline-flex items-center gap-[5px] rounded-full bg-surface-muted px-2 py-[3px] text-[12px] font-semibold">
-              <List size={16} strokeWidth={2.2} aria-hidden="true" />
-              列表
-            </span>
-            <b className="font-bold">排序：加入時間 ↓</b>
-            <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          <DesktopSortMenu />
         </div>
 
         <div className="flex flex-none items-center justify-between gap-2 lg:hidden">
@@ -127,19 +109,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
             <PhoneCount />
             <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            disabled
-            aria-haspopup="dialog"
-            aria-label={SORT_LABEL}
-            className="inline-flex h-11 flex-none items-center gap-2 rounded-full border bg-surface pr-2.5 pl-1.5 whitespace-nowrap hover-outline"
-          >
-            <span className="inline-flex items-center rounded-full bg-surface-muted px-2 py-1">
-              <List size={16} strokeWidth={2.2} aria-hidden="true" />
-            </span>
-            <b className="font-bold">加入時間 ↓</b>
-            <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          <PhoneSortPill />
         </div>
 
         <ContentDim>{children}</ContentDim>
@@ -147,9 +117,6 @@ export function ShellLayout({ children }: { children: ReactNode }) {
     </div>
   )
 }
-
-/** EXPERIENCE sort-pill: the full words for screen readers (UX-DR77). */
-const SORT_LABEL = '排序：加入時間，新的在前，列表'
 
 function IconButton({
   label,

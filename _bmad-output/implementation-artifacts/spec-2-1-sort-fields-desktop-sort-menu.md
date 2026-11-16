@@ -2,16 +2,23 @@
 title: 'Story 2.1: 51 sorts and the desktop sort menu'
 type: 'feature'
 created: '2026-11-16'
-status: 'draft'
-baseline_revision: ''
+status: 'done'
+baseline_revision: 'bdb705780e7848caa979d2389f1939a7d6f80483'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-0-browser-smoke-not-found-login-wiring.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      The disabled phone sort pill is only rendered with the default sort in tests.
+    evidence: |-
+      app-shell.test.tsx uses the default ListViewContext; e2e sort tests run at desktop width. Story 2.2 replaces the pill with the phone sort sheet.
+    location: >-
+      src/features/header/sort-menu.tsx
+    severity: low
 ---
 
 <intent-contract>
@@ -136,9 +143,47 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-16 Review pass
+- verdicts: 32 findings: high 0, medium 6, low 20, false 2, maybe-false 4
+- findings:
+  - `[maybe-false]` `[reject]` (intent) story text says widen the slim table; the diff fetches on demand. Alex's 2026-11-16 decision in AD-6 overrides the AC; epics.md keeps the old wording, the spine wins. If true, low.
+  - `[low]` `[patch]` (intent) special-value decisions (ratio -1, negative limits) live in sort-values.ts, not format.ts (AD-13). Patch: moved into format.ts.
+  - `[maybe-false]` `[reject]` (intent) the 100 ms budget is measured only for slim sorts; extra sorts wait on a round trip. The skeleton covers the wait; network latency is outside the sort budget. If true, low.
+  - `[low]` `[reject]` (intent) `?sort=state` renders a list until Story 2.3. The menu item is disabled; Story 2.3 replaces it with the board.
+  - `[low]` `[patch]` (intent) `last_activity` and `seen_complete` use dates, but EXPERIENCE writes 最後有人抓/最後更新 as time ago. Patch: relative-time kind.
+  - `[low]` `[reject]` (intent) PR deliverables cannot be judged from the diff. Handled in the PR body.
+  - `[medium]` `[patch]` (blind) sort-key deltas include every torrent with any changed extra, not only the requested field. Patch: per-field change versions.
+  - `[medium]` `[patch]` (blind) flooring time_active and seeding_time before subtracting breaks avg_dlspeed. Patch: raw values for derived math, quantized copies for change detection.
+  - `[low]` `[patch]` (blind) a hash missing from loaded keys shows 沒有 and sorts last. Patch: not-loaded renders the skeleton; sorting for up to one poll stays last (accepted).
+  - `[low]` `[reject]` (blind) two qBittorrent pulls per 5 s while an extra sort is active. LAN call from the container, 1 s pull reuse already bounds it.
+  - `[medium]` `[patch]` (blind) first getSortKeys failure holds the order forever with skeletons. Patch: stop holding on error without data, show 沒有.
+  - `[low]` `[reject]` (blind) limit sentinels -1 and -2 both read 沒有. Distinguishing them needs new UI wording (design); listed under Claude 代決 in the PR.
+  - `[low]` `[patch]` (blind) tracker `''` flips the domain to null and back. Patch: keep the last known domain.
+  - `[low]` `[reject]` (blind) `dir=desc` means A to Z for text in the URL. Documented convention tied to the arrow; ids and dirs stay consistent for Epic 3.
+  - `[false]` `[reject]` (blind) eta, priority, reannounce default to large first. EXPERIENCE: 其他數字欄位 大的在前.
+  - `[low]` `[patch]` (blind) menu items announce the digit and arrow. Patch: `aria-hidden` on both.
+  - `[low]` `[patch]` (blind) flipping the direction leaves the scroll mid-list. Patch: scroll to top on a flip too (epic rule: changing sort scrolls to the top).
+  - `[false]` `[reject]` (blind) AD-11 record not versioned. Fix edits this build's spec.
+  - `[low]` `[patch]` (blind) ratio sort loses the good colour. Patch: carry `good` into the big value.
+  - `[maybe-false]` `[reject]` (blind) comment may carry a tracker token. Alex allowed comment through getSortKeys (AD-6); settling needs a look at real comments. If true, medium; noted in the PR.
+  - `[low]` `[reject]` (blind) brittle e2e selectors and a wall-clock perf test. Sorting takes about 6 ms against 100 ms; selectors fail loudly.
+  - `[medium]` `[patch]` (verification-gap) `replace` on sort changes and URL fixes is never checked. Patch: history length and goBack assertions in e2e.
+  - `[medium]` `[patch]` (verification-gap) big-value cell rendering (rtl path, muted, hash font, title) untested. Patch: markup tests.
+  - `[low]` `[defer]` (verification-gap) phone pill only rendered with the default sort. Story 2.2 replaces the pill.
+  - `[medium]` `[patch]` (edge) first getSortKeys failure holds forever. Same patch as the blind row.
+  - `[low]` `[reject]` (edge) switching to an extra sort with an older cache orders by old keys until the refetch. Cache lives at most gcTime; fresh keys follow within one poll.
+  - `[low]` `[patch]` (edge) the disabled placeholder observer keeps the `time_active` cache alive. Patch: non-colliding disabled key.
+  - `[low]` `[patch]` (edge) missing hash shows 沒有. Same patch as the blind row.
+  - `[low]` `[patch]` (edge) `?sort=state&dir=asc` reverses the non-directional sort. Patch: dir ignored for non-directional fields.
+  - `[low]` `[patch]` (edge) full_update keeps stale extras. Patch: start from empty extras.
+  - `[low]` `[patch]` (edge) null or wrong-typed extra keeps the old value. Patch: catch to null.
+  - `[maybe-false]` `[reject]` (edge) phone pill text now follows the sort although the spec says unchanged. It stays disabled; following the sort is harmless. If true, low.
+
 ## Design Notes
 
 - Docs to read first (AD-11), matching locked versions: Radix DropdownMenu `https://www.radix-ui.com/primitives/docs/components/dropdown-menu` (check `modal`, `onSelect` with `preventDefault` to keep it open, `DropdownMenu.RadioGroup`/`RadioItem`); shadcn dropdown-menu `https://ui.shadcn.com/docs/components/dropdown-menu`; TanStack Router search params `https://tanstack.com/router/latest/docs/framework/react/guide/search-params` and validation with zod; TanStack Query polling `https://tanstack.com/query/v5/docs/framework/react/reference/useQuery`; VueTorrent v2.37.0 source for derived fields (`https://github.com/VueTorrent/VueTorrent/tree/v2.37.0`). Record the URLs actually read here.
+- URLs actually read (2026-11-16): `https://www.radix-ui.com/primitives/docs/components/dropdown-menu` (`modal`, `onSelect`, RadioGroup/RadioItem, `--radix-dropdown-menu-content-available-height`; that `onSelect` with `preventDefault` keeps the menu open was confirmed in the installed `@radix-ui/react-menu` source and by the S6 tests), `https://tanstack.com/router/latest/docs/framework/react/guide/search-params` (zod v4 schema straight into `validateSearch`, `.catch`, `useSearch`), `https://raw.githubusercontent.com/VueTorrent/VueTorrent/v2.37.0/src/composables/TorrentBuilder.ts`, `https://raw.githubusercontent.com/VueTorrent/VueTorrent/v2.37.0/src/helpers/text.ts`. shadcn dropdown-menu and the TanStack Query `useQuery` reference were not fetched again; the wrapper follows the repo's existing shadcn `dialog.tsx` pattern and the polling follows `src/state/maindata.ts`.
+- Implementation notes: VueTorrent v2.37.0 computes the average download speed as `downloaded / (time_active - seeding_time)` (upload: `uploaded / time_active`); `src/lib/sort-values.ts` follows the source, so the extras table also keeps `seeding_time` floored to 60 s. A zero or negative duration has no average (VueTorrent divides by -1). VueTorrent's `getDomainBody` also drops the top-level domain; `tracker_domain` here is the whole hostname, per row S10. `dir=desc` is the arrow ↓ and the field's first direction word for every field (for text that is A to Z), so every default direction is `desc`. `?sort=state` is valid and sorts the list by the board's column order with the status word as the big number until Story 2.3. Perf (S12): `selectVisibleTorrents` on 4165 torrents takes about 1.3 to 6.5 ms per sort in vitest (`S12` test, 4 runs); in headless Chromium on the built app with `data=many`, click on a menu item to the next frame after the list's DOM changed (MutationObserver plus `requestAnimationFrame` and a 0 ms timeout) took 10.6 to 18.2 ms over 20 switches between 做種時間, 分享率, 加入時間 and 完成時間.
 - Alex's decisions (2026-11-16): tracker only as hostname, full tracker URL and magnet never leave the container; extra fields fetched on demand through `getSortKeys` instead of widening the slim table. Both are in AD-6 and the architecture memlog.
 - Claude 代決 (Alex may veto): sort ids are qBittorrent names, derived ones snake_case (`avg_dlspeed`, `global_volume`, `tracker_domain`, `content_path_basename`); churn quantization steps (60 s; 2 decimals); keys-loading state keeps the previous order with a skeleton big number; booleans sort 是 first by default; the top-5 fields that also belong to a group are listed only in the top 5.
 
@@ -148,3 +193,17 @@ deferred: []
 - `source ~/.nvm/nvm.sh && nvm use && npm run lint && npm run typecheck && npm test` -- expected: all pass.
 - `source ~/.nvm/nvm.sh && nvm use && npm run build && npm run smoke && npm run smoke:browser` -- expected: all pass.
 - `bash .claude/skills/next-story/check.sh` -- expected: every line ok.
+
+## Auto Run Result
+
+Status: done
+
+**Summary:** 51 sort ids in `src/shared/sort-fields.ts`; `sort`/`dir` in the URL with zod and `replace` fixes; `selectVisibleTorrents` sorts by the view (missing last, ties by added_on then hash); extra fields kept in a second container table (per-field change versions, quantized change detection, tracker reduced to its hostname at parse time) and served by the gated `getSortKeys({ field, since })`; browser `['sort-keys', field]` polling only while active; enabled desktop pill and non-modal Radix sort menu (更多 expands in place, flip keeps it open, switch closes it, both scroll to the top); big number follows the sort; fake-qbit supplies every extra field.
+
+**Review:** 32 findings. Patched 6 medium entries (per-field deltas, avg speed quantization, first-load failure hold, replace untested, big-value rendering untested; the edge duplicate of the failure hold) and 14 low items. Deferred 1 (phone pill rendering, Story 2.2). Rejected the rest with reasons in the triage log. Extra fix found by the new flip check: router scroll restoration undid the scroll reset; sort navigation now passes `resetScroll: false`.
+
+**Follow-up review recommendation:** true (two or more medium entries patched on a first pass). Unverified risk: the per-field version bookkeeping in the extras table and the new error and not-loaded paths were added in one patch round.
+
+**Verification:** lint, typecheck clean; `npm test` 70 files, 1332 tests; build, smoke ok; `CI=1 npm run smoke:browser` 11 of 11; routeTree unchanged; npm audit 0; check.sh all ok. Perf: re-sort of 4165 torrents 1.3 to 6.5 ms in vitest; menu click to redraw 10.6 to 18.2 ms in headless Chromium on the built app.
+
+**Residual risks:** real qBittorrent 5.1.4 sentinel values for each extra field were not read from the NAS; Chinese names for fields VueTorrent has no Chinese text for need Alex's review; a private tracker's comment may carry a token (Alex allowed comment through getSortKeys).

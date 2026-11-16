@@ -5,7 +5,7 @@ import { createStore, useSelector } from '@tanstack/react-store'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import { selectVisibleTorrents } from '#/lib/visible-torrents'
 import type { Maindata } from '#/lib/maindata-merge'
-import type { TorrentView } from '#/lib/visible-torrents'
+import type { SortKeys, TorrentView } from '#/lib/visible-torrents'
 import type {
   GetMaindataInput,
   MaindataResponse,
@@ -155,7 +155,7 @@ export function assertMaindataRegistered(client: QueryClient): void {
  *
  *   const { data: serverState } = useMaindata(selectServerState)
  *   const { data: count } = useMaindata(countAll)
- *   const { data: hashes } = useVisibleTorrents(EPIC1_VIEW)
+ *   const { data: hashes } = useVisibleTorrents(view)
  */
 export function useMaindata<TSelected>(select: (data: Maindata) => TSelected) {
   assertMaindataRegistered(useQueryClient())
@@ -174,13 +174,14 @@ export const selectTorrents = (data: Maindata) => data.torrents
 export const selectStateBeforeMove = (data: Maindata) => data.stateBeforeMove
 
 /**
- * The visible hashes in order (AR-41). `view` must be stable too: a constant
- * like `EPIC1_VIEW`, or a `useMemo` once a view has filters.
+ * The visible hashes in order (AR-41). `view` must be stable too (the
+ * `useListView()` value is), and so must `sortKeys` (the merged
+ * `['sort-keys', field]` data keeps its reference while nothing changed).
  */
-export function useVisibleTorrents(view: TorrentView) {
+export function useVisibleTorrents(view: TorrentView, sortKeys?: SortKeys) {
   const select = useCallback(
-    (data: Maindata) => selectVisibleTorrents(data, view),
-    [view],
+    (data: Maindata) => selectVisibleTorrents(data, view, sortKeys),
+    [view, sortKeys],
   )
   return useMaindata(select)
 }
