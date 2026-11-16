@@ -298,6 +298,22 @@
   }
 }
 
+/* Loading skeleton (mockup `pulse`, spec 1.7): opacity only, off for
+ * reduced motion. Story 1.8's row skeletons reuse it. */
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@utility animate-skeleton {
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* 6. Base rules (UX-DR7, UX-DR75, NFR-6, NFR-7). */
 @layer base {
   html,

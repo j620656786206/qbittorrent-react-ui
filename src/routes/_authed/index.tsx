@@ -2,11 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authed/')({ component: Home })
 
-// Temporary page until the list screen (story 1.8).
+// The title is in the app shell's header; story 1.8 adds the list here.
 function Home() {
-  return (
-    <main className="p-page-phone lg:p-page-desktop">
-      <h1 className="text-page-title">種子</h1>
-    </main>
-  )
+  return null
 }

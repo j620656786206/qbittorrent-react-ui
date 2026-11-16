@@ -12,6 +12,8 @@ import {
   formatRowSpeed,
   formatSize,
   formatSpeed,
+  formatSpeedLimit,
+  formatSpeedLimitFull,
   isGoodRatio,
 } from '#/lib/format'
 
@@ -203,5 +205,34 @@ describe('F10 no value', () => {
     expect(NO_VALUE).toBe('沒有')
     expect(format(null)).toBe(NO_VALUE)
     expect(format(undefined)).toBe(NO_VALUE)
+  })
+})
+
+// Spec 1.7 row H4 (FR-5): the limit text next to a global speed.
+describe('H4 formatSpeedLimit', () => {
+  it.each([
+    [0, '不限速'],
+    [-1, '不限速'],
+    [undefined, '不限速'],
+    [null, '不限速'],
+    [Number.NaN, '不限速'],
+    [34_288_435, '上限 32.7'],
+    [10 * MIB, '上限 10.0'],
+    [MIB, '上限 1.00'],
+    [512_000, '上限 500 KB/s'],
+    [2 * GIB, '上限 2.00 GB/s'],
+  ] as const)('%s -> %s', (value, text) => {
+    expect(formatSpeedLimit(value)).toBe(text)
+  })
+})
+
+describe('formatSpeedLimitFull (spoken limit, spec 1.7)', () => {
+  it.each([
+    [0, '不限速'],
+    [-1, '不限速'],
+    [34_288_435, '上限 32.7 MB/s'],
+    [512_000, '上限 500 KB/s'],
+  ] as const)('%s -> %s', (value, text) => {
+    expect(formatSpeedLimitFull(value)).toBe(text)
   })
 })

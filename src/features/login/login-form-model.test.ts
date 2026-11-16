@@ -4,6 +4,7 @@ import {
   INLINE_ERROR_CODES,
   SLOW_HINT_MS,
   afterSubmitError,
+  clearsConnectionCodes,
   decideSubmit,
   screenMessage,
   startSlowHint,
@@ -200,5 +201,33 @@ describe('startSlowHint (F5)', () => {
     expect(vi.getTimerCount()).toBe(0)
     vi.advanceTimersByTime(10_000)
     expect(onChange.mock.calls).toEqual([[false]])
+  })
+})
+
+describe('spec 1.7 login alert bar (LA1 to LA3)', () => {
+  it('LA3: only a submit that goes out clears the connection codes', () => {
+    const go = decideSubmit({ inFlight: false, username: 'u', password: 'p' })
+    expect(clearsConnectionCodes(go)).toBe(true)
+    const busy = decideSubmit({ inFlight: true, username: 'u', password: 'p' })
+    expect(clearsConnectionCodes(busy)).toBe(false)
+    // LA1: 「重試」 with an empty field focuses it and sends nothing.
+    const empty = decideSubmit({ inFlight: false, username: 'u', password: '' })
+    expect(empty).toEqual({ action: 'focus', field: 'password' })
+    expect(clearsConnectionCodes(empty)).toBe(false)
+  })
+
+  it('LA1, LA3: connection codes show no inline message; login_failed does', () => {
+    for (const code of [
+      'home_unreachable',
+      'qbit_unreachable',
+      'cloudflare_expired',
+    ] as const) {
+      expect(screenMessage({ submitError: code, loginRequired: null })).toBe(
+        null,
+      )
+    }
+    expect(
+      screenMessage({ submitError: 'login_failed', loginRequired: null })?.text,
+    ).toBe(errorText('login_failed'))
   })
 })

@@ -111,6 +111,16 @@ export function decideSubmit({
 }
 
 /**
+ * Spec 1.7 row LA3: a submit that goes out clears the recorded connection
+ * codes first, so the bar shows only what this attempt runs into. A guarded
+ * press (ignored, or an empty field focused) sends nothing and changes
+ * nothing.
+ */
+export function clearsConnectionCodes(decision: SubmitDecision): boolean {
+  return decision.action === 'submit'
+}
+
+/**
  * Calls `onChange(true)` once a submit has been pending for `SLOW_HINT_MS`.
  * The returned stop function clears the timer and calls `onChange(false)`.
  */
