@@ -1,7 +1,12 @@
 import { isFirstLoadError } from '#/lib/app-error'
 import { formatPercent } from '#/lib/format'
 import { locationLabel } from '#/lib/paths'
-import { classify, showsProgress, statusOf } from '#/lib/torrent-status'
+import {
+  BOARD_COLUMN_NAMES,
+  classify,
+  showsProgress,
+  statusOf,
+} from '#/lib/torrent-status'
 import type { BoardColumn, TorrentStatusId } from '#/lib/torrent-status'
 import type { BoardColumns } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
@@ -36,31 +41,31 @@ export interface ColumnMeta {
 
 export const COLUMN_META: Readonly<Record<BoardColumn, ColumnMeta>> = {
   attention: {
-    name: '要處理',
+    name: BOARD_COLUMN_NAMES.attention,
     order: '最新出問題的在前',
     circle: 'error',
     empty: '都沒問題',
   },
   downloading: {
-    name: '下載中',
+    name: BOARD_COLUMN_NAMES.downloading,
     order: '新加入的在前',
     circle: 'downloading',
     empty: '沒有',
   },
   seeding: {
-    name: '做種中',
+    name: BOARD_COLUMN_NAMES.seeding,
     order: '做種最久的在前',
     circle: 'seeding',
     empty: '沒有',
   },
   done: {
-    name: '完成',
+    name: BOARD_COLUMN_NAMES.done,
     order: '剛完成的在前',
     circle: 'done',
     empty: '沒有',
   },
   archived: {
-    name: '已整理',
+    name: BOARD_COLUMN_NAMES.archived,
     order: '完成時間新的在前',
     circle: 'archived',
     empty: '沒有',

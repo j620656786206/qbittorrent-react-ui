@@ -3,10 +3,13 @@ import {
   DEFAULT_MODES,
   FAKE_PASS,
   FAKE_USER,
+  LIST_SCROLL_ID,
   MAIN_ID,
   expect,
+  listScrollTop,
   login,
   openList,
+  scrollList,
   setModes,
   test,
 } from './fixtures'
@@ -37,16 +40,8 @@ test.afterEach(async ({ request }) => {
 
 const rows = (page: Page) => page.getByRole('listitem')
 
-async function scrollMain(page: Page, to: 'bottom' | 'middle') {
-  await page.locator(`#${MAIN_ID}`).evaluate((main, where) => {
-    const max = main.scrollHeight - main.clientHeight
-    main.scrollTop = where === 'bottom' ? max : Math.round(max / 2)
-  }, to)
-  // Let the virtualizer render the new window.
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
-  )
-}
+// Story 2.4: the list scrolls itself, not `main`.
+const scrollMain = scrollList
 
 /**
  * Opens the unknown URL. The server answers it with a 404 document (the
@@ -117,8 +112,9 @@ test('P4 no horizontal scroll at 390px; light and dark screenshots', async ({
       await openList(page)
       if (size.name === 'phone') {
         await hasNoHorizontalScroll(page)
-        // `main` scrolls on its own: a too-wide row would scroll in there.
+        // The list scrolls on its own: a too-wide row would scroll in there.
         await hasNoHorizontalScroll(page, `#${MAIN_ID}`)
+        await hasNoHorizontalScroll(page, `#${LIST_SCROLL_ID}`)
       }
       await page.screenshot({
         path: `${SCREENSHOT_DIR}/list-${suffix}.png`,
@@ -227,7 +223,7 @@ async function bigValues(page: Page, count: number): Promise<Array<string>> {
     const items = [...document.querySelectorAll('[role="listitem"]')]
       .map((item) => ({
         index: Number(item.getAttribute('aria-posinset')),
-        cell: item.querySelector(':scope > div > div > span:last-child'),
+        cell: item.querySelector(':scope > button > span > span:last-child'),
       }))
       .sort((a, b) => a.index - b.index)
       .slice(0, max)
@@ -288,9 +284,7 @@ test('S1 the sort menu: 更多, an extra sort, flip, reopen at the item', async 
   )
   await expect(page).toHaveURL(/[?&]sort=num_seeds/)
   await expect(page).toHaveURL(/[?&]dir=desc/)
-  expect(
-    await page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop),
-  ).toBe(0)
+  expect(await listScrollTop(page)).toBe(0)
   // The keys arrive from getSortKeys; then the list is sorted large first.
   await expect.poll(async () => (await bigValues(page, 1))[0]).toBe('8')
   const desc = (await bigValues(page, 20)).map(Number)
@@ -314,9 +308,7 @@ test('S1 the sort menu: 更多, an extra sort, flip, reopen at the item', async 
   await expect(menu).toBeVisible()
   await expect(page).toHaveURL(/[?&]dir=asc/)
   await expect(current).toHaveText(/^做種人數（連上的）\u3000小的在前 ↑$/)
-  expect(
-    await page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop),
-  ).toBe(0)
+  expect(await listScrollTop(page)).toBe(0)
   expect(await historyLength()).toBe(entries)
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
@@ -422,8 +414,7 @@ async function fitHeights(page: Page) {
     }
   })
 }
-const mainScrollTop = (page: Page) =>
-  page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop)
+const mainScrollTop = listScrollTop
 
 /** Waits until no animation runs (the sheet's slide, the scrim's fade). */
 async function settled(page: Page) {

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
-import { getMain } from '#/shared/ui/main-scroll'
+import { getListScroll, getMain } from '#/shared/ui/main-scroll'
 
 // Story 2.2: what an open bottom sheet does to the page around it
 // (APG dialog-modal): the page scroll is locked, everything outside the
 // sheet is `inert`, focus stays inside (a `focusin` pull-back and Tab
-// wrapping), Esc closes it wherever focus is, and on close focus goes back
-// to the opener. One session per open; `end` undoes all of it at once, its
-// listeners first, so giving focus back is not pulled into the sheet.
+// wrapping), and on close focus goes back to the opener. One session per
+// open; `end` undoes all of it at once, its listeners first, so giving
+// focus back is not pulled into the sheet. Esc is not handled here: since
+// story 2.4 it goes through the src/state shortcut registry, which the
+// feature that opens the sheet joins (`useSheetLayer`).
 //
 // Docs (AD-11): https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
 
@@ -16,9 +18,12 @@ const FOCUSABLE =
 
 /** Sets `overflow: hidden` through the CSSOM; returns the undo. */
 function lockScroll(): () => void {
-  const targets = [document.documentElement, document.body, getMain()].filter(
-    (element): element is HTMLElement => element !== null,
-  )
+  const targets = [
+    document.documentElement,
+    document.body,
+    getMain(),
+    getListScroll(),
+  ].filter((element): element is HTMLElement => element !== null)
   const saved = targets.map((element) => element.style.overflow)
   for (const element of targets) element.style.overflow = 'hidden'
   return () => {
@@ -59,8 +64,6 @@ function focusables(root: HTMLElement): Array<HTMLElement> {
 export interface ModalSessionOptions {
   sheetRef: RefObject<HTMLElement | null>
   scrimRef: RefObject<HTMLElement | null>
-  /** Esc was pressed. */
-  onEscape: () => void
   /** Focused on close; by default what had focus when the session began. */
   returnFocus?: () => HTMLElement | null
 }
@@ -68,12 +71,11 @@ export interface ModalSessionOptions {
 export function useModalSession({
   sheetRef,
   scrimRef,
-  onEscape,
   returnFocus,
 }: ModalSessionOptions) {
-  const latest = useRef({ onEscape, returnFocus })
+  const latest = useRef({ returnFocus })
   useLayoutEffect(() => {
-    latest.current = { onEscape, returnFocus }
+    latest.current = { returnFocus }
   })
   const undoRef = useRef<((restoreFocus: boolean) => void) | null>(null)
 
@@ -99,19 +101,10 @@ export function useModalSession({
       }
       focusables(sheet)[0]?.focus({ preventScroll: true })
     }
-    // On the document: a press on the handle leaves focus on the dialog
-    // itself, or on body in some browsers.
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      event.preventDefault()
-      latest.current.onEscape()
-    }
     document.addEventListener('focusin', onFocusIn)
-    document.addEventListener('keydown', onKey)
 
     undoRef.current = (restoreFocus) => {
       document.removeEventListener('focusin', onFocusIn)
-      document.removeEventListener('keydown', onKey)
       unlockScroll()
       restorePage()
       if (!restoreFocus) return

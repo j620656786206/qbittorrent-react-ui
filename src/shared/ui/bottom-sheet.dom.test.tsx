@@ -15,7 +15,8 @@ import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
 // DOM, with the real snap decisions (src/shared/ui/sheet-snap.test.ts covers
 // them per mode). happy-dom has no layout, so the viewport and the content
 // heights are stubbed: a `fit` sheet with 400px of content rests at 400px.
-// Holding the list order is the caller's (sort-sheet.dom.test.tsx).
+// Holding the list order and Esc are the caller's (useSheetLayer;
+// sort-sheet.dom.test.tsx).
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -188,13 +189,6 @@ describe('B2 close', () => {
   it.each([
     ['✕', () => closeButton()?.click()],
     ['the scrim', () => scrim()?.click()],
-    [
-      'Esc',
-      () =>
-        dialog()?.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-        ),
-    ],
   ] as const)(
     '%s closes and focus goes back to the opener',
     async (_, act_) => {
@@ -523,11 +517,7 @@ describe('B10 motion', () => {
     expect(main.hasAttribute('inert')).toBe(true)
     expect(opener.hasAttribute('inert')).toBe(true)
     // And it closes again.
-    await act(async () =>
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-      ),
-    )
+    await act(async () => closeButton()?.click())
     expect(dialog()?.getAttribute('data-state')).toBe('closing')
   })
 
@@ -679,6 +669,44 @@ describe('page around the sheet', () => {
       row.click()
     })
     expect(onClick).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('header slot (story 2.4)', () => {
+  it('replaces the title row, names the dialog and leaves Esc to the caller', async () => {
+    await act(async () =>
+      root.render(
+        <BottomSheet
+          open
+          onOpenChange={onOpenChange}
+          mode="detail"
+          header={(titleId) => (
+            <div>
+              <h2 id={titleId}>Fake.Name</h2>
+              <button type="button" aria-label="關閉詳情的替身">
+                x
+              </button>
+            </div>
+          )}
+        >
+          <p>內容</p>
+        </BottomSheet>,
+      ),
+    )
+    const sheet = dialog() as HTMLElement
+    const labelledBy = sheet.getAttribute('aria-labelledby') ?? ''
+    expect(document.getElementById(labelledBy)?.textContent).toBe('Fake.Name')
+    expect(closeButton()).toBeNull()
+    // The handle stays above the header.
+    expect(handle()).not.toBeNull()
+    // Nothing focusable was asked for and there is no ✕: the dialog itself.
+    expect(document.activeElement).toBe(sheet)
+    await act(async () =>
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    )
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 })

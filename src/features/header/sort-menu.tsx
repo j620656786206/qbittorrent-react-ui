@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/shared/ui/dropdown-menu'
-import { getMain } from '#/shared/ui/main-scroll'
+import { resetListScroll } from '#/shared/ui/main-scroll'
 import { useListView } from '#/state/list-view'
 import {
   directionWords,
@@ -72,8 +72,7 @@ export function DesktopSortMenu() {
     if (keepOpen) event.preventDefault()
     // Any sort change, a flip too, goes back to the top of the list (and
     // between the board and the list).
-    const main = getMain()
-    if (main) main.scrollTop = 0
+    resetListScroll()
     setView(next)
   }
 

@@ -3,6 +3,7 @@ import type { HTMLAttributes, Ref } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
+import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
 import { CARD_GAP, cardHeightOf } from '#/features/board/board-model'
 
@@ -57,6 +58,8 @@ export function CardList({
   bodyProps,
   bodyRef,
 }: CardListProps) {
+  // Story 2.4: a card opens its torrent in the detail.
+  const { setHash } = useViewedHash()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -148,6 +151,7 @@ export function CardList({
                         : undefined
                     }
                     today={today}
+                    onOpen={setHash}
                   />
                 )}
               </div>

@@ -16,6 +16,25 @@ import { ROW_HEIGHT, SKELETON_ROWS } from '#/features/list/list-model'
 export const LIST_SECTION_CLASS =
   'min-h-full rounded-panel bg-surface p-1 max-lg:-mx-1 max-lg:rounded-b-none lg:p-2'
 
+/**
+ * Story 2.4: the list with rows scrolls itself (`main` does not), so the
+ * desktop detail panel beside it can fill the height. The section is the
+ * same box, as tall as `main`; the padding moves to the scroller inside.
+ */
+export const LIST_ROWS_SECTION_CLASS =
+  'flex h-full min-h-0 flex-col overflow-hidden rounded-panel bg-surface max-lg:-mx-1 max-lg:rounded-b-none'
+
+export const LIST_SCROLL_CLASS =
+  'min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin] lg:p-2'
+
+/**
+ * DESIGN 列表加詳情 (mockup S01-list-mode-desktop): the list at most 560px on
+ * the left, the detail panel takes the rest, 16px apart; both as tall as
+ * `main`, each scrolling itself.
+ */
+export const LIST_DETAIL_GRID_CLASS =
+  'grid h-full min-h-0 grid-cols-[minmax(0,560px)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-4'
+
 /** The row box without content: same height and padding as a data row. */
 function SkeletonRow() {
   return (

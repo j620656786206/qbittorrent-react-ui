@@ -7,6 +7,7 @@ import type { SortView } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
+import { openLayerCount, resetShortcuts } from '#/state/shortcuts'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { PhoneSortPill } from '#/features/header/sort-sheet'
 
@@ -100,6 +101,7 @@ afterEach(async () => {
   container.remove()
   main.remove()
   resetOrderFreeze()
+  resetShortcuts()
   vi.restoreAllMocks()
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -166,6 +168,23 @@ describe('the phone sort sheet', () => {
       document.querySelector('button[aria-label="關閉"]') as HTMLElement,
     )
     expect(frozen()).toBe(false)
+  })
+
+  it('B2 Esc closes it through the shortcut registry, even from a field; focus back on the pill', async () => {
+    await mount({ sort: 'seeding_time', dir: 'desc' })
+    await open()
+    expect(openLayerCount()).toBe(1)
+    const field = document.createElement('input')
+    sheet()?.append(field)
+    field.focus()
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    )
+    expect(sheet()).toBeNull()
+    expect(openLayerCount()).toBe(0)
+    expect(document.activeElement).toBe(pill())
   })
 
   it('更多 expands the 46 grouped rows in the sheet', async () => {

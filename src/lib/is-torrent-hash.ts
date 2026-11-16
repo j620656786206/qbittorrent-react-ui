@@ -1,5 +1,5 @@
-const TORRENT_HASH = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
+import { TORRENT_HASH_PATTERN } from '#/shared/torrent-hash'
 
 export function isTorrentHash(value: string): boolean {
-  return TORRENT_HASH.test(value)
+  return TORRENT_HASH_PATTERN.test(value)
 }

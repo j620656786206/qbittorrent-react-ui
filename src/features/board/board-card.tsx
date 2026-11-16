@@ -18,8 +18,10 @@ import type { CardModel } from '#/features/board/board-model'
 // stalled. The 4px progress bar for those three (a static width: the fill
 // animation is Story 2.9). Then the category tag (only when there is one)
 // and the location tag. Fixed heights (board-model.ts), so the column's
-// virtualizer never measures. Not clickable yet (detail is Story 2.4), no
-// checkbox (Epic 4). Names and lines are JSX text, never HTML.
+// virtualizer never measures. Story 2.4: the card is a button that opens
+// the detail (`onOpen` sets the URL's `hash`), with the 1px `text-faint`
+// inset hover ring. No checkbox (Epic 4). Names and lines are JSX text,
+// never HTML.
 
 /** Status colour of the bar fill; Tailwind needs whole class names. */
 const BAR_FILL: Readonly<Record<string, string>> = {
@@ -31,6 +33,8 @@ const BAR_FILL: Readonly<Record<string, string>> = {
 const CARD_CLASS =
   'box-border flex flex-col gap-2 overflow-hidden rounded-card bg-surface px-3.5 py-3 shadow-card'
 
+const CARD_BUTTON_CLASS = `${CARD_CLASS} w-full text-left text-text hover-ring`
+
 const TAG_CLASS =
   'inline-flex h-5 min-w-0 items-center gap-1 rounded-full border px-2 text-tag leading-4 whitespace-nowrap text-text-muted'
 
@@ -41,6 +45,8 @@ export interface BoardCardProps {
   stateBeforeMove: string | undefined
   /** Changes only at local midnight (`useDayClock().today`). */
   today: number
+  /** Stable: opens this card's torrent in the detail. */
+  onOpen: (hash: string) => void
 }
 
 /** Keyed by hash and memoized: a poll that leaves the torrent alone skips it. */
@@ -48,23 +54,35 @@ export const BoardCard = memo(function Card({
   torrent,
   stateBeforeMove,
   today,
+  onOpen,
 }: BoardCardProps) {
   const model = cardModel(torrent, {
     now: today,
     stateBeforeMove:
       stateBeforeMove !== undefined ? { [torrent.hash]: stateBeforeMove } : {},
   })
-  return <CardContent model={model} />
+  return <CardContent model={model} onOpen={() => onOpen(torrent.hash)} />
 })
 
 /** The card from a fixed model (tests render this directly). */
-export function CardContent({ model }: { model: CardModel }) {
+export function CardContent({
+  model,
+  onOpen,
+}: {
+  model: CardModel
+  onOpen?: () => void
+}) {
   const { circle, progress } = model
   return (
-    <div style={{ height: cardHeight(model) }} className={CARD_CLASS}>
-      <div className="flex h-[37px] flex-none items-start gap-2.5">
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{ height: cardHeight(model) }}
+      className={CARD_BUTTON_CLASS}
+    >
+      <span className="flex h-[37px] w-full flex-none items-start gap-2.5">
         <StatusCircle {...circle} size={32} />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span
             title={model.name}
             className="truncate text-row-name leading-[18px]"
@@ -74,13 +92,13 @@ export function CardContent({ model }: { model: CardModel }) {
           <span className="truncate text-meta leading-[17px] text-text-muted tabular-nums">
             {model.detail}
           </span>
-        </div>
+        </span>
         {model.percent !== null && (
           <span className="flex-none text-card-value tabular-nums">
             {model.percent}
           </span>
         )}
-      </div>
+      </span>
       {progress !== null && (
         <span
           aria-hidden="true"
@@ -92,7 +110,7 @@ export function CardContent({ model }: { model: CardModel }) {
           />
         </span>
       )}
-      <div className="flex h-5 min-w-0 flex-none gap-1.5 overflow-hidden">
+      <span className="flex h-5 w-full min-w-0 flex-none gap-1.5 overflow-hidden">
         {model.category !== null && (
           <span className={cn(TAG_CLASS, 'max-w-1/2 flex-none')}>
             <span className="min-w-0 truncate">{model.category}</span>
@@ -115,8 +133,8 @@ export function CardContent({ model }: { model: CardModel }) {
           </svg>
           <span className="min-w-0 truncate">{model.location}</span>
         </span>
-      </div>
-    </div>
+      </span>
+    </button>
   )
 }
 

@@ -1,0 +1,142 @@
+---
+title: 'Story 2.4: Opening detail: three containers, sticky header, prev/next'
+type: 'feature'
+created: '2026-11-17'
+status: 'blocked'
+baseline_revision: 'eccb660257a2fd554a5273c85dfa8a10d599c0b9'
+review_loop_iteration: 0
+followup_review_recommended: false
+context:
+  - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
+  - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
+  - '{project-root}/_bmad-output/implementation-artifacts/spec-2-3-board-desktop-columns-phone-status-tabs.md'
+  - '{project-root}/_bmad-output/implementation-artifacts/spec-2-2-bottom-sheet-phone-sort-sheet.md'
+warnings: ['oversized']
+deferred:
+  - summary: >-
+      The info list's 已下載 and 已上傳 rows are not drawn: `downloaded` and `uploaded` stayed out of the slim table.
+    evidence: |-
+      Adding them to the slim table (this spec's Claude 代決) breaks the getMaindata payload budget in src/server/sync/payload-size.test.ts: plain JSON full 2,102,551 bytes against 2 MiB, delta 177,654 against 160 KiB (before: 1,915,036 and 161,904). The spine's AD-6 sort-key exception also names 流量 fields as staying out of the slim table, for that 160 KB budget. Options for Alex: raise the budget and add them to the slim table; read them through getSortKeys while the detail shows (two extra polls, about 230 KB plain each on first load); or one per-torrent read that story 2.5 (num_seeds, num_leechs for the stat tiles) also needs, which is a spine change.
+    location: >-
+      src/features/detail/detail-model.ts (infoRows), src/shared/maindata.ts
+    severity: medium
+---
+
+<intent-contract>
+
+## Intent
+
+**Problem:** Rows and cards cannot be opened, so Alex cannot see one torrent's details or step through torrents one by one, and nothing survives a reload.
+
+**Approach:** Put the viewed torrent's `hash` in the URL. Desktop list mode gets a permanent right detail panel; desktop board mode gets a floating panel over the 完成 and 已整理 columns; phone opens the Story 2.2 bottom sheet in `detail` mode. All three share one sticky detail header (name, 「第 N 個／共 M 個」 with prev/next, ⋯, tabs) and an overview tab that starts with the info list. A pure `src/lib` function picks the successor when the viewed torrent vanishes, and a `src/state` shortcut registry handles `Esc` only.
+
+## Boundaries & Constraints
+
+**Always:**
+- URL: `hash` joins the `_authed` search schema (40 or 64 lowercase hex, same rule as `src/lib/is-torrent-hash.ts`; the shared schema may not import lib, so the regex lives in `src/shared`); invalid values are dropped by `fixListSearch` with `replace`. Opening, switching and closing write the URL with `replace` and `resetScroll: false`; closing removes `hash`. Sort changes keep `hash`. A `src/state` hook (e.g. `useViewedHash()` from the `_authed` provider, like `useListView`) exposes `hash` and `setHash`; features never touch the router.
+- Composition: features never import each other. A new `src/features/detail/` owns the header, tabs, info list and the three containers' contents; the route `src/routes/_authed/index.tsx` composes list + detail panel, board + floating panel, or the phone sheet. Rows and cards only call `setHash(hash)`.
+- Desktop list mode (≥1024px, mockup S01-list-mode-desktop): grid `minmax(0, 560px) minmax(0, 1fr)`, gap 16px; the list keeps its look in the left column; the right `<aside aria-label="詳情">` is `surface`, radius 22px, flex column, `overflow: hidden`; header padding 16px 22px 14px with a 1px `border` bottom line; tabs padding 12px 22px 4px; tabpanel padding 12px 22px 22px, scrolls itself. The page does not scroll as a whole: the list column and the panel each scroll (the list virtualizer's scroll element moves from `main` to the list's own scroller on both widths, with the existing freeze listeners, `scrollMargin` and the sort-change scroll-to-top following it through one shared helper, e.g. `resetListScroll()` in `src/shared/ui/main-scroll.ts`; the list still keeps under 100 rows in the DOM). Rows: hover background `surface-muted` (`hover-row`); a row is a `<button type="button" aria-current>` (true on the viewed one); click sets `hash`; the viewed row has `inset 0 0 0 2px` brand accent (`--color-primary`) ring. No `hash`, or a `hash` not in the current list: show the first row; never scroll to the viewed row. Empty list: the existing empty state replaces list and panel together.
+- Desktop board mode: cards are `<button type="button">` with a 1px `text-faint` inset hover ring (`hover-ring`); click sets `hash`. The panel `<aside aria-label="詳情">` is absolutely positioned inside a `position: relative` wrapper around the board: `top: 0; right: 0; bottom: 0; width: calc((100% - 120px) / 4 + 78px); max-width: 100%`, radius 22px, `shadow-float` (`0 12px 32px rgba(0,0,0,.28)`), no scrim; enters with opacity 0 and `translateX(24px)` to rest in 0.3s `cubic-bezier(.2,.8,.2,1)` (transform and opacity only; none under `prefers-reduced-motion`). Board stays clickable: another card switches the panel; a click on empty board space, `Esc`, or the header ✕ (`aria-label`「關閉」) closes it and removes `hash`. A covered 完成 card is left as is (no scroll, no shift).
+- Phone (<1024px), list or board: tapping a row or card (the name too) opens the shared bottom sheet in `detail` mode (70%; released past half its height closes, otherwise springs back to 70%; drag up to full screen). Closing removes `hash`. The sheet freezes the list behind (existing `sheetOpen`). The sheet needs an optional header slot so the detail header replaces its default title row (keep the handle, drag, focus trap, scroll lock and `aria-labelledby` on the name; the detail header's ✕ closes it).
+- Detail header (sticky over both tabs): name `<h2>` in `text-detail-name`, one line with 「…」 (desktop `title` = full name); ‹ 「第 N 個／共 M 個」 › (13px, tabular, nowrap); ⋯ (`aria-label`「更多動作」, disabled until 2.6); a `border` line below; then the pill tabs 概覽 and 檔案 (`role="tablist" aria-label="詳情分頁"`, selected one brand accent background and foreground; 檔案 disabled until 2.7). Desktop list mode: one row (name `flex:1`, nav group gap 6px, header gap 8px). Phone and the board panel: two rows: row 1 name, ⋯, ✕; row 2 ‹, 第 N 個, ›, left-aligned right under the name (board header padding 16px 18px 12px 22px, gap 6px; phone padding 0 16px 12px, gap 4px). Nav buttons: 36px circles with 1px `border` on desktop, 44px on phone, `aria-label`「上一個」「下一個」, 18px chevrons; disabled (50%, not-allowed) at the first or last item. Tabs: desktop 32px tall, padding 0 16px; phone 44px, padding 0 18px.
+- N and M: list mode from the same frozen order the list shows (publish the list's `useFrozenOrder` result through a `src/state` store or provider instead of running a second hook instance); M excludes 已整理. Board mode: the range is the torrent's current column from `useBoardColumns()` (live, as the board shows it), text prefixed by the column name and a full-width space, e.g. 「做種中　第 3 個／共 80 個」; prev/next stay inside the column and never jump to the next one; the expanded 已整理 column follows the same rule; on the phone board the torrent's column is the current status tab. A pure `src/lib` function computes `{ index, total, prev, next }` from an order and a hash; vitest covers normal, first, last, a single item, a hash not in the order, and a frozen order.
+- Phone name tap: the name is `<h2><button aria-expanded aria-label="展開完整名稱">` (44px min height); expanded (`aria-label`「收起名稱」) it wraps (`overflow-wrap: anywhere`), the header grows and pushes the content down (no overlay); tapping again collapses; ‹ › collapse it.
+- Overview tab: the info list (UX-DR46) is a `<dl>` grid `72px minmax(0,1fr)`, row gap 8px, column gap 12px, 13px/1.4, tabular; `dt` in `text-muted`, `dd` right after (not pushed right). Rows in order: 分類 (category, empty means 「沒有」), 大小 (`formatSize(size)`), 加入時間 (`formatDate(added_on)`), 完成時間 (`formatDate(completion_on)`), 已下載, 已上傳 (`formatSize`); every value through `format.ts`; 「沒有」 in `text-muted`. Story 2.5 adds blocks above it.
+- `downloaded` and `uploaded` join the slim table (`src/shared/maindata.ts`) like `last_activity` did in 2.3: their sort fields move to `'slim'`; keep the extras copies only if a derived extra (average speeds) still needs them; container table, raw schema, merge, fake-qbit and tests follow. Their churn rides on speed changes that already put the torrent in the delta.
+- Vanished viewed torrent: one pure `src/lib` function `(previousOrder, nextOrder, hash) => hash | null` returns the torrent that took its place (the old next one still present), else the old previous one still present, else `null`; vitest covers middle, last, only one, all gone, and still present. List mode: when the viewed hash leaves the frozen order (deleted, or became 已整理), switch to that successor and replace `hash`. Board panel: if the torrent is gone from every column, close; if it changed column, stay and recompute the column name and N of M. Phone sheet: if it is gone, close.
+- Reload with `sort` and `hash`: same sort and torrent; list panel shows it, board panel opens, phone sheet opens.
+- Shortcut registry in `src/state` (AR-52): register `Esc` only. Layers stack; `Esc` closes the topmost open one (this story: the board detail panel and any bottom sheet; a sheet above the panel closes first). While focus is in an `input`, `textarea`, `select` or contenteditable, only `Esc` is handled. The bottom sheet's document-level Esc handler moves into this registry (closes the 2.2 deferred item), injected through the existing `SheetRuntimeContext` bound in `src/router.tsx` because `src/shared` may not import `src/state`. vitest covers registration, ordering and the input rule.
+- Focus: 2px brand accent outline, offset 2px, only on `:focus-visible` (existing base rule); it must look different from the 2px inset viewing ring, and both can show on different rows at once.
+- 0 CSP violations and 0 console errors in the browser smoke; no `<style>` injection; fake data only (AD-15); UI text exactly as given; no em dash; `check.sh` before every commit.
+
+**Never:**
+- No status hero, stat tiles or save-path block (2.5), no pause/resume or ⋯ menu (2.6), no files tab content (2.7), no last-viewed torrent per category, no `↑` `↓` or other shortcuts (Epic 3), no checkboxes (Epic 4).
+- No scrolling the list to the viewed row; no scrim for the board panel; no new runtime dependency; no shadcn `Sheet`; no CSP change.
+- No `sort()` or `torrent.state ===` in features.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| D1 list default | desktop, list sort, no `hash` | panel shows the first row's torrent; first row has the ring | n/a |
+| D2 list click | click row 5 | panel switches, URL `hash` replaced, ring moves | n/a |
+| D3 hash not in list | `hash` of an archived or unknown torrent | first row shown | invalid hex dropped from URL |
+| D4 board open/close | click a card; then empty space / Esc / ✕ | panel slides in; closes, `hash` removed | n/a |
+| D5 board switch | panel open, click another card | panel shows the new one | n/a |
+| D6 phone open | 390px, tap row or card | detail sheet at 70%; drag past half closes; drag up full screen | n/a |
+| D7 N of M list | frozen order, viewed is 4th of 19 | 「第 4 個／共 19 個」; ‹ › follow the shown order | first/last disable |
+| D8 N of M board | card in 做種中, 3rd of 80 | 「做種中　第 3 個／共 80 個」; never crosses columns | ends disable |
+| D9 vanish list | viewed torrent deleted or archived | successor (next, else previous), URL updated | none left: empty state |
+| D10 vanish board | gone / moved column | close / stay and recompute | n/a |
+| D11 vanish phone | gone while sheet open | sheet closes | n/a |
+| D12 reload | URL with `sort` and `hash` | same torrent in the right container | n/a |
+| D13 Esc | sheet over panel, or focus in an input | topmost closes; only Esc acts in inputs | n/a |
+| D14 phone name | tap name, then › | expands pushing content; › collapses | n/a |
+| D15 info list | torrent without category or not completed | 「沒有」 muted | n/a |
+| D16 reduced motion | prefers-reduced-motion | board panel appears without the slide | n/a |
+
+</intent-contract>
+
+## Code Map
+
+- `src/shared/list-search.ts` -- search schema and `fixListSearch`; add `hash`. `src/routes/_authed.tsx` -- validates search, provides `ListViewContext`; add the viewed-hash control next to it. `src/state/list-view.ts` -- the provider pattern to mirror.
+- `src/routes/_authed/index.tsx` -- picks board or list; becomes the composition point (list+panel, board+floating panel, phone sheet).
+- `src/features/list/torrent-list.tsx` -- virtualizer on `getMain`, `scrollMargin`, freeze listeners, `useFrozenOrder` (line ~93, local `shown`); `torrent-row.tsx` `RowContent` (plain div today); `list-states.tsx` `LIST_SECTION_CLASS`.
+- `src/features/board/torrent-board.tsx` `DesktopBoard` (grid inside `main`), `card-list.tsx`, `board-card.tsx` `CardContent` (div today), `status-tabs.tsx` (phone tab index local state), `board-model.ts` `COLUMN_META`, `WORK_COLUMNS`.
+- `src/state/order-freeze.ts` -- `useFrozenOrder`, `useSheetOrderHold`; `src/state/maindata.ts` -- `useBoardColumns`, `useMaindata`, selectors.
+- `src/shared/ui/bottom-sheet.tsx` (props `open, onOpenChange, title, mode, children, initialFocus, returnFocus, onOpened`; renders its own `<h2>` and ✕ at ~406-424), `sheet-session.ts:104-110` (document Esc listener to move), `sheet-snap.ts` (`detail` 0.7, close at half; implemented and tested). `src/router.tsx` -- binds `SheetRuntimeContext`.
+- `src/shared/ui/main-scroll.ts` -- `getMain()`; `src/features/header/sort-menu.tsx`, `sort-sheet.tsx` -- reset `main.scrollTop` on sort change (switch to the shared helper).
+- `src/lib/format.ts` -- `NO_VALUE`, `formatSize`, `formatDate`; `src/state/now.ts` `useDayClock`.
+- `src/shared/maindata.ts`, `src/shared/sort-keys.ts:34-35`, `src/shared/sort-fields.ts:159-160`, `src/server/sync/*`, `src/server/qbit/maindata-schema.ts`, `src/lib/sort-values.ts`, `scripts/fake-qbit.mjs` -- `downloaded`/`uploaded` to slim (2.3's `last_activity` change is the template).
+- `src/styles.css` -- has `text-detail-name`, `--radius-panel`, `p-panel-padding`, `max-w-list-column-max` (560px), `shadow-float`, `hover-row`, `hover-ring`, base `:focus-visible`; add a slide-in keyframe utility (off under reduced motion) and a viewing-ring utility on `--color-primary` (Tailwind `accent` is shadcn's muted, not the brand accent).
+- `e2e/fixtures.ts` (`login`, `openList`, `setModes`), `e2e/board.spec.ts`, `e2e/smoke.spec.ts`.
+- UX: `DESIGN.md:283-319,541-542,589-599,629-646,694`; `EXPERIENCE.md:93-100,335,345,404-418`; mockups `S01-list-mode-desktop`, `S04-overview-desktop`, `SD-board-detail-desktop`, `S05-overview-phone`, `S05-name-expanded-phone`.
+
+## Tasks & Acceptance
+
+**Execution:**
+- `src/shared/list-search.ts`, `src/routes/_authed.tsx`, `src/state/` viewed-hash control (+ tests) -- `hash` in the URL.
+- `src/lib/detail-position.ts` (name may differ, + test) -- N/M/prev/next and the vanished successor (D7 to D11 logic).
+- `src/state/shortcuts.ts` (+ test), `src/router.tsx`, `src/shared/ui/bottom-sheet.tsx`, `sheet-session.ts` -- Esc registry, sheet header slot, sheet Esc through the registry (D13).
+- `src/state/` shown-order store (+ test) -- list publishes its frozen order for the detail.
+- slim `downloaded`/`uploaded` across shared, server, lib, fake-qbit (+ tests).
+- `src/features/list/*` -- row buttons, hover, viewing ring, own scroller, desktop grid with panel slot (+ tests).
+- `src/features/board/*` -- card buttons, hover ring, click to open (+ tests).
+- `src/features/detail/*` (+ DOM tests) -- header (both layouts), phone name expand, tabs, overview info list, list panel, board floating panel, phone sheet content, vanish handling.
+- `src/routes/_authed/index.tsx` -- composition and empty-space close for the board.
+- `src/styles.css` -- slide-in and viewing-ring utilities.
+- `e2e/` -- detail smoke: list default and click, board open/switch/close (Esc, ✕, empty space), phone sheet open and close, reload with `hash`, 0 CSP; screenshots at 1440 and 390, light and dark: list mode with panel, board with panel, phone sheet at 70%, full screen, name expanded; no horizontal scroll at 390px.
+
+**Acceptance Criteria:**
+- Given fake data, when Alex clicks a row or card on desktop or taps one on the phone, then the right container shows that torrent with the sticky header, the right 「第 N 個／共 M 個」 and working prev/next, and the URL carries `hash`; reloading restores it.
+- Given `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run smoke`, `CI=1 npm run smoke:browser`, `check.sh`, then all pass.
+- Given the PR, then it carries the desktop list-mode panel, desktop board panel and phone sheet (70%, full screen, name expanded) screenshots in light and dark, with no horizontal scroll at 390px.
+
+## Spec Change Log
+
+## Review Triage Log
+
+## Design Notes
+
+- Claude 代決 (Alex may veto): `downloaded` and `uploaded` join the slim table (same reasoning as 2.3's `last_activity`: the detail is open most of the time, an extra poll would almost always run, and their changes ride on speed changes already in the delta). The ✕ is labelled 「關閉」 as the AC says (the mockup's 「關閉詳情」 is not used). Board N of M uses the torrent's current column, which equals the selected tab on the phone. The list moves to its own scroller (as the mockup does) so the panel can fill the height without sticky tricks.
+- Docs to read first (AD-11): TanStack Router search params and `navigate` with `replace` (`https://tanstack.com/router/latest/docs/framework/react/guide/search-params`), TanStack Virtual virtualizer (`https://tanstack.com/virtual/latest/docs/api/virtualizer`), WAI-ARIA tabs (`https://www.w3.org/WAI/ARIA/apg/patterns/tabs/`). Record the URLs actually read.
+- URLs actually read (2026-11-17): `https://tanstack.com/router/latest/docs/framework/react/guide/search-params` (`search: (prev) => ...` keeps the other params; zod v4 `.catch` keeps types; the page does not cover `replace`, `resetScroll` or removing a key, so `hash` is removed by leaving it out of the returned object and `replace`/`resetScroll` follow the existing `setView`), `https://tanstack.com/virtual/latest/docs/api/virtualizer` (`getScrollElement`, `scrollMargin` measured from the scroll container's start and subtracted in the transform, the scroll element's size from `clientWidth`/`clientHeight`), `https://www.w3.org/WAI/ARIA/apg/patterns/tabs/` (tablist label, `aria-selected`, `aria-controls`, the panel's `aria-labelledby`, `tabindex="0"` on a panel with nothing focusable; it does not cover disabled tabs, so 檔案 is a disabled button outside the Tab order).
+- Implementation deviations (Claude 代決, Alex may veto):
+  - `SheetRuntimeContext` no longer exists (removed in #19, sheet-snap moved to src/shared/ui). The sheet's document Esc listener is gone; `useSheetLayer(open, close)` in src/state/sheet-layer.ts (order hold plus an Esc layer in src/state/shortcuts.ts) is called by each feature that opens a sheet, the same caller-side pattern #19 chose for `useSheetOrderHold`.
+  - `downloaded`/`uploaded` did not join the slim table and the two info rows are deferred (see `deferred`): the payload budget test fails with them and the spine keeps 流量 fields out of the slim table.
+  - The list publishes `{ order, viewed }` (src/state/shown-order.ts); `useListViewed` (src/state/list-viewed.ts, pure part `resolveListViewed` in src/lib/detail-position.ts) decides the viewed row, so the ring and the panel never disagree. On the phone a `hash` the list does not hold (archived, unknown) is removed and the sheet stays closed; on desktop it shows the first row and the URL is left alone (D3).
+  - The board's column names moved to `BOARD_COLUMN_NAMES` in src/lib/torrent-status.ts (the detail needs them; features never import each other); `boardColumnOf` joined src/lib/visible-torrents.ts.
+  - On the phone the dialog is named by the name's text span (the `<h2>` holds the expand button, whose `aria-label` would otherwise name the sheet 「展開完整名稱」); focus starts on the ✕ like the sort sheet.
+  - Board panel: closing with focus inside returns focus to the card that opened it, else `main`.
+
+## Verification
+
+**Commands:**
+- `source ~/.nvm/nvm.sh && nvm use && npm run lint && npm run typecheck && npm test` -- expected: all pass.
+- `source ~/.nvm/nvm.sh && nvm use && npm run build && npm run smoke && CI=1 npm run smoke:browser` -- expected: all pass.
+- `bash .claude/skills/next-story/check.sh` -- expected: every line ok.
+
+## Auto Run Result
+
+Status: blocked
+Blocking condition: intent gap. The spec put `downloaded` and `uploaded` in the slim table, which conflicts with ARCHITECTURE-SPINE AD-6 (Alex, 2026-11-16: traffic fields stay out of the slim table for the 160 KB delta budget; `payload-size.test.ts` fails with them: delta 177,654 B over 160 KiB). Everything else is built and verified; the info list omits 已下載 and 已上傳 until Alex picks how to fetch them.

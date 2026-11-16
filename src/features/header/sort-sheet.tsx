@@ -10,9 +10,9 @@ import type { SortFieldDef, SortFieldId } from '#/shared/sort-fields'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { cn } from '#/shared/ui/cn'
-import { getMain } from '#/shared/ui/main-scroll'
+import { resetListScroll } from '#/shared/ui/main-scroll'
 import { useListView } from '#/state/list-view'
-import { useSheetOrderHold } from '#/state/order-freeze'
+import { useSheetLayer } from '#/state/sheet-layer'
 import {
   directionWords,
   pickSort,
@@ -98,8 +98,9 @@ export function PhoneSortSheet({
   const selectedRef = useRef<HTMLButtonElement>(null)
   const groupIdPrefix = useId()
   const words = directionWords(view)
-  // The torrent list behind the sheet keeps its order while it is open.
-  useSheetOrderHold(open)
+  // The torrent list behind the sheet keeps its order while it is open, and
+  // Esc closes it (the shortcut registry).
+  useSheetLayer(open, () => onOpenChange(false))
 
   // The sheet is the phone's container: at desktop width (the pill is
   // hidden there) it closes, and focus falls back to `main`.
@@ -118,8 +119,7 @@ export function PhoneSortSheet({
     const picked = pickSort(view, id)
     if (picked === null) return
     // Any sort change, a flip too, goes back to the top of the list.
-    const main = getMain()
-    if (main) main.scrollTop = 0
+    resetListScroll()
     setView(picked.view)
     if (!picked.keepOpen) onOpenChange(false)
   }

@@ -55,13 +55,13 @@ describe('X1 plain text', () => {
 })
 
 describe('the row', () => {
-  it('has no button, link or tab stop; fixed height; slot is aria-hidden', () => {
+  it('is one button (story 2.4), no link or extra tab stop; fixed height; slot is aria-hidden', () => {
     const html = row()
-    expect(html).not.toContain('<button')
+    expect(openTags(html, 'button')).toHaveLength(1)
     expect(html).not.toContain('<a ')
     expect(html).not.toContain('tabindex')
-    expect(html).not.toMatch(/hover|cursor-/)
-    expect(openTags(html, 'div')[0]).toContain(`height:${ROW_HEIGHT}px`)
+    expect(html).not.toContain('<div')
+    expect(openTags(html, 'button')[0]).toContain(`height:${ROW_HEIGHT}px`)
     const slot = openTags(html, 'span')[0]
     expect(slot).toContain('aria-hidden="true"')
     expect(slot).toContain('hidden size-5')
@@ -166,10 +166,27 @@ describe('TorrentRow (the memoized row)', () => {
         today={NOW}
         sort="added_on"
         sortValue={undefined}
+        viewing={false}
+        onOpen={() => {}}
       />,
     )
     expect(html).toMatch(/role="img" aria-label="已完成"/)
     expect(html.match(/搬移中/g)).toHaveLength(1)
+  })
+})
+
+describe('the row button (spec 2.4)', () => {
+  const html = (viewing: boolean) =>
+    renderToStaticMarkup(
+      <RowContent model={rowModel(t(), OPTIONS)} viewing={viewing} />,
+    )
+
+  it('is a button with aria-current; only the viewed one has the ring', () => {
+    expect(html(false)).toMatch(/^<button type="button" aria-current="false"/)
+    expect(html(true)).toMatch(/^<button type="button" aria-current="true"/)
+    expect(html(true)).toContain('viewing-ring')
+    expect(html(false)).not.toContain('viewing-ring')
+    expect(html(false)).toContain('hover-row')
   })
 })
 

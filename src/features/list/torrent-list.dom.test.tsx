@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
-import { MAIN_ID } from '#/shared/ui/main-scroll'
+import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
@@ -20,6 +20,8 @@ import {
 } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
+import { clearShownList, shownListStore } from '#/state/shown-order'
+import { ViewedHashContext } from '#/state/viewed-hash'
 import type { SortView } from '#/shared/list-search'
 import type * as ListModel from '#/features/list/list-model'
 import { TorrentList } from '#/features/list/torrent-list'
@@ -82,19 +84,54 @@ function mountMain() {
   main = document.createElement('main')
   main.id = MAIN_ID
   main.tabIndex = -1
-  // The virtualizer reads the viewport from clientWidth and clientHeight.
-  Object.defineProperty(main, 'clientHeight', { value: VIEWPORT })
-  Object.defineProperty(main, 'clientWidth', { value: 1000 })
   document.body.append(main)
+  // The virtualizer reads the viewport of the list's own scroller (story
+  // 2.4) from clientWidth and clientHeight.
+  const height = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientHeight',
+  )
+  const width = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientWidth',
+  )
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.id === LIST_SCROLL_ID
+        ? VIEWPORT
+        : (height?.get?.call(this) as number)
+    },
+  )
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.id === LIST_SCROLL_ID
+        ? 1000
+        : (width?.get?.call(this) as number)
+    },
+  )
 }
 
+/** The list's own scroller (story 2.4). */
+const scroller = () => document.getElementById(LIST_SCROLL_ID) as HTMLElement
+
 let view: SortView = { sort: 'added_on', dir: 'desc' }
+/** The URL's `hash` (story 2.4); `setHash` writes it and re-renders. */
+let viewedHash: string | null = null
+let withPanel = false
+const setHash = vi.fn((next: string | null) => {
+  viewedHash = next
+  root.render(app())
+})
 
 function app() {
   return (
     <QueryClientProvider client={client}>
       <ListViewContext value={{ view, setView: () => {} }}>
-        <TorrentList />
+        <ViewedHashContext value={{ hash: viewedHash, setHash }}>
+          <TorrentList
+            panel={withPanel ? <aside aria-label="詳情" /> : undefined}
+          />
+        </ViewedHashContext>
       </ListViewContext>
     </QueryClientProvider>
   )
@@ -183,6 +220,10 @@ beforeEach(() => {
   modelCalls.clear()
   sortKeyCalls.length = 0
   view = { sort: 'added_on', dir: 'desc' }
+  viewedHash = null
+  withPanel = false
+  setHash.mockClear()
+  clearShownList()
   clearLoginRequired()
   clearConnectionErrors()
   clearMaindataFailure()
@@ -242,13 +283,15 @@ describe('the freeze', () => {
   it('a finger holds the order until the scroll settles', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
     await render(fakeResponse({ changed: many(5) }))
-    await act(async () => main.dispatchEvent(new TouchEvent('touchstart')))
-    await act(async () => main.dispatchEvent(new Event('scroll')))
+    await act(async () =>
+      scroller().dispatchEvent(new TouchEvent('touchstart')),
+    )
+    await act(async () => scroller().dispatchEvent(new Event('scroll')))
     await poll(delta([torrent(9)]))
     expect(shownNames()[0]).toBe('T4')
 
     // Momentum: the finger is up but the last scroll is under 300 ms old.
-    await act(async () => main.dispatchEvent(new TouchEvent('touchend')))
+    await act(async () => scroller().dispatchEvent(new TouchEvent('touchend')))
     expect(shownNames()[0]).toBe('T4')
     await act(async () => vi.advanceTimersByTime(400))
     expect(shownNames()[0]).toBe('T9')
@@ -271,7 +314,9 @@ describe('the freeze', () => {
   it("unmounting the list clears the list's reasons, not an open sheet", async () => {
     await render(fakeResponse({ changed: many(5) }))
     await act(async () => pointer('pointerover', section()))
-    await act(async () => main.dispatchEvent(new TouchEvent('touchstart')))
+    await act(async () =>
+      scroller().dispatchEvent(new TouchEvent('touchstart')),
+    )
     const releaseSheet = holdOrderForSheet()
     await act(async () => root.unmount())
     expect(freezeStore.state).toEqual({
@@ -313,7 +358,9 @@ describe('重試 on the load error', () => {
 const bigCells = () =>
   [...main.querySelectorAll('[role="listitem"]')].map(
     (item) =>
-      item.querySelector(':scope > div > div > span:last-child') as HTMLElement,
+      item.querySelector(
+        ':scope > button > span > span:last-child',
+      ) as HTMLElement,
   )
 
 describe('sorting', () => {
@@ -465,5 +512,109 @@ describe('sorting', () => {
       '分享率 0.00',
       '分享率 0.00',
     ])
+  })
+})
+
+// Spec 2.4 rows D1, D2, D3, D9, D11: rows open the detail; the viewed row
+// has the ring; the list publishes what it shows; a vanished row moves on.
+const rowButtons = () => [
+  ...main.querySelectorAll<HTMLButtonElement>('[role="listitem"] > button'),
+]
+const ringed = () =>
+  rowButtons()
+    .filter((button) => button.getAttribute('aria-current') === 'true')
+    .map((button) => button.querySelector('[title]')?.getAttribute('title'))
+
+describe('the detail (spec 2.4)', () => {
+  it('D1 desktop without hash: the panel sits right of the rows; the first row is viewed', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: many(3) }))
+    const grid = section().parentElement as HTMLElement
+    expect(grid.className).toContain(
+      'grid-cols-[minmax(0,560px)_minmax(0,1fr)]',
+    )
+    expect(
+      grid.querySelector(':scope > aside[aria-label="詳情"]'),
+    ).not.toBeNull()
+    expect(ringed()).toEqual(['T2'])
+    expect(rowButtons()[0].className).toContain('viewing-ring')
+    expect(rowButtons()[1].className).not.toContain('viewing-ring')
+    expect(shownListStore.state).toEqual({
+      order: [fakeHash(3), fakeHash(2), fakeHash(1)],
+      viewed: fakeHash(3),
+    })
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('D2 a click sets hash and the ring moves', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: many(3) }))
+    await act(async () => rowButtons()[2].click())
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(ringed()).toEqual(['T0'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(1))
+  })
+
+  it('D3 a hash not in the list: the first row, the URL left alone', async () => {
+    withPanel = true
+    viewedHash = fakeHash(99)
+    await render(fakeResponse({ changed: many(3) }))
+    expect(ringed()).toEqual(['T2'])
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('D9 the viewed row is deleted: the next one, written to the URL', async () => {
+    withPanel = true
+    viewedHash = fakeHash(2)
+    await render(fakeResponse({ changed: many(3) }))
+    expect(ringed()).toEqual(['T1'])
+    await poll(
+      fakeResponse({
+        version: 'v-removed',
+        full: false,
+        changed: [],
+        removed: [fakeHash(2)],
+      }),
+    )
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(ringed()).toEqual(['T0'])
+  })
+
+  it('D9 archived while the list is frozen: it leaves at once, the next one shows', async () => {
+    withPanel = true
+    viewedHash = fakeHash(3)
+    await render(fakeResponse({ changed: many(3) }))
+    await act(async () => pointer('pointerover', section()))
+    await poll(delta([torrent(2, { state: 'missingFiles', private: false })]))
+    expect(shownNames()).toEqual(['T1', 'T0'])
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+    expect(ringed()).toEqual(['T1'])
+  })
+
+  it('D11 phone (no panel): nothing ringed without hash; a deleted viewed row removes hash', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    expect(ringed()).toEqual([])
+    expect(shownListStore.state.viewed).toBeNull()
+    await act(async () => rowButtons()[1].click())
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+    expect(shownListStore.state.viewed).toBe(fakeHash(2))
+    await poll(
+      fakeResponse({
+        version: 'v-removed',
+        full: false,
+        changed: [],
+        removed: [fakeHash(2)],
+      }),
+    )
+    expect(setHash).toHaveBeenLastCalledWith(null)
+    expect(shownListStore.state.viewed).toBeNull()
+  })
+
+  it('unmounting clears what the list published', async () => {
+    await render(fakeResponse({ changed: many(2) }))
+    expect(shownListStore.state.order).toHaveLength(2)
+    await act(async () => root.unmount())
+    expect(shownListStore.state).toEqual({ order: undefined, viewed: null })
+    root = createRoot(document.createElement('div'))
   })
 })
