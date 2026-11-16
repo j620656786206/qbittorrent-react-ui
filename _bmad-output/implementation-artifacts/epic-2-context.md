@@ -22,7 +22,7 @@ Turn the Epic 1 list into the real daily view. The "state" sort shows a board (d
 
 ## Requirements & Constraints
 
-- Scale: about 4165 torrents. List, board columns and files tab are virtualised (`@tanstack/react-virtual`), under 60 rows/cards in the DOM per list or column; re-sort plus repaint under about 100 ms.
+- Scale: about 4165 torrents. List, board columns and files tab are virtualised (`@tanstack/react-virtual`): the list under 100 rows in the DOM, each board column and the files tab under 60; re-sort plus repaint under about 100 ms.
 - Sort: exactly 51 field ids (no download path, its basename, or tags); top 5 are state, seeding time, added, ratio, completed. Missing values sort last in both directions; ties break by `added_on` newest then `hash`, never reversed. Board column order is fixed per column, not user-editable. "Organised" torrents never appear in list mode or count in totals and "M".
 - Changing sort (including board/list switch) scrolls to top. No `sort` in URL means "state" from Story 2.3 on.
 - Refresh must not reorder the list while the desktop mouse is over it, anything is selected, a mobile finger is scrolling, or a sheet is open. The board is not frozen by hover; Alex's own actions always apply immediately.

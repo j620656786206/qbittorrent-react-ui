@@ -17,6 +17,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: CI ? 1 : 0,
+  // A pass on the retry still fails the run: a CSP violation or console
+  // error that shows up only sometimes must not merge.
+  failOnFlakyTests: CI,
   forbidOnly: CI,
   timeout: 60_000,
   reporter: CI
@@ -33,7 +36,8 @@ export default defineConfig({
     // Never test a stale fake-qbit or another server on the port.
     reuseExistingServer: false,
     timeout: 60_000,
-    stdout: 'ignore',
+    // The app's log lines, for a failed CI run.
+    stdout: 'pipe',
     stderr: 'pipe',
     // SIGTERM lets fake-qbit stop the app and remove its temporary CONFIG_DIR.
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },

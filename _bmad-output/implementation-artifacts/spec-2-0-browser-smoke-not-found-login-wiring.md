@@ -5,7 +5,7 @@ created: '2026-11-16'
 status: 'done'
 baseline_revision: 'aac638ccd9b7d26afa258587e5bdeb7530217df1'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -140,6 +140,34 @@ deferred: []
   - `[maybe-false]` `[reject]` (edge) 25 min job timeout may be hit. Earlier PR runs plus about 1 min install and 20 s smoke; settled by the first CI run. If true, low and loud.
   - `[maybe-false]` `[reject]` (edge) P3 claim vs 404 allowance. Duplicate of the allowance rows; patched there.
 
+### 2026-11-16 Review pass (follow-up)
+- verdicts: 24 findings: high 0, medium 2, low 13, false 5, maybe-false 4
+- findings:
+  - `[maybe-false]` `[reject]` (intent) CI path verified only by YAML text and a local run. Settled by the PR's first CI run, which /ship waits on; not a code defect.
+  - `[false]` `[reject]` (intent) not-found outside the app shell. carried: recorded Claude 代決.
+  - `[maybe-false]` `[reject]` (intent) 404 allowance beyond P5/P6. carried: narrowed to `/no-such-page` by the first pass patch.
+  - `[maybe-false]` `[reject]` (intent) server-side egress not observed. carried.
+  - `[low]` `[reject]` (intent) W3 renders nothing. carried.
+  - `[low]` `[reject]` (intent) P6 cannot tell click recovery from poll recovery. carried.
+  - `[low]` `[patch]` (blind) epic-2-context.md says the list's DOM budget is under 60; epics.md Story 1.8 says under 100 (60 is for board columns, files tab, picker). Patch: corrected the line.
+  - `[false]` `[reject]` (blind) spec `done` before CI ran. `done` is the build-auto status; CI is /ship's gate.
+  - `[false]` `[reject]` (blind) review summary counts do not add up. Fix edits this build's spec.
+  - `[false]` `[reject]` (blind) stale `window` array design note. Fix edits this build's spec.
+  - `[false]` `[reject]` (blind) `review_loop_iteration` should be 1. It counts bad_spec loopbacks; there were none.
+  - `[maybe-false]` `[reject]` (blind) AC2 loopback claim covers only browser requests. carried.
+  - `[low]` `[reject]` (blind) W3 lacks a pass-through case. P1 and P7 (logged in) prove the guard lets a session through, in CI.
+  - `[low]` `[reject]` (blind) notFoundComponent hookup checked only in the browser smoke. P7 runs on every PR.
+  - `[low]` `[patch]` (blind) P2 middle check passes with zero rows or a jump to the top. Patch: first row visible and its `aria-posinset` between 1500 and 2700.
+  - `[low]` `[reject]` (blind) P5/P6 only run the desktop bar. Both bars are the same `AlertBar`, DOM-tested in alert-bar.dom.test.tsx.
+  - `[medium]` `[patch]` (blind) CI retry hides flaky CSP or console failures. Patch: `failOnFlakyTests: CI`.
+  - `[low]` `[reject]` (blind) no stale-build detection locally. CI always builds first; the config comment says to build.
+  - `[low]` `[reject]` (blind) `Window.__rtCspViolation` global visible to src types. No app code can reach it at runtime; negligible.
+  - `[low]` `[patch]` (blind) `stdout: 'ignore'` drops server logs on CI failures. Patch: `stdout: 'pipe'`.
+  - `[medium]` `[patch]` (verification-gap) retry passes flaky P3 failures. Same root cause and patch as the blind row.
+  - `[low]` `[patch]` (edge) P2 middle check passes with zero rows. Same patch as the blind P2 row.
+  - `[low]` `[reject]` (edge) screenshot dir relative to cwd. CI and the npm script always run from the repo root.
+  - `[low]` `[reject]` (edge) notifyManager scheduler restored by hand. Test-only, every test in the file passes; no observed effect.
+
 ## Design Notes
 
 - Docs to read first (AD-11), matching locked versions: Playwright 1.64 `https://playwright.dev/docs/test-webserver`, `https://playwright.dev/docs/api/class-page#page-emulate-media`, `https://playwright.dev/docs/ci#github-actions`; TanStack Router not-found `https://tanstack.com/router/latest/docs/framework/react/guide/not-found-errors`; Router testing with memory history `https://tanstack.com/router/latest/docs/framework/react/api/router/createMemoryHistoryFunction`. Record the URLs actually read here.
@@ -185,3 +213,7 @@ Status: done
 **Verification:** `npm run lint`, `npm run typecheck` clean; `npm test` 61 files, 1092 tests pass; `npm run build`, `npm run smoke` ok; `npm run smoke:browser` 8 of 8 pass in 20 s; routeTree unchanged; `check.sh` all ok.
 
 **Residual risks:** first CI run of the browser smoke; CJK font availability on ubuntu-latest for screenshot readability; CI retry 1 may hide a flaky test.
+
+### Follow-up pass (2026-11-16)
+
+Patched: CI fails on a test that passes only on retry (`failOnFlakyTests: CI`, medium); P2 middle-scroll check now needs rows near the middle (low); server logs piped for CI failures (low); epic-2-context.md list DOM budget corrected to under 100 (low). Deferred: none. Follow-up review recommendation: false (no high patched on a follow-up pass). Verification: lint, typecheck, `npm test` 1092 pass, `npm run smoke:browser` 8 of 8 locally and with `CI=1`, check.sh all ok.

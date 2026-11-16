@@ -90,7 +90,11 @@ test('P2 4165 torrents keep the DOM virtualized', async ({ page, request }) => {
   expect(await rows(page).count()).toBeLessThan(MAX_ROWS_IN_DOM)
 
   await scrollMain(page, 'middle')
-  await expect(rows(page).last()).not.toHaveAttribute('aria-posinset', '4165')
+  // Rows near the middle are drawn: not the top, not the bottom, not none.
+  await expect(rows(page).first()).toBeVisible()
+  const middle = Number(await rows(page).first().getAttribute('aria-posinset'))
+  expect(middle).toBeGreaterThan(1500)
+  expect(middle).toBeLessThan(2700)
   expect(await rows(page).count()).toBeLessThan(MAX_ROWS_IN_DOM)
 })
 
