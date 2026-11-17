@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
+import { PREF_KEYS } from '../src/lib/prefs'
 
 // Story 2.0 row P3: every test records CSP violations, console errors and
 // requests that leave loopback, and fails on any of them. A test that forces
@@ -221,4 +222,19 @@ export async function scrollList(page: Page, to: 'bottom' | 'middle' | number) {
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
   )
+}
+
+/**
+ * Story 2.8: turns the desktop board's auto-collapse off for this page
+ * (before any script of the app runs), for tests about plain column
+ * scrolling from stories 2.3 and 2.4.
+ */
+export async function autoCollapseOff(page: Page) {
+  await page.addInitScript((key) => {
+    try {
+      localStorage.setItem(key, 'off')
+    } catch {
+      // No storage: the test then sees the default.
+    }
+  }, PREF_KEYS.autoCollapse)
 }

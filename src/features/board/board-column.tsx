@@ -1,22 +1,61 @@
 import type { ReactNode, Ref } from 'react'
 import { formatCount } from '#/lib/format'
+import { cn } from '#/shared/ui/cn'
 import type { BoardColumn } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import { COLUMN_META } from '#/features/board/board-model'
 import { CardList } from '#/features/board/card-list'
+import type { CardLayout, CardPin } from '#/features/board/card-list'
 
 // DESIGN board-column (mockup S01-list-desktop): `surface-muted`, radius
 // 22px; the header is the 28px status circle, the column name
 // (`column-title`) and the muted count, with the order as its tooltip (an
 // explanation, not a control: memlog #127). The body scrolls by itself
 // (padding 4px 12px 12px, cards 10px apart) and is virtualized.
+//
+// Story 2.8 (demo `.col .bg`): the `surface-muted` background is its own
+// layer behind the content, so the auto-collapse can widen or narrow it
+// with `scaleX` while text is never scaled. The content sits above every
+// column's background (z 1 over z 0), so a strip's background still
+// shrinking never covers its neighbour's cards.
 
 export const COLUMN_CLASS =
-  'flex min-h-0 min-w-0 flex-col overflow-hidden rounded-panel bg-surface-muted'
+  'relative flex min-h-0 min-w-0 flex-col rounded-panel'
 
 export const COLUMN_HEADER_CLASS =
-  'm-0 flex flex-none items-center gap-2 px-4 pt-3.5 pb-2 text-column-title'
+  'relative z-[1] m-0 flex flex-none items-center gap-2 px-4 pt-3.5 pb-2 text-column-title'
+
+/** A column's section with its background layer (`data-column-bg`). */
+export function ColumnShell({
+  column,
+  label,
+  className,
+  sectionRef,
+  children,
+}: {
+  column: BoardColumn
+  label: string
+  className?: string
+  sectionRef?: Ref<HTMLElement>
+  children: ReactNode
+}) {
+  return (
+    <section
+      ref={sectionRef}
+      aria-label={label}
+      data-column={column}
+      className={cn(COLUMN_CLASS, className)}
+    >
+      <div
+        aria-hidden="true"
+        data-column-bg=""
+        className="pointer-events-none absolute inset-0 z-0 origin-top-left rounded-panel bg-surface-muted"
+      />
+      {children}
+    </section>
+  )
+}
 
 /** The header's inside: circle, name, count. */
 export function ColumnTitle({
@@ -56,6 +95,12 @@ export interface BoardColumnViewProps {
   /** Replaces the plain header (the expanded 已整理 header is a button). */
   header?: ReactNode
   sectionRef?: Ref<HTMLElement>
+  /** Story 2.8: the column's scroll body, for the auto-collapse. */
+  bodyRef?: Ref<HTMLDivElement>
+  layout?: CardLayout
+  pin?: CardPin | null
+  hereHash?: string | null
+  hereMs?: number
 }
 
 export function BoardColumnView({
@@ -67,16 +112,25 @@ export function BoardColumnView({
   empty,
   header,
   sectionRef,
+  bodyRef,
+  layout,
+  pin,
+  hereHash,
+  hereMs,
 }: BoardColumnViewProps) {
   const meta = COLUMN_META[column]
   return (
-    <section
-      ref={sectionRef}
-      aria-label={`${meta.name}，${formatCount(hashes.length)} 個`}
-      className={COLUMN_CLASS}
+    <ColumnShell
+      column={column}
+      sectionRef={sectionRef}
+      label={`${meta.name}，${formatCount(hashes.length)} 個`}
     >
       {header ?? (
-        <h2 title={meta.order} className={COLUMN_HEADER_CLASS}>
+        <h2
+          title={meta.order}
+          data-column-head=""
+          className={COLUMN_HEADER_CLASS}
+        >
           <ColumnTitle
             column={column}
             count={<CountText count={hashes.length} />}
@@ -92,10 +146,18 @@ export function BoardColumnView({
         label={meta.name}
         paddingStart={4}
         paddingEnd={12}
-        className="flex-1 px-3"
+        // The section no longer clips (its background layer scales past it
+        // during the collapse), so the body clips itself to the column's
+        // rounded bottom corners, scrollbar included.
+        className="relative z-[1] flex-1 rounded-b-panel px-3"
         // Keyboard users scroll the column like a phone panel.
         bodyProps={{ role: 'group', tabIndex: 0, 'aria-label': meta.name }}
+        bodyRef={bodyRef}
+        layout={layout}
+        pin={pin}
+        hereHash={hereHash}
+        hereMs={hereMs}
       />
-    </section>
+    </ColumnShell>
   )
 }

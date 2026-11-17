@@ -333,6 +333,7 @@ describe('the freeze', () => {
       pointerInList: false,
       touchScroll: false,
       sheetOpen: true,
+      animation: false,
     })
     releaseSheet()
     root = createRoot(document.createElement('div'))

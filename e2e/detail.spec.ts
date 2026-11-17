@@ -3,6 +3,7 @@ import {
   DEFAULT_MODES,
   LIST_SCROLL_ID,
   MAIN_ID,
+  autoCollapseOff,
   expect,
   listScrollTop,
   login,
@@ -418,6 +419,8 @@ test('opening and switching the detail never scrolls the list or a board column'
   page,
   request,
 }) => {
+  // Plain column scrolling (story 2.8's auto-collapse is not under test).
+  await autoCollapseOff(page)
   await setModes(request, { data: 'many' })
   await page.setViewportSize(DESKTOP)
   await login(page)

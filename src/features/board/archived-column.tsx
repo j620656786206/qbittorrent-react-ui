@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
+import type { Ref } from 'react'
 import { formatCount } from '#/lib/format'
 import type { SlimTorrent } from '#/shared/maindata'
-import { StatusCircle } from '#/shared/ui/status-circle'
 import {
   BoardColumnView,
   COLUMN_HEADER_CLASS,
@@ -9,6 +9,8 @@ import {
   CountText,
 } from '#/features/board/board-column'
 import { COLUMN_META } from '#/features/board/board-model'
+import type { CardLayout, CardPin } from '#/features/board/card-list'
+import { CollapsedStrip } from '#/features/board/collapsed-strip'
 
 // The 已整理 column (EXPERIENCE 已整理欄, DESIGN board-column-collapsed,
 // mockup S01-list-desktop): desktop only, the 5th column, collapsed by
@@ -28,6 +30,12 @@ export interface ArchivedColumnProps {
   today: number
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
+  /** Story 2.8: expanded, it can be the auto-collapse's wide column. */
+  bodyRef?: Ref<HTMLDivElement>
+  layout?: CardLayout
+  pin?: CardPin | null
+  hereHash?: string | null
+  hereMs?: number
 }
 
 export function ArchivedColumn({
@@ -37,6 +45,11 @@ export function ArchivedColumn({
   today,
   expanded,
   onExpandedChange,
+  bodyRef,
+  layout,
+  pin,
+  hereHash,
+  hereMs,
 }: ArchivedColumnProps) {
   const toggleRef = useRef<HTMLButtonElement>(null)
   const toggled = useRef(false)
@@ -63,8 +76,13 @@ export function ArchivedColumn({
         stateBeforeMove={stateBeforeMove}
         today={today}
         empty={META.empty}
+        bodyRef={bodyRef}
+        layout={layout}
+        pin={pin}
+        hereHash={hereHash}
+        hereMs={hereMs}
         header={
-          <h2 className="m-0 flex flex-none">
+          <h2 data-column-head="" className="relative z-[1] m-0 flex flex-none">
             <button
               ref={toggleRef}
               type="button"
@@ -86,27 +104,13 @@ export function ArchivedColumn({
   }
 
   return (
-    <section
-      aria-label="已整理欄"
-      className="flex min-h-0 min-w-0 rounded-panel bg-surface-muted"
-    >
-      <button
-        ref={toggleRef}
-        type="button"
-        aria-expanded="false"
-        aria-label={`展開已整理欄，${count} 個`}
-        title={META.order}
-        onClick={() => toggle(true)}
-        className="flex flex-1 flex-col items-center gap-2.5 rounded-panel py-3.5 text-text hover-ring"
-      >
-        <StatusCircle status="archived" arcFraction={null} size={28} />
-        <span className="text-meta whitespace-nowrap text-text-muted tabular-nums">
-          {count}
-        </span>
-        <span className="text-[14px] leading-[1.2] font-bold tracking-[.08em] [writing-mode:vertical-rl]">
-          {META.name}
-        </span>
-      </button>
-    </section>
+    <CollapsedStrip
+      column="archived"
+      count={hashes.length}
+      label={`展開已整理欄，${count} 個`}
+      sectionLabel="已整理欄"
+      onPress={() => toggle(true)}
+      buttonRef={toggleRef}
+    />
   )
 }
