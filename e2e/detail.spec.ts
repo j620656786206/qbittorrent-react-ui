@@ -113,7 +113,16 @@ test('D1 D2 D7 D12 desktop list mode: the panel, the ring, N of M, prev and next
     '大小',
     '加入時間',
     '完成時間',
+    '已下載',
+    '已上傳',
   ])
+  // 已下載 and 已上傳 arrive from getTorrentDetail (AD-6 detail exception).
+  await expect(panel(page).locator('dd').nth(4)).toHaveText(
+    /^[\d.,]+ (B|KB|MB|GB|TB)$/,
+  )
+  await expect(panel(page).locator('dd').nth(5)).toHaveText(
+    /^[\d.,]+ (B|KB|MB|GB|TB)$/,
+  )
 
   // Layout: 560px list, 16px gap, the panel takes the rest; neither the
   // page nor `main` scrolls, the list scrolls itself.

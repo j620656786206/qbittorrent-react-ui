@@ -274,4 +274,13 @@ describe('one list of sort extras (src/shared/sort-keys.ts)', () => {
     table.apply(delta(3, { [HASH_A]: { num_seeds: 'many' } }))
     expect(table.keysSince('num_seeds', null).keys[HASH_A]).toBeNull()
   })
+
+  it('rawOf: one torrent as qBittorrent sent it, unquantized; gone hashes are undefined (story 2.4)', () => {
+    const table = setup()
+    table.apply(delta(2, { [HASH_A]: { uploaded: 7, time_active: 61 } }))
+    expect(table.rawOf(HASH_A)).toMatchObject({ uploaded: 7, time_active: 61 })
+    table.apply(raw({ rid: 3, torrents_removed: [HASH_A] }))
+    expect(table.rawOf(HASH_A)).toBeUndefined()
+    expect(table.rawOf('f'.repeat(40))).toBeUndefined()
+  })
 })

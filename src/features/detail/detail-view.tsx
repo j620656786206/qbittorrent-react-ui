@@ -1,9 +1,14 @@
 import { useId } from 'react'
 import type { Ref } from 'react'
 import type { DetailPosition } from '#/lib/detail-position'
+import { getTorrentDetail } from '#/server/functions/get-torrent-detail'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { useDayClock } from '#/state/now'
+import {
+  bindFetchTorrentDetail,
+  useTorrentDetail,
+} from '#/state/torrent-detail'
 import { infoRows } from '#/features/detail/detail-model'
 import { DetailHeader } from '#/features/detail/detail-header'
 import type { DetailHeaderLayout } from '#/features/detail/detail-header'
@@ -69,12 +74,16 @@ export function DetailTabs({
   )
 }
 
+const fetchTorrentDetail = bindFetchTorrentDetail(getTorrentDetail)
+
 /** UX-DR46: label on the left in `text-muted`, the value right after it. */
 export function InfoList({ torrent }: { torrent: SlimTorrent }) {
   const { today } = useDayClock()
+  // Polls every 5 s while this detail shows, for this hash only (AD-6).
+  const { data } = useTorrentDetail(torrent.hash, fetchTorrentDetail)
   return (
     <dl className="m-0 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13px] leading-[1.4] tabular-nums">
-      {infoRows(torrent, today).map((row) => (
+      {infoRows(torrent, today, data?.detail).map((row) => (
         <div key={row.label} className="contents">
           <dt className="text-text-muted">{row.label}</dt>
           <dd

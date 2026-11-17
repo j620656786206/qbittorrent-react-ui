@@ -32,6 +32,24 @@ import {
 // the phone sheet. The list's own side (rows, ring, vanish) is in
 // torrent-list.dom.test.tsx; layout, motion and real clicks in e2e.
 
+// getTorrentDetail never reaches a server here: each test sets the answer.
+const detailCalls = vi.hoisted(() => ({
+  hashes: [] as Array<string>,
+  answer: (_hash: string): Promise<unknown> =>
+    Promise.resolve({
+      ok: true,
+      data: {
+        detail: { downloaded: 2 * 1024 ** 3, uploaded: 512 * 1024 ** 2 },
+      },
+    }),
+}))
+vi.mock('#/server/functions/get-torrent-detail', () => ({
+  getTorrentDetail: (options: { data: { hash: string } }) => {
+    detailCalls.hashes.push(options.data.hash)
+    return detailCalls.answer(options.data.hash)
+  },
+}))
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
 }
@@ -275,7 +293,7 @@ describe('the list panel (desktop list mode)', () => {
     expect(tabs[0].getAttribute('aria-controls')).toBe(panel.id)
     expect(
       [...panel.querySelectorAll('dt')].map((dt) => dt.textContent),
-    ).toEqual(['分類', '大小', '加入時間', '完成時間'])
+    ).toEqual(['分類', '大小', '加入時間', '完成時間', '已下載', '已上傳'])
     // The header and tabs stay; only the panel scrolls.
     expect(panel.className).toContain('overflow-y-auto')
   })
@@ -295,6 +313,39 @@ describe('the list panel (desktop list mode)', () => {
     expect(values[0].className).toContain('text-text-muted')
     expect(values[3].textContent).toBe('沒有')
     expect(values[1].className).not.toContain('text-text-muted')
+  })
+
+  it('已下載 and 已上傳 come from getTorrentDetail for the viewed hash only', async () => {
+    detailCalls.hashes = []
+    await render(<ListDetailPanel />)
+    await act(async () => publishShownList({ order, viewed: h(2) }))
+    const values = () =>
+      [...document.querySelectorAll('dd')].map((dd) => dd.textContent)
+    await vi.waitFor(() =>
+      expect(values().slice(4)).toEqual(['2 GB', '512 MB']),
+    )
+    expect(new Set(detailCalls.hashes)).toEqual(new Set([h(2)]))
+  })
+
+  it('before the first answer 「…」 muted; detail null is 「沒有」', async () => {
+    const original = detailCalls.answer
+    let resolve: (value: unknown) => void = () => {}
+    detailCalls.answer = () =>
+      new Promise((done) => {
+        resolve = done
+      })
+    try {
+      await render(<ListDetailPanel />)
+      await act(async () => publishShownList({ order, viewed: h(2) }))
+      const dd = () => [...document.querySelectorAll('dd')]
+      expect(dd()[4].textContent).toBe('…')
+      expect(dd()[4].className).toContain('text-text-muted')
+      await act(async () => resolve({ ok: true, data: { detail: null } }))
+      await vi.waitFor(() => expect(dd()[5].textContent).toBe('沒有'))
+      expect(dd()[5].className).toContain('text-text-muted')
+    } finally {
+      detailCalls.answer = original
+    }
   })
 })
 

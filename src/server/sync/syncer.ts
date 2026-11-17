@@ -9,6 +9,8 @@ import type { TorrentTable } from '#/server/sync/torrent-table'
 import { MAINDATA_VERSION_PATTERN } from '#/shared/maindata'
 import type { MaindataResponse } from '#/shared/maindata'
 import type { ExtraSortFieldId, SortKeysResponse } from '#/shared/sort-keys'
+import { pickTorrentDetail } from '#/shared/torrent-detail'
+import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 
 // AD-6 / AR-37 / AR-38: pull-through sync. The container talks to
 // qBittorrent only while it is serving a `getMaindata` call, with its own
@@ -29,6 +31,8 @@ import type { ExtraSortFieldId, SortKeysResponse } from '#/shared/sort-keys'
 // The same pulls feed the sort extras table (story 2.1). `readSortKeys`
 // pulls like `read` (so it joins or reuses the same pull) and answers one
 // extra sort's values, with versions of the extras table's own counter.
+// `readTorrentDetail` (story 2.4) pulls the same way and answers the detail
+// fields of one torrent from the extras table.
 
 export const MIN_PULL_INTERVAL_MS = 1000
 
@@ -55,6 +59,8 @@ export interface Syncer {
     field: ExtraSortFieldId,
     since?: string,
   ) => Promise<SortKeysResponse>
+  /** `hash` is a valid torrent hash (the server function checked it). */
+  readTorrentDetail: (hash: string) => Promise<TorrentDetailResponse>
 }
 
 interface LastPull {
@@ -168,5 +174,13 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return { version: `${instanceId}.${extras.version}`, full, keys }
   }
 
-  return { instanceId, read, readSortKeys }
+  async function readTorrentDetail(
+    hash: string,
+  ): Promise<TorrentDetailResponse> {
+    await pull()
+    const raw = extras.rawOf(hash)
+    return { detail: raw ? pickTorrentDetail(raw) : null }
+  }
+
+  return { instanceId, read, readSortKeys, readTorrentDetail }
 }
