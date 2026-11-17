@@ -55,7 +55,7 @@ development_status:
   2-4-點開詳情-三種容器-固定頭和前後切換: done # PR #21：詳情三種容器、固定頭、前後切換，已下載已上傳走 getTorrentDetail
   2-5-詳情概覽-狀態區-數字小卡-儲存位置: done # PR #22：概覽的狀態區 12 種、數字小卡、儲存位置和複製
   2-6-暫停繼續和-toast: done # PR #24：「⋯」選單暫停繼續、stopTorrents 和 startTorrents、pendingOps、自己寫的 toast
-  2-7-檔案分頁-清單-勾選-優先順序: backlog
+  2-7-檔案分頁-清單-勾選-優先順序: review
   2-8-看板自動收合: backlog
   2-9-進度環轉進來和列進場: backlog
   2-10-出錯種子的原因: backlog
