@@ -102,8 +102,7 @@ export function DetailTop({
     <>
       <DetailHeader
         layout={layout}
-        hash={target.torrent.hash}
-        name={target.torrent.name}
+        torrent={target.torrent}
         titleId={titleId}
         position={target.position}
         columnName={target.columnName}

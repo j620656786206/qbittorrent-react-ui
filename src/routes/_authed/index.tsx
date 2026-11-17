@@ -36,10 +36,15 @@ function Home() {
   )
 }
 
-/** A target on no control and not in the panel. */
-function isEmptySpace(target: EventTarget): boolean {
+/**
+ * A target on no control and not in the panel. Story 2.6: only the board's
+ * own DOM counts; a portaled menu (the panel's 「⋯」) bubbles here through
+ * React but lies outside the wrapper.
+ */
+function isEmptySpace(target: EventTarget, board: Element): boolean {
   return (
     target instanceof Element &&
+    board.contains(target) &&
     target.closest('button, a, input, select, textarea, aside') === null
   )
 }
@@ -70,12 +75,19 @@ function BoardHome({ desktop }: { desktop: boolean }) {
   const { hash, setHash } = useViewedHash()
   const pressedEmptyRef = useRef(false)
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    pressedEmptyRef.current = isEmptySpace(event.target) && !onScrollbar(event)
+    pressedEmptyRef.current =
+      isEmptySpace(event.target, event.currentTarget) && !onScrollbar(event)
   }
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const pressedEmpty = pressedEmptyRef.current
     pressedEmptyRef.current = false
-    if (hash === null || !pressedEmpty || !isEmptySpace(event.target)) return
+    if (
+      hash === null ||
+      !pressedEmpty ||
+      !isEmptySpace(event.target, event.currentTarget)
+    ) {
+      return
+    }
     if (window.getSelection()?.isCollapsed === false) return
     setHash(null)
   }

@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ERROR_TEXT, LIST_LOAD_FAILED, errorText } from '#/lib/error-text'
+import {
+  ERROR_TEXT,
+  LIST_LOAD_FAILED,
+  OPERATION_FAILURE_CODES,
+  errorText,
+  isOperationFailureCode,
+  pauseActionFailureText,
+} from '#/lib/error-text'
 import { ERROR_CODES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
 
@@ -46,5 +53,32 @@ describe('LIST_LOAD_FAILED (spec 1.8 V2)', () => {
   it('is the option A wording, plain Chinese, no dash', () => {
     expect(LIST_LOAD_FAILED).toBe('讀不到種子清單')
     expect(LIST_LOAD_FAILED).not.toContain(EM_DASH)
+  })
+})
+
+describe('pause and resume failure text (spec 2.6 F1)', () => {
+  it('handles exactly qbit_rejected, timeout and invalid_input', () => {
+    expect([...OPERATION_FAILURE_CODES]).toEqual([
+      'qbit_rejected',
+      'timeout',
+      'invalid_input',
+    ])
+    expect(ERROR_CODES.filter(isOperationFailureCode)).toEqual([
+      'qbit_rejected',
+      'timeout',
+      'invalid_input',
+    ])
+  })
+
+  it.each([
+    ['stop', 'qbit_rejected', '暫停失敗：qBittorrent 拒絕這個操作'],
+    ['stop', 'timeout', '暫停失敗：qBittorrent 沒有回應，請再試一次'],
+    ['stop', 'invalid_input', '暫停失敗：送出的資料格式不對'],
+    ['start', 'qbit_rejected', '繼續失敗：qBittorrent 拒絕這個操作'],
+    ['start', 'timeout', '繼續失敗：qBittorrent 沒有回應，請再試一次'],
+    ['start', 'invalid_input', '繼續失敗：送出的資料格式不對'],
+  ] as const)('%s %s', (action, code, text) => {
+    expect(pauseActionFailureText(action, code)).toBe(text)
+    expect(text).not.toContain(EM_DASH)
   })
 })

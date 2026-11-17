@@ -36,13 +36,23 @@ function DropdownMenuTrigger({
   )
 }
 
+/**
+ * `container`: where the content portals (Radix Portal `container`, default
+ * `body`). A menu opened inside the bottom sheet portals into the sheet, so
+ * the sheet's focus trap and `inert` page leave it alone (story 2.6).
+ */
 function DropdownMenuContent({
   className,
   sideOffset = 6,
+  container,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & {
+  container?: React.ComponentProps<
+    typeof DropdownMenuPrimitive.Portal
+  >['container']
+}) {
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
@@ -65,7 +75,7 @@ function DropdownMenuGroup({
 }
 
 const ITEM_CLASS =
-  'flex h-9 w-full flex-none cursor-pointer items-center gap-2 rounded-row pr-3 pl-2 text-left select-none data-highlighted:bg-surface-muted'
+  'flex h-9 w-full flex-none cursor-pointer items-center gap-2 rounded-row pr-3 pl-2 text-left select-none data-highlighted:bg-surface-muted data-disabled:cursor-not-allowed data-disabled:opacity-50'
 
 function DropdownMenuItem({
   className,

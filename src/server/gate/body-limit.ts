@@ -11,8 +11,16 @@ import { failureResponse } from '#/server/gate/respond'
 // ANONYMOUS_BODY_LIMIT, however high MAX_REQUEST_BODY is raised later.
 
 export const DEFAULT_BODY_LIMIT = 65_536
-/** Request-level ceiling. Later stories raise it for uploads and hash lists. */
-export const MAX_REQUEST_BODY = DEFAULT_BODY_LIMIT
+/**
+ * AD-12: a request that carries a hash list (story 2.6: stop, start; later
+ * delete, move) may be 384 KB. Server functions that take one give it as
+ * their own `bodyLimit`. Measured as Start serializes the body (story 2.6,
+ * torrent-ops.test.ts): 5000 40-char hashes fit; 64-char lists fit only up
+ * to 4975. Raising the limit is a spine AD-12 decision left to Alex.
+ */
+export const HASH_LIST_BODY_LIMIT = 393_216
+/** Request-level ceiling: the largest per-function limit (uploads raise it). */
+export const MAX_REQUEST_BODY = HASH_LIST_BODY_LIMIT
 /** Ceiling without a valid session. Stays 64 KB when MAX_REQUEST_BODY grows. */
 export const ANONYMOUS_BODY_LIMIT = 65_536
 

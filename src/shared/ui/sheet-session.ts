@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
 import { getListScroll, getMain } from '#/shared/ui/main-scroll'
+import { TOAST_REGION_ATTR, isInToastRegion } from '#/shared/ui/toast-region'
 
 // Story 2.2: what an open bottom sheet does to the page around it
 // (APG dialog-modal): the page scroll is locked, everything outside the
@@ -10,6 +11,10 @@ import { getListScroll, getMain } from '#/shared/ui/main-scroll'
 // focus back is not pulled into the sheet. Esc is not handled here: since
 // story 2.4 it goes through the src/state shortcut registry, which the
 // feature that opens the sheet joins (`useSheetLayer`).
+//
+// Story 2.6: the toast region (src/shared/ui/toaster.tsx) is left out of
+// the session: never made `inert`, and focus moving into it is not pulled
+// back, so a failure toast's 「重試」 and ✕ work over an open sheet.
 //
 // Docs (AD-11): https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
 
@@ -35,12 +40,15 @@ function lockScroll(): () => void {
 
 /**
  * Makes the page outside the sheet `inert` (hidden from screen readers and
- * focus): every top-level body child except `keep`, skipping ones that
- * already were. Returns the undo.
+ * focus): every top-level body child except `keep` and the toast region,
+ * skipping ones that already were. Returns the undo.
  */
 function inertOthers(keep: ReadonlyArray<Element | null>): () => void {
   const changed = [...document.body.children].filter(
-    (element) => !keep.includes(element) && !element.hasAttribute('inert'),
+    (element) =>
+      !keep.includes(element) &&
+      !element.hasAttribute(TOAST_REGION_ATTR) &&
+      !element.hasAttribute('inert'),
   )
   for (const element of changed) element.setAttribute('inert', '')
   return () => {
@@ -96,7 +104,11 @@ export function useModalSession({
     const restorePage = inertOthers([scrimRef.current, sheet])
 
     const onFocusIn = (event: FocusEvent) => {
-      if (!(event.target instanceof Node) || sheet.contains(event.target)) {
+      if (
+        !(event.target instanceof Node) ||
+        sheet.contains(event.target) ||
+        isInToastRegion(event.target)
+      ) {
         return
       }
       focusables(sheet)[0]?.focus({ preventScroll: true })

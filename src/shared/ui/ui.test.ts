@@ -102,6 +102,7 @@ describe('shadcn components (row 21)', () => {
       'location-tag.tsx',
       'skeleton.tsx',
       'status-circle.tsx',
+      'toaster.tsx',
     ])
     for (const file of files) {
       const source = read(file)

@@ -15,6 +15,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
+import { clearPending, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
 import { openLayerCount, resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, publishShownList } from '#/state/shown-order'
 import { ViewedHashContext } from '#/state/viewed-hash'
@@ -54,6 +55,38 @@ vi.mock('#/server/functions/get-torrent-detail', () => ({
     return detailCalls.answer(options.data.hash)
   },
 }))
+
+// Story 2.6: stopTorrents and startTorrents never reach a server either;
+// toasts are checked at the feature's API (src/lib/toast.ts).
+const opCalls = vi.hoisted(() => ({
+  sent: [] as Array<{ op: 'stop' | 'start'; hashes: Array<string> }>,
+  answer: (_op: 'stop' | 'start'): Promise<unknown> =>
+    Promise.resolve({ ok: true, data: { items: [] } }),
+}))
+vi.mock('#/server/functions/stop-torrents', () => ({
+  stopTorrents: (options: { data: { hashes: Array<string> } }) => {
+    opCalls.sent.push({ op: 'stop', hashes: options.data.hashes })
+    return opCalls.answer('stop')
+  },
+}))
+vi.mock('#/server/functions/start-torrents', () => ({
+  startTorrents: (options: { data: { hashes: Array<string> } }) => {
+    opCalls.sent.push({ op: 'start', hashes: options.data.hashes })
+    return opCalls.answer('start')
+  },
+}))
+const toastCalls = vi.hoisted(() => {
+  const dismissFailure = vi.fn()
+  return {
+    dismissFailure,
+    info: vi.fn(),
+    action: vi.fn(),
+    failure: vi.fn((_text: string, _options: { onRetry: () => void }) => ({
+      dismiss: dismissFailure,
+    })),
+  }
+})
+vi.mock('#/lib/toast', () => ({ toast: toastCalls }))
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -209,8 +242,7 @@ describe('the header', () => {
     await render(
       <DetailHeader
         layout={layout}
-        hash="a"
-        name="A.Very.Long.Name"
+        torrent={t({ hash: 'a', name: 'A.Very.Long.Name' })}
         position={position}
         onNavigate={onNavigate}
         onClose={onClose}
@@ -219,7 +251,7 @@ describe('the header', () => {
     return onNavigate
   }
 
-  it('row (list mode): one row, name with title, nav, disabled ⋯, no ✕; 36px buttons', async () => {
+  it('row (list mode): one row, name with title, nav, ⋯, no ✕; 36px buttons', async () => {
     const onNavigate = await header('row')
     const h2 = q('h2') as HTMLElement
     expect(h2.getAttribute('title')).toBe('A.Very.Long.Name')
@@ -228,7 +260,9 @@ describe('the header', () => {
     expect(positionLine()).toBe('第 1 個／共 3 個')
     expect(byLabel('上一個').disabled).toBe(true)
     expect(byLabel('下一個').disabled).toBe(false)
-    expect(byLabel('更多動作').disabled).toBe(true)
+    // Story 2.6: ⋯ works now.
+    expect(byLabel('更多動作').disabled).toBe(false)
+    expect(byLabel('更多動作').className).toContain('size-9')
     expect(byLabel('關閉')).toBeNull()
     expect(byLabel('下一個').className).toContain('size-9')
     // One row: the nav group is a sibling of the name.
@@ -877,5 +911,291 @@ describe('the overview (story 2.5)', () => {
     expect(panel.textContent).toContain(`85 GB · ${markup}`)
     expect(panel.textContent).toContain(`/data/javascript:alert(1)/${markup}`)
     expect(q('h2')?.textContent).toBe(markup)
+  })
+})
+
+describe('the ⋯ menu (story 2.6)', () => {
+  const OK = { ok: true, data: { items: [] } }
+  const failWith = (code: string) => () =>
+    Promise.resolve({ ok: false, error: { code, message: 'x' } })
+
+  beforeEach(() => {
+    opCalls.sent.length = 0
+    opCalls.answer = () => Promise.resolve(OK)
+    toastCalls.info.mockClear()
+    toastCalls.action.mockClear()
+    toastCalls.failure.mockClear()
+    toastCalls.dismissFailure.mockClear()
+    resetPendingOps()
+  })
+
+  afterEach(() => resetPendingOps())
+
+  const trigger = () => byLabel('更多動作')
+  const menu = () => q('[role="menu"]')
+  const item = () => q('[role="menuitem"]') as HTMLElement
+
+  async function openMenu() {
+    await act(async () => {
+      trigger().dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    expect(menu()).not.toBeNull()
+  }
+
+  async function pressItem() {
+    await act(async () => item().click())
+  }
+
+  /**
+   * Lets the mutation and the refresh it starts settle, and Radix's focus
+   * return after the menu closed (a 0 ms timer in its FocusScope).
+   */
+  async function settle() {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
+  const pausedDown = (state: string) =>
+    t({ hash: h(1), name: 'Down1', added_on: T0 + 10, state, progress: 0.42 })
+
+  it('M1 one item: 暫停 for a downloading torrent, 繼續 for paused and done', async () => {
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    expect(trigger().getAttribute('aria-haspopup')).toBe('menu')
+    expect(trigger().className).toContain('size-9')
+    await openMenu()
+    expect(document.querySelectorAll('[role="menuitem"]')).toHaveLength(1)
+    expect(item().textContent).toBe('暫停')
+    expect(item().className).toContain('h-9')
+    await act(async () => root.unmount())
+
+    for (const state of ['pausedDL', 'stoppedDL']) {
+      await render(<BoardDetailPanel />, {
+        hash: h(1),
+        data: [pausedDown(state), ...board().slice(1)],
+      })
+      await openMenu()
+      expect(item().textContent, state).toBe('繼續')
+      await act(async () => root.unmount())
+    }
+    const done = t({
+      hash: h(1),
+      name: 'Done1',
+      state: 'stoppedUP',
+      progress: 1,
+      completion_on: T0,
+    })
+    await render(<BoardDetailPanel />, {
+      hash: h(1),
+      data: [done, ...board().slice(1)],
+    })
+    await openMenu()
+    expect(item().textContent).toBe('繼續')
+  })
+
+  it('P1 暫停: one stop call for that hash, no toast, one refresh; disabled until the state flips', async () => {
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await openMenu()
+    const before = fetchCount
+    await pressItem()
+    await settle()
+    expect(opCalls.sent).toEqual([{ op: 'stop', hashes: [h(1)] }])
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(toastCalls.info).not.toHaveBeenCalled()
+    expect(fetchCount).toBe(before + 1)
+    expect(menu()).toBeNull()
+    // qBittorrent has not shown it yet: the item is disabled, same word.
+    expect(pendingOpOf(h(1))).toBe('stop')
+    await openMenu()
+    expect(item().textContent).toBe('暫停')
+    expect(item().getAttribute('aria-disabled')).toBe('true')
+    await pressItem()
+    expect(opCalls.sent).toHaveLength(1)
+    // The next maindata shows it paused: 繼續, enabled.
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [pausedDown('stoppedDL')],
+      }),
+    )
+    expect(pendingOpOf(h(1))).toBeNull()
+    expect(item().textContent).toBe('繼續')
+    expect(item().getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('繼續 on a 已完成 torrent sends start', async () => {
+    const done = t({
+      hash: h(1),
+      name: 'Done1',
+      state: 'stoppedUP',
+      progress: 1,
+      completion_on: T0,
+    })
+    await render(<BoardDetailPanel />, {
+      hash: h(1),
+      data: [done, ...board().slice(1)],
+    })
+    await openMenu()
+    await pressItem()
+    await settle()
+    expect(opCalls.sent).toEqual([{ op: 'start', hashes: [h(1)] }])
+  })
+
+  it.each([
+    ['qbit_rejected', '暫停失敗：qBittorrent 拒絕這個操作'],
+    ['timeout', '暫停失敗：qBittorrent 沒有回應，請再試一次'],
+    ['invalid_input', '暫停失敗：送出的資料格式不對'],
+  ])(
+    'F1 %s: a failure toast with 重試; the item is enabled again; 重試 resends',
+    async (code, text) => {
+      opCalls.answer = failWith(code)
+      await render(<BoardDetailPanel />, { hash: h(1) })
+      await openMenu()
+      await pressItem()
+      await settle()
+      expect(toastCalls.failure).toHaveBeenCalledOnce()
+      const [shownText, { onRetry }] = toastCalls.failure.mock.calls[0] as [
+        string,
+        { onRetry: () => void },
+      ]
+      expect(shownText).toBe(text)
+      expect(pendingOpOf(h(1))).toBeNull()
+      await openMenu()
+      expect(item().getAttribute('aria-disabled')).toBeNull()
+      // 重試 works even after the detail closed.
+      await act(async () => root.unmount())
+      opCalls.answer = () => Promise.resolve(OK)
+      await act(async () => onRetry())
+      await settle()
+      expect(opCalls.sent).toEqual([
+        { op: 'stop', hashes: [h(1)] },
+        { op: 'stop', hashes: [h(1)] },
+      ])
+      expect(toastCalls.failure).toHaveBeenCalledOnce()
+      expect(pendingOpOf(h(1))).toBe('stop')
+    },
+  )
+
+  it.each([
+    'home_unreachable',
+    'qbit_unreachable',
+    'not_logged_in',
+    'bad_origin',
+  ])(
+    'F2 %s: no toast (the global onError has it); pending cleared',
+    async (code) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      opCalls.answer = failWith(code)
+      await render(<BoardDetailPanel />, { hash: h(1) })
+      await openMenu()
+      await pressItem()
+      await settle()
+      expect(toastCalls.failure).not.toHaveBeenCalled()
+      expect(pendingOpOf(h(1))).toBeNull()
+    },
+  )
+
+  it('a new op for the hash closes its failure toast, so 重試 cannot resend a stale op', async () => {
+    opCalls.answer = failWith('qbit_rejected')
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await openMenu()
+    await pressItem()
+    await settle()
+    expect(toastCalls.failure).toHaveBeenCalledOnce()
+    expect(toastCalls.dismissFailure).not.toHaveBeenCalled()
+    opCalls.answer = () => Promise.resolve(OK)
+    await openMenu()
+    await pressItem()
+    await settle()
+    expect(toastCalls.dismissFailure).toHaveBeenCalledOnce()
+    expect(opCalls.sent).toHaveLength(2)
+  })
+
+  it('the item stays disabled while its call is in flight, past the pending mark', async () => {
+    let finish: (value: unknown) => void = () => {}
+    opCalls.answer = () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await openMenu()
+    await pressItem()
+    await settle()
+    // The 30 s mark ends while the call still runs (server 30 s, callFn 35 s).
+    await act(async () => clearPending(h(1)))
+    await openMenu()
+    expect(item().getAttribute('aria-disabled')).toBe('true')
+    await pressItem()
+    expect(opCalls.sent).toHaveLength(1)
+    await act(async () => finish(OK))
+    await settle()
+    // Settled; its mark already ended, so the item is enabled again.
+    expect(pendingOpOf(h(1))).toBeNull()
+    expect(item().getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('a paused torrent polled to moving still offers 繼續 (stateBeforeMove)', async () => {
+    await render(<BoardDetailPanel />, {
+      hash: h(1),
+      data: [pausedDown('pausedDL'), ...board().slice(1)],
+    })
+    await openMenu()
+    expect(item().textContent).toBe('繼續')
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [pausedDown('moving')],
+      }),
+    )
+    expect(item().textContent).toBe('繼續')
+  })
+
+  it('Esc with the menu open closes only the menu, not the panel', async () => {
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await openMenu()
+    const target = document.activeElement ?? document
+    await act(async () => {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(menu()).toBeNull()
+    expect(hashNow).toBe(h(1))
+    expect(q('aside')).not.toBeNull()
+    await esc()
+    expect(hashNow).toBeNull()
+  })
+
+  it('phone: 44px trigger and rows; the menu portals into the sheet and stays open', async () => {
+    await render(<BoardDetailSheet />, { hash: h(11) })
+    const dialog = q('[role="dialog"]') as HTMLElement
+    expect(trigger().className).toContain('size-11')
+    await openMenu()
+    expect(dialog.contains(menu())).toBe(true)
+    expect(item().className).toContain('h-11')
+    expect(item().textContent).toBe('暫停')
+    // Focus moved into the menu without the sheet pulling it back.
+    expect(menu()?.contains(document.activeElement)).toBe(true)
+    // Esc closes the menu, the sheet stays.
+    await act(async () => {
+      ;(document.activeElement ?? document).dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(menu()).toBeNull()
+    expect(q('[role="dialog"]')).not.toBeNull()
+    expect(hashNow).toBe(h(11))
   })
 })

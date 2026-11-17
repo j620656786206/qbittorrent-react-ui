@@ -2,12 +2,14 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, Ref } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import type { DetailPosition } from '#/lib/detail-position'
+import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { positionText } from '#/features/detail/detail-model'
+import { MoreMenu } from '#/features/detail/more-menu'
 
 // DESIGN detail-header (mockups S01-list-mode-desktop, SD-board-detail-desktop,
 // S05-overview-phone, S05-name-expanded-phone): the name, ‹ 「第 N 個／共 M
-// 個」 ›, ⋯ (disabled until story 2.6) and, on the board panel and the
+// 個」 ›, ⋯ (story 2.6: the 暫停／繼續 menu, more-menu.tsx) and, on the board panel and the
 // phone, ✕; a `border` line below. Three layouts:
 // - `row`, desktop list mode (panel about 660px): one row, the name takes
 //   the rest, then the nav group, then ⋯.
@@ -57,8 +59,7 @@ const ICON = { size: 18, strokeWidth: 2.4, 'aria-hidden': true } as const
 export interface DetailHeaderProps {
   layout: DetailHeaderLayout
   /** The viewed torrent; a new one collapses an expanded phone name. */
-  hash: string
-  name: string
+  torrent: SlimTorrent
   /** Names the dialog on the phone (the sheet's `aria-labelledby`). */
   titleId?: string
   position: DetailPosition
@@ -74,8 +75,7 @@ export interface DetailHeaderProps {
 
 export function DetailHeader({
   layout,
-  hash,
-  name,
+  torrent,
   titleId,
   position,
   columnName,
@@ -84,6 +84,7 @@ export function DetailHeader({
   closeRef,
 }: DetailHeaderProps) {
   const phone = layout === 'phone'
+  const { hash, name } = torrent
   // The hash whose name is expanded: switching torrents collapses it.
   const [expandedFor, setExpandedFor] = useState<string | null>(null)
   const expanded = phone && expandedFor === hash
@@ -140,22 +141,7 @@ export function DetailHeader({
     </div>
   )
 
-  const more = (
-    <IconButton label="更多動作" phone={phone} disabled>
-      {/* The mockup's three filled dots. */}
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <circle cx="5" cy="12" r="1.8" />
-        <circle cx="12" cy="12" r="1.8" />
-        <circle cx="19" cy="12" r="1.8" />
-      </svg>
-    </IconButton>
-  )
+  const more = <MoreMenu torrent={torrent} phone={phone} />
 
   const close = onClose && (
     <IconButton

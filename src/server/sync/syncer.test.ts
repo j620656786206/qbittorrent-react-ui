@@ -36,7 +36,7 @@ function setup(answers: Array<Answer> = [], instanceId = ID) {
     if (next instanceof Error) return Promise.reject(next)
     return Promise.resolve(next)
   })
-  const client: QbitClient = { syncMaindata }
+  const client: Pick<QbitClient, 'syncMaindata'> = { syncMaindata }
   const syncer = createSyncer({ client, now: () => clock, instanceId })
   return {
     syncer,

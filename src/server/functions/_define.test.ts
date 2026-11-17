@@ -275,7 +275,7 @@ describe('guard() hardening', () => {
     })
   })
 
-  it.each([65_537, -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY])(
+  it.each([393_217, -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY])(
     'throws at definition time for bodyLimit %s',
     (bodyLimit) => {
       expect(() => makeGuarded(async () => ok(1), { bodyLimit })).toThrow(
@@ -287,7 +287,7 @@ describe('guard() hardening', () => {
   it('accepts bodyLimit 0 and the request ceiling', () => {
     expect(() => makeGuarded(async () => ok(1), { bodyLimit: 0 })).not.toThrow()
     expect(() =>
-      makeGuarded(async () => ok(1), { bodyLimit: 65_536 }),
+      makeGuarded(async () => ok(1), { bodyLimit: 393_216 }),
     ).not.toThrow()
   })
 

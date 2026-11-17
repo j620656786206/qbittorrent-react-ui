@@ -3,6 +3,7 @@ import { testSession } from '#/server/auth/testing'
 import {
   ANONYMOUS_BODY_LIMIT,
   DEFAULT_BODY_LIMIT,
+  HASH_LIST_BODY_LIMIT,
   MAX_REQUEST_BODY,
   bodyLimit,
 } from './body-limit'
@@ -38,9 +39,11 @@ async function expectTooLarge(response: Response) {
 }
 
 describe('body limit (AR-27)', () => {
-  it('uses 64 KB as default, request ceiling and anonymous ceiling', () => {
+  it('uses 64 KB as default and anonymous ceiling, 384 KB as request ceiling', () => {
     expect(DEFAULT_BODY_LIMIT).toBe(65_536)
-    expect(MAX_REQUEST_BODY).toBe(65_536)
+    // Story 2.6, AD-12: the hash-list limit is the ceiling.
+    expect(HASH_LIST_BODY_LIMIT).toBe(393_216)
+    expect(MAX_REQUEST_BODY).toBe(HASH_LIST_BODY_LIMIT)
     // Never raise this with MAX_REQUEST_BODY: it is what a caller without a
     // session can make the container read and parse.
     expect(ANONYMOUS_BODY_LIMIT).toBe(65_536)
@@ -53,6 +56,33 @@ describe('body limit (AR-27)', () => {
       context: { session: testSession() },
     })
     expect(next).toHaveBeenCalledWith({ context: { bodyBytes: 1000 } })
+  })
+
+  it('story 2.6: a logged-in body of exactly 393 216 bytes reaches next', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'z'.repeat(HASH_LIST_BODY_LIMIT),
+    })
+    const { next } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).toHaveBeenCalledWith({
+      context: { bodyBytes: HASH_LIST_BODY_LIMIT },
+    })
+  })
+
+  it('story 2.6: a logged-in body of 393 217 bytes gets 413', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'z'.repeat(HASH_LIST_BODY_LIMIT + 1),
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).not.toHaveBeenCalled()
+    await expectTooLarge(response)
   })
 
   it('treats a session look-alike as anonymous', async () => {

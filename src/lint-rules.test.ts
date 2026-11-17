@@ -212,8 +212,35 @@ const PROBES: Record<string, string> = {
   ),
   'src/features/lint-probe/state-variable-key.ts':
     'declare const LABELS: Record<string, string>\ndeclare const state: string\n\nexport const label = LABELS[state]\n',
+  'src/features/lint-probe/toaster.ts': importFrom(
+    '#/shared/ui/toaster',
+    'Toaster',
+  ),
+  'src/routes/-lint-probe-toaster.tsx': importFrom(
+    '../shared/ui/toaster',
+    'showToast',
+  ),
+  'src/shared/ui/lint-probe-toaster.tsx': importFrom('./toaster', 'Toaster'),
+  'src/state/lint-probe-toaster.ts': importFrom(
+    '#/shared/ui/toaster',
+    'showToast',
+  ),
+  'src/features/lint-probe/toast-api.ts': importFrom('#/lib/toast', 'toast'),
+  'src/lib/lint-probe-toaster.ts': importFrom(
+    '#/shared/ui/toaster',
+    'showToast',
+  ),
   'src/features/lint-probe/router-state.ts':
     "declare const router: { state: { status: string } }\n\nexport const idle = router.state.status === 'idle'\n",
+}
+
+// Probes at the path of a real file, kept under their own key so the real
+// file's result (REAL_FILES) does not replace them.
+const PROBES_AT_REAL_PATHS: Record<string, { file: string; source: string }> = {
+  'probe:src/lib/toast.ts': {
+    file: 'src/lib/toast.ts',
+    source: importFrom('#/shared/ui/cn', 'cn'),
+  },
 }
 
 // Real files linted alongside the probes (read only).
@@ -223,6 +250,8 @@ const REAL_FILES = [
   'src/server/functions/__fixtures__/sample.ts',
   'src/shared/ui/cn.ts',
   'src/shared/zod.ts',
+  'src/lib/toast.ts',
+  'src/routes/__root.tsx',
 ]
 
 const results = new Map<string, Array<Linter.LintMessage>>()
@@ -270,6 +299,12 @@ beforeAll(async () => {
       filePath: join(ROOT, file),
     })
     results.set(file, result.messages)
+  }
+  for (const [key, { file, source }] of Object.entries(PROBES_AT_REAL_PATHS)) {
+    const [result] = await probes.lintText(source, {
+      filePath: join(ROOT, file),
+    })
+    results.set(key, result.messages)
   }
   const real = await new ESLint({ cwd: ROOT }).lintFiles(REAL_FILES)
   for (const result of real) {
@@ -428,6 +463,33 @@ describe('src/shared/ui only from screens', () => {
 
   it('allows it from a route', () => {
     expect(ruleIds('src/routes/-lint-probe-ui.tsx')).toEqual([])
+  })
+})
+
+describe('AD-13 the toaster only through src/lib/toast.ts', () => {
+  it.each([
+    ['a feature', 'src/features/lint-probe/toaster.ts'],
+    ['a route other than __root', 'src/routes/-lint-probe-toaster.tsx'],
+    ['another src/shared/ui file', 'src/shared/ui/lint-probe-toaster.tsx'],
+    ['src/state', 'src/state/lint-probe-toaster.ts'],
+    ['another src/lib file', 'src/lib/lint-probe-toaster.ts'],
+  ])('blocks it from %s', (_name, file) => {
+    expect(ruleIds(file)).toContain('no-restricted-imports')
+  })
+
+  it('src/lib/toast.ts still may not import other src/shared/ui modules', () => {
+    expect(ruleIds('probe:src/lib/toast.ts')).toContain('no-restricted-imports')
+  })
+
+  it.each([
+    ['src/lib/toast.ts', 'src/lib/toast.ts'],
+    ['the root', 'src/routes/__root.tsx'],
+    [
+      'a feature using src/lib/toast.ts',
+      'src/features/lint-probe/toast-api.ts',
+    ],
+  ])('allows %s', (_name, file) => {
+    expect(ruleIds(file)).not.toContain('no-restricted-imports')
   })
 })
 

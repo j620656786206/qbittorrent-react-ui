@@ -43,6 +43,17 @@
 //          案中, 已暫停, 停滯, 做種中, 已完成, 找不到檔案, 錯誤, 狀態不明,
 //          已整理); the first has a long save path with Chinese in it
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
+//   ops:   normal | reject (story 2.6: reject answers torrents/stop and
+//          torrents/start with HTTP 400, which the container maps to
+//          qbit_rejected)
+//   Any `data` parameter (even the current one) also clears the stop/start
+//   state overrides and the call log below.
+// Story 2.6: POST /api/v2/torrents/stop and /start (cookie required, form
+// field `hashes`, `|` between) record each call and override those
+// torrents' states for the next maindata: stop gives stoppedUP when complete
+// else stoppedDL; start gives uploading when complete else downloading.
+// The calls (loopback only, rejected ones marked `rejected: true`):
+//   curl 'http://localhost:3100/__fake/ops'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
@@ -91,6 +102,7 @@ const DATA_MODES = new Set([
   'states',
 ])
 const GROW_MODES = new Set(['0', '1'])
+const OPS_MODES = new Set(['normal', 'reject'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -101,7 +113,13 @@ const FRONT_MODES = new Set([
 // A reserved name (RFC 2606): never resolves, never leaves this machine.
 const ACCESS_LOGIN = 'https://access.example/cdn-cgi/access/login'
 const ACCESS_PAGE = '<!doctype html><html><body><h1>Sign in</h1></body></html>'
-const mode = { qbit: 'normal', front: 'normal', data: 'sample', grow: '0' }
+const mode = {
+  qbit: 'normal',
+  front: 'normal',
+  data: 'sample',
+  grow: '0',
+  ops: 'normal',
+}
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
 function frontPort() {
@@ -540,10 +558,50 @@ function withSpeeds(torrents, tick) {
   return out
 }
 
+/** Story 2.6: state codes set by stop/start calls, by hash. */
+const stateOverrides = new Map()
+/** Story 2.6: every stop/start call, oldest first. */
+const opLog = []
+
+function withOverrides(torrents) {
+  if (stateOverrides.size === 0) return torrents
+  const out = { ...torrents }
+  for (const [key, state] of stateOverrides) {
+    if (out[key]) out[key] = { ...out[key], state }
+  }
+  return out
+}
+
 function currentTorrents(tick) {
   const base = DATA[mode.data]
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
-  return growCount > 0 ? { ...torrents, ...grown } : torrents
+  return withOverrides(growCount > 0 ? { ...torrents, ...grown } : torrents)
+}
+
+const OP_PATHS = {
+  '/api/v2/torrents/stop': 'stop',
+  '/api/v2/torrents/start': 'start',
+}
+
+/** stop/start: record the call and override the states it names. */
+function applyOp(op, hashes) {
+  opLog.push({ op, hashes })
+  const torrents = currentTorrents(rid)
+  for (const key of hashes) {
+    const torrent = torrents[key]
+    if (!torrent) continue
+    const complete = torrent.progress >= 1
+    stateOverrides.set(
+      key,
+      op === 'stop'
+        ? complete
+          ? 'stoppedUP'
+          : 'stoppedDL'
+        : complete
+          ? 'uploading'
+          : 'downloading',
+    )
+  }
 }
 
 const CATEGORIES = {
@@ -602,6 +660,19 @@ const fakeQbit = createServer(async (req, res) => {
       'set-cookie': 'SID=fake; HttpOnly; path=/',
     })
   }
+  if (req.method === 'POST' && Object.hasOwn(OP_PATHS, url.pathname)) {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    const form = new URLSearchParams(await readBody(req))
+    const hashes = (form.get('hashes') ?? '').split('|').filter(Boolean)
+    if (mode.ops === 'reject') {
+      // Logged too, so a test can see 重試 really sent again.
+      opLog.push({ op: OP_PATHS[url.pathname], hashes, rejected: true })
+      return send(res, 400, 'Bad Request')
+    }
+    applyOp(OP_PATHS[url.pathname], hashes)
+    return send(res, 200, '')
+  }
   if (req.method === 'GET' && url.pathname === '/api/v2/sync/maindata') {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
       return send(res, 403, 'Forbidden')
@@ -644,6 +715,7 @@ function controlMode(req, res, url) {
       front: FRONT_MODES,
       data: DATA_MODES,
       grow: GROW_MODES,
+      ops: OPS_MODES,
     }
     const next = {}
     for (const [name, values] of Object.entries(allowed)) {
@@ -658,9 +730,14 @@ function controlMode(req, res, url) {
       for (const key of Object.keys(grown)) delete grown[key]
       growCount = 0
     }
+    // Any data parameter starts from the data set as written.
+    if (next.data) {
+      stateOverrides.clear()
+      opLog.length = 0
+    }
     Object.assign(mode, next)
     console.log(
-      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow}`,
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops}`,
     )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
@@ -670,10 +747,21 @@ function controlMode(req, res, url) {
   })
 }
 
+/** Story 2.6: the stop/start calls so far (loopback only, GET). */
+function controlOps(req, res) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'GET') return send(res, 405, 'GET\n')
+  send(res, 200, `${JSON.stringify({ calls: opLog })}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
 function frontHandler(appPort) {
   return (req, res) => {
     const url = new URL(req.url ?? '/', 'http://front')
     if (url.pathname === '/__fake/mode') return controlMode(req, res, url)
+    if (url.pathname === '/__fake/ops') return controlOps(req, res)
     if (mode.front === 'down' && url.pathname.startsWith(SERVER_FN_PREFIX)) {
       return send(res, 502, '<html><body>Bad gateway</body></html>', {
         'content-type': 'text/html; charset=utf-8',
@@ -826,11 +914,13 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0'
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
-  data:  sample | many | empty | archived
+  data:  sample | many | empty | archived | calm | states
   grow:  0 | 1
+  ops:   normal | reject
+stop/start calls: curl '${origin}/__fake/ops'
 Ctrl+C stops everything.`)
 }
 

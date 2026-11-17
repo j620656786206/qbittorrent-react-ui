@@ -109,6 +109,8 @@ export interface Modes {
   front?: 'normal' | 'down' | 'cloudflare'
   data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm' | 'states'
   grow?: '0' | '1'
+  /** Story 2.6: `reject` answers torrents/stop and /start with HTTP 400. */
+  ops?: 'normal' | 'reject'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -116,6 +118,18 @@ export const DEFAULT_MODES: Required<Modes> = {
   front: 'normal',
   data: 'sample',
   grow: '0',
+  ops: 'normal',
+}
+
+/** Story 2.6: the stop/start calls the fake qBittorrent received. */
+export async function opCalls(
+  request: APIRequestContext,
+): Promise<
+  Array<{ op: 'stop' | 'start'; hashes: Array<string>; rejected?: true }>
+> {
+  const response = await request.get('/__fake/ops')
+  expect(response.ok(), await response.text()).toBe(true)
+  return ((await response.json()) as { calls: never }).calls
 }
 
 /** Switches the fake server through its loopback-only control route. */

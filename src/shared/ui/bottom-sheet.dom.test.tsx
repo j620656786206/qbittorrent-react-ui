@@ -10,6 +10,7 @@ import {
 } from '#/shared/ui/bottom-sheet'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
+import { TOAST_REGION_ATTR } from '#/shared/ui/toast-region'
 
 // Spec 2.2 rows B1 to B5, B10, B14: the shared bottom sheet's wiring in a
 // DOM, with the real snap decisions (src/shared/ui/sheet-snap.test.ts covers
@@ -231,6 +232,21 @@ describe('B2 close', () => {
     await mount()
     await act(async () => opener.focus())
     expect(dialog()?.contains(document.activeElement)).toBe(true)
+  })
+
+  it('T3 the toast region stays usable: not inert, focus inside it stays', async () => {
+    const region = document.createElement('div')
+    region.setAttribute(TOAST_REGION_ATTR, '')
+    const retry = document.createElement('button')
+    retry.textContent = '重試'
+    region.append(retry)
+    document.body.append(region)
+    await mount()
+    expect(region.hasAttribute('inert')).toBe(false)
+    expect(main.hasAttribute('inert')).toBe(true)
+    await act(async () => retry.focus())
+    expect(document.activeElement).toBe(retry)
+    region.remove()
   })
 })
 
