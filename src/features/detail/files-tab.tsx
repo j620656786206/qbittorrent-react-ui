@@ -1,18 +1,8 @@
 import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
-import {
-  MutationObserver,
-  useMutationState,
-  useQueryClient,
-} from '@tanstack/react-query'
-import type { QueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
-import { isAppError } from '#/lib/app-error'
-import {
-  FILES_LOAD_FAILED,
-  fileActionFailureText,
-  isOperationFailureCode,
-} from '#/lib/error-text'
+import { FILES_LOAD_FAILED, fileActionFailureText } from '#/lib/error-text'
 import {
   FILE_PRIORITY_CHOICES,
   FILE_PRIORITY_WORDS,
@@ -23,7 +13,6 @@ import {
 } from '#/lib/file-priority'
 import type { FilePriorityLevel } from '#/lib/file-priority'
 import { formatPercent, formatSize } from '#/lib/format'
-import { toast } from '#/lib/toast'
 import { heroKindOf } from '#/lib/torrent-status'
 import { getFiles } from '#/server/functions/get-files'
 import { setFilePriority } from '#/server/functions/set-file-priority'
@@ -50,16 +39,12 @@ import { Skeleton } from '#/shared/ui/skeleton'
 import { callFn } from '#/state/call-fn'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import {
-  clearPending,
-  filePendingKey,
-  markPending,
-  useIsPending,
-} from '#/state/pending-ops'
-import {
   bindFetchFiles,
   filesKey,
   useTorrentFiles,
 } from '#/state/torrent-files'
+import { sendOp, useOpsInFlight } from '#/state/tracked-op'
+import type { TrackedOp } from '#/state/tracked-op'
 
 // Story 2.7 (EXPERIENCE 檔案分頁, DESIGN 詳情由上到下; mockups
 // S04-files-desktop, S05-files-phone): under the sticky header and tabs the
@@ -78,15 +63,15 @@ import {
 // priority 0, ticking 1, the pill's menu 1, 6 or 7 (the current level sends
 // nothing); an unticked row's pill reads 不下載 and is disabled. From the
 // send until the `['files', hash]` refetch after it settles, that row's
-// checkbox and pill are disabled (`pendingOps`, keyed per file, AD-7; the
-// 30 s timer is the fallback). Success: no toast, no local change, the row
-// follows the refetch. `qbit_rejected`, `timeout`, `invalid_input`: a
-// failure toast with 「重試」 resending the same call; a new change to that
-// file closes its toast. Connection codes and `bad_origin` are the global
-// `onError`'s. The menu is Radix's non-modal DropdownMenu
+// checkbox and pill are disabled: the call is in flight that long, since
+// `onSuccess` awaits the refetch (AD-7, `useOpsInFlight`). Success: no
+// toast, no local change, the row follows the refetch. Failures go through
+// `sendOp` (src/state/tracked-op.ts): `qbit_rejected`, `timeout`,
+// `invalid_input` show a failure toast with 「重試」 resending the same call,
+// and a new change to that file closes its toast. The menu is Radix's
+// non-modal DropdownMenu
 // (https://www.radix-ui.com/primitives/docs/components/dropdown-menu); in
-// the phone sheet it portals into the sheet (story 2.6). Calls go through a
-// MutationObserver so 重試 works after the tab closed, like 2.6's ⋯ menu.
+// the phone sheet it portals into the sheet (story 2.6).
 // https://tanstack.com/query/v5/docs/reference/QueryClient (invalidateQueries)
 
 const fetchFiles = bindFetchFiles(getFiles)
@@ -97,55 +82,15 @@ const ROW_GAP = 2
 const OVERSCAN = 10
 const SKELETON_ROWS = 5
 const estimateSize = () => FILE_ROW_HEIGHT
-const FILE_OP_KEY = ['set-file-priority'] as const
-const PENDING_OP = 'file-priority'
 
-/** Per file key, closes its failure toast if that toast still shows. */
-const failureToasts = new Map<string, () => void>()
-
-const keysOf = ({ hash, ids }: SetFilePriorityInput) =>
-  ids.map((id) => filePendingKey(hash, id))
-
-function fileOpOptions(client: QueryClient) {
-  return {
-    mutationKey: FILE_OP_KEY,
-    mutationFn: (variables: SetFilePriorityInput) =>
-      callFn(setFilePriority, variables),
-    onMutate: (variables: SetFilePriorityInput) => {
-      for (const key of keysOf(variables)) {
-        failureToasts.get(key)?.()
-        failureToasts.delete(key)
-        markPending(key, PENDING_OP)
-      }
-    },
-    // Awaited by the mutation: it stays pending until the refetch settled.
-    onSuccess: async (_data: unknown, variables: SetFilePriorityInput) => {
-      try {
-        await client.invalidateQueries({ queryKey: filesKey(variables.hash) })
-      } finally {
-        for (const key of keysOf(variables)) clearPending(key)
-      }
-    },
-    onError: (error: Error, variables: SetFilePriorityInput) => {
-      for (const key of keysOf(variables)) clearPending(key)
-      if (!isAppError(error) || !isOperationFailureCode(error.code)) return
-      const { dismiss } = toast.failure(fileActionFailureText(error.code), {
-        onRetry: () => sendFileOp(client, variables),
-      })
-      for (const key of keysOf(variables)) failureToasts.set(key, dismiss)
-    },
-  }
-}
-
-/** One call, whether or not the tab is still mounted (重試 too). */
-function sendFileOp(client: QueryClient, variables: SetFilePriorityInput) {
-  const observer = new MutationObserver(client, fileOpOptions(client))
-  // The failure path already ran in onError. Detached once settled, so the
-  // finished mutation has no observer and the cache can collect it.
-  observer
-    .mutate(variables)
-    .catch(() => undefined)
-    .finally(() => observer.reset())
+const fileOp: TrackedOp<SetFilePriorityInput> = {
+  name: 'set-file-priority',
+  call: (variables) => callFn(setFilePriority, variables),
+  keysOf: ({ hash, ids }) => ids.map((id) => `file:${hash}:${id}`),
+  failureText: (_variables, code) => fileActionFailureText(code),
+  // Awaited: the call stays in flight (the row locked) until the refetch.
+  onSuccess: (client, { hash }) =>
+    client.invalidateQueries({ queryKey: filesKey(hash) }),
 }
 
 export function FilesTab({
@@ -266,12 +211,8 @@ function FileRows({
     return () => observer.disconnect()
   }, [])
 
-  // Files whose call (and the refetch after it) is still running: locked
-  // even when the 30 s pending mark already ended.
-  const inFlight = useMutationState({
-    filters: { mutationKey: FILE_OP_KEY, status: 'pending' },
-    select: (mutation) => mutation.state.variables as SetFilePriorityInput,
-  })
+  // Files whose call (and the refetch after it) is still running.
+  const inFlight = useOpsInFlight(fileOp)
   const busy = new Set(
     inFlight
       .filter((variables) => variables.hash === hash)
@@ -280,7 +221,7 @@ function FileRows({
 
   const send = useCallback(
     (index: number, priority: FilePriority) =>
-      sendFileOp(client, { hash, ids: [index], priority }),
+      sendOp(fileOp, client, { hash, ids: [index], priority }),
     [client, hash],
   )
 
@@ -320,7 +261,6 @@ function FileRows({
             }}
           >
             <FileRow
-              hash={hash}
               file={file}
               phone={phone}
               busy={busy.has(file.index)}
@@ -334,20 +274,16 @@ function FileRows({
 }
 
 const FileRow = memo(function FileRowView({
-  hash,
   file,
   phone,
   busy,
   onSend,
 }: {
-  hash: string
   file: TorrentFile
   phone: boolean
   busy: boolean
   onSend: (index: number, priority: FilePriority) => void
 }) {
-  const pending = useIsPending(filePendingKey(hash, file.index))
-  const locked = pending || busy
   const wanted = isFileWanted(file.priority)
   return (
     <div
@@ -358,7 +294,7 @@ const FileRow = memo(function FileRowView({
     >
       <Checkbox
         checked={wanted}
-        disabled={locked}
+        disabled={busy}
         aria-label={`下載這個檔案：${file.name}`}
         onCheckedChange={(checked) =>
           onSend(file.index, tickPriority(checked === true))
@@ -387,7 +323,7 @@ const FileRow = memo(function FileRowView({
           <PriorityMenu
             file={file}
             phone={phone}
-            disabled={locked || !wanted}
+            disabled={busy || !wanted}
             onSend={onSend}
           />
         </div>

@@ -212,24 +212,23 @@ const PROBES: Record<string, string> = {
   ),
   'src/features/lint-probe/state-variable-key.ts':
     'declare const LABELS: Record<string, string>\ndeclare const state: string\n\nexport const label = LABELS[state]\n',
-  'src/features/lint-probe/toaster.ts': importFrom(
-    '#/shared/ui/toaster',
-    'Toaster',
+  'src/features/lint-probe/toast-store.ts': importFrom(
+    '#/shared/toast-store',
+    'toastStore',
   ),
-  'src/routes/-lint-probe-toaster.tsx': importFrom(
-    '../shared/ui/toaster',
-    'showToast',
+  'src/routes/-lint-probe-toast-store.tsx': importFrom(
+    '../shared/toast-store',
+    'toastStore',
   ),
-  'src/shared/ui/lint-probe-toaster.tsx': importFrom('./toaster', 'Toaster'),
-  'src/state/lint-probe-toaster.ts': importFrom(
-    '#/shared/ui/toaster',
-    'showToast',
+  'src/state/lint-probe-toast-store.ts': importFrom(
+    '#/shared/toast-store',
+    'toastStore',
+  ),
+  'src/shared/ui/lint-probe-toast-store.tsx': importFrom(
+    '../toast-store',
+    'toastStore',
   ),
   'src/features/lint-probe/toast-api.ts': importFrom('#/lib/toast', 'toast'),
-  'src/lib/lint-probe-toaster.ts': importFrom(
-    '#/shared/ui/toaster',
-    'showToast',
-  ),
   'src/features/lint-probe/router-state.ts':
     "declare const router: { state: { status: string } }\n\nexport const idle = router.state.status === 'idle'\n",
 }
@@ -466,30 +465,32 @@ describe('src/shared/ui only from screens', () => {
   })
 })
 
-describe('AD-13 the toaster only through src/lib/toast.ts', () => {
+describe('AD-13 the toast store only through src/lib/toast.ts', () => {
   it.each([
-    ['a feature', 'src/features/lint-probe/toaster.ts'],
-    ['a route other than __root', 'src/routes/-lint-probe-toaster.tsx'],
-    ['another src/shared/ui file', 'src/shared/ui/lint-probe-toaster.tsx'],
-    ['src/state', 'src/state/lint-probe-toaster.ts'],
-    ['another src/lib file', 'src/lib/lint-probe-toaster.ts'],
+    ['a feature', 'src/features/lint-probe/toast-store.ts'],
+    ['a route', 'src/routes/-lint-probe-toast-store.tsx'],
+    ['src/state', 'src/state/lint-probe-toast-store.ts'],
   ])('blocks it from %s', (_name, file) => {
-    expect(ruleIds(file)).toContain('no-restricted-imports')
+    expect(ruleIds(file)).toContain('boundaries/dependencies')
   })
 
-  it('src/lib/toast.ts still may not import other src/shared/ui modules', () => {
+  it('src/lib/toast.ts still may not import src/shared/ui modules', () => {
     expect(ruleIds('probe:src/lib/toast.ts')).toContain('no-restricted-imports')
   })
 
   it.each([
     ['src/lib/toast.ts', 'src/lib/toast.ts'],
+    [
+      'the renderer in src/shared/ui',
+      'src/shared/ui/lint-probe-toast-store.tsx',
+    ],
     ['the root', 'src/routes/__root.tsx'],
     [
       'a feature using src/lib/toast.ts',
       'src/features/lint-probe/toast-api.ts',
     ],
   ])('allows %s', (_name, file) => {
-    expect(ruleIds(file)).not.toContain('no-restricted-imports')
+    expect(ruleIds(file)).toEqual([])
   })
 })
 

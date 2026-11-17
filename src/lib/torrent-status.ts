@@ -275,6 +275,28 @@ export function pauseActionOf(
   return status === 'paused' || status === 'done' ? 'start' : 'stop'
 }
 
+/** State kinds qBittorrent keeps after a stop or start (they win over it). */
+const KEPT_AFTER_PAUSE: ReadonlySet<StateKind> = new Set([
+  'error',
+  'missing_files',
+  'unknown',
+])
+
+/**
+ * Story 2.6: whether qBittorrent shows `pauseActionOf`'s action by flipping
+ * it soon. Not for errors and missing files: qBittorrent's state checks
+ * those before stopped, so after a stop the state code (and the action)
+ * stays; not while moving (the code stays `moving` until the move ends);
+ * nor for an unknown code, which cannot be judged.
+ */
+export function pauseActionFlips(
+  torrent: SlimTorrent,
+  stateBeforeMove: Readonly<Record<string, string>>,
+): boolean {
+  if (kindOf(torrent.state) === 'moving') return false
+  return !KEPT_AFTER_PAUSE.has(effectiveKind(torrent, stateBeforeMove).kind)
+}
+
 /** The menu item's word for an action. */
 export const PAUSE_ACTION_WORDS: Readonly<Record<PauseAction, string>> = {
   stop: '暫停',

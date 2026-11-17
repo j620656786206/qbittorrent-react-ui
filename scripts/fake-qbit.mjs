@@ -600,13 +600,19 @@ const OP_PATHS = {
   '/api/v2/torrents/start': 'start',
 }
 
+/**
+ * qBittorrent checks these before "stopped", so a stop or start leaves the
+ * state code as it was (TorrentImpl::updateState); the fake does the same.
+ */
+const KEPT_STATES = new Set(['error', 'missingFiles'])
+
 /** stop/start: record the call and override the states it names. */
 function applyOp(op, hashes) {
   opLog.push({ op, hashes })
   const torrents = currentTorrents(rid)
   for (const key of hashes) {
     const torrent = torrents[key]
-    if (!torrent) continue
+    if (!torrent || KEPT_STATES.has(torrent.state)) continue
     const complete = torrent.progress >= 1
     stateOverrides.set(
       key,

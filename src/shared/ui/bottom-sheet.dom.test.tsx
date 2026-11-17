@@ -10,7 +10,7 @@ import {
 } from '#/shared/ui/bottom-sheet'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
-import { TOAST_REGION_ATTR } from '#/shared/ui/toast-region'
+import { TOAST_REGION_ATTR } from '#/shared/ui/toaster'
 
 // Spec 2.2 rows B1 to B5, B10, B14: the shared bottom sheet's wiring in a
 // DOM, with the real snap decisions (src/shared/ui/sheet-snap.test.ts covers

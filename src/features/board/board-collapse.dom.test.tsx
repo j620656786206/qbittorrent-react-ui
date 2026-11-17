@@ -22,6 +22,7 @@ import {
   EXPAND_MS,
   SPREAD_MS,
 } from '#/features/board/board-collapse'
+import { BoardCollapseController } from '#/features/board/board-collapse-controller'
 import { TorrentBoard } from '#/features/board/torrent-board'
 
 // Spec 2.8 rows C1, C2, C4, E1, E2, F1, R1, P1, V1 in a DOM (happy-dom).
@@ -295,6 +296,8 @@ describe('C1 R1 collapse (reduced motion: at once)', () => {
     const strip = button(/^回到看板，下載中/)
     expect(strip.getAttribute('aria-label')).toBe('回到看板，下載中，2 個')
     expect(strip.textContent).toBe('2下載中')
+    // A press restores the board, it does not expand that column.
+    expect(strip.hasAttribute('aria-expanded')).toBe(false)
     expect(button(/^回到看板，已整理/).getAttribute('aria-label')).toBe(
       '回到看板，已整理，0 個',
     )
@@ -789,6 +792,106 @@ describe('C4 F1 with animations', () => {
     expect(body('做種中').scrollTop).toBe(0)
     expect(animate).toHaveBeenCalled()
     await wait(EXPAND_MS + 100)
+    expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+describe('review fixes', () => {
+  it('R1 reduced motion ends only after the commit, so the pin is applied first', async () => {
+    const views: Array<unknown> = []
+    const controller = new BoardCollapseController((next) => views.push(next))
+    const rootElement = document.createElement('div')
+    const scroller = document.createElement('div')
+    rootElement.append(scroller)
+    document.body.append(rootElement)
+    controller.setRoot(rootElement)
+    controller.scrollerRef('seeding')(scroller)
+    expect(controller.collapse('seeding')).toBe(true)
+    expect(views).toHaveLength(1)
+    // No commit yet: no timer may end it (that would clear the pin in the
+    // same render, before the pin's layout effect runs).
+    await wait(1000)
+    expect(freezeStore.state.animation).toBe(true)
+    expect(views).toHaveLength(1)
+    // The hook's layout effect after the commit ends it.
+    controller.runPending()
+    expect(freezeStore.state.animation).toBe(false)
+    controller.setRoot(null)
+    rootElement.remove()
+  })
+
+  it('wheel and touchmove on the board are passive except during a transition', async () => {
+    reduced = false
+    const added: Array<{ type: string; passive: unknown }> = []
+    const removed: Array<string> = []
+    const add = HTMLElement.prototype.addEventListener
+    const remove = HTMLElement.prototype.removeEventListener
+    vi.spyOn(HTMLElement.prototype, 'addEventListener').mockImplementation(
+      function (this: HTMLElement, type, listener, options) {
+        if (this.getAttribute('aria-label') === '看板') {
+          added.push({
+            type,
+            passive: typeof options === 'object' ? options.passive : undefined,
+          })
+        }
+        add.call(this, type, listener, options)
+      },
+    )
+    vi.spyOn(HTMLElement.prototype, 'removeEventListener').mockImplementation(
+      function (this: HTMLElement, type, listener, options) {
+        if (this.getAttribute('aria-label') === '看板') removed.push(type)
+        remove.call(this, type, listener, options)
+      },
+    )
+    await render(fakeResponse({ changed: data() }))
+    const scrollers = added.filter(
+      (each) => each.type === 'wheel' || each.type === 'touchmove',
+    )
+    expect(scrollers.length).toBeGreaterThan(0)
+    expect(scrollers.every((each) => each.passive === true)).toBe(true)
+    added.length = 0
+    await scroll(body('做種中'), 700)
+    expect(added).toEqual([
+      { type: 'wheel', passive: false },
+      { type: 'touchmove', passive: false },
+    ])
+    await wait(COLLAPSE_MS)
+    await wait(SPREAD_MS + 300)
+    expect(freezeStore.state.animation).toBe(false)
+    expect(removed).toEqual(['wheel', 'touchmove'])
+  })
+
+  it('a step ends when its last animation does, delays included', async () => {
+    reduced = false
+    restores.at(-1)?.()
+    stubPrototype('clientWidth', 900)
+    animate.mockImplementation(
+      (_frames: unknown, options: { duration: number; delay?: number }) => ({
+        cancel: () => {},
+        finished: Promise.resolve(),
+        effect: {
+          getComputedTiming: () => ({
+            endTime: (options.delay ?? 0) + options.duration,
+          }),
+        },
+      }),
+    )
+    await render(fakeResponse({ changed: data() }))
+    await scroll(body('做種中'), 700)
+    await wait(COLLAPSE_MS)
+    // Step 2 spreads to three per row, so cards new to the screen rise in
+    // after their staggered delays.
+    const last = Math.max(
+      ...animate.mock.calls.map(
+        ([, options]) =>
+          ((options as { delay?: number }).delay ?? 0) +
+          (options as { duration: number }).duration,
+      ),
+    )
+    expect(last).toBeGreaterThan(SPREAD_MS + 300)
+    await wait(SPREAD_MS + 300)
+    expect(freezeStore.state.animation).toBe(true)
+    await wait(last - SPREAD_MS)
     expect(freezeStore.state.animation).toBe(false)
   })
 })

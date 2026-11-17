@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
 import { getListScroll, getMain } from '#/shared/ui/main-scroll'
-import { TOAST_REGION_ATTR, isInToastRegion } from '#/shared/ui/toast-region'
+import { TOAST_REGION_ATTR, isInToastRegion } from '#/shared/ui/toaster'
 
 // Story 2.2: what an open bottom sheet does to the page around it
 // (APG dialog-modal): the page scroll is locked, everything outside the

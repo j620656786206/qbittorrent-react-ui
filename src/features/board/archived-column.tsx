@@ -110,6 +110,7 @@ export function ArchivedColumn({
       label={`展開已整理欄，${count} 個`}
       sectionLabel="已整理欄"
       onPress={() => toggle(true)}
+      expands
       buttonRef={toggleRef}
     />
   )

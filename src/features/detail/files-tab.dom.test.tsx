@@ -23,12 +23,7 @@ import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { resetOrderFreeze } from '#/state/order-freeze'
-import {
-  clearPending,
-  filePendingKey,
-  pendingOpOf,
-  resetPendingOps,
-} from '#/state/pending-ops'
+import { resetPendingOps } from '#/state/pending-ops'
 import { createQueryClient } from '#/state/query-client'
 import { resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, publishShownList } from '#/state/shown-order'
@@ -84,17 +79,15 @@ vi.mock('#/server/functions/stop-torrents', () => ({
 vi.mock('#/server/functions/start-torrents', () => ({
   startTorrents: () => Promise.resolve({ ok: true, data: { items: [] } }),
 }))
-const toastCalls = vi.hoisted(() => {
-  const dismissFailure = vi.fn()
-  return {
-    dismissFailure,
-    info: vi.fn(),
-    action: vi.fn(),
-    failure: vi.fn((_text: string, _options: { onRetry: () => void }) => ({
-      dismiss: dismissFailure,
-    })),
-  }
-})
+const toastCalls = vi.hoisted(() => ({
+  dismissFor: vi.fn((_key: string) => {}),
+  failure: vi.fn(
+    (
+      _text: string,
+      _options: { keys: ReadonlyArray<string>; onRetry: () => void },
+    ) => {},
+  ),
+}))
 vi.mock('#/lib/toast', () => ({ toast: toastCalls }))
 
 declare global {
@@ -251,9 +244,7 @@ beforeEach(() => {
   prioCalls.sent = []
   prioCalls.answer = () => Promise.resolve({ ok: true, data: null })
   toastCalls.failure.mockClear()
-  toastCalls.info.mockClear()
-  toastCalls.action.mockClear()
-  toastCalls.dismissFailure.mockClear()
+  toastCalls.dismissFor.mockClear()
   resetPendingOps()
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
@@ -573,10 +564,8 @@ describe('changes', () => {
     expect(prioCalls.sent).toEqual([{ hash: h(1), ids: [0], priority: 0 }])
     expect(fileCalls.hashes.length).toBe(before + 1)
     expect(toastCalls.failure).not.toHaveBeenCalled()
-    expect(toastCalls.info).not.toHaveBeenCalled()
     expect(checkbox(E01).getAttribute('aria-checked')).toBe('false')
     expect(prio(E01).textContent).toBe('不下載')
-    expect(pendingOpOf(filePendingKey(h(1), 0))).toBeNull()
 
     files[h(1)] = [file(0, 1), file(1, 0), file(2, 6)]
     await act(async () => checkbox(E01).click())
@@ -624,10 +613,6 @@ describe('changes', () => {
     expect(prio(E01).disabled).toBe(true)
     expect(checkbox(E02).disabled).toBe(false)
     expect(prio(file(2).name).disabled).toBe(false)
-    expect(pendingOpOf(filePendingKey(h(1), 0))).not.toBeNull()
-    // The 30 s mark may end first: still locked while the call runs.
-    await act(async () => clearPending(filePendingKey(h(1), 0)))
-    expect(checkbox(E01).disabled).toBe(true)
     await act(async () => finish({ ok: true, data: files[h(1)] }))
     await settle()
     expect(checkbox(E01).disabled).toBe(false)
@@ -680,7 +665,9 @@ describe('changes', () => {
         { onRetry: () => void },
       ]
       expect(shown).toBe(text)
-      expect(pendingOpOf(filePendingKey(h(1), 0))).toBeNull()
+      expect(toastCalls.failure.mock.calls[0][1].keys).toEqual([
+        `file:${h(1)}:0`,
+      ])
       expect(checkbox(E01).disabled).toBe(false)
       // 重試 works even after the detail closed.
       await act(async () => root.unmount())
@@ -705,7 +692,7 @@ describe('changes', () => {
       await act(async () => checkbox(E01).click())
       await settle()
       expect(toastCalls.failure).not.toHaveBeenCalled()
-      expect(pendingOpOf(filePendingKey(h(1), 0))).toBeNull()
+      expect(checkbox(E01).disabled).toBe(false)
     },
   )
 
@@ -718,15 +705,15 @@ describe('changes', () => {
       })
     await act(async () => checkbox(E01).click())
     await settle()
-    expect(toastCalls.dismissFailure).not.toHaveBeenCalled()
+    expect(toastCalls.failure).toHaveBeenCalledOnce()
     prioCalls.answer = () => Promise.resolve({ ok: true, data: null })
-    // Another file leaves it alone; the same file closes it.
+    // Each send closes the toast about its own file (the store matches it).
     await openMenu(file(2).name)
     await choose('最高')
-    expect(toastCalls.dismissFailure).not.toHaveBeenCalled()
+    expect(toastCalls.dismissFor).toHaveBeenLastCalledWith(`file:${h(1)}:2`)
     await act(async () => checkbox(E01).click())
     await settle()
-    expect(toastCalls.dismissFailure).toHaveBeenCalledOnce()
+    expect(toastCalls.dismissFor).toHaveBeenLastCalledWith(`file:${h(1)}:0`)
   })
 })
 

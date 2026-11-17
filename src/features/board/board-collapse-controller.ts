@@ -39,8 +39,14 @@ import type { CardLayout, CardPin } from '#/features/board/card-list'
 // While a transition runs (`busy`): the order freeze holds (AD-7, from the
 // first measure to the end, released on unmount too), wheel, touch and
 // scroll keys on the board are cancelled, and no other collapse or expand
-// starts. Scrolls the code makes itself (the pin, the scroll to the top)
-// happen inside that window, so they never count as Alex's.
+// starts. The cancelling (non-passive) wheel and touchmove listeners are
+// on the board only for that window, so ordinary scrolling never waits for
+// the main thread. A step ends after its own length plus settle, or when
+// its last animation does (the per-card delays included), whichever is
+// later. Reduced motion has no animation, but still ends after the commit
+// (`instant`), so the pin is applied before it is cleared. Scrolls the code
+// makes itself (the pin, the scroll to the top) happen inside that window,
+// so they never count as Alex's.
 //
 // Docs (AD-11): https://developer.mozilla.org/en-US/docs/Web/API/Element/animate,
 // https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion
@@ -92,6 +98,7 @@ const SCROLL_KEYS = new Set([
 type Rects = Map<string, DOMRect>
 
 type Pending =
+  | { step: 'instant' }
   | { step: 'collapse'; column: BoardColumn; first: Rects }
   | { step: 'spread'; column: BoardColumn; first: Rects; anchorIndex: number }
   | { step: 'expand'; column: BoardColumn; first: Rects; anchorIndex: number }
@@ -106,6 +113,20 @@ function prefersReducedMotion(): boolean {
 
 function canAnimate(element: Element): element is HTMLElement {
   return typeof (element as HTMLElement).animate === 'function'
+}
+
+/**
+ * When the last of `started` ends (its delay included), but not before
+ * `ms` (the step's own length plus its settle).
+ */
+function endOf(started: ReadonlyArray<Animation>, ms: number): number {
+  let end = ms
+  for (const animation of started) {
+    const timing = animation.effect?.getComputedTiming()
+    const at = Number(timing?.endTime)
+    if (Number.isFinite(at)) end = Math.max(end, at)
+  }
+  return end
 }
 
 /** Demo `visibleCards`: the column's card wrappers in view, in order. */
@@ -255,6 +276,8 @@ export class BoardCollapseController {
   >()
   private readonly detachScroll = new Map<BoardColumn, () => void>()
   private detachRoot: (() => void) | null = null
+  /** Removes the non-passive listeners that hold scrolling while busy. */
+  private detachHold: (() => void) | null = null
   private pointer: { x: number; y: number } | null = null
   private suppressed: BoardColumn | null = null
   private wheelAcc = 0
@@ -288,6 +311,7 @@ export class BoardCollapseController {
   readonly setRoot = (element: HTMLElement | null): void => {
     this.detachRoot?.()
     this.detachRoot = null
+    this.releaseScroll()
     this.root = element
     if (!element) return
     const onWheel = (event: WheelEvent) => this.onWheel(event)
@@ -296,11 +320,7 @@ export class BoardCollapseController {
       this.lastTouchY = event.touches.item(0)?.clientY ?? null
     }
     const onTouchMove = (event: TouchEvent) => {
-      if (this.busy) {
-        event.preventDefault()
-        return
-      }
-      this.onTouchPull(event)
+      if (!this.busy) this.onTouchPull(event)
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (!this.busy || !SCROLL_KEYS.has(event.key)) return
@@ -309,17 +329,42 @@ export class BoardCollapseController {
       if (event.key === ' ' && target instanceof HTMLButtonElement) return
       event.preventDefault()
     }
-    // Not passive: these cancel scrolling while an animation runs.
-    element.addEventListener('wheel', onWheel, { passive: false })
+    // Passive: they only read. `holdScroll` adds the cancelling ones.
+    element.addEventListener('wheel', onWheel, { passive: true })
     element.addEventListener('touchstart', onTouchStart, { passive: true })
-    element.addEventListener('touchmove', onTouchMove, { passive: false })
+    element.addEventListener('touchmove', onTouchMove, { passive: true })
     element.addEventListener('keydown', onKeyDown)
+    if (this.busy) this.holdScroll()
     this.detachRoot = () => {
       element.removeEventListener('wheel', onWheel)
       element.removeEventListener('touchstart', onTouchStart)
       element.removeEventListener('touchmove', onTouchMove)
       element.removeEventListener('keydown', onKeyDown)
     }
+  }
+
+  /** While busy: cancel wheel and touch scrolling on the board. */
+  private holdScroll(): void {
+    const root = this.root
+    if (!root || this.detachHold) return
+    const onWheel = (event: WheelEvent) => {
+      // Only vertical scrolling is held; ctrl + wheel (and a trackpad
+      // pinch, sent as one) zooms, and sideways wheels pass.
+      const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+      if (vertical && !event.ctrlKey) event.preventDefault()
+    }
+    const onTouchMove = (event: TouchEvent) => event.preventDefault()
+    root.addEventListener('wheel', onWheel, { passive: false })
+    root.addEventListener('touchmove', onTouchMove, { passive: false })
+    this.detachHold = () => {
+      root.removeEventListener('wheel', onWheel)
+      root.removeEventListener('touchmove', onTouchMove)
+    }
+  }
+
+  private releaseScroll(): void {
+    this.detachHold?.()
+    this.detachHold = null
   }
 
   /** A stable callback ref per column for its scroll body. */
@@ -399,13 +444,7 @@ export class BoardCollapseController {
   }
 
   private onWheel(event: WheelEvent): void {
-    if (this.busy) {
-      // Only vertical scrolling is held; ctrl + wheel (and a trackpad
-      // pinch, sent as one) zooms, and sideways wheels pass.
-      const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
-      if (vertical && !event.ctrlKey) event.preventDefault()
-      return
-    }
+    if (this.busy) return
     const step = wheelAtTop({
       acc: this.wheelAcc,
       deltaY: event.deltaY,
@@ -517,6 +556,7 @@ export class BoardCollapseController {
 
   private begin(totalMs: number, anchor: string | null): void {
     this.busy = true
+    this.holdScroll()
     this.wheelAcc = 0
     this.release?.()
     this.release = holdOrderForAnimation()
@@ -536,6 +576,7 @@ export class BoardCollapseController {
     this.stepTimer = null
     this.pending = null
     this.busy = false
+    this.releaseScroll()
     this.release?.()
     this.release = null
     this.animations.clear()
@@ -576,6 +617,7 @@ export class BoardCollapseController {
     }
     if (reduced) {
       // R1: both steps at once, the anchor kept, no animation.
+      this.pending = { step: 'instant' }
       this.setView({
         focus: column,
         column,
@@ -583,7 +625,6 @@ export class BoardCollapseController {
         pin: anchor ? { hash: anchor.hash, offset: anchor.offset } : null,
         ...here,
       })
-      this.schedule(0, this.finish)
       return true
     }
     const cards = cardsInView(scroller)
@@ -663,8 +704,8 @@ export class BoardCollapseController {
       hereMs: total + FRAME_EXTRA_MS,
     }
     if (reduced) {
+      this.pending = { step: 'instant' }
       this.setView(next)
-      this.schedule(0, this.finish)
       return true
     }
     const cards = scroller ? cardsInView(scroller) : []
@@ -682,45 +723,53 @@ export class BoardCollapseController {
   runPending(): void {
     this.restoreFocus()
     const pending = this.pending
-    const root = this.root
-    if (!pending || !root) return
+    if (!pending) return
     this.pending = null
+    const root = this.root
+    // Nothing to play (reduced motion, or the board went away): end now,
+    // after the commit, so the pin was applied.
+    if (pending.step === 'instant' || !root) {
+      this.finish()
+      return
+    }
     const scroller = this.scrollers.get(pending.column)
     const cards = scroller ? cardsInView(scroller) : []
     const ripple = (anchorIndex: number) => (key: string, el: HTMLElement) =>
       key.startsWith('card:') ? rippleDelay(indexOf(el), anchorIndex) : 0
 
     if (pending.step === 'collapse') {
-      this.track(
-        playMoves(pending.first, withCards(chromeOf(root), cards), COLLAPSE_MS),
+      const started = playMoves(
+        pending.first,
+        withCards(chromeOf(root), cards),
+        COLLAPSE_MS,
       )
-      this.schedule(COLLAPSE_MS, () => this.spread(pending.column))
+      this.track(started)
+      this.schedule(endOf(started, COLLAPSE_MS), () =>
+        this.spread(pending.column),
+      )
       return
     }
     if (pending.step === 'spread') {
-      this.track(
-        playMoves(
+      const started = [
+        ...playMoves(
           pending.first,
           withCards(new Map(), cards),
           SPREAD_MS,
           ripple(pending.anchorIndex),
         ),
-      )
-      this.track(
-        riseNew(pending.first, cards, Math.round(SPREAD_MS * FADE_NEW_AT)),
-      )
-      this.schedule(SPREAD_MS + SPREAD_SETTLE_MS, this.finish)
+        ...riseNew(pending.first, cards, Math.round(SPREAD_MS * FADE_NEW_AT)),
+      ]
+      this.track(started)
+      this.schedule(endOf(started, SPREAD_MS + SPREAD_SETTLE_MS), this.finish)
       return
     }
     // Expand: cards back to one per row, reopening columns fade in.
     const chrome = chromeOf(root)
-    this.track(
-      playMoves(
-        pending.first,
-        withCards(chrome, cards),
-        EXPAND_MS,
-        ripple(pending.anchorIndex),
-      ),
+    const started = playMoves(
+      pending.first,
+      withCards(chrome, cards),
+      EXPAND_MS,
+      ripple(pending.anchorIndex),
     )
     const reopenAt = Math.round(EXPAND_MS * REOPEN_AT)
     for (const [key, head] of chrome) {
@@ -728,18 +777,19 @@ export class BoardCollapseController {
       const column = key.slice('head:'.length) as BoardColumn
       for (const element of [head, this.scrollers.get(column)]) {
         if (!element || !canAnimate(element)) continue
-        this.track([
+        started.push(
           element.animate([{ opacity: 0 }, { opacity: 1 }], {
             duration: REOPEN_MS,
             delay: reopenAt,
             easing: 'ease-out',
             fill: 'backwards',
           }),
-        ])
+        )
       }
     }
-    this.track(riseNew(pending.first, cards, reopenAt))
-    this.schedule(EXPAND_MS + EXPAND_SETTLE_MS, this.finish)
+    started.push(...riseNew(pending.first, cards, reopenAt))
+    this.track(started)
+    this.schedule(endOf(started, EXPAND_MS + EXPAND_SETTLE_MS), this.finish)
   }
 
   /**
@@ -774,6 +824,7 @@ export class BoardCollapseController {
     this.disableAfter = false
     this.focusAfter = null
     this.busy = false
+    this.releaseScroll()
     this.release?.()
     this.release = null
   }
