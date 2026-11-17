@@ -16,6 +16,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "audit:prod": "node scripts/audit.mjs",
     "smoke": "node scripts/smoke-built-server.mjs",
     "smoke:browser": "playwright test",
     "fake-qbit": "node scripts/fake-qbit.mjs",

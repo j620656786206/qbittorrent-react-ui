@@ -38,7 +38,9 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm audit --omit=dev --audit-level=high
+      # npm audit --omit=dev --audit-level=high, minus the dated skips in
+      # scripts/audit.mjs (one advisory with no fixed release, 2026-11-18).
+      - run: npm run audit:prod
       - run: node --check scripts/fake-qbit.mjs
       - run: npm run build
       # Boots .output: CSP nonce on HTML, asset CSP, refuses to start without env.

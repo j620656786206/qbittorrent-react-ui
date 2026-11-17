@@ -38,7 +38,7 @@ github.com 有時候會連不上幾分鐘，但其他網站正常。這不是工
 - 型別檢查（有 `typecheck` 就跑它，沒有就 `npx tsc --noEmit`）
 - 單元測試（`npm test`）
 - build（`npm run build`）
-- `npm audit --omit=dev --audit-level=high`
+- `npm run audit:prod`（`npm audit --omit=dev --audit-level=high`，扣掉 `scripts/audit.mjs` 裡有到期日的例外）
 
 失敗就修，修完重跑。lint 能自動修的先自動修。每次修完 commit 前跑 check.sh。
 
