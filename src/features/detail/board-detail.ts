@@ -8,18 +8,25 @@ import type { DetailTarget } from '#/features/detail/detail-view'
 
 // Story 2.4: the board's detail target (desktop panel and phone sheet). The
 // range is the torrent's column as the board shows it now (live, never
-// frozen): N of M and ‹ › stay inside it and never jump to the next column;
-// on the phone that column is the status tab it was opened from. A torrent
-// that changes column keeps the detail open with the new column's name and
-// N of M; one gone from every column (deleted) closes it, and so does a
-// reloaded `hash` the board does not have.
+// frozen): N of M and ‹ › stay inside it and never jump to the next column.
+// It is the torrent's live column, so after a reload on the phone it can
+// differ from the status tab on screen (spec 2.4 review). A torrent that
+// changes column keeps the detail open with the new column's name and N of
+// M; one gone from every column (deleted) closes it, and so does a reloaded
+// `hash` the board does not have. The phone board has no 已整理 tab, so
+// there an archived torrent counts as gone: the sheet closes (D11).
 
-export function useBoardDetailTarget(): DetailTarget | null {
+export function useBoardDetailTarget({
+  phone,
+}: {
+  phone: boolean
+}): DetailTarget | null {
   const { hash, setHash } = useViewedHash()
   const { data: columns } = useBoardColumns()
   const { data: torrents } = useMaindata(selectTorrents)
 
-  const column = hash !== null && columns ? boardColumnOf(columns, hash) : null
+  const found = hash !== null && columns ? boardColumnOf(columns, hash) : null
+  const column = phone && found === 'archived' ? null : found
   const gone = hash !== null && columns !== undefined && column === null
 
   useEffect(() => {

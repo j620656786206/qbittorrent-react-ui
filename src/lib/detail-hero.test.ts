@@ -145,9 +145,9 @@ describe('H1 the 12 hero rows', () => {
   it.each(H1)('%s', (_name, overrides, status, headline, summary) => {
     const hero = detailHero(t(overrides), OPTIONS)
     expect(hero.status).toBe(status)
-    expect(hero.circle.status).toBe(status)
+    expect(hero.status).toBe(status)
     expect(hero.headline).toBe(headline)
-    expect(hero.summary).toBe(summary)
+    expect(hero.summaryParts.join(' · ')).toBe(summary)
   })
 
   it('an unlisted (future) state reads as 狀態不明', () => {
@@ -165,13 +165,14 @@ describe('H1 the 12 hero rows', () => {
     expect(hero.status).toBe('archived')
   })
 
-  it('the circle: a ring with a label for statuses that show progress', () => {
-    expect(
-      detailHero(t({ state: 'stalledDL', progress: 0.87 }), OPTIONS).circle,
-    ).toEqual({ status: 'stalled', label: '停滯，87%', arcFraction: 0.87 })
-    expect(
-      detailHero(t({ state: 'uploading', progress: 1 }), OPTIONS).circle,
-    ).toEqual({ status: 'seeding', label: '做種中', arcFraction: null })
+  it('the circle: a ring for statuses that show progress', () => {
+    const stalled = detailHero(
+      t({ state: 'stalledDL', progress: 0.87 }),
+      OPTIONS,
+    )
+    expect([stalled.status, stalled.arcFraction]).toEqual(['stalled', 0.87])
+    const seeding = detailHero(t({ state: 'uploading', progress: 1 }), OPTIONS)
+    expect([seeding.status, seeding.arcFraction]).toEqual(['seeding', null])
   })
 
   it('a moving torrent keeps the row it had before (no 搬移中 text: Epic 5)', () => {
@@ -191,8 +192,10 @@ describe('H1 the 12 hero rows', () => {
 describe('H2 summary gaps', () => {
   it('an empty category is left out', () => {
     expect(
-      detailHero(t({ ...TV, category: '', state: 'queuedDL' }), OPTIONS)
-        .summary,
+      detailHero(
+        t({ ...TV, category: '', state: 'queuedDL' }),
+        OPTIONS,
+      ).summaryParts.join(' · '),
     ).toBe('85 GB')
   })
 
@@ -201,7 +204,7 @@ describe('H2 summary gaps', () => {
       detailHero(
         t({ ...TV, state: 'downloading', dlspeed: 0, eta: 120 }),
         OPTIONS,
-      ).summary,
+      ).summaryParts.join(' · '),
     ).toBe('剩餘時間不明 · 85 GB · mteam-tv')
   })
 
@@ -210,34 +213,46 @@ describe('H2 summary gaps', () => {
       detailHero(
         t({ ...TV, state: 'downloading', dlspeed: 2 * MIB, eta: 8_640_000 }),
         OPTIONS,
-      ).summary,
+      ).summaryParts.join(' · '),
     ).toBe('剩餘時間不明 · ↓ 2.00 MB/s · 85 GB · mteam-tv')
   })
 
   it('已上傳: 「…」 before the first answer, left out when unknown', () => {
     const seeding = t({ ...TV, state: 'stalledUP', progress: 1, ratio: 1 })
     expect(
-      detailHero(seeding, { ...OPTIONS, uploaded: undefined }).summary,
+      detailHero(seeding, {
+        ...OPTIONS,
+        uploaded: undefined,
+      }).summaryParts.join(' · '),
     ).toBe('分享率 1.00 · 已上傳 … · 85 GB · mteam-tv')
-    expect(detailHero(seeding, { ...OPTIONS, uploaded: null }).summary).toBe(
-      '分享率 1.00 · 85 GB · mteam-tv',
-    )
+    expect(
+      detailHero(seeding, { ...OPTIONS, uploaded: null }).summaryParts.join(
+        ' · ',
+      ),
+    ).toBe('分享率 1.00 · 85 GB · mteam-tv')
   })
 
   it('已完成 or 已整理 never completed: no date', () => {
     expect(
-      detailHero(t({ ...TV, state: 'pausedUP', progress: 1 }), OPTIONS).summary,
+      detailHero(
+        t({ ...TV, state: 'pausedUP', progress: 1 }),
+        OPTIONS,
+      ).summaryParts.join(' · '),
     ).toBe('下載好了 · 分享率 0.00 · 85 GB · mteam-tv')
     expect(
-      detailHero(t({ ...TV, state: 'missingFiles', progress: 1 }), OPTIONS)
-        .summary,
+      detailHero(
+        t({ ...TV, state: 'missingFiles', progress: 1 }),
+        OPTIONS,
+      ).summaryParts.join(' · '),
     ).toBe('留著當紀錄 · 85 GB · mteam-tv')
   })
 
   it('names and categories are plain text', () => {
     expect(
-      detailHero(t({ category: '<b>x</b>', state: 'queuedDL' }), OPTIONS)
-        .summary,
+      detailHero(
+        t({ category: '<b>x</b>', state: 'queuedDL' }),
+        OPTIONS,
+      ).summaryParts.join(' · '),
     ).toBe('85 GB · <b>x</b>')
   })
 })

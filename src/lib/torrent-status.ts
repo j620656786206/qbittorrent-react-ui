@@ -296,6 +296,39 @@ function detailOf(
   }
 }
 
+/** The status circle of a list row, a board card or the detail hero. */
+export interface StatusCircleModel {
+  status: TorrentStatusId
+  /** Screen reader text: 「停滯，87%」 or 「做種中」. */
+  label: string
+  /** 0 to 1 for a progress ring (on `track`), `null` for a full ring. */
+  arcFraction: number | null
+}
+
+/** `progress` as a 0 to 1 fraction for a ring or a bar. */
+export function progressFraction(progress: number): number {
+  if (!(progress > 0)) return 0
+  return Math.min(1, progress)
+}
+
+export function circleOf(
+  classification: Pick<
+    TorrentClassification,
+    'status' | 'word' | 'showsProgress'
+  >,
+  progress: number,
+): StatusCircleModel {
+  const { status, word } = classification
+  if (!classification.showsProgress) {
+    return { status, label: word, arcFraction: null }
+  }
+  return {
+    status,
+    label: `${word}，${formatPercent(progress)}`,
+    arcFraction: progressFraction(progress),
+  }
+}
+
 export function classify(
   torrent: SlimTorrent,
   options: ClassifyOptions,

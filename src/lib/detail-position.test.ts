@@ -3,7 +3,6 @@ import {
   detailPosition,
   resolveListViewed,
   successorOf,
-  viewedInOrder,
 } from '#/lib/detail-position'
 
 // Spec 2.4 rows D7 to D11: N of M, prev and next, and the vanished
@@ -62,15 +61,6 @@ describe('detailPosition (D7, D8)', () => {
       prev: 'd',
       next: 'c',
     })
-  })
-})
-
-describe('viewedInOrder (D1, D3)', () => {
-  it('the hash when the order holds it, else the first, else null', () => {
-    expect(viewedInOrder(ORDER, 'c')).toBe('c')
-    expect(viewedInOrder(ORDER, null)).toBe('a')
-    expect(viewedInOrder(ORDER, 'z')).toBe('a')
-    expect(viewedInOrder([], 'a')).toBeNull()
   })
 })
 
@@ -167,6 +157,25 @@ describe('resolveListViewed (D1, D3, D9, D11)', () => {
         order: ORDER,
         hash: 'z',
         previous: { order: ORDER, viewed: 'a' },
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('D3 with a stale hash the row shown stays while in the order (a new one on top)', () => {
+    expect(
+      resolveListViewed({
+        order: ['n', 'a', 'b'],
+        hash: 'z',
+        previous: { order: ['a', 'b'], viewed: 'a' },
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+    expect(
+      resolveListViewed({
+        order: ['b', 'a'],
+        hash: 'z',
+        previous: { order: ['a', 'b'], viewed: 'a' },
         ...desktop,
       }),
     ).toEqual({ viewed: 'a', write: undefined })

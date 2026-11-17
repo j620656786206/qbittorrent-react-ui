@@ -1,4 +1,4 @@
-import { skipToken, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import type {
   GetTorrentDetailInput,
   TorrentDetailResponse,
@@ -57,14 +57,21 @@ export function torrentDetailQueryOptions(
   } as const
 }
 
-/** The detail fields of `hash`; `null` observes nothing and runs nothing. */
+/**
+ * The detail fields of `hash`. `failed`: a call failed and none has
+ * answered yet. Sticky: with no data Query resets `isError` each time a
+ * poll starts, while `errorUpdateCount` only grows (same trap as the list's
+ * sort keys), so 「沒有」 never blinks back to 「…」 between polls.
+ */
 export function useTorrentDetail(
-  hash: string | null,
+  hash: string,
   fetchTorrentDetail: FetchTorrentDetail,
 ) {
-  return useQuery<TorrentDetailResponse>(
-    hash === null
-      ? { queryKey: ['torrent-detail', null], queryFn: skipToken }
-      : torrentDetailQueryOptions(hash, fetchTorrentDetail),
+  const query = useQuery<TorrentDetailResponse>(
+    torrentDetailQueryOptions(hash, fetchTorrentDetail),
   )
+  return {
+    data: query.data,
+    failed: query.data === undefined && query.errorUpdateCount > 0,
+  }
 }

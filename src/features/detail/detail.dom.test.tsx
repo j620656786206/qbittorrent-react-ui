@@ -370,6 +370,14 @@ describe('traffic values (getTorrentDetail)', () => {
       await vi.waitFor(() => expect(dd()[4].textContent).toBe('沒有'))
       expect(dd()[5].textContent).toBe('沒有')
       expect(dd()[4].className).toContain('text-text-muted')
+      // The next poll starts and hangs: still 「沒有」, never back to 「…」
+      // (Query resets `isError` when a fetch starts with no data).
+      detailCalls.answer = () => new Promise(() => {})
+      await act(async () => {
+        void client.refetchQueries({ queryKey: ['torrent-detail', h(1)] })
+      })
+      expect(dd()[4].textContent).toBe('沒有')
+      expect(dd()[5].textContent).toBe('沒有')
     } finally {
       detailCalls.answer = original
     }
@@ -549,6 +557,29 @@ describe('the phone sheet', () => {
         full: false,
         changed: [],
         removed: [h(11)],
+      }),
+    )
+    expect(writes).toEqual([null])
+    expect(q('[role="dialog"]')).toBeNull()
+  })
+
+  it('board: a torrent turning 已整理 closes it (the phone has no 已整理 tab)', async () => {
+    await render(<BoardDetailSheet />, { hash: h(11) })
+    expect(q('[role="dialog"]')).not.toBeNull()
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [
+          t({
+            hash: h(11),
+            name: 'Seed1',
+            state: 'missingFiles',
+            progress: 1,
+            completion_on: T0,
+            private: false,
+          }),
+        ],
       }),
     )
     expect(writes).toEqual([null])

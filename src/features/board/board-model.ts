@@ -3,11 +3,16 @@ import { formatPercent } from '#/lib/format'
 import { locationLabel } from '#/lib/paths'
 import {
   BOARD_COLUMN_NAMES,
+  circleOf,
   classify,
   showsProgress,
   statusOf,
 } from '#/lib/torrent-status'
-import type { BoardColumn, TorrentStatusId } from '#/lib/torrent-status'
+import type {
+  BoardColumn,
+  StatusCircleModel,
+  TorrentStatusId,
+} from '#/lib/torrent-status'
 import type { BoardColumns } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
 
@@ -131,12 +136,7 @@ export function totalOf(columns: BoardColumns): number {
 }
 
 export interface CardModel {
-  circle: {
-    status: TorrentStatusId
-    /** Screen reader text: 「停滯，87%」 or 「做種中」. */
-    label: string
-    arcFraction: number | null
-  }
+  circle: StatusCircleModel
   name: string
   /** 「87%」 at the right: only downloading, paused and stalled. */
   percent: string | null
@@ -157,28 +157,18 @@ export interface CardModelOptions {
   stateBeforeMove: Readonly<Record<string, string>>
 }
 
-function clampFraction(progress: number): number {
-  if (!(progress > 0)) return 0
-  return Math.min(1, progress)
-}
-
 export function cardModel(
   torrent: SlimTorrent,
   { now, timeZone, stateBeforeMove }: CardModelOptions,
 ): CardModel {
   const status = classify(torrent, { now, timeZone, stateBeforeMove })
-  const percent = formatPercent(torrent.progress)
-  const fraction = clampFraction(torrent.progress)
+  const circle = circleOf(status, torrent.progress)
   return {
-    circle: {
-      status: status.status,
-      label: status.showsProgress ? `${status.word}，${percent}` : status.word,
-      arcFraction: status.showsProgress ? fraction : null,
-    },
+    circle,
     name: torrent.name,
-    percent: status.showsProgress ? percent : null,
+    percent: status.showsProgress ? formatPercent(torrent.progress) : null,
     detail: status.detail,
-    progress: status.showsProgress ? fraction : null,
+    progress: circle.arcFraction,
     category: torrent.category === '' ? null : torrent.category,
     location: locationLabel(torrent.save_path),
   }
