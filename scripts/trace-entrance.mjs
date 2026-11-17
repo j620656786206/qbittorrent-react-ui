@@ -149,6 +149,8 @@ const lastEnd = (page) =>
   page.evaluate(() => {
     let end = null
     for (const animation of window.__rtTrace.animations) {
+      // Pending or cancelled: no start time, no end on the timeline.
+      if (animation.startTime === null) continue
       const timing = animation.effect?.getComputedTiming()
       const at = Number(animation.startTime) + Number(timing?.endTime)
       if (Number.isFinite(at)) end = Math.max(end ?? at, at)

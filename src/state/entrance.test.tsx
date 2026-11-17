@@ -63,6 +63,8 @@ interface SurfaceProps {
   tops?: ReadonlyArray<number>
   /** Rows with no arc (a seeding or done circle). */
   plain?: ReadonlyArray<number>
+  /** The arc and bar sit this far below their row's top, px (own boxes). */
+  insideOffset?: number
 }
 
 function Surface({
@@ -70,6 +72,7 @@ function Surface({
   rise = true,
   tops = [0, 70, 140],
   plain = [],
+  insideOffset,
 }: SurfaceProps) {
   const ref = useRef<HTMLDivElement>(null)
   useEntrance(ref, { ready, rise })
@@ -81,12 +84,20 @@ function Surface({
             {!plain.includes(top) && (
               <circle
                 data-progress-arc=""
+                data-top={
+                  insideOffset === undefined ? undefined : top + insideOffset
+                }
                 strokeDasharray={CIRCUMFERENCE}
                 strokeDashoffset={50}
               />
             )}
           </svg>
-          <span data-progress-bar="" />
+          <span
+            data-progress-bar=""
+            data-top={
+              insideOffset === undefined ? undefined : top + insideOffset
+            }
+          />
         </button>
       ))}
     </div>
@@ -167,6 +178,22 @@ describe('useEntrance', () => {
       '70',
     ])
     expect(spins()).toHaveLength(1)
+  })
+
+  it('a row partly in the box rises, but its arc and bar outside it stay put', async () => {
+    // The row is 590 to 650 against a 0 to 600 box; its arc and bar start
+    // at 610, below the box.
+    await mount({ tops: [0, 590], insideOffset: 20 })
+    expect(rises().map((a) => a.element.getAttribute('data-top'))).toEqual([
+      '0',
+      '590',
+    ])
+    expect(spins().map((a) => a.element.getAttribute('data-top'))).toEqual([
+      '20',
+    ])
+    expect(grows().map((a) => a.element.getAttribute('data-top'))).toEqual([
+      '20',
+    ])
   })
 
   it('tops within 1px share a row and a delay', async () => {

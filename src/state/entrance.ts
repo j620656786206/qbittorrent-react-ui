@@ -27,9 +27,11 @@ import { holdOrderForAnimation } from '#/state/order-freeze'
 // `startedAt` claims it, surfaces ready within JOIN_MS join with their
 // delays shifted, and any surface ready or mounted later draws its current
 // state without animation. `replayEntrance()` (Epic 3 calls it on a
-// category change) starts a new, unclaimed generation: the first mounted
-// surface ready after it claims it (however long its new rows take to
-// commit) and the others join as on the first load.
+// category change, once the new rows have committed) starts a new,
+// unclaimed generation: every mounted surface sweeps the rows it has on its
+// next commit, the first one claiming it and the others joining as on the
+// first load. A surface not ready then (no data yet) claims or joins once
+// it is.
 //
 // A sweep runs in a layout effect, so the first painted frame of the rows
 // is already the animation's first frame. It reads every box once, keeps
@@ -39,8 +41,9 @@ import { holdOrderForAnimation } from '#/state/order-freeze'
 // sweep, no hold. Docs: https://react.dev/reference/react/useLayoutEffect ,
 // https://developer.mozilla.org/en-US/docs/Web/API/Animation/finished ,
 // TanStack Store `createStore` and `useSelector` as in
-// src/state/order-freeze.ts
-// (https://tanstack.com/store/latest/docs/framework/react/reference/functions/useStore).
+// src/state/order-freeze.ts, @tanstack/react-store 0.11.2 (pinned):
+// https://unpkg.com/@tanstack/react-store@0.11.2/src/useSelector.ts and
+// https://unpkg.com/@tanstack/store@0.11.2/src/store.ts .
 // React StrictMode (the dev client entry) mounts, cleans up and mounts each
 // effect again: a cleanup that cancels an unsettled run forgets the
 // generation, so the second mount sweeps it again (it joins).
@@ -61,6 +64,15 @@ export const entranceStore = createStore<EntranceState>(INITIAL)
 /**
  * Epic 3's trigger (category change): the rows and rings in view play the
  * entrance again on every mounted surface.
+ *
+ * Call it after the new category's rows have committed, e.g. from a layout
+ * effect keyed on the category. The surfaces' `ready` stays true across a
+ * category change (their scroll boxes stay measured; the hero is always
+ * ready), so they sweep whatever rows they hold on the commit right after
+ * this call: from a layout effect that commit runs before paint, and every
+ * mounted surface (the detail hero too) sweeps the new rows. Called before
+ * the new rows commit, it would play on the old rows and the new ones would
+ * appear unanimated.
  */
 export function replayEntrance(): void {
   entranceStore.setState((state) => ({
@@ -96,7 +108,21 @@ function sweep(
   if (items.length === 0) return []
   const box = container.getBoundingClientRect()
   const viewport = { width: window.innerWidth, height: window.innerHeight }
-  const shown = items.filter((item) => isVisible(item.rect, box, viewport))
+  const visible = (element: Element) =>
+    isVisible(element.getBoundingClientRect(), box, viewport)
+  // All boxes are read before any animation starts (one layout). A row only
+  // partly in the box can hold an arc or bar outside it: those stay put.
+  const shown = items
+    .filter((item) => isVisible(item.rect, box, viewport))
+    .map((item) =>
+      item.rise
+        ? {
+            ...item,
+            arcs: item.arcs.filter(visible),
+            bars: item.bars.filter(visible),
+          }
+        : item,
+    )
   const rows = rowOrdinals(shown.map((item) => item.rect.top))
   const started: Array<Animation> = []
   shown.forEach((item, index) => {

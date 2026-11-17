@@ -5,7 +5,7 @@ created: '2026-11-17'
 status: 'done'
 baseline_revision: '515ca355bff3f15de95cd3a19b8961c79a181b3d'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -108,6 +108,7 @@ deferred:
 ## Spec Change Log
 
 - 2026-11-17, implementation: the DOM helpers live in `src/shared/entrance-motion.ts`, not `src/shared/ui/`. The eslint rule `SHARED_UI_BAN` forbids `src/state` (the hook) from importing `src/shared/ui`; `src/shared` stays free of state as the Code Map asks. Test-only stubs for `Element.animate` and reduced motion are in `src/state/entrance-testing.ts`, shared by the state and feature DOM tests. happy-dom 21 does implement `Element.animate`; its boxes are empty, so nothing counts as visible and other DOM tests start no entrance animation.
+- 2026-11-17, first review pass: `replayEntrance()` starts the new generation with `startedAt: null`, not `now`, and the first ready surface claims it. Triggered by the replay-skip findings (a commit over JOIN_MS after the call skipped every surface). Avoids a replay that silently does nothing. KEEP: claim on first ready sweep; join within JOIN_MS; the intent's clause "every mounted surface sweeps it on its next commit" is the governing rule. Epic 3 must call `replayEntrance()` after the new category's rows commit (documented on the function).
 
 ## Review Triage Log
 
@@ -145,6 +146,45 @@ deferred:
   - `[low]` `[reject]` (edge, claim) Code Map points to `src/shared/ui/entrance-motion.ts` : the fix is a spec edit; the move is already recorded in the Spec Change Log.
   - `[medium]` `[patch]` (verification-gap) No test proves a poll mid-spin keeps the turning arc : DOM test added: the arc stays connected, its offset becomes `ringOffset(0.6)`, no new `animate` call.
   - `[medium]` `[patch]` (verification-gap, other) StrictMode cancels the hero spin in dev : same root cause as the blind StrictMode entry; fixed there.
+
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 35 findings, high 0, medium 5, low 23, false 6, maybe-false 1
+- findings:
+  - `[false]` `[reject]` (intent) `replayEntrance()` leaves `startedAt: null` where the contract says `now` : the contract's own clause "every mounted surface sweeps it on its next commit" fails under `now` for a commit over JOIN_MS late; the epics AC ("Epic 3 換分類時呼叫就會再轉一次") is met; recorded in the Spec Change Log.
+  - `[low]` `[reject]` (intent) No test asserts the first painted frame is the animation's first frame : needs a paint-level harness; the layout-effect sweep makes it structural and the trace frames show the start state.
+  - `[medium]` `[patch]` (intent) Hero joining the list on a `hash` load is untested : grouped with the verification-gap finding below; e2e added.
+  - `[false]` `[reject]` (intent) Hero may be off-screen during the panel or sheet slide-in : carried; the hero's container is its own block and at the slide's first frame it is inside the viewport.
+  - `[low]` `[reject]` (intent) Phone panel visibility only unit-tested : carried; the board DOM test covers it.
+  - `[low]` `[reject]` (intent) `replayEntrance()` has no e2e : no product caller until Epic 3; store, hook, list and board tests cover it.
+  - `[low]` `[reject]` (intent) Order hold during the entrance has no e2e : unit and DOM tests cover hold and release; the freeze store itself is e2e-tested since 1.8.
+  - `[low]` `[reject]` (intent) Status change mid-spin is simulated by a rejected `finished` : browsers keep the animation of a removed element until it ends, so `allSettled` resolves either way.
+  - `[low]` `[reject]` (intent) Board/list switch or tab swipe within JOIN_MS would animate : a person cannot change sort or swipe within 150ms of the first data.
+  - `[low]` `[patch]` (intent) Stale comment in the list replay test ("the replay's clock started a moment before this commit") : comment corrected.
+  - `[medium]` `[patch]` (blind) A replay called before the new rows commit sweeps the old rows (`ready` stays true) : `replayEntrance()` now documents the calling contract (after the new rows commit, e.g. from a layout effect keyed on the category).
+  - `[medium]` `[patch]` (blind) On replay the hero claims at once and could lock out a late list : same root cause; under the documented contract every surface sweeps in the same commit.
+  - `[low]` `[reject]` (blind) A sweep that animates nothing still claims : carried; claiming is also what stops a surface mounted later (sort switch) from animating when nothing on screen had an arc.
+  - `[false]` `[reject]` (blind) Phone hero in the sheet never spins : carried.
+  - `[low]` `[reject]` (blind) Rows are clickable while still at opacity 0 during their delay : at most about 0.8s, rows already sit in their final place and a click opens the right torrent.
+  - `[low]` `[reject]` (blind) `stubReducedMotion` is thin : carried.
+  - `[low]` `[reject]` (blind) `src/state/entrance-testing.ts` imports vitest in the src tree : only test files import it; the build passes and nothing reaches the bundle.
+  - `[low]` `[patch]` (blind) TanStack Store link is `latest` and names `useStore` : now cites the pinned 0.11.2 source for `useSelector` and `createStore`.
+  - `[low]` `[patch]` (blind) Trace `lastEnd` coerces a null `startTime` to 0 : null start times skipped; trace rerun.
+  - `[low]` `[reject]` (blind) Trace `ok` counts rings in their delay and visible circles only at the first call : can only cause a false failure, never a false pass; the run reports `ok: true`.
+  - `[low]` `[reject]` (blind) Trace hides fake-qbit's stderr : carried.
+  - `[low]` `[reject]` (blind) Board stagger assertions round the delays : the exact shift is unit-tested in `entrance.test.tsx`; rounding keeps the browser test stable.
+  - `[low]` `[reject]` (blind) No phone e2e in CI : carried.
+  - `[low]` `[reject]` (blind) The bar reuses `RING_MS` : the bar grows with its ring by design (Claude 代決); naming only.
+  - `[maybe-false]` `[defer]` (edge) Hero claims before the list is ready and the list may skip after 150ms : carried; already the deferred item; the proposed guard would let a later-mounted surface animate when nothing had an arc.
+  - `[medium]` `[patch]` (edge) Replay animates stale rows when new rows commit later : same root cause as the blind replay entry; fixed there.
+  - `[low]` `[patch]` (edge) An arc outside the scroll box spins when its row is only partly visible : arcs and bars are now visibility-checked on their own rect; unit test added.
+  - `[low]` `[reject]` (edge) No stagger cap : carried.
+  - `[low]` `[patch]` (edge) Trace null `startTime` : same as the blind trace entry; fixed there.
+  - `[false]` `[reject]` (edge, claim) Replay does not set `startedAt` : same as the intent entry above.
+  - `[low]` `[patch]` (edge, claim) Partly visible rows spin hidden rings : same root cause as the arc visibility entry; fixed there.
+  - `[low]` `[reject]` (edge, claim) Code Map path `src/shared/ui/entrance-motion.ts` : carried; the fix is a spec edit, the move is in the Spec Change Log.
+  - `[medium]` `[patch]` (verification-gap) No browser test opens with `hash` on a torrent with an arc : e2e added; the hero spin's delay is within (-150, 0] and the list's delays stay [0, 60, 120, 180].
+  - `[false]` `[reject]` (verification-gap, other) Mutation check of the `ready` gate : the reviewer confirmed 7 tests fail when the gate is removed; not a defect.
+  - `[false]` `[reject]` (verification-gap, other) Double release of the hold : the release is once-only (`order-freeze.ts`); not a defect.
 
 ## Design Notes
 
@@ -197,3 +237,7 @@ Status: done (first review pass)
 **Verification (2026-11-17).** `npm run lint`, `npm run typecheck`: clean. `npm test`: 99 files, 2285 tests passed. `npm run build` then `npx playwright test`: 69 passed, 0 CSP violations. `check.sh`: all ok. `node scripts/trace-entrance.mjs` on 4165 fake torrents (desktop 1440x900 and phone 390x844, list and board): 0 tasks over 50ms from navigation start to the last animation end, rings running at once equal visible circles, `ok: true`.
 
 **Residual risks.** Smoothness on Alex's real phone and tablet is unchecked (headless Chromium only). On real hardware the page takes longer from navigation to first data than locally. The board animates a 0-to-0 bar on a card at 0%, which is invisible.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 35 findings: patched 2 medium entries (replay calling contract documented; e2e for opening with `hash` on a torrent with an arc) and low ones (arc and bar visibility per element, pinned TanStack Store source links, trace null start times, a stale test comment). Deferred item carried, not re-added. Follow-up review: not recommended (no high patched on a follow-up pass). Trace rerun: 0 tasks over 50ms from navigation start to the last animation end on all four runs, `ok: true`.

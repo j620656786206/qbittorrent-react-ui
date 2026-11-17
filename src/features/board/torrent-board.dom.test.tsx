@@ -574,7 +574,13 @@ describe('the entrance (spec 2.9)', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
       function (this: Element) {
         if (this.matches(BODY)) return bodyRect(this)
-        if (!this.hasAttribute('data-entrance')) return new DOMRect(0, 0, 0, 0)
+        // A row's arc and bar get the row's own box.
+        if (
+          !this.matches(
+            '[data-entrance], [data-progress-arc], [data-progress-bar]',
+          )
+        )
+          return new DOMRect(0, 0, 0, 0)
         const body = this.closest(BODY)
         const wrapper = this.closest<HTMLElement>('[data-hash]')
         const y = Number(

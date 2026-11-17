@@ -23,6 +23,8 @@ interface Logged {
   kind: 'rise' | 'spin' | 'grow'
   delay: number
   duration: number
+  /** Inside the detail panel (the hero), not the list or board. */
+  inDetail: boolean
 }
 
 declare global {
@@ -56,6 +58,7 @@ async function recordEntrance(page: Page, { pause = false } = {}) {
           kind,
           delay: Number(options.delay ?? 0),
           duration: Number(options.duration ?? 0),
+          inDetail: this.closest('aside[aria-label="詳情"]') !== null,
         })
         if (pauseAtCreation) {
           animation.pause()
@@ -146,6 +149,41 @@ test('list: rows rise 60 ms apart and the arcs turn; a sort change adds nothing'
   await expect(page).toHaveURL(/[?&]sort=seeding_time/)
   await page.waitForTimeout(300)
   expect((await logged(page)).length).toBe(before)
+})
+
+test('opening with hash: the hero ring joins the list entrance', async ({
+  page,
+}) => {
+  // Sample torrent 1 is downloading at 87%: its hero circle has an arc.
+  const hash = (1).toString(16).padStart(40, '0')
+  await login(page)
+  await recordEntrance(page, { pause: true })
+  await page.goto(`/?sort=added_on&hash=${hash}`)
+  await expect(page.getByRole('listitem').first()).toBeVisible()
+  await expect(
+    page.locator('aside[aria-label="詳情"] [data-progress-arc]'),
+  ).toHaveCount(1)
+  const entries = await logged(page)
+  await finishPaused(page)
+  // The rows keep their stagger; whichever surface claimed first, the other
+  // joined within JOIN_MS (150 ms), so delays shift by less than that.
+  const rises = entries.filter(
+    (entry) => entry.kind === 'rise' && !entry.inDetail,
+  )
+  expect(rises.map((entry) => Math.round(entry.delay / 60) * 60 || 0)).toEqual([
+    0, 60, 120, 180,
+  ])
+  expect(rises[0].delay).toBeLessThanOrEqual(0)
+  expect(rises[0].delay).toBeGreaterThan(-150)
+  const heroSpins = entries.filter(
+    (entry) => entry.kind === 'spin' && entry.inDetail,
+  )
+  expect(heroSpins).toHaveLength(1)
+  expect(heroSpins[0].delay).toBeLessThanOrEqual(0)
+  expect(heroSpins[0].delay).toBeGreaterThan(-150)
+  expect(entries.some((entry) => entry.kind === 'rise' && entry.inDetail)).toBe(
+    false,
+  )
 })
 
 test('a ring whose progress changes mid-turn lands on the new value without restarting', async ({

@@ -729,7 +729,13 @@ describe('the entrance (spec 2.9)', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
       function (this: Element) {
         if (this.id === LIST_SCROLL_ID) return new DOMRect(0, 0, 1000, VIEWPORT)
-        if (!this.hasAttribute('data-entrance')) return new DOMRect(0, 0, 0, 0)
+        // A row's arc and bar get the row's own box.
+        if (
+          !this.matches(
+            '[data-entrance], [data-progress-arc], [data-progress-bar]',
+          )
+        )
+          return new DOMRect(0, 0, 0, 0)
         const wrapper = this.closest<HTMLElement>('[role="listitem"]')
         const y = Number(
           /translateY\((-?[\d.]+)px\)/.exec(
@@ -814,8 +820,8 @@ describe('the entrance (spec 2.9)', () => {
     await setView({ sort: 'name', dir: 'asc' })
     expect(stub.calls).toHaveLength(0)
     await act(async () => replayEntrance())
-    // The replay's clock started a moment before this commit: delays shift
-    // by that moment, 60ms apart.
+    // The first ready surface claims the replay on this commit (the list, or
+    // the panel hero joining a moment apart): rows stay 60ms apart.
     const [first, second, third] = rises().map((call) =>
       Number(call.options.delay),
     )
