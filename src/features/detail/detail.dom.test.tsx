@@ -629,6 +629,10 @@ describe('the overview (story 2.5)', () => {
     expect(blocks[1].className).toContain('grid-cols-3')
     expect(blocks[2]).toBe(sectionOf())
     expect(blocks[3].tagName).toBe('DL')
+    // The headline says the status: the circle is decorative.
+    const circle = blocks[0].querySelector('svg') as SVGElement
+    expect(circle.getAttribute('aria-hidden')).toBe('true')
+    expect(circle.hasAttribute('role')).toBe(false)
     // The panel scrolls and its first content takes no focus: it stays a
     // tab stop (WAI-ARIA tabs pattern).
     expect(panel.getAttribute('tabindex')).toBe('0')
@@ -772,6 +776,55 @@ describe('the overview (story 2.5)', () => {
     expect(q('h2')?.textContent).toBe('Seed2')
     expect(pathButton().getAttribute('aria-expanded')).toBe('false')
     expect(pills()[0].textContent).toBe('複製')
+  })
+
+  it('a copy still pending when ‹ › remounts the block changes nothing afterwards', async () => {
+    let resolve: () => void = () => {}
+    setClipboard({
+      writeText: () =>
+        new Promise<void>((done) => {
+          resolve = done
+        }),
+    })
+    const errors = vi.spyOn(console, 'error')
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await act(async () => pills()[0].click())
+    expect(pills()[0].textContent).toBe('複製')
+    await act(async () => byLabel('下一個').click())
+    expect(q('h2')?.textContent).toBe('Seed2')
+    const timersBefore = vi.getTimerCount()
+    await act(async () => resolve())
+    // The gone block starts no 1.5 s timer.
+    expect(vi.getTimerCount()).toBe(timersBefore)
+    expect(pills()[0].textContent).toBe('複製')
+    await act(async () => vi.advanceTimersByTime(2000))
+    expect(pills()[0].textContent).toBe('複製')
+    expect(errors).not.toHaveBeenCalled()
+  })
+
+  it('a move keeps the row it had before (stateBeforeMove from maindata)', async () => {
+    const paused = t({
+      hash: h(1),
+      name: 'Down1',
+      state: 'pausedDL',
+      progress: 0.42,
+    })
+    await render(<BoardDetailPanel />, {
+      hash: h(1),
+      data: [paused, ...board().slice(1)],
+    })
+    const headline = () => q('[role="tabpanel"] p') as HTMLElement
+    expect(headline().textContent).toBe('已暫停\u300042%')
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [{ ...paused, state: 'moving' }],
+      }),
+    )
+    expect(headline().textContent).toBe('已暫停\u300042%')
+    expect(headline().className).toContain('text-status-paused')
   })
 
   it('X1 names, paths and categories with markup stay plain text', async () => {

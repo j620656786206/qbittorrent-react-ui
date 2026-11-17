@@ -34,7 +34,6 @@ function copyWithTextarea(text: string, host: HTMLElement): boolean {
   area.value = text
   // Not `readOnly`: iOS Safari selects nothing in a read-only textarea, so
   // the copy would be empty. 16px so focusing it does not zoom on iOS.
-  area.setAttribute('aria-hidden', 'true')
   area.tabIndex = -1
   area.style.position = 'fixed'
   area.style.top = '0'

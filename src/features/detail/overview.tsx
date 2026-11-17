@@ -86,7 +86,13 @@ export function Overview({
 function HeroBlock({ hero }: { hero: DetailHero }) {
   return (
     <div className="flex items-center gap-3.5">
-      <StatusCircle {...hero.circle} size={64} />
+      {/* No label: the headline beside it says the status (the circle's
+          word can differ, e.g. 下載中 next to 排隊中), so it is hidden. */}
+      <StatusCircle
+        status={hero.circle.status}
+        arcFraction={hero.circle.arcFraction}
+        size={64}
+      />
       <div className="flex min-w-0 flex-col gap-1">
         <p
           className={cn(

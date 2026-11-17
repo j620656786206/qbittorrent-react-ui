@@ -2,10 +2,10 @@
 title: 'Story 2.5: Detail overview: status hero, stat tiles, save path'
 type: 'feature'
 created: '2026-11-17'
-status: 'in-review'
+status: 'done'
 baseline_revision: '5f16c22fd3069d0ac8435850c34bff1405d93d64'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -123,6 +123,39 @@ deferred: []
   - `[low]` `[patch]` (edge) `navigator.clipboard` set to undefined for good (same root cause). Patched there.
   - `[false]` `[reject]` (edge) 11 list-mode shots plus one board-panel shot. Same as the intent row: 已整理 cannot show in list mode.
 
+### 2026-11-17: Review pass (follow-up)
+- verdicts: 29 findings: high 0, medium 1, low 23, false 5, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (intent) the `error` summary is fixed text. carried: Alex's 2026-11-16 decision, real reason in Story 2.10.
+  - `[low]` `[reject]` (intent) the hero comes from a finer kind that `classify` is now built on, not from `classify`'s output. Done on purpose in the first pass so one source decides; the agreement test guards it and `classify`'s outputs are unchanged.
+  - `[low]` `[reject]` (intent) no test runs a real http origin or WebKit. Not possible in CI here; the C2 e2e now checks the copied text (row below) and the iOS check is a residual risk for Alex's phone.
+  - `[low]` `[reject]` (intent) glyph order and tile sizes checked by structure and token classes. carried: the screenshots show the order; tokens map to the AC values.
+  - `[low]` `[reject]` (intent) the summary may wrap between parts in narrow panels. 「下面一行」 reads as "the line below"; wrapping whole parts in a ~300px panel beats clipping (Claude 代決 in Design Notes).
+  - `[low]` `[reject]` (intent) e2e runs at 1024 and 1440 (panels about 304px and 408px), never exactly 354px. The two widths bracket it and both assert one row of tiles and no horizontal scroll.
+  - `[low]` `[reject]` (intent) contrast and screenshots live on the PR. carried: the PR carries the computed ratios and the screenshots.
+  - `[false]` `[reject]` (intent) `formatEta` refactored without new tests. Its existing tests in `src/lib/format.test.ts` still run and pass unchanged.
+  - `[low]` `[patch]` (blind) the hero circle is labelled as well as the headline, so screen readers hear the status twice. Patch: the hero circle is `aria-hidden`.
+  - `[low]` `[reject]` (blind) after a rejected `writeText` the textarea runs outside the gesture. Over http there is no `writeText`, so the textarea runs before any await; a rejection over https is rare and still shows 「複製失敗」 honestly.
+  - `[low]` `[reject]` (blind) the copy result has no live region. carried.
+  - `[low]` `[reject]` (blind) special values outside `format.ts`, muted by string. carried.
+  - `[false]` `[reject]` (blind) 「最後有人抓」 uses `last_activity`, which counts downloads. EXPERIENCE says 「最後有人抓」用 qBittorrent 的最後活動時間.
+  - `[false]` `[reject]` (blind) the desktop path is reachable only by hover. carried: the AC says 「電腦 hover 看全文」.
+  - `[low]` `[patch]` (blind) the fallback textarea is `aria-hidden` yet focused. Patch: `aria-hidden` dropped.
+  - `[low]` `[patch]` (blind) the mounted-ref guard is untested. Patch: DOM test with a pending copy across a switch.
+  - `[low]` `[reject]` (blind) contrast pairs not tested. carried.
+  - `[low]` `[reject]` (blind) `HERO_COLORS` is another per-status class map. Tailwind needs literal class names per file; a shared map is a refactor across 2.3's components.
+  - `[low]` `[patch]` (blind) e2e gaps, including the phone path screenshot without `animations: 'disabled'`. Patch: animations disabled; the other gaps are covered by DOM and unit tests.
+  - `[low]` `[reject]` (blind) hero options get `today` while tiles split `today` and `now`. Nothing in `ClassifyOptions` needs minute precision today; the verification row below pins the tile's clock.
+  - `[low]` `[reject]` (blind) `detailHero` runs `effectiveKind` twice. Negligible cost for one torrent.
+  - `[low]` `[patch]` (blind) fake `states` rows lean on factory defaults. Patch: explicit `state` and `private` on every row.
+  - `[low]` `[patch]` (edge) the circle label uses `classify().word`, so 排隊中 is announced as 下載中 (same root cause as the hero-circle row). Patched there.
+  - `[low]` `[reject]` (edge) empty `save_path`. carried.
+  - `[low]` `[reject]` (edge) the textarea after a rejected `writeText` loses the gesture (same as the blind row). Rejected there.
+  - `[false]` `[reject]` (edge) the desktop path only by hover. carried.
+  - `[low]` `[patch]` (verification) 「最後有人抓」 could read the day clock and no test would fail. Patch: a case with `today` and `now` apart.
+  - `[low]` `[patch]` (verification) the overview's `stateBeforeMove` wiring is untested. Patch: DOM test polling paused to moving.
+  - `[medium]` `[patch]` (verification) e2e C2 checks only the label; Chromium's `execCommand` returns true with nothing selected, so the textarea's placement in the sheet is unverified. Patch: a `copy` listener records the selected text and the test asserts the full path.
+
 ## Design Notes
 
 - Claude 代決 (Alex may veto): 來源數 is `num_seeds` (connected seeds) and 在抓的人 `num_leechs` (connected leechers), the counts qBittorrent's own UI shows as connected; an empty category is left out of the summary; the hero's 下載中 summary reuses `formatEta` and `formatSpeed` with 「↓ 」 as the list's second line does; the 剩餘時間 tile shows the `formatEta` text without its 「剩 」 prefix when that reads better in the mockup (follow the mockup); a second 複製 press restarts the 1.5 s.
@@ -150,7 +183,7 @@ deferred: []
 
 ## Auto Run Result
 
-Status: done (first review pass; a follow-up pass is recommended)
+Status: done (two review passes: first pass and follow-up)
 
 Summary: the overview now shows the status hero (64px circle, 28px status-coloured headline, muted summary for the 12 rows), three stat tiles by status group, the save-path block (label with location tag, front-cut path with hover and phone expand, four pills with only 複製 working, clipboard plus textarea fallback, 1.5 s labels) and the 2.4 info list. `getTorrentDetail` also sends `num_seeds` and `num_leechs`.
 
@@ -161,11 +194,13 @@ Files changed (main ones):
 - `scripts/fake-qbit.mjs` (`states` mode), `e2e/detail.spec.ts`, `e2e/fixtures.ts`, tests beside each file.
 - `_bmad-output/implementation-artifacts/epic-2-context.md` recompiled (the spine had changed).
 
-Review: 30 findings. Patched 2 medium entries and 9 low entries (10 fixes), deferred none, rejected 15 (9 low, 6 false counting grouped rows once; every row has its reason in the log).
+Review, first pass: 30 findings. Patched 2 medium entries and 9 low entries (10 fixes), deferred none, the rest rejected with reasons in the log.
 
-Follow-up review recommendation: true. Two medium entries were patched on a first pass. Named risk: `classify()`'s status now comes through the new hero-kind map in `src/lib/torrent-status.ts` (the core state mapping every screen uses), and the iOS textarea fallback cannot be exercised here.
+Review, follow-up pass: 29 findings. Patched 1 medium and 7 low entries (8 fixes: hero circle hidden from screen readers, textarea without aria-hidden, tests for the pending copy, the tile clock, the moving hero and the copied text in the phone sheet, screenshot animations, explicit fake rows), deferred none, rejected 21 (16 low, 5 false) with reasons in the log.
 
-Verification (2026-11-17, after the patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 86 files, 1916 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 43 passed, 0 CSP violations; `check.sh` all ok. Matrix audit: H1, H2, T1, T2, P1, P2, C1, C2, X1 each have covering tests that ran and passed.
+Follow-up review recommendation: false. The first pass recommended one (2 medium patched); the follow-up pass patched no high (1 medium, 7 low), so the work has converged.
+
+Verification (2026-11-17, after the follow-up patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 86 files, 1919 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 43 passed, 0 CSP violations; `check.sh` all ok. Matrix audit: H1, H2, T1, T2, P1, P2, C1, C2, X1 each have covering tests that ran and passed.
 
 Residual risks: copy over plain http on iOS Safari needs Alex's phone; contrast computed from tokens (lowest headline 4.06:1 light paused; muted text on tiles 4.95:1 dark, 5.09:1 light), not measured in a test.
 

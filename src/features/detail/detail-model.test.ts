@@ -140,6 +140,14 @@ describe('statTiles (T1, T2)', () => {
     },
   )
 
+  it('最後有人抓 reads the minute clock `now`, not the day clock `today`', () => {
+    const clock = { today: Date.UTC(2026, 10, 16, 0, 0, 0), now: NOW }
+    const torrent = t({ progress: 1, last_activity: NOW / 1000 - 3 * 3600 })
+    expect(statTiles(torrent, 'seeding', clock, DETAIL)[2].value).toBe(
+      '3 小時前',
+    )
+  })
+
   it('T2 no values: 「0 KB/s」, 「不明」, 「沒人抓過」, 「沒有」', () => {
     const none = { ...DETAIL, num_seeds: -1, num_leechs: null }
     expect(text(statTiles(t(), 'downloading', CLOCK, none))).toEqual([

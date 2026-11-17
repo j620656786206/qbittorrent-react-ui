@@ -878,6 +878,7 @@ test.describe('story 2.5 overview', () => {
       await savePath(detailSheet(page)).scrollIntoViewIfNeeded()
       await page.screenshot({
         path: `${SCREENSHOT_DIR_25}/sheet-path-expanded-phone-${scheme}.png`,
+        animations: 'disabled',
       })
       await pathButton.click()
       await expect(pathButton).toHaveAttribute('aria-expanded', 'false')
@@ -913,6 +914,20 @@ test.describe('story 2.5 overview', () => {
         get: () => undefined,
         configurable: true,
       })
+      // What `copy` really took: Chromium's execCommand('copy') returns
+      // true even with nothing selected, so the label alone proves nothing.
+      document.addEventListener(
+        'copy',
+        () => {
+          const active = document.activeElement
+          const copied =
+            active instanceof HTMLTextAreaElement
+              ? active.value.slice(active.selectionStart, active.selectionEnd)
+              : (document.getSelection()?.toString() ?? '')
+          document.documentElement.dataset.rtCopied = copied
+        },
+        true,
+      )
     })
     await page.setViewportSize(PHONE)
     await login(page)
@@ -923,6 +938,11 @@ test.describe('story 2.5 overview', () => {
     const copy = copyButton(detailSheet(page))
     await copy.click()
     await expect(copy).toHaveText('已複製')
+    // The whole long path was selected when the copy ran.
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-rt-copied',
+      LONG_SAVE_PATH,
+    )
     await expect(detailSheet(page).locator('textarea')).toHaveCount(0)
     await expect(copy).toBeFocused()
     await expect(copy).toHaveText('複製', { timeout: 3000 })

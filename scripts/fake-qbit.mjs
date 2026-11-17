@@ -382,6 +382,8 @@ const STATE_ROWS = [
   [
     'Downloading',
     {
+      state: 'downloading',
+      private: false,
       dlspeed: 6_510_000,
       eta: 2040,
       progress: 0.87,
@@ -392,11 +394,42 @@ const STATE_ROWS = [
         '/data/media/tv/假影集.第一季.Fake.Show.Season.Pack.2160p.WEB-DL',
     },
   ],
-  ['Meta', { state: 'metaDL', progress: 0, size: 0, category: 'mteam-tv' }],
-  ['Queued', { state: 'queuedDL', progress: 0.12, category: 'mteam-tv' }],
-  ['Checking', { state: 'checkingDL', progress: 0.45, category: 'mteam-tv' }],
-  ['Paused', { state: 'stoppedDL', progress: 0.87, category: 'mteam-tv' }],
-  ['Stalled', { state: 'stalledDL', progress: 0.87, category: 'mteam-X' }],
+  [
+    'Meta',
+    {
+      state: 'metaDL',
+      private: false,
+      progress: 0,
+      size: 0,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Queued',
+    { state: 'queuedDL', private: false, progress: 0.12, category: 'mteam-tv' },
+  ],
+  [
+    'Checking',
+    {
+      state: 'checkingDL',
+      private: false,
+      progress: 0.45,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Paused',
+    {
+      state: 'stoppedDL',
+      private: false,
+      progress: 0.87,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Stalled',
+    { state: 'stalledDL', private: false, progress: 0.87, category: 'mteam-X' },
+  ],
   [
     'Seeding',
     {
@@ -417,6 +450,7 @@ const STATE_ROWS = [
     'Done',
     {
       state: 'stoppedUP',
+      private: false,
       progress: 1,
       ratio: 3.12,
       completion_on: BASE_TIME - 2 * HOUR,
@@ -433,12 +467,19 @@ const STATE_ROWS = [
       private: true,
     },
   ],
-  ['Error', { state: 'error', progress: 0.3, category: 'mteam-tv' }],
-  ['Unknown', { state: 'unknown', progress: 0.1, category: 'mteam-tv' }],
+  [
+    'Error',
+    { state: 'error', private: false, progress: 0.3, category: 'mteam-tv' },
+  ],
+  [
+    'Unknown',
+    { state: 'unknown', private: false, progress: 0.1, category: 'mteam-tv' },
+  ],
   [
     'Archived',
     {
       state: 'missingFiles',
+      private: false,
       progress: 1,
       completion_on: Math.floor(Date.UTC(2025, 6, 18, 4, 0) / 1000),
       category: 'X',
