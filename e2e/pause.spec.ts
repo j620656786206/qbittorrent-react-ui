@@ -83,6 +83,29 @@ test('pause a downloading torrent: one stop call, no toast, 已暫停 and 繼續
   await expect(resume).not.toHaveAttribute('aria-disabled', 'true')
 })
 
+test('pause a missing-files torrent: qBittorrent keeps the state, the item comes back after the refresh (no 30 s lock)', async ({
+  page,
+  request,
+}) => {
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  // Sample E04: missingFiles, private (要處理). The fake, like qBittorrent,
+  // leaves missingFiles and error as they are on stop.
+  await page.goto(`/?hash=${hashOf(4)}`)
+  await expect(panel(page)).toBeVisible()
+
+  await openMenu(page)
+  await menu(page).getByRole('menuitem', { name: '暫停' }).click()
+  await expect
+    .poll(() => opCalls(request))
+    .toEqual([{ op: 'stop', hashes: [hashOf(4)] }])
+  await expect(toastCard(page)).toHaveCount(0)
+  // Same word, enabled again well inside the expect timeout (5 s), not 30 s.
+  await openMenu(page)
+  const pause = menu(page).getByRole('menuitem', { name: '暫停' })
+  await expect(pause).not.toHaveAttribute('aria-disabled', 'true')
+})
+
 test('start a 已完成 torrent: it moves to 做種中, the panel stays and recounts', async ({
   page,
   request,

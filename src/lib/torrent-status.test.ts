@@ -5,6 +5,7 @@ import {
   KNOWN_STATE_CODES,
   PAUSE_ACTION_WORDS,
   heroKindOf,
+  pauseActionFlips,
   pauseActionOf,
   statusOf,
   statusOfHeroKind,
@@ -380,5 +381,37 @@ describe('M1 pauseActionOf', () => {
 
   it('words: 暫停 and 繼續', () => {
     expect(PAUSE_ACTION_WORDS).toEqual({ stop: '暫停', start: '繼續' })
+  })
+})
+
+describe('pauseActionFlips', () => {
+  it.each([
+    'downloading',
+    'stalledDL',
+    'metaDL',
+    'queuedDL',
+    'checkingUP',
+    'pausedDL',
+    'stoppedUP',
+    'uploading',
+    'stalledUP',
+  ])('%s: the action flips', (state) => {
+    const torrent = t({ state, progress: state.endsWith('UP') ? 1 : 0.5 })
+    expect(pauseActionFlips(torrent, {})).toBe(true)
+  })
+
+  it.each(['error', 'missingFiles', 'unknown', 'someFutureState'])(
+    '%s: the state code stays, so the action does not flip',
+    (state) => {
+      expect(pauseActionFlips(t({ state, progress: 1 }), {})).toBe(false)
+    },
+  )
+
+  it('moving does not flip until the move ends, remembered state or not', () => {
+    const torrent = t({ state: 'moving', progress: 1 })
+    expect(pauseActionFlips(torrent, {})).toBe(false)
+    expect(pauseActionFlips(torrent, { [torrent.hash]: 'uploading' })).toBe(
+      false,
+    )
   })
 })

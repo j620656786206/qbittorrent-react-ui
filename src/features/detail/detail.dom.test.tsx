@@ -75,17 +75,15 @@ vi.mock('#/server/functions/start-torrents', () => ({
     return opCalls.answer('start')
   },
 }))
-const toastCalls = vi.hoisted(() => {
-  const dismissFailure = vi.fn()
-  return {
-    dismissFailure,
-    info: vi.fn(),
-    action: vi.fn(),
-    failure: vi.fn((_text: string, _options: { onRetry: () => void }) => ({
-      dismiss: dismissFailure,
-    })),
-  }
-})
+const toastCalls = vi.hoisted(() => ({
+  dismissFor: vi.fn((_key: string) => {}),
+  failure: vi.fn(
+    (
+      _text: string,
+      _options: { keys: ReadonlyArray<string>; onRetry: () => void },
+    ) => {},
+  ),
+}))
 vi.mock('#/lib/toast', () => ({ toast: toastCalls }))
 
 declare global {
@@ -925,10 +923,8 @@ describe('the ⋯ menu (story 2.6)', () => {
   beforeEach(() => {
     opCalls.sent.length = 0
     opCalls.answer = () => Promise.resolve(OK)
-    toastCalls.info.mockClear()
-    toastCalls.action.mockClear()
     toastCalls.failure.mockClear()
-    toastCalls.dismissFailure.mockClear()
+    toastCalls.dismissFor.mockClear()
     resetPendingOps()
   })
 
@@ -1006,7 +1002,6 @@ describe('the ⋯ menu (story 2.6)', () => {
     await settle()
     expect(opCalls.sent).toEqual([{ op: 'stop', hashes: [h(1)] }])
     expect(toastCalls.failure).not.toHaveBeenCalled()
-    expect(toastCalls.info).not.toHaveBeenCalled()
     expect(fetchCount).toBe(before + 1)
     expect(menu()).toBeNull()
     // qBittorrent has not shown it yet: the item is disabled, same word.
@@ -1029,6 +1024,23 @@ describe('the ⋯ menu (story 2.6)', () => {
     expect(item().getAttribute('aria-disabled')).toBeNull()
   })
 
+  it('a settled call (重試 too) leaves no observer behind: the cache collects it', async () => {
+    opCalls.answer = failWith('qbit_rejected')
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    client.setMutationDefaults(['pause-resume'], { gcTime: 0 })
+    await openMenu()
+    await pressItem()
+    await settle()
+    const [, { onRetry }] = toastCalls.failure.mock.calls[0]
+    await act(async () => onRetry())
+    await settle()
+    expect(opCalls.sent).toHaveLength(2)
+    await settle()
+    expect(
+      client.getMutationCache().findAll({ mutationKey: ['pause-resume'] }),
+    ).toEqual([])
+  })
+
   it('繼續 on a 已完成 torrent sends start', async () => {
     const done = t({
       hash: h(1),
@@ -1046,6 +1058,34 @@ describe('the ⋯ menu (story 2.6)', () => {
     await settle()
     expect(opCalls.sent).toEqual([{ op: 'start', hashes: [h(1)] }])
   })
+
+  it.each(['missingFiles', 'error'])(
+    '暫停 on a %s torrent (qBittorrent keeps that state code): the item comes back once the refresh arrived',
+    async (state) => {
+      const kept = t({
+        hash: h(1),
+        name: 'Kept1',
+        state,
+        progress: 1,
+        completion_on: T0,
+      })
+      await render(<BoardDetailPanel />, {
+        hash: h(1),
+        data: [kept, ...board().slice(1)],
+      })
+      await openMenu()
+      const before = fetchCount
+      await pressItem()
+      await settle()
+      expect(opCalls.sent).toEqual([{ op: 'stop', hashes: [h(1)] }])
+      expect(fetchCount).toBe(before + 1)
+      // Same word (the state did not change), usable again: no 30 s wait.
+      expect(pendingOpOf(h(1))).toBeNull()
+      await openMenu()
+      expect(item().textContent).toBe('暫停')
+      expect(item().getAttribute('aria-disabled')).toBeNull()
+    },
+  )
 
   it.each([
     ['qbit_rejected', '暫停失敗：qBittorrent 拒絕這個操作'],
@@ -1108,12 +1148,14 @@ describe('the ⋯ menu (story 2.6)', () => {
     await pressItem()
     await settle()
     expect(toastCalls.failure).toHaveBeenCalledOnce()
-    expect(toastCalls.dismissFailure).not.toHaveBeenCalled()
+    expect(toastCalls.failure.mock.calls[0][1].keys).toEqual([h(1)])
+    expect(toastCalls.dismissFor).toHaveBeenCalledTimes(1)
     opCalls.answer = () => Promise.resolve(OK)
     await openMenu()
     await pressItem()
     await settle()
-    expect(toastCalls.dismissFailure).toHaveBeenCalledOnce()
+    expect(toastCalls.dismissFor).toHaveBeenCalledTimes(2)
+    expect(toastCalls.dismissFor).toHaveBeenLastCalledWith(h(1))
     expect(opCalls.sent).toHaveLength(2)
   })
 

@@ -23,6 +23,12 @@ export interface CollapsedStripProps {
   /** The section's accessible name. */
   sectionLabel?: string
   appear?: boolean
+  /**
+   * Pressing it expands this column (the 已整理 strip): `aria-expanded`.
+   * The auto-collapse's strips restore the whole board instead, so they
+   * have none.
+   */
+  expands?: boolean
   buttonRef?: Ref<HTMLButtonElement>
 }
 
@@ -33,6 +39,7 @@ export function CollapsedStrip({
   onPress,
   sectionLabel,
   appear = false,
+  expands = false,
   buttonRef,
 }: CollapsedStripProps) {
   const meta = COLUMN_META[column]
@@ -45,7 +52,7 @@ export function CollapsedStrip({
       <button
         ref={buttonRef}
         type="button"
-        aria-expanded="false"
+        aria-expanded={expands ? false : undefined}
         aria-label={label}
         title={meta.order}
         onClick={onPress}
