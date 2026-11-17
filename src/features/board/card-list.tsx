@@ -4,6 +4,7 @@ import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import type { Range } from '@tanstack/react-virtual'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
+import { useEntrance } from '#/state/entrance'
 import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
 import {
@@ -231,6 +232,13 @@ export function CardList({
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
+  // Story 2.9: the cards in view rise (the inner card button, never the
+  // wrapper the virtualizer and the FLIP move) and their rings and bars
+  // grow, once the body is measured (`scrollRect`:
+  // https://unpkg.com/@tanstack/virtual-core@3.19.11/src/index.ts). Each
+  // column staggers from its own top; the phone's off-screen panels show
+  // nothing, so they animate nothing.
+  useEntrance(scrollRef, { ready: virtualizer.scrollRect !== null })
 
   // The pin's scroll, in a layout effect: before paint and before the
   // board's own layout effect measures where the cards went. Applied again

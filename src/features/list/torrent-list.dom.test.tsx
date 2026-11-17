@@ -9,7 +9,11 @@ import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
+import { ringOffset } from '#/shared/ui/status-circle'
 import { clearConnectionErrors } from '#/state/connection'
+import { replayEntrance, resetEntrance } from '#/state/entrance'
+import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
+import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
@@ -238,6 +242,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetEntrance()
   mountMain()
 })
 
@@ -708,5 +713,141 @@ describe('the detail (spec 2.4)', () => {
     await act(async () => root.unmount())
     expect(shownListStore.state).toEqual({ order: undefined, viewed: null })
     root = createRoot(document.createElement('div'))
+  })
+})
+
+describe('the entrance (spec 2.9)', () => {
+  let stub: AnimateStub
+  let reduced: boolean
+
+  beforeEach(() => {
+    stub = stubElementAnimate()
+    reduced = false
+    stubReducedMotion(() => reduced)
+    // Boxes from the virtualizer's own positions: the scroller is the
+    // window's top 600px; a row sits at its wrapper's translateY.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: Element) {
+        if (this.id === LIST_SCROLL_ID) return new DOMRect(0, 0, 1000, VIEWPORT)
+        // A row's arc and bar get the row's own box.
+        if (
+          !this.matches(
+            '[data-entrance], [data-progress-arc], [data-progress-bar]',
+          )
+        )
+          return new DOMRect(0, 0, 0, 0)
+        const wrapper = this.closest<HTMLElement>('[role="listitem"]')
+        const y = Number(
+          /translateY\((-?[\d.]+)px\)/.exec(
+            wrapper?.style.transform ?? '',
+          )?.[1] ?? NaN,
+        )
+        return new DOMRect(0, y, 1000, 59)
+      },
+    )
+  })
+
+  afterEach(() => {
+    stub.restore()
+  })
+
+  const rises = () =>
+    stub.calls.filter((call) => call.element.hasAttribute('data-entrance'))
+  const spins = () =>
+    stub.calls.filter((call) => call.element.hasAttribute('data-progress-arc'))
+
+  it('the rows in view rise 60ms apart; overscan rows do not', async () => {
+    await render(fakeResponse({ changed: many(300) }))
+    const rendered = main.querySelectorAll('[data-entrance]').length
+    // 600px of 59px rows with 2px gaps: 10 rows show (the 10th partly).
+    expect(rises().map((call) => call.options.delay)).toEqual(
+      Array.from({ length: 10 }, (_, row) => row * 60),
+    )
+    expect(rendered).toBeGreaterThan(10)
+    expect(rises()[0].keyframes).toEqual([
+      { offset: 0, opacity: 0, transform: 'translateY(10px)' },
+    ])
+  })
+
+  it('arcs turn from their dash array; seeding and done circles do not', async () => {
+    await render(
+      fakeResponse({
+        changed: [
+          torrent(3, { state: 'downloading', progress: 0.4 }),
+          torrent(2, { state: 'uploading', progress: 1 }),
+          torrent(1, { state: 'stalledDL', progress: 0.2 }),
+          torrent(0, { state: 'pausedUP', progress: 1 }),
+        ],
+      }),
+    )
+    expect(spins()).toHaveLength(2)
+    for (const call of spins()) {
+      const dash = call.element.getAttribute('stroke-dasharray')
+      expect(call.keyframes).toEqual([
+        { offset: 0, strokeDashoffset: `${dash}px` },
+      ])
+      expect(call.options).toMatchObject({
+        duration: 900,
+        easing: 'cubic-bezier(.2,.8,.2,1)',
+        fill: 'backwards',
+      })
+    }
+    // A row's ring turns as its row arrives: T3 is row 0, T1 row 2.
+    expect(spins().map((call) => call.options.delay)).toEqual([0, 120])
+  })
+
+  it('a poll mid-turn keeps the turning arc and moves its end, no restart', async () => {
+    await render(
+      fakeResponse({
+        changed: [torrent(3, { state: 'downloading', progress: 0.4 })],
+      }),
+    )
+    const [spin] = spins()
+    const calls = stub.calls.length
+    await poll(delta([torrent(3, { state: 'downloading', progress: 0.6 })]))
+    expect(spin.element.isConnected).toBe(true)
+    expect(spin.element.getAttribute('stroke-dashoffset')).toBe(
+      String(ringOffset(0.6)),
+    )
+    expect(stub.calls).toHaveLength(calls)
+  })
+
+  it('a poll and a sort change start nothing; replayEntrance() plays again', async () => {
+    await render(fakeResponse({ changed: many(30) }))
+    expect(rises().length).toBeGreaterThan(0)
+    stub.calls.length = 0
+    await poll(delta([torrent(31)]))
+    await setView({ sort: 'name', dir: 'asc' })
+    expect(stub.calls).toHaveLength(0)
+    await act(async () => replayEntrance())
+    // The first ready surface claims the replay on this commit (the list, or
+    // the panel hero joining a moment apart): rows stay 60ms apart.
+    const [first, second, third] = rises().map((call) =>
+      Number(call.options.delay),
+    )
+    expect(first).toBeLessThanOrEqual(0)
+    expect(first).toBeGreaterThan(-150)
+    expect(second - first).toBeCloseTo(60)
+    expect(third - first).toBeCloseTo(120)
+  })
+
+  it('the order holds until the entrance settles', async () => {
+    await render(fakeResponse({ changed: many(5) }))
+    expect(freezeStore.state.animation).toBe(true)
+    await poll(delta([torrent(9)]))
+    expect(shownNames()[0]).toBe('T4')
+    await act(async () => {
+      for (const call of stub.calls) call.finish()
+      await Promise.resolve()
+    })
+    expect(freezeStore.state.animation).toBe(false)
+    expect(shownNames()[0]).toBe('T9')
+  })
+
+  it('reduced motion: nothing animates, nothing holds', async () => {
+    reduced = true
+    await render(fakeResponse({ changed: many(30) }))
+    expect(stub.calls).toHaveLength(0)
+    expect(freezeStore.state.animation).toBe(false)
   })
 })

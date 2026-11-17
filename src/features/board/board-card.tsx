@@ -16,13 +16,14 @@ import type { CardModel } from '#/features/board/board-model'
 // `surface`, radius 16px, padding 12px 14px, the card shadow. Row 1: the
 // 32px status circle, the one-line name (`title` is the full name) over
 // the second line, the percent at the right for downloading, paused and
-// stalled. The 4px progress bar for those three (a static width: the fill
-// animation is Story 2.9). Then the category tag (only when there is one)
-// and the location tag. Fixed heights (board-model.ts), so the column's
-// virtualizer never measures. Story 2.4: the card is a button that opens
-// the detail (`onOpen` sets the URL's `hash`), with the 1px `text-faint`
-// inset hover ring. No checkbox (Epic 4). Names and lines are JSX text,
-// never HTML.
+// stalled. The 4px progress bar for those three (its width is the
+// progress; story 2.9's entrance grows the fill from the left with the
+// ring, `data-progress-bar`, and raises the card, `data-entrance`). Then
+// the category tag (only when there is one) and the location tag. Fixed
+// heights (board-model.ts), so the column's virtualizer never measures.
+// Story 2.4: the card is a button that opens the detail (`onOpen` sets the
+// URL's `hash`), with the 1px `text-faint` inset hover ring. No checkbox
+// (Epic 4). Names and lines are JSX text, never HTML.
 
 /** Status colour of the bar fill; Tailwind needs whole class names. */
 const BAR_FILL: Readonly<Record<string, string>> = {
@@ -77,6 +78,7 @@ export function CardContent({
   return (
     <button
       type="button"
+      data-entrance=""
       onClick={onOpen}
       style={{ height: cardHeight(model) }}
       className={CARD_BUTTON_CLASS}
@@ -106,7 +108,11 @@ export function CardContent({
           className="block h-1 w-full flex-none overflow-hidden rounded-bar bg-track"
         >
           <span
-            className={cn('block h-full rounded-bar', BAR_FILL[circle.status])}
+            data-progress-bar=""
+            className={cn(
+              'block h-full origin-left rounded-bar',
+              BAR_FILL[circle.status],
+            )}
             style={{ width: `${progress * 100}%` }}
           />
         </span>

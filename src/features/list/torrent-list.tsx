@@ -12,6 +12,7 @@ import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
+import { useEntrance } from '#/state/entrance'
 import { useListView, viewKeyOf } from '#/state/list-view'
 import { useListViewed } from '#/state/list-viewed'
 import {
@@ -236,6 +237,11 @@ function TorrentRows({
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
+  // Story 2.9: the rows in view rise and their rings turn in once the
+  // virtualizer has measured the scroller (`scrollRect`, the rows of that
+  // commit cover the view); after the virtualizer, so its layout effect ran
+  // first. https://unpkg.com/@tanstack/virtual-core@3.19.11/src/index.ts
+  useEntrance(scrollRef, { ready: virtualizer.scrollRect !== null })
 
   const total = shown.length
   return (

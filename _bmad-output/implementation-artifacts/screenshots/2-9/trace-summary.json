@@ -1,0 +1,120 @@
+{
+  "recordedAt": "2026-11-17T16:19:56.531Z",
+  "data": "fake-qbit many (about 4165 torrents)",
+  "browser": "headless Chromium",
+  "longTaskMs": 50,
+  "note": "ms are relative to the sweep (the first entrance animation); long tasks count on every renderer main thread from the navigation start to the last animation end",
+  "framesMs": [
+    0,
+    150,
+    300,
+    600,
+    900,
+    1500
+  ],
+  "runs": [
+    {
+      "viewport": "1440x900",
+      "mode": "list",
+      "animations": {
+        "rise": 13,
+        "spin": 5
+      },
+      "navigationStartMs": -187,
+      "navigationStartFrom": "navigationStart",
+      "lastAnimationEndMs": 1501,
+      "traceEndMs": 2533,
+      "lastAnimationEndInsideTrace": true,
+      "longTasksBeforeSweep": [],
+      "longTasksDuringEntrance": [],
+      "maxRingsAtOnce": 5,
+      "visibleCircles": 5,
+      "frames": [
+        "e2e-output/screenshots/2-9/desktop-list-0000ms.png",
+        "e2e-output/screenshots/2-9/desktop-list-0150ms.png",
+        "e2e-output/screenshots/2-9/desktop-list-0300ms.png",
+        "e2e-output/screenshots/2-9/desktop-list-0600ms.png",
+        "e2e-output/screenshots/2-9/desktop-list-0900ms.png",
+        "e2e-output/screenshots/2-9/desktop-list-1500ms.png"
+      ]
+    },
+    {
+      "viewport": "1440x900",
+      "mode": "board",
+      "animations": {
+        "rise": 27,
+        "spin": 7,
+        "grow": 6
+      },
+      "navigationStartMs": -88,
+      "navigationStartFrom": "navigationStart",
+      "lastAnimationEndMs": 1256,
+      "traceEndMs": 2529,
+      "lastAnimationEndInsideTrace": true,
+      "longTasksBeforeSweep": [],
+      "longTasksDuringEntrance": [],
+      "maxRingsAtOnce": 7,
+      "visibleCircles": 7,
+      "frames": [
+        "e2e-output/screenshots/2-9/desktop-board-0000ms.png",
+        "e2e-output/screenshots/2-9/desktop-board-0150ms.png",
+        "e2e-output/screenshots/2-9/desktop-board-0300ms.png",
+        "e2e-output/screenshots/2-9/desktop-board-0600ms.png",
+        "e2e-output/screenshots/2-9/desktop-board-0900ms.png",
+        "e2e-output/screenshots/2-9/desktop-board-1500ms.png"
+      ]
+    },
+    {
+      "viewport": "390x844",
+      "mode": "list",
+      "animations": {
+        "rise": 11,
+        "spin": 4
+      },
+      "navigationStartMs": -160,
+      "navigationStartFrom": "navigationStart",
+      "lastAnimationEndMs": 1495,
+      "traceEndMs": 2572,
+      "lastAnimationEndInsideTrace": true,
+      "longTasksBeforeSweep": [],
+      "longTasksDuringEntrance": [],
+      "maxRingsAtOnce": 4,
+      "visibleCircles": 4,
+      "frames": [
+        "e2e-output/screenshots/2-9/phone-list-0000ms.png",
+        "e2e-output/screenshots/2-9/phone-list-0150ms.png",
+        "e2e-output/screenshots/2-9/phone-list-0300ms.png",
+        "e2e-output/screenshots/2-9/phone-list-0600ms.png",
+        "e2e-output/screenshots/2-9/phone-list-0900ms.png",
+        "e2e-output/screenshots/2-9/phone-list-1500ms.png"
+      ]
+    },
+    {
+      "viewport": "390x844",
+      "mode": "board",
+      "animations": {
+        "rise": 4,
+        "spin": 1,
+        "grow": 1
+      },
+      "navigationStartMs": -84,
+      "navigationStartFrom": "navigationStart",
+      "lastAnimationEndMs": 904,
+      "traceEndMs": 2535,
+      "lastAnimationEndInsideTrace": true,
+      "longTasksBeforeSweep": [],
+      "longTasksDuringEntrance": [],
+      "maxRingsAtOnce": 1,
+      "visibleCircles": 1,
+      "frames": [
+        "e2e-output/screenshots/2-9/phone-board-0000ms.png",
+        "e2e-output/screenshots/2-9/phone-board-0150ms.png",
+        "e2e-output/screenshots/2-9/phone-board-0300ms.png",
+        "e2e-output/screenshots/2-9/phone-board-0600ms.png",
+        "e2e-output/screenshots/2-9/phone-board-0900ms.png",
+        "e2e-output/screenshots/2-9/phone-board-1500ms.png"
+      ]
+    }
+  ],
+  "ok": true
+}

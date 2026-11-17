@@ -9,9 +9,11 @@ import type { TorrentStatusId } from '#/shared/torrent-status'
 // stalled; a full ring in the status color otherwise. Inner circle at 80%
 // filled with the status color, the mockup's icon (about 42%) in
 // `status-icon`. Display only: not clickable, labelled for screen readers
-// (「停滯，87%」) or hidden when it only decorates a labelled box. No
-// spin-in yet (Story 2.9). Shared: the list and the board both draw it
-// (story 2.3 moved it out of features/list).
+// (「停滯，87%」) or hidden when it only decorates a labelled box. Story
+// 2.9: the arc carries `data-progress-arc`, so the entrance
+// (src/state/entrance.ts) can turn it in from its `stroke-dasharray` (an
+// empty ring) to its live offset. Shared: the list and the board both draw
+// it (story 2.3 moved it out of features/list).
 
 export type StatusCircleSize = 28 | 32 | 36 | 64
 
@@ -162,6 +164,7 @@ export function StatusCircle({
               fill="none"
               strokeWidth="3"
               strokeLinecap="round"
+              data-progress-arc=""
               strokeDasharray={ringCircumference(size)}
               strokeDashoffset={ringOffset(arcFraction, size)}
               transform={`rotate(-90 ${center} ${center})`}

@@ -12,6 +12,9 @@ import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
+import { replayEntrance, resetEntrance } from '#/state/entrance'
+import { stubElementAnimate } from '#/state/entrance-testing'
+import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
@@ -182,6 +185,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetEntrance()
   main = document.createElement('main')
   main.id = MAIN_ID
   document.body.append(main)
@@ -532,5 +536,149 @@ describe('the phone board', () => {
     ])
     expect(panels()).toHaveLength(1)
     expect(panels()[0].getAttribute('aria-busy')).toBe('true')
+  })
+})
+
+describe('the entrance (spec 2.9)', () => {
+  let stub: AnimateStub
+  let reduced: boolean
+
+  /** A card list body: desktop group or phone tab panel. */
+  const BODY = '[role="group"], [role="tabpanel"]'
+
+  /** Body `i` of the phone track sits `i - selected` windows to the side. */
+  function bodyRect(body: Element): DOMRect {
+    if (body.getAttribute('role') !== 'tabpanel')
+      return new DOMRect(0, 0, 300, 600)
+    const all = [...main.querySelectorAll('[role="tabpanel"]')]
+    const shown = all.findIndex((panel) => !panel.hasAttribute('inert'))
+    const x = (all.indexOf(body) - shown) * window.innerWidth
+    return new DOMRect(x, 0, window.innerWidth, 600)
+  }
+
+  beforeEach(() => {
+    stub = stubElementAnimate()
+    reduced = false
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches:
+            query === DESKTOP_QUERY
+              ? desktop
+              : query.includes('prefers-reduced-motion') && reduced,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: Element) {
+        if (this.matches(BODY)) return bodyRect(this)
+        // A row's arc and bar get the row's own box.
+        if (
+          !this.matches(
+            '[data-entrance], [data-progress-arc], [data-progress-bar]',
+          )
+        )
+          return new DOMRect(0, 0, 0, 0)
+        const body = this.closest(BODY)
+        const wrapper = this.closest<HTMLElement>('[data-hash]')
+        const y = Number(
+          /(?:translateY\(|, )(-?[\d.]+)px\)/.exec(
+            wrapper?.style.transform ?? '',
+          )?.[1] ?? NaN,
+        )
+        const box = body ? bodyRect(body) : new DOMRect(0, 0, 0, 0)
+        return new DOMRect(
+          box.x,
+          y,
+          box.width,
+          Number.parseFloat(wrapper?.style.height ?? '0'),
+        )
+      },
+    )
+  })
+
+  afterEach(() => {
+    stub.restore()
+  })
+
+  /** `name` of the card each call's element sits in, with the delay. */
+  const calls = (attribute: string) =>
+    stub.calls
+      .filter((call) => call.element.hasAttribute(attribute))
+      .map((call) => [
+        call.element
+          .closest('[data-hash]')
+          ?.querySelector('[title]')
+          ?.getAttribute('title'),
+        // Columns after the first join a moment later (their delays shift
+        // by under a ms): the stagger step each delay is at.
+        Math.round(Number(call.options.delay) / 60) * 60 || 0,
+      ])
+
+  it('desktop: each column rises from its own first row; rings and bars grow with their card', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    expect(calls('data-entrance')).toEqual([
+      ['Stalled', 0],
+      ['Error', 60],
+      ['Down', 0],
+      ['Seed', 0],
+    ])
+    expect(calls('data-progress-arc')).toEqual([
+      ['Stalled', 0],
+      ['Down', 0],
+    ])
+    expect(calls('data-progress-bar')).toEqual([
+      ['Stalled', 0],
+      ['Down', 0],
+    ])
+    const bar = stub.calls.find((call) =>
+      call.element.hasAttribute('data-progress-bar'),
+    )
+    expect(bar?.keyframes).toEqual([{ offset: 0, transform: 'scaleX(0)' }])
+    expect(bar?.element.classList.contains('origin-left')).toBe(true)
+    // The card button rises, never the wrapper the virtualizer moves.
+    expect(
+      stub.calls.some((call) => call.element.hasAttribute('data-hash')),
+    ).toBe(false)
+  })
+
+  it('a poll moving a card starts nothing; replayEntrance() plays again', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    // The entrance ends (its order hold with it), then the poll applies.
+    await act(async () => {
+      for (const call of stub.calls) call.finish()
+      await Promise.resolve()
+    })
+    expect(freezeStore.state.animation).toBe(false)
+    stub.calls.length = 0
+    await poll(
+      delta([t({ hash: h(1), name: 'Down', state: 'uploading', progress: 1 })]),
+    )
+    expect(stub.calls).toHaveLength(0)
+    await act(async () => replayEntrance())
+    expect(calls('data-entrance').map(([name]) => name)).toEqual([
+      'Stalled',
+      'Error',
+      'Seed',
+      'Down',
+    ])
+  })
+
+  it('phone: only the visible panel animates', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: sample() }))
+    expect(calls('data-entrance')).toEqual([
+      ['Stalled', 0],
+      ['Error', 60],
+    ])
+  })
+
+  it('reduced motion: nothing animates, nothing holds', async () => {
+    reduced = true
+    await render(fakeResponse({ changed: sample() }))
+    expect(stub.calls).toHaveLength(0)
+    expect(freezeStore.state.animation).toBe(false)
   })
 })

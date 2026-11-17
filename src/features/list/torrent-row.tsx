@@ -66,6 +66,8 @@ export function RowContent({
     <button
       type="button"
       aria-current={viewing ? 'true' : 'false'}
+      // Story 2.9: the element that rises in the entrance.
+      data-entrance=""
       onClick={onOpen}
       style={{ height: ROW_HEIGHT }}
       className={cn(
