@@ -47,7 +47,7 @@ development_status:
   1-9-映像-ci-推送和-nas-部署範本: done  # PR #12：Dockerfile、映像檢查、GHCR 推送、Dependabot、Unraid 範本、部署說明
   epic-1-retrospective: done
 
-  epic-2: in-progress
+  epic-2: done
   2-0-瀏覽器-smoke-中文找不到頁面-登入接線測試: done  # PR #16：Playwright 瀏覽器 smoke、中文找不到頁面、登入和 _authed 接線測試
   2-1-51-種排序和電腦排序選單: done  # PR #17：51 種排序、電腦排序選單、getSortKeys 用到才拿、tracker 只送網域
   2-2-底部面板和手機排序面板: done  # PR #18：共用底部面板（自己寫的手勢、四種高度）、手機排序面板、CSP 不放寬
@@ -58,7 +58,7 @@ development_status:
   2-7-檔案分頁-清單-勾選-優先順序: done # PR #25：getFiles 和 setFilePriority、虛擬化的檔案清單、勾選和優先順序、送出後那一列鎖到重抓回來
   2-8-看板自動收合: done # PR #26：捲過一欄高度自動收合、錨點標框、FLIP 只動 transform、動畫中凍結、prefs.ts 的 autoCollapse
   2-9-進度環轉進來和列進場: done # PR #28：打開 App 時進度環轉進來、列一列接一列浮上來
-  2-10-出錯種子的原因: review
+  2-10-出錯種子的原因: done # PR #29：出錯種子顯示 qBittorrent log 裡整理過的原因
   epic-2-retrospective: optional
 
   epic-3: backlog
