@@ -8,14 +8,15 @@ import {
   SHEET_EASING,
   SHEET_MOTION_MS,
 } from '#/shared/ui/bottom-sheet'
-import { MAIN_ID } from '#/shared/ui/main-scroll'
+import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
 
 // Spec 2.2 rows B1 to B5, B10, B14: the shared bottom sheet's wiring in a
 // DOM, with the real snap decisions (src/shared/ui/sheet-snap.test.ts covers
 // them per mode). happy-dom has no layout, so the viewport and the content
 // heights are stubbed: a `fit` sheet with 400px of content rests at 400px.
-// Holding the list order is the caller's (sort-sheet.dom.test.tsx).
+// Holding the list order and Esc are the caller's (useSheetLayer;
+// sort-sheet.dom.test.tsx).
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -27,6 +28,15 @@ const REST = 400
 let root: Root
 let container: HTMLElement
 let main: HTMLElement
+/** The list's own scroller (story 2.4), inside `main` as in the app. */
+let listScroll: HTMLElement
+/** Everything the scroll lock must hold still. */
+const scrollers = () => [
+  document.documentElement,
+  document.body,
+  main,
+  listScroll,
+]
 let opener: HTMLButtonElement
 const onOpenChange = vi.fn()
 
@@ -127,6 +137,9 @@ beforeEach(() => {
   main = document.createElement('main')
   main.id = MAIN_ID
   document.body.append(main)
+  listScroll = document.createElement('div')
+  listScroll.id = LIST_SCROLL_ID
+  main.append(listScroll)
   opener = document.createElement('button')
   document.body.append(opener)
   opener.focus()
@@ -163,11 +176,11 @@ describe('B1 open', () => {
 
   it('locks the page scroll while open (B14)', async () => {
     await mount()
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('hidden')
     }
     await act(async () => closeButton()?.click())
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('')
     }
   })
@@ -188,13 +201,6 @@ describe('B2 close', () => {
   it.each([
     ['✕', () => closeButton()?.click()],
     ['the scrim', () => scrim()?.click()],
-    [
-      'Esc',
-      () =>
-        dialog()?.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-        ),
-    ],
   ] as const)(
     '%s closes and focus goes back to the opener',
     async (_, act_) => {
@@ -517,17 +523,13 @@ describe('B10 motion', () => {
     expect(dialog()?.contains(document.activeElement)).toBe(true)
     expect(dialog()?.hasAttribute('inert')).toBe(false)
     // The whole session is back: scroll lock, inert page.
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('hidden')
     }
     expect(main.hasAttribute('inert')).toBe(true)
     expect(opener.hasAttribute('inert')).toBe(true)
     // And it closes again.
-    await act(async () =>
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-      ),
-    )
+    await act(async () => closeButton()?.click())
     expect(dialog()?.getAttribute('data-state')).toBe('closing')
   })
 
@@ -594,7 +596,7 @@ describe('page around the sheet', () => {
     await mount()
     await act(async () => root.unmount())
     expect(main.hasAttribute('inert')).toBe(false)
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('')
     }
     root = createRoot(container)
@@ -679,6 +681,44 @@ describe('page around the sheet', () => {
       row.click()
     })
     expect(onClick).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('header slot (story 2.4)', () => {
+  it('replaces the title row, names the dialog and leaves Esc to the caller', async () => {
+    await act(async () =>
+      root.render(
+        <BottomSheet
+          open
+          onOpenChange={onOpenChange}
+          mode="detail"
+          header={(titleId) => (
+            <div>
+              <h2 id={titleId}>Fake.Name</h2>
+              <button type="button" aria-label="關閉詳情的替身">
+                x
+              </button>
+            </div>
+          )}
+        >
+          <p>內容</p>
+        </BottomSheet>,
+      ),
+    )
+    const sheet = dialog() as HTMLElement
+    const labelledBy = sheet.getAttribute('aria-labelledby') ?? ''
+    expect(document.getElementById(labelledBy)?.textContent).toBe('Fake.Name')
+    expect(closeButton()).toBeNull()
+    // The handle stays above the header.
+    expect(handle()).not.toBeNull()
+    // Nothing focusable was asked for and there is no ✕: the dialog itself.
+    expect(document.activeElement).toBe(sheet)
+    await act(async () =>
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    )
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 })

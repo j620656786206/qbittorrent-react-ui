@@ -7,8 +7,10 @@ import { ROW_HEIGHT, rowModel } from '#/features/list/list-model'
 import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 
 // DESIGN list-row (mockups S01-list-mode-desktop, S02-list-mode-phone).
-// Epic 1 rows have no click, no hover, no cursor change and are not
-// focusable: plain boxes, Epic 2 adds the click. Desktop: the 20px
+// Story 2.4: a row is a button that opens the detail (`onOpen` sets the
+// URL's `hash`); hover is `surface-muted`, the viewed row has
+// `aria-current="true"` and the 2px inset brand-accent ring (keyboard focus
+// is the outline outside, so the two never look alike). Desktop: the 20px
 // checkbox slot (empty, `aria-hidden`), the circle, name and second line,
 // the 「分享率」 column (hidden while sorting by ratio) and the big number,
 // which follows the sort (story 2.1). Phone: no slot, no visible ratio
@@ -17,6 +19,13 @@ import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 // stays (at most half the line).
 // Names and details are JSX text, never HTML or links.
 
+export interface RowActionProps {
+  /** The detail shows this row (the ring, `aria-current`). */
+  viewing: boolean
+  /** Stable: opens this row's torrent in the detail. */
+  onOpen: (hash: string) => void
+}
+
 /** A box of fixed height on both breakpoints, so a short line cannot shrink it. */
 export const TorrentRow = memo(function Row({
   torrent,
@@ -24,27 +33,49 @@ export const TorrentRow = memo(function Row({
   today,
   sort,
   sortValue,
-}: RowProps) {
+  viewing,
+  onOpen,
+}: RowProps & RowActionProps) {
   const model = rowModel(torrent, {
     now: today,
     stateBeforeMove: stateBeforeMove ? { [torrent.hash]: stateBeforeMove } : {},
     sort,
     sortValue,
   })
-  return <RowContent model={model} />
+  return (
+    <RowContent
+      model={model}
+      viewing={viewing}
+      onOpen={() => onOpen(torrent.hash)}
+    />
+  )
 })
 
 /** The row from a fixed model (tests render this directly). */
-export function RowContent({ model }: { model: RowModel }) {
+export function RowContent({
+  model,
+  viewing = false,
+  onOpen,
+}: {
+  model: RowModel
+  viewing?: boolean
+  onOpen?: () => void
+}) {
   return (
-    <div
+    <button
+      type="button"
+      aria-current={viewing ? 'true' : 'false'}
+      onClick={onOpen}
       style={{ height: ROW_HEIGHT }}
-      className="box-border flex items-center gap-2 rounded-row px-2.5 py-[9px] lg:gap-2.5 lg:px-3"
+      className={cn(
+        'box-border flex w-full items-center gap-2 rounded-row px-2.5 py-[9px] text-left text-text hover-row lg:gap-2.5 lg:px-3',
+        viewing && 'viewing-ring',
+      )}
     >
       <span aria-hidden="true" className="hidden size-5 flex-none lg:block" />
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:gap-3">
+      <span className="flex min-w-0 flex-1 items-center gap-2.5 lg:gap-3">
         <StatusCircle {...model.circle} />
-        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <span
             title={model.name}
             className="truncate text-row-name leading-[18px]"
@@ -52,7 +83,7 @@ export function RowContent({ model }: { model: RowModel }) {
             {model.name}
           </span>
           <SecondLine model={model} />
-        </div>
+        </span>
         {/* Phone has no column but screen readers still get the ratio.
             Sorting by ratio: the big number is the ratio, no column. */}
         {model.showRatio && (
@@ -69,8 +100,8 @@ export function RowContent({ model }: { model: RowModel }) {
           </span>
         )}
         <BigValueCell value={model.value} />
-      </div>
-    </div>
+      </span>
+    </button>
   )
 }
 

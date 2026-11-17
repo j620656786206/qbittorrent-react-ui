@@ -9,6 +9,8 @@ import type { APIRequestContext, Page } from '@playwright/test'
 export const FAKE_USER = 'fake-user'
 export const FAKE_PASS = 'fake-pass'
 export const MAIN_ID = 'rt-main'
+/** The list's own scroller (story 2.4: the list scrolls itself, not `main`). */
+export const LIST_SCROLL_ID = 'rt-list-scroll'
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
@@ -139,4 +141,33 @@ export async function login(page: Page) {
 export async function openList(page: Page, sort = 'added_on') {
   await page.goto(`/?sort=${sort}`)
   await expect(page.getByRole('listitem').first()).toBeVisible()
+}
+
+/**
+ * Where the list is scrolled: its own scroller when a list is shown,
+ * otherwise `main` (the board never scrolls it).
+ */
+export function listScrollTop(page: Page) {
+  return page.evaluate(
+    ([listId, mainId]) =>
+      (document.getElementById(listId) ?? document.getElementById(mainId))
+        ?.scrollTop ?? 0,
+    [LIST_SCROLL_ID, MAIN_ID],
+  )
+}
+
+/** Scrolls the list's own scroller and waits a frame for the virtualizer. */
+export async function scrollList(page: Page, to: 'bottom' | 'middle' | number) {
+  await page.locator(`#${LIST_SCROLL_ID}`).evaluate((scroller, where) => {
+    const max = scroller.scrollHeight - scroller.clientHeight
+    scroller.scrollTop =
+      where === 'bottom'
+        ? max
+        : where === 'middle'
+          ? Math.round(max / 2)
+          : where
+  }, to)
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
+  )
 }

@@ -5,13 +5,15 @@ import {
   useRef,
   useState,
 } from 'react'
+import type { ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SortKeys } from '#/lib/visible-torrents'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
-import { getMain } from '#/shared/ui/main-scroll'
+import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useListView, viewKeyOf } from '#/state/list-view'
+import { useListViewed } from '#/state/list-viewed'
 import {
   selectStateBeforeMove,
   selectTorrents,
@@ -29,7 +31,9 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
+import { usePublishShownList } from '#/state/shown-order'
 import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
+import { useViewedHash } from '#/state/viewed-hash'
 import {
   ROW_GAP,
   ROW_HEIGHT,
@@ -38,7 +42,9 @@ import {
   rowProps,
 } from '#/features/list/list-model'
 import {
-  LIST_SECTION_CLASS,
+  LIST_DETAIL_GRID_CLASS,
+  LIST_ROWS_SECTION_CLASS,
+  LIST_SCROLL_CLASS,
   ListEmpty,
   ListLoadError,
   ListSkeleton,
@@ -50,11 +56,19 @@ import { TorrentRow } from '#/features/list/torrent-row'
 // the view is the URL's sort (`useListView`). An extra sort's keys come from
 // `['sort-keys', field]`, polled only while that sort is active; until its
 // first keys arrive the order shown stays and the big numbers are skeletons.
-// rows are virtualized with `main` (the shell's scroll container) as the
-// scroll element, fixed height, keyed by hash. Only the rows in view plus
-// 10 above and below exist. Docs: TanStack Virtual `Virtualizer` options
-// and the React adapter (https://tanstack.com/virtual/latest/docs/api/virtualizer,
+// Rows are virtualized with the list's own scroller as the scroll element
+// (story 2.4: `main` no longer scrolls, so the desktop detail panel beside
+// the list fills the height), fixed height, keyed by hash. Only the rows in
+// view plus 10 above and below exist. Docs: TanStack Virtual `Virtualizer`
+// options and the React adapter
+// (https://tanstack.com/virtual/latest/docs/api/virtualizer,
 // https://tanstack.com/virtual/latest/docs/framework/react/react-virtual).
+//
+// Story 2.4: the row the detail shows comes from the URL's `hash` and this
+// order (`useListViewed`); the order shown and that row are published for
+// the detail (`usePublishShownList`), which never runs a second freeze.
+// Desktop list mode passes the detail panel as `panel`: it sits right of
+// the rows; the empty, error and loading blocks replace both.
 
 const estimateSize = () => ROW_HEIGHT
 
@@ -72,7 +86,15 @@ function mouseRestsOn(element: HTMLElement | null): boolean {
 
 const fetchSortKeys = bindFetchSortKeys(getSortKeys)
 
-export function TorrentList() {
+export interface TorrentListProps {
+  /**
+   * Desktop list mode: the detail panel, drawn right of the rows. With it,
+   * no usable `hash` means the first row is viewed.
+   */
+  panel?: ReactNode
+}
+
+export function TorrentList({ panel }: TorrentListProps) {
   const { view } = useListView()
   const extraField = isExtraSortField(view.sort) ? view.sort : null
   const { data: sortKeysData, errorUpdateCount } = useSortKeys(
@@ -96,6 +118,8 @@ export function TorrentList() {
     holdAddsNew: keysFailed,
   })
   const { retry, retrying } = useMaindataRetry()
+  const viewed = useListViewed(shown, { fallbackFirst: panel !== undefined })
+  usePublishShownList(shown, viewed)
 
   const state = listView({
     hasData: shown !== undefined,
@@ -106,13 +130,22 @@ export function TorrentList() {
   if (state === 'error')
     return <ListLoadError onRetry={retry} busy={retrying} />
   if (state === 'empty' || !shown) return <ListEmpty />
-  return (
+  const rows = (
     <TorrentRows
       shown={shown}
       sort={view.sort}
       sortKeys={sortKeys}
       keysFailed={keysFailed}
+      viewed={viewed}
     />
+  )
+  // One wrapper either way, so crossing 1024px keeps the rows mounted
+  // (scroll, virtualizer and freeze); without a panel it adds no box.
+  return (
+    <div className={panel === undefined ? 'contents' : LIST_DETAIL_GRID_CLASS}>
+      {rows}
+      {panel}
+    </div>
   )
 }
 
@@ -121,6 +154,7 @@ function TorrentRows({
   sort,
   sortKeys,
   keysFailed,
+  viewed,
 }: {
   shown: ReadonlyArray<string>
   sort: SortFieldId
@@ -128,58 +162,62 @@ function TorrentRows({
   sortKeys: SortKeys | undefined
   /** The first keys failed: values read 「沒有」 instead of skeletons. */
   keysFailed: boolean
+  /** The row the detail shows, `null` for none. */
+  viewed: string | null
 }) {
+  const { setHash } = useViewedHash()
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   const clock = useDayClock()
   // Only a sort shown as 「N 前」 makes the rows read the minute tick.
   const today = rowClock(sort, clock.today, clock.now)
   const listRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
 
-  // Where the rows start inside `main` (the section's padding: 8px desktop,
+  // Where the rows start inside the scroller (its padding: 8px desktop,
   // 4px phone); re-measured when the width changes the breakpoint.
   useLayoutEffect(() => {
-    const main = getMain()
+    const scroller = scrollRef.current
     const list = listRef.current
-    if (!main || !list) return
+    if (!scroller || !list) return
     const measure = () => {
       const offset =
         list.getBoundingClientRect().top -
-        main.getBoundingClientRect().top +
-        main.scrollTop
+        scroller.getBoundingClientRect().top +
+        scroller.scrollTop
       setScrollMargin((previous) =>
         Math.abs(previous - offset) < 0.5 ? previous : offset,
       )
     }
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(main)
+    observer.observe(scroller)
     return () => observer.disconnect()
   }, [])
 
-  // Freeze reasons: a finger on `main` (until the last finger lifts and the
-  // scroll settles), and the mouse on the section (events below). Rows that
-  // replace a block under a resting mouse get no `pointerenter`, so check
-  // `:hover` once on mount. Leaving the list clears both.
+  // Freeze reasons: a finger on the scroller (until the last finger lifts
+  // and the scroll settles), and the mouse on the section (events below).
+  // Rows that replace a block under a resting mouse get no `pointerenter`,
+  // so check `:hover` once on mount. Leaving the list clears both.
   useEffect(() => {
-    const main = getMain()
-    if (!main) return
+    const scroller = scrollRef.current
+    if (!scroller) return
     if (mouseRestsOn(sectionRef.current)) setPointerInList(true)
     const options = { passive: true } as const
     const onTouchEnd = (event: TouchEvent) => {
       if (event.touches.length === 0) touchScrollEnd()
     }
-    main.addEventListener('touchstart', touchScrollStart, options)
-    main.addEventListener('touchend', onTouchEnd, options)
-    main.addEventListener('touchcancel', onTouchEnd, options)
-    main.addEventListener('scroll', noteScroll, options)
+    scroller.addEventListener('touchstart', touchScrollStart, options)
+    scroller.addEventListener('touchend', onTouchEnd, options)
+    scroller.addEventListener('touchcancel', onTouchEnd, options)
+    scroller.addEventListener('scroll', noteScroll, options)
     return () => {
-      main.removeEventListener('touchstart', touchScrollStart)
-      main.removeEventListener('touchend', onTouchEnd)
-      main.removeEventListener('touchcancel', onTouchEnd)
-      main.removeEventListener('scroll', noteScroll)
+      scroller.removeEventListener('touchstart', touchScrollStart)
+      scroller.removeEventListener('touchend', onTouchEnd)
+      scroller.removeEventListener('touchcancel', onTouchEnd)
+      scroller.removeEventListener('scroll', noteScroll)
       resetListFreeze()
     }
   }, [])
@@ -189,7 +227,7 @@ function TorrentRows({
   const getItemKey = useCallback((index: number) => shown[index], [shown])
   const virtualizer = useVirtualizer({
     count: shown.length,
-    getScrollElement: getMain,
+    getScrollElement: () => scrollRef.current,
     estimateSize,
     getItemKey,
     overscan: 10,
@@ -204,7 +242,7 @@ function TorrentRows({
     <section
       ref={sectionRef}
       aria-label={`種子列表，共 ${total} 個`}
-      className={LIST_SECTION_CLASS}
+      className={LIST_ROWS_SECTION_CLASS}
       onPointerEnter={(event) => {
         if (event.pointerType === 'mouse') setPointerInList(true)
       }}
@@ -212,41 +250,49 @@ function TorrentRows({
         if (event.pointerType === 'mouse') setPointerInList(false)
       }}
     >
-      <div
-        ref={listRef}
-        role="list"
-        className="relative w-full"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
-        {virtualizer.getVirtualItems().map((item) => {
-          const hash = shown[item.index]
-          const props =
-            torrents && stateBeforeMove
-              ? rowProps(
-                  { torrents, stateBeforeMove },
-                  hash,
-                  today,
-                  sort,
-                  sortKeys,
-                  keysFailed,
-                )
-              : null
-          return (
-            <div
-              key={item.key}
-              role="listitem"
-              aria-setsize={total}
-              aria-posinset={item.index + 1}
-              className="absolute top-0 left-0 w-full"
-              style={{
-                height: ROW_HEIGHT,
-                transform: `translateY(${item.start - scrollMargin}px)`,
-              }}
-            >
-              {props && <TorrentRow {...props} />}
-            </div>
-          )
-        })}
+      <div ref={scrollRef} id={LIST_SCROLL_ID} className={LIST_SCROLL_CLASS}>
+        <div
+          ref={listRef}
+          role="list"
+          className="relative w-full"
+          style={{ height: virtualizer.getTotalSize() }}
+        >
+          {virtualizer.getVirtualItems().map((item) => {
+            const hash = shown[item.index]
+            const props =
+              torrents && stateBeforeMove
+                ? rowProps(
+                    { torrents, stateBeforeMove },
+                    hash,
+                    today,
+                    sort,
+                    sortKeys,
+                    keysFailed,
+                  )
+                : null
+            return (
+              <div
+                key={item.key}
+                role="listitem"
+                aria-setsize={total}
+                aria-posinset={item.index + 1}
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${item.start - scrollMargin}px)`,
+                }}
+              >
+                {props && (
+                  <TorrentRow
+                    {...props}
+                    viewing={hash === viewed}
+                    onOpen={setHash}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </section>
   )

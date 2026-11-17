@@ -6,6 +6,7 @@ import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import {
   countAll,
+  boardColumnOf,
   selectBoardColumns,
   selectVisibleTorrents,
 } from '#/lib/visible-torrents'
@@ -492,5 +493,21 @@ describe('selectBoardColumns', () => {
     const total = Object.values(columns).reduce((n, c) => n + c.length, 0)
     expect(total).toBe(4165)
     expect(ms).toBeLessThan(100)
+  })
+})
+
+describe('boardColumnOf (spec 2.4)', () => {
+  const columns = {
+    attention: ['a'],
+    downloading: [],
+    seeding: ['b', 'c'],
+    done: [],
+    archived: ['d'],
+  }
+
+  it('the column holding the hash, archived included; null when none', () => {
+    expect(boardColumnOf(columns, 'c')).toBe('seeding')
+    expect(boardColumnOf(columns, 'd')).toBe('archived')
+    expect(boardColumnOf(columns, 'z')).toBeNull()
   })
 })

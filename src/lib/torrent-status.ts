@@ -69,6 +69,18 @@ export function columnOf(status: TorrentStatusId): BoardColumn {
   return COLUMNS[status]
 }
 
+/**
+ * The board columns' names (UX DESIGN board-column, status-tabs), for the
+ * board and the detail header's column prefix (story 2.4).
+ */
+export const BOARD_COLUMN_NAMES: Readonly<Record<BoardColumn, string>> = {
+  attention: '要處理',
+  downloading: '下載中',
+  seeding: '做種中',
+  done: '完成',
+  archived: '已整理',
+}
+
 const SHOWS_PROGRESS: ReadonlySet<TorrentStatusId> = new Set([
   'downloading',
   'paused',

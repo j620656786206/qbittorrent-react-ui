@@ -39,10 +39,15 @@ import type { SheetMode } from '#/shared/ui/sheet-snap'
 //
 // This file owns the open, close and settle motion and the measuring. The
 // gesture is src/shared/ui/sheet-drag.ts, the page around an open sheet
-// (scroll lock, inert, focus, Esc) src/shared/ui/sheet-session.ts, and
-// where a release settles src/shared/ui/sheet-snap.ts. Holding the torrent
-// list's order while a sheet is open is the caller's job
-// (`useSheetOrderHold` in src/state/order-freeze.ts).
+// (scroll lock, inert, focus) src/shared/ui/sheet-session.ts, and where a
+// release settles src/shared/ui/sheet-snap.ts. Holding the torrent list's
+// order and closing on Esc (the src/state shortcut registry) while a sheet
+// is open are the caller's job: `useSheetLayer` in src/state/sheet-layer.ts
+// (src/shared may not import src/state).
+//
+// Story 2.4: `header` replaces the default title row (the detail's sticky
+// header and tabs). It gets the id that names the dialog; the handle, the
+// drag, the focus trap and the scroll lock stay the sheet's.
 //
 // CSP (AD-10, no style-src): no `<style>` element is ever added. Inline
 // styles are set through the CSSOM (React `style`, `element.style`,
@@ -69,8 +74,14 @@ const translate = (px: number) => `translate3d(0, ${px}px, 0)`
 export interface BottomSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The visible title; it also names the dialog. */
-  title: string
+  /** The visible title; it also names the dialog. Ignored with `header`. */
+  title?: string
+  /**
+   * Replaces the title row (and its ✕): rendered under the handle, outside
+   * the scrolling content. The element with `titleId` names the dialog;
+   * the header must offer its own way to close.
+   */
+  header?: (titleId: string) => ReactNode
   mode?: SheetMode
   children: ReactNode
   /** Focused when the sheet opens; the ✕ when this returns `null`. */
@@ -85,6 +96,7 @@ export function BottomSheet({
   open,
   onOpenChange,
   title,
+  header,
   mode = 'fit',
   children,
   initialFocus,
@@ -123,12 +135,7 @@ export function BottomSheet({
 
   const close = () => propsRef.current.onOpenChange(false)
 
-  const session = useModalSession({
-    sheetRef,
-    scrimRef,
-    onEscape: close,
-    returnFocus,
-  })
+  const session = useModalSession({ sheetRef, scrimRef, returnFocus })
 
   const fullScreen = expanded || mode === 'full'
 
@@ -331,8 +338,8 @@ export function BottomSheet({
     pendingOpenedRef.current = false
     propsRef.current.onOpened?.(body)
     updateTouchAction()
-    const first = propsRef.current.initialFocus?.() ?? closeRef.current
-    first?.focus({ preventScroll: true })
+    const first = propsRef.current.initialFocus?.() ?? closeRef.current ?? sheet
+    first.focus({ preventScroll: true })
   }, [openedSeq, updateTouchAction])
 
   // Content or screen size changes: new rest height (更多 expanding).
@@ -407,23 +414,27 @@ export function BottomSheet({
           <div aria-hidden="true" className="flex h-5 justify-center pt-2">
             <span className="block h-[5px] w-11 rounded-full bg-border" />
           </div>
-          <div className="flex items-center gap-2 pr-3 pb-1 pl-5">
-            <h2
-              id={titleId}
-              className="m-0 flex-1 text-[16px] leading-[1.2] font-bold"
-            >
-              {title}
-            </h2>
-            <button
-              ref={closeRef}
-              type="button"
-              aria-label="關閉"
-              onClick={close}
-              className="inline-flex size-11 flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline"
-            >
-              <X size={18} strokeWidth={2.4} aria-hidden="true" />
-            </button>
-          </div>
+          {header ? (
+            header(titleId)
+          ) : (
+            <div className="flex items-center gap-2 pr-3 pb-1 pl-5">
+              <h2
+                id={titleId}
+                className="m-0 flex-1 text-[16px] leading-[1.2] font-bold"
+              >
+                {title}
+              </h2>
+              <button
+                ref={closeRef}
+                type="button"
+                aria-label="關閉"
+                onClick={close}
+                className="inline-flex size-11 flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline"
+              >
+                <X size={18} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
         <div
           ref={bodyRef}

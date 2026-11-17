@@ -11,11 +11,13 @@ import { sessionQueryOptions } from '#/features/login/session-query'
 import {
   fixListSearch,
   listSearchSchema,
+  searchWithHash,
   sortViewOf,
 } from '#/shared/list-search'
 import type { SortView } from '#/shared/list-search'
 import { ListViewContext } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
+import { ViewedHashContext } from '#/state/viewed-hash'
 
 // Every page that shows data sits under this pathless layout (Start auth
 // guide). `ssr: false`: the built server would run beforeLoad without the
@@ -28,7 +30,9 @@ import { loginStore } from '#/state/login-required'
 // https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts
 // Story 2.1, AD-13: the list's `sort` and `dir` live in the URL. A bad value
 // reads as missing (the schema's `.catch`), and the address bar is fixed
-// with `replace`; every sort change also uses `replace`.
+// with `replace`; every sort change also uses `replace`. Story 2.4: the
+// viewed torrent's `hash` too; opening, switching and closing the detail
+// write it with `replace` and `resetScroll: false`, a sort change keeps it.
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
 export const Route = createFileRoute('/_authed')({
   ssr: false,
@@ -43,7 +47,7 @@ export const Route = createFileRoute('/_authed')({
 })
 
 function AuthedLayout() {
-  const { sort, dir } = Route.useSearch()
+  const { sort, dir, hash } = Route.useSearch()
   const navigate = useNavigate()
   // The search as typed in the address bar, before validation.
   const rawSearch = useLocation({ select: (location) => location.search })
@@ -76,11 +80,30 @@ function AuthedLayout() {
   )
   const control = useMemo(() => ({ view, setView }), [view, setView])
 
+  const setHash = useCallback(
+    (next: string | null) => {
+      void navigate({
+        to: '.',
+        search: (previous) => searchWithHash(previous, next) as never,
+        replace: true,
+        // The detail never moves the list or the board.
+        resetScroll: false,
+      })
+    },
+    [navigate],
+  )
+  const viewed = useMemo(
+    () => ({ hash: hash ?? null, setHash }),
+    [hash, setHash],
+  )
+
   return (
     <ListViewContext value={control}>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <ViewedHashContext value={viewed}>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </ViewedHashContext>
     </ListViewContext>
   )
 }

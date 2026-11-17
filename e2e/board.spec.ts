@@ -1,8 +1,10 @@
 import type { Locator, Page } from '@playwright/test'
 import {
   DEFAULT_MODES,
+  LIST_SCROLL_ID,
   MAIN_ID,
   expect,
+  listScrollTop,
   login,
   setModes,
   test,
@@ -48,8 +50,7 @@ const sortPill = (page: Page) =>
   page
     .getByRole('button', { name: /^排序：.*，(列表|看板)$/ })
     .filter({ visible: true })
-const mainScrollTop = (page: Page) =>
-  page.locator(`#${MAIN_ID}`).evaluate((main) => main.scrollTop)
+const mainScrollTop = listScrollTop
 
 async function hasNoHorizontalScroll(page: Page, selector = ':root') {
   const { scrollWidth, clientWidth } = await page
@@ -199,10 +200,17 @@ test('K2 switching board and list starts at the top', async ({
   ).toBeVisible({
     timeout: POLL_WAIT,
   })
+  // Story 2.4: the list scrolls itself; the board scrolls neither.
   const scrollMainTo = (top: number) =>
-    page.locator(`#${MAIN_ID}`).evaluate((main, value) => {
-      main.scrollTop = value
-    }, top)
+    page.evaluate(
+      ([value, ids]) => {
+        for (const id of ids) {
+          const element = document.getElementById(id)
+          if (element) element.scrollTop = value
+        }
+      },
+      [top, [LIST_SCROLL_ID, MAIN_ID]] as const,
+    )
   await scrollMainTo(600)
   expect(await mainScrollTop(page)).toBeGreaterThan(0)
 

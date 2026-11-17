@@ -163,6 +163,28 @@ export function selectBoardColumns(maindata: Maindata): BoardColumns {
   }
 }
 
+/**
+ * Story 2.4: the board column that holds `hash` right now (the detail's
+ * range for 「第 N 個」 and ‹ ›), or `null` when no column does (deleted).
+ */
+export function boardColumnOf(
+  columns: BoardColumns,
+  hash: string,
+): BoardColumn | null {
+  for (const column of BOARD_COLUMNS) {
+    if (columns[column].includes(hash)) return column
+  }
+  return null
+}
+
+const BOARD_COLUMNS = [
+  'attention',
+  'downloading',
+  'seeding',
+  'done',
+  'archived',
+] as const satisfies ReadonlyArray<BoardColumn>
+
 /** The 「全部」 count: every torrent except archived ones. */
 export function countAll(maindata: Maindata): number {
   let count = 0

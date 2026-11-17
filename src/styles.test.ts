@@ -389,6 +389,34 @@ describe('Tailwind theme (row 20)', () => {
     expect(declarations(reduced[0].body).get('animation')).toBe('none')
   })
 
+  it('has the viewing ring on the brand accent and the panel slide-in (spec 2.4)', () => {
+    const ring = byPrelude('@utility viewing-ring')
+    expect(ring).toHaveLength(1)
+    expect(declarations(ring[0].body).get('box-shadow')).toBe(
+      'inset 0 0 0 2px var(--color-primary)',
+    )
+
+    const keyframes = byPrelude('@keyframes panel-in')
+    expect(keyframes).toHaveLength(1)
+    const from = blocks(keyframes[0].body)
+    expect(from.map((b) => b.prelude)).toEqual(['from'])
+    const fromDecl = declarations(from[0].body)
+    expect(fromDecl.get('opacity')).toBe('0')
+    expect(fromDecl.get('transform')).toBe('translateX(24px)')
+    expect([...fromDecl.keys()].sort()).toEqual(['opacity', 'transform'])
+
+    const utility = byPrelude('@utility animate-panel-in')
+    expect(utility).toHaveLength(1)
+    expect(declarations(utility[0].body).get('animation')).toBe(
+      'panel-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both',
+    )
+    const reduced = blocks(utility[0].body)
+    expect(reduced.map((b) => b.prelude)).toEqual([
+      '@media (prefers-reduced-motion: reduce)',
+    ])
+    expect(declarations(reduced[0].body).get('animation')).toBe('none')
+  })
+
   it('sets body, focus and disabled base rules', () => {
     const rule = (prelude: string) => {
       const found = BASE.filter((b) => b.prelude === prelude)

@@ -54,6 +54,8 @@ export interface ExtrasTable {
     field: ExtraSortFieldId,
     counter: number | null,
   ) => SortKeysChanges
+  /** One torrent's extras as qBittorrent sent them; `undefined` if unknown. */
+  rawOf: (hash: string) => SortExtras | undefined
 }
 
 interface Row {
@@ -171,6 +173,7 @@ export function createExtrasTable(): ExtrasTable {
   return {
     apply,
     keysSince,
+    rawOf: (hash) => rows.get(hash)?.raw,
     get version() {
       return version
     },

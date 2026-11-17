@@ -17,6 +17,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
+import { ViewedHashContext } from '#/state/viewed-hash'
 import {
   CARD_GAP,
   CARD_HEIGHT,
@@ -93,6 +94,7 @@ let answers: Array<MaindataResponse | AppError | 'pending'>
 let fetchCount: number
 let desktop = true
 const restores: Array<() => void> = []
+const setHash = vi.fn()
 
 function stubPrototype(name: 'clientHeight' | 'clientWidth', value: number) {
   const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)
@@ -128,7 +130,9 @@ async function render(first: MaindataResponse | AppError | 'pending') {
   await act(async () => {
     root.render(
       <QueryClientProvider client={client}>
-        <TorrentBoard />
+        <ViewedHashContext value={{ hash: null, setHash }}>
+          <TorrentBoard />
+        </ViewedHashContext>
       </QueryClientProvider>,
     )
   })
@@ -191,6 +195,31 @@ afterEach(async () => {
   vi.restoreAllMocks()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('opening the detail (spec 2.4)', () => {
+  it('a card is a button with the hover ring; a click sets hash', async () => {
+    setHash.mockClear()
+    await render(fakeResponse({ changed: sample() }))
+    const card = section('下載中，1 個').querySelector(
+      '[role="listitem"] > button',
+    ) as HTMLButtonElement
+    expect(card.type).toBe('button')
+    expect(card.className).toContain('hover-ring')
+    await act(async () => card.click())
+    expect(setHash).toHaveBeenCalledWith(h(1))
+  })
+
+  it('a phone card opens it too', async () => {
+    setHash.mockClear()
+    desktop = false
+    await render(fakeResponse({ changed: sample() }))
+    const card = main.querySelector(
+      '[role="tabpanel"] [role="listitem"] > button',
+    ) as HTMLButtonElement
+    await act(async () => card.click())
+    expect(setHash).toHaveBeenCalledWith(h(3))
+  })
 })
 
 describe('the desktop board', () => {

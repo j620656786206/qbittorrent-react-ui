@@ -3,6 +3,7 @@ import {
   DEFAULT_SORT_VIEW,
   fixListSearch,
   listSearchSchema,
+  searchWithHash,
   sortViewOf,
 } from '#/shared/list-search'
 
@@ -92,5 +93,52 @@ describe('sortViewOf on a field without a direction', () => {
       sort: 'state',
       dir: 'desc',
     })
+  })
+})
+
+// Spec 2.4: `hash`, the torrent the detail shows (D3, D12).
+const SHA1 = '0123456789abcdef'.repeat(2) + '01234567'
+const SHA256 = '0123456789abcdef'.repeat(4)
+
+describe('hash in the search', () => {
+  it('keeps a 40 or 64 lowercase hex hash', () => {
+    expect(listSearchSchema.parse({ hash: SHA1 }).hash).toBe(SHA1)
+    expect(listSearchSchema.parse({ hash: SHA256 }).hash).toBe(SHA256)
+  })
+
+  it.each([
+    ['uppercase', SHA1.toUpperCase()],
+    ['too short', SHA1.slice(1)],
+    ['41 characters', `${SHA1}a`],
+    ['not hex', 'g'.repeat(40)],
+    ['a number', 12],
+    ['all', 'all'],
+  ])('reads a hash that is %s as missing, never throws', (_, hash) => {
+    expect(listSearchSchema.parse({ hash }).hash).toBeUndefined()
+  })
+
+  it('fixListSearch drops a bad hash alone and keeps a good one', () => {
+    expect(fixListSearch({ sort: 'ratio', hash: SHA1 })).toBeNull()
+    expect(fixListSearch({ sort: 'ratio', hash: 'nope' })).toEqual({
+      sort: 'ratio',
+    })
+    expect(fixListSearch({ sort: 'nope', hash: SHA1 })).toEqual({
+      hash: SHA1,
+    })
+    expect(fixListSearch({ hash: SHA1.toUpperCase(), q: 'x' })).toEqual({
+      q: 'x',
+    })
+  })
+
+  it('searchWithHash sets or removes hash and keeps the sort', () => {
+    const previous = { sort: 'ratio', dir: 'asc', hash: SHA1 }
+    expect(searchWithHash(previous, SHA256)).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+      hash: SHA256,
+    })
+    const closed = searchWithHash(previous, null)
+    expect(closed).toEqual({ sort: 'ratio', dir: 'asc' })
+    expect('hash' in closed).toBe(false)
   })
 })
