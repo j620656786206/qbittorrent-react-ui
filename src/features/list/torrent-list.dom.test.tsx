@@ -573,6 +573,23 @@ describe('the detail (spec 2.4)', () => {
     expect(setHash).not.toHaveBeenCalled()
   })
 
+  it('D9 without hash, the whole order replaced: the new first row, no blank panel', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: many(2) }))
+    expect(ringed()).toEqual(['T1'])
+    await poll(
+      fakeResponse({
+        version: 'v-replaced',
+        full: true,
+        changed: [torrent(5), torrent(6)],
+      }),
+    )
+    expect(shownNames()).toEqual(['T6', 'T5'])
+    expect(ringed()).toEqual(['T6'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(7))
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
   it('D9 the viewed row is deleted: the next one, written to the URL', async () => {
     withPanel = true
     viewedHash = fakeHash(2)

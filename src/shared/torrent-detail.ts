@@ -5,8 +5,9 @@ import type { SortExtras } from '#/shared/sort-keys'
 // AD-6 detail exception (2026-11-17, Alex, story 2.4): while the detail
 // shows a torrent, the browser asks `getTorrentDetail({ hash })` every 5 s
 // for the few qBittorrent fields the detail draws that the slim table does
-// not carry. The container answers from its sort extras table (the same
-// `sync/maindata` pulls), so qBittorrent gets no extra request. Only the
+// not carry. The container answers from its sort extras table, reusing a
+// `sync/maindata` pull younger than 6 s (maindata pulls every 5 s, so
+// qBittorrent is normally not asked again), else it pulls. Only the
 // fields named here leave, for that one torrent: never comment, paths,
 // infohashes, the tracker or anything else the extras table keeps. Story 2.5
 // adds the seed and peer counts here.

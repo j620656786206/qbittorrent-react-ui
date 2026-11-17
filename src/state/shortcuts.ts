@@ -11,7 +11,7 @@ import { useLayoutEffect, useRef } from 'react'
 // `input`, `textarea`, `select` or contenteditable, only shortcuts marked
 // `inInputs` (only `Esc`) are handled. A key another handler already took
 // (`defaultPrevented`, e.g. a Radix menu closing on Esc) is left alone,
-// and so is a key pressed while an IME is composing.
+// and so are a key pressed while an IME is composing and an auto-repeat.
 //
 // One `keydown` listener on `document`, there only while a layer is open.
 
@@ -20,6 +20,8 @@ export interface ShortcutEvent {
   target: EventTarget | null
   defaultPrevented: boolean
   isComposing?: boolean
+  /** A held key auto-repeating. */
+  repeat?: boolean
   preventDefault: () => void
 }
 
@@ -66,7 +68,8 @@ export function isTypingTarget(target: EventTarget | null): boolean {
  * (and then the default is prevented).
  */
 export function handleShortcut(event: ShortcutEvent): boolean {
-  if (event.defaultPrevented || event.isComposing) return false
+  // A held Esc repeats: one press closes one layer, not the ones below.
+  if (event.defaultPrevented || event.isComposing || event.repeat) return false
   const shortcut = SHORTCUTS.find((entry) => entry.key === event.key)
   if (!shortcut) return false
   if (!shortcut.inInputs && isTypingTarget(event.target)) return false

@@ -4,8 +4,10 @@ import {
   LIST_SCROLL_ID,
   MAIN_ID,
   expect,
+  listScrollTop,
   login,
   openList,
+  scrollList,
   setModes,
   test,
 } from './fixtures'
@@ -46,6 +48,30 @@ const card = (page: Page, n: number) =>
     .filter({ has: page.getByTitle(name(n), { exact: true }) })
 const detailSheet = (page: Page) => page.getByRole('dialog')
 const positionText = (scope: Locator) => scope.getByText(/個／共/)
+
+/**
+ * Clicks, with the mouse at its centre, the first row or card button that
+ * lies fully inside the scroller's visible box (the overscan ones are
+ * rendered outside it).
+ */
+async function clickInside(page: Page, scroller: string) {
+  const point = await page.evaluate((selector) => {
+    const box = document.querySelector(selector)?.getBoundingClientRect()
+    if (!box) return null
+    const buttons = document.querySelectorAll<HTMLElement>(
+      `${selector} [role="listitem"] > button`,
+    )
+    for (const button of buttons) {
+      const rect = button.getBoundingClientRect()
+      if (rect.top >= box.top + 40 && rect.bottom <= box.bottom - 40) {
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      }
+    }
+    return null
+  }, scroller)
+  expect(point, scroller).not.toBeNull()
+  await page.mouse.click(point?.x ?? 0, point?.y ?? 0)
+}
 
 /** Waits until no animation runs (slides, fades). */
 async function settled(page: Page) {
@@ -288,6 +314,24 @@ test('D4 D5 D8 D12 desktop board: open, switch, close by Esc, ✕ and empty spac
   await expect(panel(page)).toHaveCount(0)
   await expect(page).not.toHaveURL(/hash=/)
 
+  // Esc with the real sort menu open over the panel closes the menu only;
+  // a second Esc closes the panel.
+  await card(page, 1).click()
+  await expect(panel(page)).toBeVisible()
+  await page
+    .getByRole('button', { name: /^排序：.*，看板$/ })
+    .filter({ visible: true })
+    .click()
+  const menu = page.getByRole('menu', { name: '排序' })
+  await expect(menu).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(panel(page)).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`[?&]hash=${hashOf(1)}`))
+  await page.keyboard.press('Escape')
+  await expect(panel(page)).toHaveCount(0)
+  await expect(page).not.toHaveURL(/hash=/)
+
   // A click inside the panel (on text, not a control) keeps it; a click on
   // a column header (empty board space) closes it.
   await card(page, 1).click()
@@ -341,6 +385,44 @@ test('D4 D5 D8 D12 desktop board: open, switch, close by Esc, ✕ and empty spac
         ((wideBoard?.x ?? 0) + (wideBoard?.width ?? 0)),
     ),
   ).toBeLessThanOrEqual(1)
+})
+
+test('opening and switching the detail never scrolls the list or a board column', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'many' })
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+
+  // List mode: scrolled partway, a click and ‹ › leave the scroll alone.
+  await openList(page)
+  await scrollList(page, 'middle')
+  const listTop = await listScrollTop(page)
+  expect(listTop).toBeGreaterThan(0)
+  // A real mouse click on a row inside the scroller's view (Playwright's
+  // own click would scroll an overscan row into view first).
+  await clickInside(page, `#${LIST_SCROLL_ID}`)
+  await expect(page).toHaveURL(/[?&]hash=/)
+  await panel(page).getByRole('button', { name: '下一個' }).click()
+  await panel(page).getByRole('button', { name: '上一個' }).click()
+  await panel(page).getByRole('button', { name: '上一個' }).click()
+  expect(await listScrollTop(page)).toBe(listTop)
+
+  // Board: a column body scrolled partway stays where it is.
+  await page.goto('/')
+  const seeding = board(page)
+    .getByRole('region', { name: /^做種中/ })
+    .getByRole('group', { name: '做種中' })
+  await seeding.evaluate((element) => {
+    element.scrollTop = 600
+  })
+  const columnTop = await seeding.evaluate((element) => element.scrollTop)
+  expect(columnTop).toBeGreaterThan(0)
+  await clickInside(page, '[role="group"][aria-label="做種中"]')
+  await expect(panel(page)).toBeVisible()
+  await panel(page).getByRole('button', { name: '下一個' }).click()
+  expect(await seeding.evaluate((element) => element.scrollTop)).toBe(columnTop)
 })
 
 test('D16 reduced motion: the board panel appears without the slide', async ({

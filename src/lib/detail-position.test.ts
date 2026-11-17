@@ -194,6 +194,25 @@ describe('resolveListViewed (D1, D3, D9, D11)', () => {
     ).toEqual({ viewed: 'b', write: 'b' })
   })
 
+  it('D9 without hash, every old row gone and new ones in: the first row', () => {
+    expect(
+      resolveListViewed({
+        order: ['x', 'y'],
+        hash: null,
+        previous: { order: ['a', 'b'], viewed: 'a' },
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'x', write: undefined })
+    expect(
+      resolveListViewed({
+        order: [],
+        hash: null,
+        previous: { order: ['a'], viewed: 'a' },
+        ...desktop,
+      }),
+    ).toEqual({ viewed: null, write: undefined })
+  })
+
   it('D9 none left: nothing viewed, hash removed', () => {
     expect(
       resolveListViewed({

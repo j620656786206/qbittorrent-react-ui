@@ -2,17 +2,24 @@
 title: 'Story 2.4: Opening detail: three containers, sticky header, prev/next'
 type: 'feature'
 created: '2026-11-17'
-status: 'in-review'
+status: 'done'
 baseline_revision: 'eccb660257a2fd554a5273c85dfa8a10d599c0b9'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-3-board-desktop-columns-phone-status-tabs.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-2-bottom-sheet-phone-sort-sheet.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      A click on a board column's scrollbar may count as empty space and close the board detail panel.
+    evidence: |-
+      `isEmptySpace` in src/routes/_authed/index.tsx treats any click outside button, a, input, select, textarea and aside as empty space, and the column bodies are scroll containers. Settle it in Chromium and Safari: drag or click a column scrollbar with the panel open and see whether `click` reaches the wrapper.
+    location: >-
+      src/routes/_authed/index.tsx:38-44
+    severity: medium (unverified)
 ---
 
 <intent-contract>
@@ -35,7 +42,7 @@ deferred: []
 - N and M: list mode from the same frozen order the list shows (publish the list's `useFrozenOrder` result through a `src/state` store or provider instead of running a second hook instance); M excludes 已整理. Board mode: the range is the torrent's current column from `useBoardColumns()` (live, as the board shows it), text prefixed by the column name and a full-width space, e.g. 「做種中　第 3 個／共 80 個」; prev/next stay inside the column and never jump to the next one; the expanded 已整理 column follows the same rule; on the phone board the torrent's column is the current status tab. A pure `src/lib` function computes `{ index, total, prev, next }` from an order and a hash; vitest covers normal, first, last, a single item, a hash not in the order, and a frozen order.
 - Phone name tap: the name is `<h2><button aria-expanded aria-label="展開完整名稱">` (44px min height); expanded (`aria-label`「收起名稱」) it wraps (`overflow-wrap: anywhere`), the header grows and pushes the content down (no overlay); tapping again collapses; ‹ › collapse it.
 - Overview tab: the info list (UX-DR46) is a `<dl>` grid `72px minmax(0,1fr)`, row gap 8px, column gap 12px, 13px/1.4, tabular; `dt` in `text-muted`, `dd` right after (not pushed right). Rows in order: 分類 (category, empty means 「沒有」), 大小 (`formatSize(size)`), 加入時間 (`formatDate(added_on)`), 完成時間 (`formatDate(completion_on)`), 已下載, 已上傳 (`formatSize`); every value through `format.ts`; 「沒有」 in `text-muted`. Story 2.5 adds blocks above it.
-- `downloaded` and `uploaded` stay out of the slim table (spine AD-6). Alex decided 2026-11-17 (spine AD-6 detail exception): a new GET server function `getTorrentDetail({ hash })` answers the detail fields the slim table lacks for that one torrent, read from the container's sort extras table (same `sync/maindata` pulls, no extra qBittorrent request); `src/shared/torrent-detail.ts` lists the fields (2.4: `downloaded`, `uploaded`; 2.5 adds the seed and peer counts). The detail polls it every 5 s as `['torrent-detail', hash]` only while shown. Before the first answer the two rows show 「…」 muted; unknown is 「沒有」.
+- `downloaded` and `uploaded` stay out of the slim table (spine AD-6). Alex decided 2026-11-17 (spine AD-6 detail exception): a new GET server function `getTorrentDetail({ hash })` answers the detail fields the slim table lacks for that one torrent, read from the container's sort extras table (reusing a `sync/maindata` pull younger than 6 s, so normally no extra qBittorrent request); `src/shared/torrent-detail.ts` lists the fields (2.4: `downloaded`, `uploaded`; 2.5 adds the seed and peer counts). The detail polls it every 5 s as `['torrent-detail', hash]` only while shown. Before the first answer the two rows show 「…」 muted; unknown is 「沒有」.
 - Vanished viewed torrent: one pure `src/lib` function `(previousOrder, nextOrder, hash) => hash | null` returns the torrent that took its place (the old next one still present), else the old previous one still present, else `null`; vitest covers middle, last, only one, all gone, and still present. List mode: when the viewed hash leaves the frozen order (deleted, or became 已整理), switch to that successor and replace `hash`. Board panel: if the torrent is gone from every column, close; if it changed column, stay and recompute the column name and N of M. Phone sheet: if it is gone, close.
 - Reload with `sort` and `hash`: same sort and torrent; list panel shows it, board panel opens, phone sheet opens.
 - Shortcut registry in `src/state` (AR-52): register `Esc` only. Layers stack; `Esc` closes the topmost open one (this story: the board detail panel and any bottom sheet; a sheet above the panel closes first). While focus is in an `input`, `textarea`, `select` or contenteditable, only `Esc` is handled. The bottom sheet's document-level Esc handler moves into this registry (closes the 2.2 deferred item), injected through the existing `SheetRuntimeContext` bound in `src/router.tsx` because `src/shared` may not import `src/state`. vitest covers registration, ordering and the input rule.
@@ -150,6 +157,43 @@ deferred: []
   - `[low]` `[patch]` (edge) a focused ‹ or › that becomes disabled drops focus to body. Patch: focus moves to the other nav button.
   - `[false]` `[reject]` (edge) a board click with `hash` set but no panel removes `hash`. With no target the hash is not on the board, and D12 already closes (removes `hash`) in that case.
 
+### 2026-11-17: Review pass (follow-up)
+- verdicts: 33 findings: high 0, medium 3, low 24, false 5, maybe-false 1
+- findings:
+  - `[false]` `[reject]` (blind) the viewed row is never scrolled into view. The AC says 「那一列不在畫面上時不捲過去」: not scrolling is the rule.
+  - `[low]` `[reject]` (blind) board cards carry no mark for the open torrent. carried: same as the first pass's `aria-current` row.
+  - `[low]` `[reject]` (blind) `hover-ring` replaces the card shadow on hover. carried: same as the first pass's row.
+  - `[low]` `[reject]` (blind) cards under the board panel stay in the tab order. The spec leaves a covered 完成 card as is and the board stays clickable; `inert` columns would change that; rare with one keyboard user.
+  - `[low]` `[reject]` (blind) the phone `<h2>` is named 「展開完整名稱」 by its button. The AC sets that `aria-label`; the fix edits the spec.
+  - `[low]` `[reject]` (blind) a failed detail read and an unknown value both show 「沒有」. Failures already raise the global connection alert; a separate marker adds a state.
+  - `[false]` `[reject]` (blind) phone Back does not close the sheet. The AC wants `replace` (no new history entry; e2e checks `history.length`).
+  - `[false]` `[reject]` (blind) refs written during render. carried for `pendingRef`; the sheet's `lastRef` only keeps the last target for the close animation (idempotent), and the effect writes only while `write` is set, which the pending value turns off after one write.
+  - `[low]` `[reject]` (blind) BottomSheet relies on callers for Esc. carried: same as the first pass's row.
+  - `[low]` `[reject]` (blind) `searchWithHash(...) as never`. carried: same as the first pass's row.
+  - `[low]` `[reject]` (blind) the list panel renders an empty `aside` before the first publish. One frame before the list publishes; `viewed` always comes from the same torrents.
+  - `[low]` `[patch]` (blind) no e2e checks Esc with the real sort menu open over the board panel. Patch: e2e step in D4.
+  - `[low]` `[reject]` (blind) Safari does not focus a clicked card, so the opener can be stale. Mouse users get focus on `main` (no visible change); keyboard Enter focuses the card; the fix plumbs the opener through every card.
+  - `[low]` `[reject]` (blind) a click on a column heading closes the board panel. carried: same as the first pass's `isEmptySpace` row; e2e treats it as the intended empty-space close.
+  - `[low]` `[reject]` (intent) no single test composes freeze, poll and the header's N of M. The frozen list publishes its frozen order (first-pass DOM test) and the panel reads only the published order (D7 tests).
+  - `[false]` `[reject]` (intent) the sticky no-`hash` row reads against "no hash shows the first row". The first pass patched this on purpose (the panel must not swap while read); the first load still shows the first row.
+  - `[false]` `[reject]` (intent) the expanded panel width differs from the formula. The AC asks the panel to float over 完成 and 已整理; the formula described the collapsed strip, e2e checks the edges in both states.
+  - `[low]` `[reject]` (intent) the phone board range follows the torrent's column, not the tab, after a reload with `hash`. Only on a reload with a hash from another column; syncing the tab needs new plumbing (same as the edge row below).
+  - `[low]` `[patch]` (intent) AD-6 text says "不另外問 qBittorrent" while the syncer pulls itself after 6 s. Patch: spine, spec and comments now say it reuses a pull younger than 6 s, else pulls.
+  - `[low]` `[reject]` (intent) visual specs are checked as class names and CSS text. The PR screenshots in both themes check the rendering.
+  - `[medium]` `[patch]` (intent) "does not scroll" has no test (same root cause as the verification row below). Patched there.
+  - `[low]` `[reject]` (intent) widths between 390 and 1024 are not exercised. The layout switches at 1024 only; 390 is the narrow case.
+  - `[medium]` `[patch]` (verification) opening or switching the detail is never checked to leave the list or board scroll alone. Patch: e2e with `data=many`, list and board column.
+  - `[medium]` `[patch]` (edge) no `hash`, every shown row vanishes at once: `viewed` null, blank panel until a later render. Patch: fall back to the first row.
+  - `[low]` `[reject]` (edge) a torrent deleted with focus in the board panel drops focus to body. Deleting from the app comes in 2.6; rare, and the fix reroutes the gone path.
+  - `[low]` `[reject]` (edge) a deleted focused row drops focus to body. Same pattern as any virtualized row leaving; rare.
+  - `[low]` `[reject]` (edge) phone board with an archived `hash` or a hash outside the current tab after reload. Reload-only; syncing the tab is new plumbing.
+  - `[low]` `[reject]` (edge) `pressedRef` stays set when a nav target never lands. Needs the target to vanish inside one router turn; the fix adds state.
+  - `[maybe-false]` `[defer]` (edge) a click on a column's scrollbar may count as empty space and close the board panel. Whether Chromium and Safari fire `click` for scrollbar drags on these columns needs a real-browser check.
+  - `[low]` `[reject]` (edge) a BottomSheet with neither `title` nor `header` has no name. No caller does that; both callers pass one.
+  - `[low]` `[reject]` (edge) the list scroller remounting while a sheet is open is not locked. Needs the list to empty and refill under an open sheet; rare.
+  - `[low]` `[patch]` (edge) a held Esc auto-repeats and closes two layers. Patch: ignore `event.repeat`.
+  - `[low]` `[reject]` (edge) `muted` by string compare. carried: same as the first pass's row.
+
 ## Design Notes
 
 - Alex 2026-11-17: 已下載 and 已上傳 come from `getTorrentDetail` (spine AD-6 detail exception), not the slim table. Claude 代決 (Alex may veto): before its first answer the two rows show 「…」 in `text-muted`; the query keys on the hash so ‹ › never show the previous torrent's numbers. The ✕ is labelled 「關閉」 as the AC says (the mockup's 「關閉詳情」 is not used). Board N of M uses the torrent's current column, which equals the selected tab on the phone. The list moves to its own scroller (as the mockup does) so the panel can fill the height without sticky tricks.
@@ -172,7 +216,7 @@ deferred: []
 
 ## Auto Run Result
 
-Status: done (first review pass; a follow-up pass is recommended, see below)
+Status: done (two review passes: first pass and follow-up)
 
 Summary: the detail opens from list rows and board cards in three containers (desktop list panel, desktop board floating panel, phone 70% sheet) with the sticky header, 「第 N 個／共 M 個」 and ‹ ›, `hash` in the URL, vanish handling and the Esc-only shortcut registry. 已下載 and 已上傳 come from the new `getTorrentDetail({ hash })` (spine AD-6 detail exception, Alex 2026-11-17), read from the container's extras table and reusing a pull younger than 6 s.
 
@@ -185,10 +229,12 @@ Files changed (main ones):
 - `e2e/detail.spec.ts` (new), `e2e/smoke.spec.ts`, `e2e/board.spec.ts`: detail smoke and screenshots, helpers for the own scroller.
 - ARCHITECTURE-SPINE AD-6: the detail exception.
 
-Review: 35 findings. Patched 9 medium and 10 low entries (see the triage log, 14 fixes), deferred none, rejected 16 (9 low not worth the added complexity, 7 false), each with its reason in the log.
+Review, first pass: 35 findings. Patched 9 medium and 10 low entries (14 fixes), deferred none, rejected 16 (9 low not worth the added complexity, 7 false), each with its reason in the log.
 
-Follow-up review recommendation: true. Two or more medium entries were patched on a first pass (9 medium patched, 10 low patched). Named risk: `useListViewed`'s pending-write logic and the new no-`hash` rule in `resolveListViewed` changed behavior in a race-prone hook, and the syncer's 6 s detail reuse window changes when qBittorrent is asked; both are covered by new tests written by the same implementer.
+Review, follow-up pass: 33 findings. Patched 3 medium and 3 low entries (blank panel when the whole order is replaced, held Esc repeat, AD-6 wording on the 6 s pull reuse, e2e for Esc with the real menu and for scroll staying put), deferred 1 maybe-false (scrollbar click may close the board panel, unverified medium), rejected 23 (18 low, 5 false), each with its reason in the log.
 
-Verification (2026-11-17, after the patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 84 files, 1588 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 38 passed; `check.sh` all ok. Matrix audit: rows D1 to D16 each have at least one covering test that ran and passed.
+Follow-up review recommendation: false. The first pass recommended one (9 medium patched); the follow-up pass patched no high (3 medium, 3 low), so the work has converged.
 
-Residual risks: the phone list now scrolls in its own scroller (iOS address-bar collapse and status-bar tap to top may change); the swipe and sheet feel still needs Alex's real-phone check.
+Verification (2026-11-17, after the follow-up patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 84 files, 1591 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 39 passed; `check.sh` all ok. Matrix audit: rows D1 to D16 each have at least one covering test that ran and passed.
+
+Residual risks: a click on a board column's scrollbar may close the board panel (deferred, unverified); the phone list now scrolls in its own scroller (iOS address-bar collapse and status-bar tap to top may change); the swipe and sheet feel still needs Alex's real-phone check.

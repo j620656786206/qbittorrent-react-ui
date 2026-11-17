@@ -101,7 +101,7 @@ flowchart TD
   - 列表、看板、詳情、分類數量、速度、連線狀態都從 `['maindata']` 推出來。看板「捲到底載入下一批」只是畫面虛擬化，不向伺服器分頁要資料。
   - 檔案分頁例外：只在打開時每 5 秒抓那一個種子的檔案，key 是 `['files', hash]`。
   - 排序欄位例外（2026-11-16 Story 2.1，Alex 決定）：51 種排序裡，種子表沒有的欄位（人數、上限、流量、comment、內容路徑、infohash 等）不進種子表。容器另外存這些欄位，只在排到那些排序時，前端每 5 秒呼叫 `getSortKeys({ field, since })` 拿「那一個排序」每個種子的值（衍生值在容器用 `src/lib` 的純函式算），key 是 `['sort-keys', field]`。理由：全部塞進種子表時，4167 個種子的完整資料從約 1.3 MB 變約 4.8 MB，每 5 秒的變動超過 160 KB 的預算。
-  - 詳情例外（2026-11-17 Story 2.4，Alex 決定）：詳情要畫、種子表沒有的少數欄位（2.4 的已下載、已上傳；2.5 加來源數、在抓的人），詳情打開時前端每 5 秒呼叫 `getTorrentDetail({ hash })`，只拿正在看的那一個種子。容器從排序用的第二張表讀（同一次 `sync/maindata` 同步），不另外問 qBittorrent。key 是 `['torrent-detail', hash]`，換種子就換 key，不顯示上一個種子的值。只送 `src/shared/torrent-detail.ts` 列出的欄位。理由：放進種子表時每 5 秒的變動超過 160 KB 預算（約 174 KB）；用 `getSortKeys` 又要為一個種子拿全部種子的值。
+  - 詳情例外（2026-11-17 Story 2.4，Alex 決定）：詳情要畫、種子表沒有的少數欄位（2.4 的已下載、已上傳；2.5 加來源數、在抓的人），詳情打開時前端每 5 秒呼叫 `getTorrentDetail({ hash })`，只拿正在看的那一個種子。容器從排序用的第二張表讀，重用 6 秒內已經跑過的 `sync/maindata` 同步（種子資料每 5 秒會同步一次，所以平常不會多問 qBittorrent）；超過 6 秒沒同步才自己同步一次。key 是 `['torrent-detail', hash]`，換種子就換 key，不顯示上一個種子的值。只送 `src/shared/torrent-detail.ts` 列出的欄位。理由：放進種子表時每 5 秒的變動超過 160 KB 預算（約 174 KB）；用 `getSortKeys` 又要為一個種子拿全部種子的值。
   - tracker 只存網域（容器從 tracker 網址算出來），完整 tracker 網址（裡面有 passkey）和 magnet 永遠不出容器（2026-11-16 Alex 決定）。comment、內容路徑、根路徑、infohash 只經由 `getSortKeys` 送出。
   - 分頁不在前景時停止輪詢，回到前景立刻拿一次。`['maindata']` 失敗時保留舊資料。
 

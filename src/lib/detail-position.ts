@@ -122,6 +122,11 @@ export function resolveListViewed({
   if (!fallbackFirst) return { viewed: null, write: close }
   if (vanished) {
     const next = successorOf(previous.order, order, lost)
+    // Without a hash and none of the old rows left (the order replaced
+    // wholesale): the first row, never a blank panel.
+    if (next === null && hash === null) {
+      return { viewed: order[0] ?? null, write: undefined }
+    }
     return { viewed: next, write: next ?? close }
   }
   // Without a hash the row shown stays while it is in the order: a torrent

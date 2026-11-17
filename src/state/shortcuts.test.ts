@@ -102,6 +102,26 @@ describe('ordering', () => {
     ).toBe(false)
   })
 
+  it('a held Esc (auto-repeat) closes one layer only', () => {
+    const calls: Array<string> = []
+    let offTop = () => {}
+    pushEscapeLayer(() => calls.push('below'))
+    offTop = pushEscapeLayer(() => {
+      calls.push('top')
+      offTop()
+    })
+    press('Escape')
+    const repeat = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    document.body.dispatchEvent(repeat)
+    expect(repeat.defaultPrevented).toBe(false)
+    expect(calls).toEqual(['top'])
+  })
+
   it('an Esc another handler took (a menu) is left alone', () => {
     const close = vi.fn()
     pushEscapeLayer(close)
