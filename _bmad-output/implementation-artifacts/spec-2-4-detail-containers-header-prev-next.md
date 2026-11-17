@@ -12,14 +12,12 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-3-board-desktop-columns-phone-status-tabs.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-2-bottom-sheet-phone-sort-sheet.md'
 warnings: ['oversized']
-deferred:
-  - summary: >-
-      A click on a board column's scrollbar may count as empty space and close the board detail panel.
-    evidence: |-
-      `isEmptySpace` in src/routes/_authed/index.tsx treats any click outside button, a, input, select, textarea and aside as empty space, and the column bodies are scroll containers. Settle it in Chromium and Safari: drag or click a column scrollbar with the panel open and see whether `click` reaches the wrapper.
-    location: >-
-      src/routes/_authed/index.tsx:38-44
-    severity: medium (unverified)
+deferred: []
+# Settled 2026-11-17 (epic 2 review of 2.3 to 2.5): in Chromium a click on a
+# board column's scrollbar sends no `click`, so the panel stays
+# (e2e/board-scrollbar.spec.ts, which fails if it ever closes). BoardHome
+# also ignores a press on a scrollbar for browsers that do send one; Safari
+# is not checked by CI.
 ---
 
 <intent-contract>

@@ -22,7 +22,7 @@ import {
 // close it and remove `hash`. A covered 完成 card is left as is.
 
 export function BoardDetailPanel() {
-  const target = useBoardDetailTarget()
+  const target = useBoardDetailTarget({ phone: false })
   const { setHash } = useViewedHash()
   const ids = useDetailIds()
   const open = target !== null

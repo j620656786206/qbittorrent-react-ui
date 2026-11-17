@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { Ref } from 'react'
 import type { DetailPosition } from '#/lib/detail-position'
 import type { SlimTorrent } from '#/shared/maindata'
@@ -134,8 +134,19 @@ export function DetailPanelBody({
   phone?: boolean
   className?: string
 }) {
+  // ‹ › and another card show the next torrent from its top: the panel
+  // scrolls itself on desktop, the sheet's content scrolls on the phone.
+  const panelRef = useRef<HTMLDivElement>(null)
+  const shownRef = useRef(torrent.hash)
+  useLayoutEffect(() => {
+    if (shownRef.current === torrent.hash) return
+    shownRef.current = torrent.hash
+    const scroller = scrollerOf(panelRef.current)
+    if (scroller) scroller.scrollTop = 0
+  }, [torrent.hash])
   return (
     <div
+      ref={panelRef}
       role="tabpanel"
       id={ids.panelId}
       aria-labelledby={ids.tabId}
@@ -148,4 +159,13 @@ export function DetailPanelBody({
       <Overview torrent={torrent} phone={phone} />
     </div>
   )
+}
+
+/** The element itself or its nearest ancestor that scrolls vertically. */
+function scrollerOf(element: HTMLElement | null): HTMLElement | null {
+  for (let node = element; node !== null; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node)
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
+  }
+  return null
 }

@@ -10,11 +10,11 @@ import {
 } from '#/lib/format'
 import { locationLabel } from '#/lib/paths'
 import { slimSortValue } from '#/lib/sort-values'
-import { classify } from '#/lib/torrent-status'
+import { circleOf, classify } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
 import type {
+  StatusCircleModel,
   TorrentClassification,
-  TorrentStatusId,
 } from '#/lib/torrent-status'
 import type { SortKeys } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
@@ -97,13 +97,7 @@ export interface BigValue {
 }
 
 export interface RowModel {
-  circle: {
-    status: TorrentStatusId
-    /** Screen reader text: 「停滯，87%」 or 「做種中」. */
-    label: string
-    /** 0 to 1 for a progress ring (on `track`), `null` for a full ring. */
-    arcFraction: number | null
-  }
+  circle: StatusCircleModel
   name: string
   /** The location tag: the last two path segments. */
   tag: string
@@ -194,11 +188,6 @@ function bigValue(
   }
 }
 
-function clampFraction(progress: number): number {
-  if (!(progress > 0)) return 0
-  return Math.min(1, progress)
-}
-
 export function rowModel(
   torrent: SlimTorrent,
   options: RowModelOptions,
@@ -210,15 +199,7 @@ export function rowModel(
     downloading ? torrent.dlspeed : torrent.upspeed,
   )
   return {
-    circle: {
-      status: status.status,
-      label: status.showsProgress
-        ? `${status.word}，${formatPercent(torrent.progress)}`
-        : status.word,
-      arcFraction: status.showsProgress
-        ? clampFraction(torrent.progress)
-        : null,
-    },
+    circle: circleOf(status, torrent.progress),
     name: torrent.name,
     tag: locationLabel(torrent.save_path),
     size: formatSize(torrent.size),

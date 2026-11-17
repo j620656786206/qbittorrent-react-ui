@@ -8,7 +8,11 @@ import {
   selectVisibleTorrents,
 } from '#/lib/visible-torrents'
 import type { Maindata } from '#/lib/maindata-merge'
-import type { SortKeys, TorrentView } from '#/lib/visible-torrents'
+import type {
+  BoardColumns,
+  SortKeys,
+  TorrentView,
+} from '#/lib/visible-torrents'
 import type {
   GetMaindataInput,
   MaindataResponse,
@@ -189,14 +193,29 @@ export function useVisibleTorrents(view: TorrentView, sortKeys?: SortKeys) {
   return useMaindata(select)
 }
 
+/** One board computation per maindata snapshot, however many observe it. */
+const boardColumnsBySnapshot = new WeakMap<Maindata, BoardColumns>()
+
+function selectBoardColumnsOnce(data: Maindata): BoardColumns {
+  let columns = boardColumnsBySnapshot.get(data)
+  if (columns === undefined) {
+    columns = selectBoardColumns(data)
+    boardColumnsBySnapshot.set(data, columns)
+  }
+  return columns
+}
+
 /**
  * Story 2.3: the board's five columns (`selectBoardColumns`), each in its
  * fixed order. Live, never frozen (EXPERIENCE 「看板不受影響」). Query's
  * structural sharing keeps a column's array when its hashes did not change,
- * so an unchanged column does not re-render.
+ * so an unchanged column does not re-render. The board and its detail
+ * both observe it: Query runs `select` per observer, so the result is
+ * cached per snapshot and ~4167 torrents are classified and sorted once a
+ * poll, not once per observer.
  */
 export function useBoardColumns() {
-  return useMaindata(selectBoardColumns)
+  return useMaindata(selectBoardColumnsOnce)
 }
 
 /**

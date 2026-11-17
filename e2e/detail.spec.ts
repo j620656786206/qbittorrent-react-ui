@@ -339,6 +339,27 @@ test('D4 D5 D8 D12 desktop board: open, switch, close by Esc, ✕ and empty spac
   await panel(page).locator('dd').first().click()
   await expect(panel(page)).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`[?&]hash=${hashOf(1)}`))
+  // A drag that selects the panel's name and is released over empty board
+  // space keeps it (the click goes to the common ancestor).
+  const nameBox = await panel(page)
+    .getByRole('heading', { level: 2 })
+    .boundingBox()
+  const headerBox = await board(page)
+    .getByRole('region', { name: /^下載中/ })
+    .getByRole('heading')
+    .boundingBox()
+  if (!nameBox || !headerBox) throw new Error('no name or column header box')
+  await page.mouse.move(nameBox.x + 2, nameBox.y + nameBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(
+    headerBox.x + headerBox.width / 2,
+    headerBox.y + headerBox.height / 2,
+    { steps: 5 },
+  )
+  await page.mouse.up()
+  await expect(panel(page)).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`[?&]hash=${hashOf(1)}`))
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
   await board(page)
     .getByRole('region', { name: /^下載中/ })
     .getByRole('heading')
@@ -457,8 +478,19 @@ test('D6 D11 phone: rows and cards open the 70% sheet; drag, full screen, name, 
   expect((await nav.boundingBox())?.height).toBe(44)
   await hasNoHorizontalScroll(page)
 
+  // Scrolled down, › shows the next torrent from its top.
+  const content = detailSheet(page).locator(
+    '[data-slot="bottom-sheet-content"]',
+  )
+  await content.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  expect(
+    await content.evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0)
   await nav.click()
   await expect(detailSheet(page)).toHaveAccessibleName(name(2))
+  expect(await content.evaluate((element) => element.scrollTop)).toBe(0)
 
   // A short drag springs back; past half the height closes.
   await dragHandle(page, 60)

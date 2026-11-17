@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import { ROW_HEIGHT, rowModel } from '#/features/list/list-model'
 import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
@@ -152,23 +153,10 @@ function SecondLine({ model }: { model: RowModel }) {
   const phoneHidden = errorDetail !== null ? 'max-lg:hidden' : undefined
   return (
     <span className="flex h-5 min-w-0 items-center gap-x-2 gap-y-0 overflow-hidden text-tag whitespace-nowrap text-text-muted tabular-nums max-lg:flex-wrap">
-      <span className="inline-flex max-w-1/2 min-w-0 flex-none items-center gap-1 rounded-full border px-2 py-px lg:max-w-none">
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="flex-none"
-        >
-          <path d="M3 7h6l2 2h10v10H3z" />
-        </svg>
-        <span className="min-w-0 truncate">{model.tag}</span>
-      </span>
+      <LocationTag
+        label={model.tag}
+        className="max-w-1/2 flex-none rounded-full border px-2 py-px lg:max-w-none"
+      />
       {movingDetail !== null && (
         <span className="flex-none">{movingDetail}</span>
       )}

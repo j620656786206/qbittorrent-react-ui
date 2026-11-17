@@ -99,6 +99,7 @@ describe('shadcn components (row 21)', () => {
       'dropdown-menu.tsx',
       'input.tsx',
       'list-blocks.tsx',
+      'location-tag.tsx',
       'skeleton.tsx',
       'status-circle.tsx',
     ])

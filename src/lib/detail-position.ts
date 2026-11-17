@@ -32,19 +32,6 @@ export function detailPosition(
 }
 
 /**
- * The torrent the desktop list shows: the URL's `hash` when the order holds
- * it, otherwise the first one (EXPERIENCE detail-panel: no hash, or a hash
- * not in the list, shows the first row); `null` for an empty order.
- */
-export function viewedInOrder(
-  order: ReadonlyArray<string>,
-  hash: string | null,
-): string | null {
-  if (hash !== null && order.includes(hash)) return hash
-  return order[0] ?? null
-}
-
-/**
  * EXPERIENCE 「正在看的種子不見了」: who takes `hash`'s place when it left
  * `previousOrder` for `nextOrder`. Still there: itself. Gone: the first one
  * after it in the old order that is still there (the row that moved into
@@ -97,10 +84,11 @@ export interface ListViewed {
 
 /**
  * Story 2.4 rows D1, D3, D9, D11: which row the list's detail shows, and
- * whether the URL must follow. Without a `hash` the first row is shown on
- * the first load, and stays shown while it is in the order. The viewed row leaving the order (deleted,
- * archived) is told apart from a `hash` that never was in it (D3: the first
- * row, the URL left alone).
+ * whether the URL must follow. Without a usable `hash` (none, or one the
+ * list does not hold: D3, the URL left alone) the first row is shown on the
+ * first load, and stays shown while it is in the order. The viewed row
+ * leaving the order (deleted, archived) is told apart from a `hash` that
+ * never was in it.
  */
 export function resolveListViewed({
   order,
@@ -129,9 +117,11 @@ export function resolveListViewed({
     }
     return { viewed: next, write: next ?? close }
   }
-  // Without a hash the row shown stays while it is in the order: a torrent
-  // landing on top, or the order moving, never swaps what Alex reads.
-  if (hash === null && lost !== null && order.includes(lost)) {
+  // Without a usable hash the row shown stays while it is in the order: a
+  // torrent landing on top, or the order moving, never swaps what Alex
+  // reads. A stale `hash` (an archived torrent opened on the board, then a
+  // list sort) counts as none here.
+  if (lost !== null && order.includes(lost)) {
     return { viewed: lost, write: undefined }
   }
   return { viewed: order[0] ?? null, write: undefined }

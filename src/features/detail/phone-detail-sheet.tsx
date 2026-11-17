@@ -86,7 +86,7 @@ export function ListDetailSheet() {
   return <PhoneDetailSheet target={useListDetailTarget()} />
 }
 
-/** Phone board: the card tapped, in its column (the current status tab). */
+/** Phone board: the card tapped, in its column (never 已整理: no tab). */
 export function BoardDetailSheet() {
-  return <PhoneDetailSheet target={useBoardDetailTarget()} />
+  return <PhoneDetailSheet target={useBoardDetailTarget({ phone: true })} />
 }

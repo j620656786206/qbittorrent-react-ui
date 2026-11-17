@@ -2,6 +2,7 @@ import { memo } from 'react'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import {
   CARD_HEIGHT,
@@ -116,23 +117,10 @@ export function CardContent({
             <span className="min-w-0 truncate">{model.category}</span>
           </span>
         )}
-        <span className={cn(TAG_CLASS, 'flex-initial')}>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            className="flex-none"
-          >
-            <path d="M3 7h6l2 2h10v10H3z" />
-          </svg>
-          <span className="min-w-0 truncate">{model.location}</span>
-        </span>
+        <LocationTag
+          label={model.location}
+          className={cn(TAG_CLASS, 'flex-initial')}
+        />
       </span>
     </button>
   )

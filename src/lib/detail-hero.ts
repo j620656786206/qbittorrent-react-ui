@@ -7,7 +7,12 @@ import {
   formatSize,
   formatSpeed,
 } from '#/lib/format'
-import { classify, heroKindOf, statusOfHeroKind } from '#/lib/torrent-status'
+import {
+  heroKindOf,
+  progressFraction,
+  showsProgress,
+  statusOfHeroKind,
+} from '#/lib/torrent-status'
 import type { ClassifyOptions, HeroKind } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import type { TorrentStatusId } from '#/shared/torrent-status'
@@ -27,17 +32,13 @@ export interface DetailHero {
   /** The `status-*` colour of the headline and the circle. */
   status: TorrentStatusId
   headline: string
-  /** The summary's parts (each one kept together on screen when it fits). */
+  /**
+   * The summary's parts, shown joined by 「 · 」 (each one kept together on
+   * screen when it fits).
+   */
   summaryParts: Array<string>
-  /** The parts joined by 「 · 」. */
-  summary: string
-  circle: {
-    status: TorrentStatusId
-    /** 「下載中，87%」 or 「做種中」, like a list row's circle. */
-    label: string
-    /** 0 to 1 on the track for statuses that show progress, else `null`. */
-    arcFraction: number | null
-  }
+  /** The circle's ring: 0 to 1 for statuses that show progress, else `null`. */
+  arcFraction: number | null
 }
 
 export interface DetailHeroOptions extends ClassifyOptions {
@@ -46,11 +47,6 @@ export interface DetailHeroOptions extends ClassifyOptions {
    * the first answer (「…」), `null` when unknown (the part is left out).
    */
   uploaded: number | null | undefined
-}
-
-function clampFraction(progress: number): number {
-  if (!(progress > 0)) return 0
-  return Math.min(1, progress)
 }
 
 function headlineOf(kind: HeroKind, torrent: SlimTorrent): string {
@@ -146,25 +142,15 @@ export function detailHero(
   torrent: SlimTorrent,
   options: DetailHeroOptions,
 ): DetailHero {
-  // The row decides the colour; classify() (whose status comes from the
-  // same row) adds the word and whether a ring shows.
+  // The row decides the colour, and the colour whether a ring shows.
   const kind = heroKindOf(torrent, options.stateBeforeMove)
-  const colour = statusOfHeroKind(kind)
-  const status = classify(torrent, options)
-  const summaryParts = summaryPartsOf(kind, torrent, options)
+  const status = statusOfHeroKind(kind)
   return {
-    status: colour,
+    status,
     headline: headlineOf(kind, torrent),
-    summaryParts,
-    summary: summaryParts.join(' · '),
-    circle: {
-      status: colour,
-      label: status.showsProgress
-        ? `${status.word}，${formatPercent(torrent.progress)}`
-        : status.word,
-      arcFraction: status.showsProgress
-        ? clampFraction(torrent.progress)
-        : null,
-    },
+    summaryParts: summaryPartsOf(kind, torrent, options),
+    arcFraction: showsProgress(status)
+      ? progressFraction(torrent.progress)
+      : null,
   }
 }

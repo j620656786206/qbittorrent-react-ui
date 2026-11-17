@@ -9,6 +9,7 @@ import type { TorrentDetail } from '#/shared/torrent-detail'
 import type { TorrentStatusId } from '#/shared/torrent-status'
 import { cn } from '#/shared/ui/cn'
 import { copyText } from '#/shared/ui/copy-text'
+import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import { useDayClock } from '#/state/now'
@@ -51,10 +52,10 @@ export function Overview({
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   // One observer for the hero, the tiles and the info list: polls every 5 s
   // while this detail shows, for this hash only (AD-6).
-  const { data, isError } = useTorrentDetail(torrent.hash, fetchTorrentDetail)
-  // The first call failed: 「沒有」 instead of 「…」 until a poll answers. An
-  // answer of `detail: null` (unknown torrent) stays 「沒有」 too.
-  const detail = data ? data.detail : isError ? null : undefined
+  const { data, failed } = useTorrentDetail(torrent.hash, fetchTorrentDetail)
+  // A failed call: 「沒有」 instead of 「…」 until a poll answers. An answer
+  // of `detail: null` (unknown torrent) stays 「沒有」 too.
+  const detail = data ? data.detail : failed ? null : undefined
   const options = {
     now: clock.today,
     stateBeforeMove: stateBeforeMove ?? {},
@@ -89,8 +90,8 @@ function HeroBlock({ hero }: { hero: DetailHero }) {
       {/* No label: the headline beside it says the status (the circle's
           word can differ, e.g. 下載中 next to 排隊中), so it is hidden. */}
       <StatusCircle
-        status={hero.circle.status}
-        arcFraction={hero.circle.arcFraction}
+        status={hero.status}
+        arcFraction={hero.arcFraction}
         size={64}
       />
       <div className="flex min-w-0 flex-col gap-1">
@@ -230,23 +231,10 @@ function SavePathBlock({ path, phone }: { path: string; phone: boolean }) {
     >
       <div className="flex min-w-0 items-center gap-2">
         <span className="flex-none text-meta font-semibold">儲存位置</span>
-        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border px-2 py-px text-tag whitespace-nowrap text-text-muted">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            className="flex-none"
-          >
-            <path d="M3 7h6l2 2h10v10H3z" />
-          </svg>
-          <span className="min-w-0 truncate">{locationLabel(path)}</span>
-        </span>
+        <LocationTag
+          label={locationLabel(path)}
+          className="rounded-full border px-2 py-px text-tag whitespace-nowrap text-text-muted"
+        />
       </div>
       {phone ? (
         // 44px tall to tap, without adding the height to the block.
