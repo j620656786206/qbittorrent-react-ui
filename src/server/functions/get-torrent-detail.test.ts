@@ -83,32 +83,57 @@ describe('getTorrentDetail server function', () => {
     nextAnswer = () =>
       fullMaindata({
         torrents: {
-          [HASH_A]: rawTorrent({ downloaded: 11, uploaded: 22 }),
-          [HASH_B]: rawTorrent({ downloaded: 33, uploaded: 44 }),
+          [HASH_A]: rawTorrent({
+            downloaded: 11,
+            uploaded: 22,
+            num_seeds: 7,
+            num_leechs: 2,
+          }),
+          [HASH_B]: rawTorrent({
+            downloaded: 33,
+            uploaded: 44,
+            num_seeds: 9,
+            num_leechs: 4,
+          }),
         },
       })
     expect(data(await run({ hash: HASH_A }))).toEqual({
-      detail: { downloaded: 11, uploaded: 22 },
+      // Story 2.5: the connected seeds and leechers joined.
+      detail: { downloaded: 11, uploaded: 22, num_seeds: 7, num_leechs: 2 },
     })
   })
 
   it('a value qBittorrent left out is null', async () => {
     const torrent: Record<string, unknown> = rawTorrent()
     delete torrent.uploaded
+    delete torrent.num_leechs
     nextAnswer = () => fullMaindata({ torrents: { [HASH_A]: torrent } })
     expect(data(await run({ hash: HASH_A }))).toEqual({
-      detail: { downloaded: 1_073_741_824, uploaded: null },
+      detail: {
+        downloaded: 1_073_741_824,
+        uploaded: null,
+        num_seeds: 3,
+        num_leechs: null,
+      },
     })
   })
 
   it('follows the next pull', async () => {
     vi.useFakeTimers()
     await run({ hash: HASH_A })
-    nextAnswer = () => ({ rid: 2, torrents: { [HASH_A]: { uploaded: 99 } } })
+    nextAnswer = () => ({
+      rid: 2,
+      torrents: { [HASH_A]: { uploaded: 99, num_seeds: 5 } },
+    })
     // Past the detail read's 6 s pull reuse.
     vi.advanceTimersByTime(DETAIL_PULL_REUSE_MS + 500)
     expect(data(await run({ hash: HASH_A }))).toEqual({
-      detail: { downloaded: 1_073_741_824, uploaded: 99 },
+      detail: {
+        downloaded: 1_073_741_824,
+        uploaded: 99,
+        num_seeds: 5,
+        num_leechs: 1,
+      },
     })
   })
 

@@ -73,6 +73,7 @@ function PhoneDetailSheet({ target }: { target: DetailTarget | null }) {
         <DetailPanelBody
           torrent={shown.torrent}
           ids={ids}
+          phone
           className="px-4 pt-3 pb-8"
         />
       )}

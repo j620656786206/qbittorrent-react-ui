@@ -165,6 +165,17 @@ export function formatEta(eta: number, dlspeed: number): string {
   return `剩 ${etaParts(eta)}`
 }
 
+/**
+ * The detail's 剩餘時間 tile (story 2.5, mockup S05-overview-phone): the
+ * `formatEta` text without 「剩 」: 「34 分」 「不到 1 分」 「2 天 5 小時」;
+ * unknown is 「不明」 (EXPERIENCE 數字小卡依狀態換).
+ */
+export function formatTimeLeft(eta: number, dlspeed: number): string {
+  const text = formatEta(eta, dlspeed)
+  if (text === '剩餘時間不明') return '不明'
+  return text.startsWith('剩 ') ? text.slice('剩 '.length) : text.slice(1)
+}
+
 interface ZonedParts {
   year: number
   month: number

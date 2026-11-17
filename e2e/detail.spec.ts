@@ -618,3 +618,298 @@ test('screenshots: list panel, board panel, phone sheet (70%, full, name), light
     })
   }
 })
+
+// Story 2.5 rows H1, T1, P1, P2, C1, C2: the overview against
+// `data=states` (one fake torrent per hero row, hashes 0x3001 to 0x300c).
+// Screenshots: the 12 rows in the desktop list panel, light and dark (已整理
+// is never in list mode, so it comes from the board panel), the board's
+// narrow panel, and the phone sheet with the path expanded.
+
+const SCREENSHOT_DIR_25 = 'e2e-output/screenshots/2-5'
+const STATE_ROWS = [
+  ['downloading', '下載中　87%'],
+  ['meta', '抓種子資訊中'],
+  ['queued', '排隊中　12%'],
+  ['checking', '檢查檔案中　45%'],
+  ['paused', '已暫停　87%'],
+  ['stalled', '停滯　87%'],
+  ['seeding', '做種 41 天'],
+  ['done', '已完成'],
+  ['missing-files', '找不到檔案'],
+  ['error', '錯誤'],
+  ['unknown', '狀態不明'],
+  ['archived', '已整理'],
+] as const
+const stateHash = (index: number) => hashOf(0x3001 + index)
+const ARCHIVED_INDEX = 11
+const LONG_SAVE_PATH =
+  '/data/media/tv/假影集.第一季.Fake.Show.Season.Pack.2160p.WEB-DL'
+
+const overview = (scope: Locator) => scope.getByRole('tabpanel')
+const savePath = (scope: Locator) =>
+  scope.getByRole('region', { name: '儲存位置' })
+const copyButton = (scope: Locator) =>
+  savePath(scope).getByRole('button', { name: /^(複製|已複製|複製失敗)$/ })
+
+/** The overview's four blocks, top to bottom, by what they are. */
+async function blockKinds(scope: Locator) {
+  return overview(scope)
+    .locator(':scope > div > *')
+    .evaluateAll((blocks) =>
+      blocks.map((block) =>
+        block.tagName === 'DL'
+          ? 'info'
+          : block.getAttribute('aria-label') === '儲存位置'
+            ? 'path'
+            : block.getAttribute('data-slot') === 'stat-tiles'
+              ? `tiles:${block.children.length}`
+              : block.querySelector('svg[width="64"]')
+                ? 'hero'
+                : 'other',
+      ),
+    )
+}
+
+/** The three tiles sit on one row (same top). */
+async function tilesInOneRow(scope: Locator) {
+  const tops = await overview(scope)
+    .locator('[data-slot="stat-tiles"] > *')
+    .evaluateAll((tiles) =>
+      tiles.map((tile) => Math.round(tile.getBoundingClientRect().top)),
+    )
+  expect(tops).toHaveLength(3)
+  expect(new Set(tops).size).toBe(1)
+}
+
+/** The path box is one line tall. */
+async function expectOneLine(cut: Locator) {
+  const { height, lineHeight } = await cut.evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+  }))
+  expect(Math.round(height)).toBe(Math.round(lineHeight))
+}
+
+/**
+ * P1: a path too long for the box overflows at its start (off to the left,
+ * under the 「…」) while its end lines up with the box's right edge.
+ */
+async function expectFrontCut(cut: Locator) {
+  await expectOneLine(cut)
+  const box = await cut.evaluate((element) => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const text = range.getBoundingClientRect()
+    const own = element.getBoundingClientRect()
+    return {
+      overflowing: element.scrollWidth > element.clientWidth,
+      textRight: Math.round(text.right),
+      boxRight: Math.round(own.right),
+      textLeft: text.left,
+      boxLeft: own.left,
+      ellipsis: getComputedStyle(element).textOverflow,
+    }
+  })
+  expect(box.overflowing).toBe(true)
+  expect(box.ellipsis).toBe('ellipsis')
+  expect(box.textLeft).toBeLessThan(box.boxLeft)
+  expect(Math.abs(box.textRight - box.boxRight)).toBeLessThanOrEqual(1)
+}
+
+test.describe('story 2.5 overview', () => {
+  test.beforeEach(async ({ request }) => {
+    await setModes(request, { ...DEFAULT_MODES, data: 'states' })
+  })
+
+  test('H1 T1 P1 the 12 hero rows in the list panel, order, tiles; screenshots light and dark', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP)
+    await login(page)
+    for (const scheme of SCHEMES) {
+      await page.emulateMedia({ colorScheme: scheme })
+      for (const [index, [slug, headline]] of STATE_ROWS.entries()) {
+        const archived = index === ARCHIVED_INDEX
+        await page.goto(
+          archived
+            ? `/?hash=${stateHash(index)}`
+            : `/?sort=added_on&hash=${stateHash(index)}`,
+        )
+        await expect(panel(page)).toBeVisible()
+        await expect(overview(panel(page)).locator('p').first()).toHaveText(
+          headline,
+        )
+        expect(await blockKinds(panel(page))).toEqual([
+          'hero',
+          'tiles:3',
+          'path',
+          'info',
+        ])
+        await tilesInOneRow(panel(page))
+        await hasNoHorizontalScroll(page, '[role="tabpanel"]')
+        await settled(page)
+        await page.screenshot({
+          path: `${SCREENSHOT_DIR_25}/${String(index + 1).padStart(2, '0')}-${slug}-${archived ? 'board' : 'list'}-desktop-${scheme}.png`,
+          animations: 'disabled',
+        })
+      }
+    }
+
+    // T1: the tiles of each group, with the detail counts.
+    await page.emulateMedia({ colorScheme: 'light' })
+    const tileTitles = (scope: Locator) =>
+      overview(scope).locator('[data-slot="stat-tiles"] > * > span:first-child')
+    await page.goto(`/?sort=added_on&hash=${stateHash(0)}`)
+    await expect(tileTitles(panel(page))).toHaveText([
+      '下載速度',
+      '剩餘時間',
+      '來源數',
+    ])
+    await expect(
+      overview(panel(page)).locator('[data-slot="stat-tiles"] > *').nth(1),
+    ).toHaveText('剩餘時間34 分')
+    await expect(
+      overview(panel(page)).locator('[data-slot="stat-tiles"] > *').nth(2),
+    ).toHaveText(/^來源數\d+$/)
+    await page.goto(`/?sort=added_on&hash=${stateHash(6)}`)
+    await expect(tileTitles(panel(page))).toHaveText([
+      '現在上傳',
+      '在抓的人',
+      '最後有人抓',
+    ])
+    await page.goto(`/?sort=added_on&hash=${stateHash(9)}`)
+    await expect(tileTitles(panel(page))).toHaveText([
+      '大小',
+      '完成時間',
+      '分享率',
+    ])
+
+    // P1: the long path keeps its end on one line, cut at the front.
+    await page.goto(`/?sort=added_on&hash=${stateHash(0)}`)
+    const cut = savePath(panel(page)).locator('[dir="rtl"]')
+    await expect(cut).toHaveText(LONG_SAVE_PATH)
+    await expect(cut.locator('..')).toHaveAttribute('title', LONG_SAVE_PATH)
+    await expectOneLine(cut)
+    await expect(
+      savePath(panel(page)).getByRole('button', { name: '改路徑' }),
+    ).toBeDisabled()
+  })
+
+  test('board narrow panel and phone 390: same order, no horizontal scroll; phone path expand; screenshots', async ({
+    page,
+  }) => {
+    await login(page)
+    for (const scheme of SCHEMES) {
+      await page.emulateMedia({ colorScheme: scheme })
+      // The narrowest desktop board (1024px) and the usual one (1440px).
+      for (const width of [1024, DESKTOP.width]) {
+        await page.setViewportSize({ width, height: DESKTOP.height })
+        for (const index of [0, 6]) {
+          await page.goto(`/?hash=${stateHash(index)}`)
+          await expect(panel(page)).toBeVisible()
+          await settled(page)
+          expect(await blockKinds(panel(page))).toEqual([
+            'hero',
+            'tiles:3',
+            'path',
+            'info',
+          ])
+          await tilesInOneRow(panel(page))
+          await hasNoHorizontalScroll(page, '[role="tabpanel"]')
+          await hasNoHorizontalScroll(page)
+          if (index === 0) {
+            await expectFrontCut(savePath(panel(page)).locator('[dir="rtl"]'))
+          }
+          if (width === DESKTOP.width) {
+            await page.screenshot({
+              path: `${SCREENSHOT_DIR_25}/board-panel-${STATE_ROWS[index][0]}-desktop-${scheme}.png`,
+              animations: 'disabled',
+            })
+          }
+        }
+      }
+
+      await page.setViewportSize(PHONE)
+      await page.goto(`/?sort=added_on&hash=${stateHash(0)}`)
+      await expect(detailSheet(page)).toBeVisible()
+      await settled(page)
+      expect(await blockKinds(detailSheet(page))).toEqual([
+        'hero',
+        'tiles:3',
+        'path',
+        'info',
+      ])
+      await tilesInOneRow(detailSheet(page))
+      await hasNoHorizontalScroll(page)
+      await hasNoHorizontalScroll(page, '[role="tabpanel"]')
+      // P2: tap the path, it wraps; 2 x 2 pills, 44px.
+      const pathButton = savePath(detailSheet(page)).getByRole('button', {
+        name: LONG_SAVE_PATH,
+      })
+      await expect(pathButton).toHaveAttribute('aria-expanded', 'false')
+      const pathText = pathButton.locator(':scope > span')
+      const collapsed = (await pathButton.boundingBox())?.height ?? 0
+      expect(Math.round(collapsed)).toBe(44)
+      expect(Math.round((await pathText.boundingBox())?.height ?? 0)).toBe(18)
+      await pathButton.click()
+      await expect(pathButton).toHaveAttribute('aria-expanded', 'true')
+      // Wrapped over several 18px lines, the whole path visible.
+      expect((await pathText.boundingBox())?.height ?? 0).toBeGreaterThan(30)
+      await expect(pathText).toHaveText(LONG_SAVE_PATH)
+      await hasNoHorizontalScroll(page)
+      const copy = copyButton(detailSheet(page))
+      expect(Math.round((await copy.boundingBox())?.height ?? 0)).toBe(44)
+      // Bring the block into view for the picture.
+      await savePath(detailSheet(page)).scrollIntoViewIfNeeded()
+      await page.screenshot({
+        path: `${SCREENSHOT_DIR_25}/sheet-path-expanded-phone-${scheme}.png`,
+      })
+      await pathButton.click()
+      await expect(pathButton).toHaveAttribute('aria-expanded', 'false')
+      expect(Math.round((await pathButton.boundingBox())?.height ?? 0)).toBe(
+        Math.round(collapsed),
+      )
+    }
+  })
+
+  test('C1 複製 copies the full path: 「已複製」 for 1.5 s', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.setViewportSize(DESKTOP)
+    await login(page)
+    await page.goto(`/?sort=added_on&hash=${stateHash(0)}`)
+    const copy = copyButton(panel(page))
+    await expect(copy).toHaveText('複製')
+    await copy.click()
+    await expect(copy).toHaveText('已複製')
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      LONG_SAVE_PATH,
+    )
+    await expect(copy).toHaveText('複製', { timeout: 3000 })
+  })
+
+  test('C2 without navigator.clipboard (plain http) the textarea fallback copies', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'clipboard', {
+        get: () => undefined,
+        configurable: true,
+      })
+    })
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await page.goto(`/?sort=added_on&hash=${stateHash(0)}`)
+    await expect(detailSheet(page)).toBeVisible()
+    await settled(page)
+    // The textarea goes inside the sheet: the focus trap keeps it.
+    const copy = copyButton(detailSheet(page))
+    await copy.click()
+    await expect(copy).toHaveText('已複製')
+    await expect(detailSheet(page).locator('textarea')).toHaveCount(0)
+    await expect(copy).toBeFocused()
+    await expect(copy).toHaveText('複製', { timeout: 3000 })
+  })
+})

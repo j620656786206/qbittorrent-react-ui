@@ -107,7 +107,7 @@ export { expect }
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'
   front?: 'normal' | 'down' | 'cloudflare'
-  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm'
+  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm' | 'states'
   grow?: '0' | '1'
 }
 

@@ -10,11 +10,14 @@ import type { SortExtras } from '#/shared/sort-keys'
 // qBittorrent is normally not asked again), else it pulls. Only the
 // fields named here leave, for that one torrent: never comment, paths,
 // infohashes, the tracker or anything else the extras table keeps. Story 2.5
-// adds the seed and peer counts here.
+// added the connected seeds (`num_seeds`, the 來源數 tile) and leechers
+// (`num_leechs`, the 在抓的人 tile).
 
 export const TORRENT_DETAIL_FIELDS = [
   'downloaded',
   'uploaded',
+  'num_seeds',
+  'num_leechs',
 ] as const satisfies ReadonlyArray<keyof SortExtras>
 
 export type TorrentDetailField = (typeof TORRENT_DETAIL_FIELDS)[number]

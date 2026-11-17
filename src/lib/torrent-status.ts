@@ -238,6 +238,63 @@ function detailOf(
   }
 }
 
+/**
+ * Story 2.5: which row of EXPERIENCE 「詳情狀態區每種狀態寫什麼」 a torrent
+ * reads as. Finer than the status (下載中 splits into 抓資訊, 排隊, 檢查;
+ * 錯誤 into missing files, `error` and `unknown`), from the same state
+ * kinds as classify(), so screens never look at `torrent.state`. A move
+ * keeps the row it had before; with nothing remembered the progress
+ * decides, as for the status. Moving text itself is Epic 5.
+ */
+export type HeroKind =
+  | 'downloading'
+  | 'meta'
+  | 'queued'
+  | 'checking'
+  | 'paused'
+  | 'stalled'
+  | 'seeding'
+  | 'done'
+  | 'missing_files'
+  | 'error'
+  | 'unknown'
+  | 'archived'
+
+export function heroKindOf(
+  torrent: SlimTorrent,
+  stateBeforeMove: Readonly<Record<string, string>>,
+): HeroKind {
+  const { kind } = effectiveKind(torrent, stateBeforeMove)
+  switch (kind) {
+    case 'error':
+      return 'error'
+    case 'unknown':
+      return 'unknown'
+    case 'missing_files':
+      // AR-58: `private: null` (no metadata yet) counts as regular.
+      return torrent.private === true ? 'missing_files' : 'archived'
+    case 'stalled_dl':
+      return 'stalled'
+    case 'downloading':
+      return 'downloading'
+    case 'meta':
+      return 'meta'
+    case 'queued_dl':
+      return 'queued'
+    case 'checking_dl':
+      return 'checking'
+    case 'paused_dl':
+      return 'paused'
+    case 'seeding':
+    case 'stalled_up':
+      return 'seeding'
+    case 'paused_up':
+      return 'done'
+    case 'moving':
+      return torrent.progress >= 1 ? 'seeding' : 'downloading'
+  }
+}
+
 export function classify(
   torrent: SlimTorrent,
   options: ClassifyOptions,

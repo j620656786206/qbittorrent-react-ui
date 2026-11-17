@@ -18,7 +18,9 @@ import type { FetchTorrentDetail } from '#/state/torrent-detail'
 const HASH = 'a'.repeat(40)
 
 function answer(downloaded: number, uploaded = 0): TorrentDetailResponse {
-  return { detail: { downloaded, uploaded } }
+  return {
+    detail: { downloaded, uploaded, num_seeds: 3, num_leechs: 1 },
+  }
 }
 
 let cleanups: Array<() => void> = []
