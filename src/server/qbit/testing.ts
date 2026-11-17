@@ -167,6 +167,24 @@ export interface FakeQbitRoutes {
   /** `torrents/stop` and `torrents/start`; 200 with an empty body by default. */
   stop?: Handler
   start?: Handler
+  /** Story 2.7: `torrents/files` (two fake files) and `torrents/filePrio`. */
+  files?: Handler
+  filePrio?: Handler
+}
+
+/** Story 2.7: a raw `torrents/files` entry with qBittorrent's extra fields. */
+export function rawFile(overrides: Record<string, unknown> = {}) {
+  return {
+    index: 0,
+    name: 'Fake.Show/Fake.Show.E01.mkv',
+    size: 1_073_741_824,
+    progress: 0.5,
+    priority: 1,
+    is_seed: false,
+    piece_range: [0, 255],
+    availability: 0.75,
+    ...overrides,
+  }
 }
 
 /** A routing fake `fetch` that records every call. */
@@ -178,6 +196,14 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
       routes.maindata ?? (() => jsonResponse(fullMaindata())),
     '/api/v2/torrents/stop': routes.stop ?? (() => new Response('')),
     '/api/v2/torrents/start': routes.start ?? (() => new Response('')),
+    '/api/v2/torrents/files':
+      routes.files ??
+      (() =>
+        jsonResponse([
+          rawFile(),
+          rawFile({ index: 1, name: 'Fake.Show/Fake.Show.E02.mkv' }),
+        ])),
+    '/api/v2/torrents/filePrio': routes.filePrio ?? (() => new Response('')),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

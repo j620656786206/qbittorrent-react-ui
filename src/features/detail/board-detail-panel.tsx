@@ -6,7 +6,7 @@ import { useBoardDetailTarget } from '#/features/detail/board-detail'
 import {
   DetailPanelBody,
   DetailTop,
-  useDetailIds,
+  useDetailTabs,
 } from '#/features/detail/detail-view'
 
 // Story 2.4, DESIGN detail-panel (mockup SD-board-detail-desktop): desktop
@@ -24,8 +24,8 @@ import {
 export function BoardDetailPanel() {
   const target = useBoardDetailTarget({ phone: false })
   const { setHash } = useViewedHash()
-  const ids = useDetailIds()
   const open = target !== null
+  const tabs = useDetailTabs(open)
   const asideRef = useRef<HTMLElement>(null)
   /** The card focus goes back to when the panel closes. */
   const openerRef = useRef<HTMLElement | null>(null)
@@ -81,11 +81,11 @@ export function BoardDetailPanel() {
         target={target}
         onNavigate={setHash}
         onClose={close}
-        ids={ids}
+        tabs={tabs}
       />
       <DetailPanelBody
         torrent={target.torrent}
-        ids={ids}
+        tabs={tabs}
         className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-[22px] [scrollbar-width:thin]"
       />
     </aside>

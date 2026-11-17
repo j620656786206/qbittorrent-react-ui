@@ -326,7 +326,10 @@ describe('the list panel (desktop list mode)', () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual(['概覽', '檔案'])
     expect(tabs[0].getAttribute('aria-selected')).toBe('true')
     expect(tabs[0].className).toContain('bg-primary')
-    expect(tabs[1].disabled).toBe(true)
+    // Story 2.7: 檔案 works; roving tabIndex.
+    expect(tabs[1].disabled).toBe(false)
+    expect(tabs[1].getAttribute('aria-selected')).toBe('false')
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1])
     const panel = q('[role="tabpanel"]') as HTMLElement
     expect(panel.getAttribute('aria-labelledby')).toBe(tabs[0].id)
     expect(tabs[0].getAttribute('aria-controls')).toBe(panel.id)

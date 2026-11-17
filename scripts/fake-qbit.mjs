@@ -46,12 +46,27 @@
 //   ops:   normal | reject (story 2.6: reject answers torrents/stop and
 //          torrents/start with HTTP 400, which the container maps to
 //          qbit_rejected)
+//   files: normal | slow | fail (story 2.7: slow delays torrents/files
+//          25 s, fail answers it with HTTP 500, which the container maps
+//          to qbit_rejected; for the loading and failure screenshots)
 //   Any `data` parameter (even the current one) also clears the stop/start
-//   state overrides and the call log below.
+//   state overrides, the file priorities set, the call log and the
+//   torrents/files request log below.
 // Story 2.6: POST /api/v2/torrents/stop and /start (cookie required, form
 // field `hashes`, `|` between) record each call and override those
 // torrents' states for the next maindata: stop gives stoppedUP when complete
 // else stoppedDL; start gives uploading when complete else downloading.
+// Story 2.7: GET /api/v2/torrents/files?hash= (cookie required) answers
+// deterministic fake files for every torrent of the data set (fake names
+// under the torrent's own name, so only code-name paths); sample E03 has
+// 1000 files (the virtualisation check), a torrent still fetching its
+// metadata has none, an unknown hash is 404. POST /api/v2/torrents/filePrio
+// (form fields hash, id with `|` between, priority) records each call and
+// sets those files' priority for the next files answer; a missing or empty
+// id or priority, a non-integer id or a priority other than 0, 1, 6, 7 is
+// 400, an unknown torrent 404, an unknown file id 409, and `ops=reject`
+// answers 400; every call not applied is logged with `rejected: true`. The
+// hashes torrents/files was asked for: curl 'http://localhost:3100/__fake/files'
 // The calls (loopback only, rejected ones marked `rejected: true`):
 //   curl 'http://localhost:3100/__fake/ops'
 import { spawn } from 'node:child_process'
@@ -103,6 +118,7 @@ const DATA_MODES = new Set([
 ])
 const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject'])
+const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -119,6 +135,7 @@ const mode = {
   data: 'sample',
   grow: '0',
   ops: 'normal',
+  files: 'normal',
 }
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
@@ -560,7 +577,7 @@ function withSpeeds(torrents, tick) {
 
 /** Story 2.6: state codes set by stop/start calls, by hash. */
 const stateOverrides = new Map()
-/** Story 2.6: every stop/start call, oldest first. */
+/** Stories 2.6, 2.7: every stop/start and filePrio call, oldest first. */
 const opLog = []
 
 function withOverrides(torrents) {
@@ -602,6 +619,86 @@ function applyOp(op, hashes) {
           : 'downloading',
     )
   }
+}
+
+// Story 2.7: torrents/files and torrents/filePrio.
+const MANY_FILES = 1000
+const MANY_FILES_HASH = hash(3)
+const FILE_PRIORITY_VALUES = new Set([0, 1, 6, 7])
+/** Priorities set by filePrio calls: hash -> (index -> priority). */
+const filePriorities = new Map()
+/** Every torrents/files request's hash, oldest first (`/__fake/files`). */
+const filesLog = []
+
+/** The fake files of one torrent, deterministic per hash, before calls. */
+function baseFiles(key, torrent) {
+  if (torrent.state === 'metaDL' || torrent.state === 'forcedMetaDL') return []
+  const root = torrent.name
+  const seed = Number.parseInt(key.slice(-4), 16)
+  const count = key === MANY_FILES_HASH ? MANY_FILES : 3 + (seed % 4)
+  const files = []
+  for (let index = 0; index < count; index += 1) {
+    const episode = String(index + 1).padStart(count > 99 ? 4 : 2, '0')
+    const name =
+      index === count - 1 && count < MANY_FILES
+        ? `${root}/Extras/${root}.Extras.Trailer.mkv`
+        : `${root}/${root}.E${episode}.mkv`
+    const progress =
+      torrent.progress >= 1 ? 1 : ((index * 37 + seed) % 100) / 100
+    files.push({
+      index,
+      name,
+      size: (300 + ((index * 131 + seed) % 3700)) * 1024 ** 2,
+      progress,
+      // The trailer is unticked, the second file 高, the rest 一般.
+      priority: name.includes('Trailer') ? 0 : index === 1 ? 6 : 1,
+      is_seed: progress >= 1,
+      piece_range: [index * 10, index * 10 + 9],
+      availability: 1.5,
+    })
+  }
+  return files
+}
+
+function filesOf(key) {
+  const torrent = currentTorrents(rid)[key]
+  if (!torrent) return null
+  const set = filePriorities.get(key)
+  return baseFiles(key, torrent).map((file) =>
+    set?.has(file.index) ? { ...file, priority: set.get(file.index) } : file,
+  )
+}
+
+/** filePrio's status as qBittorrent 5.1.4 would answer it, before applying. */
+function filePrioStatus(key, idField, priorityField) {
+  // A missing or empty field, or an id that is not a whole number: 400.
+  if (!idField || !priorityField) return 400
+  const parts = idField.split('|')
+  if (!parts.every((part) => /^\d+$/.test(part))) return 400
+  if (!/^-?\d+$/.test(priorityField)) return 400
+  if (!FILE_PRIORITY_VALUES.has(Number(priorityField))) return 400
+  const files = filesOf(key)
+  if (files === null) return 404
+  if (!parts.every((part) => Number(part) < files.length)) return 409
+  return 200
+}
+
+/** filePrio: logs the call (anything not applied as `rejected: true`). */
+function applyFilePrio(form) {
+  const key = form.get('hash') ?? ''
+  const idField = form.get('id')
+  const priorityField = form.get('priority')
+  const ids = (idField ?? '').split('|').filter(Boolean).map(Number)
+  const priority = Number(priorityField)
+  const status =
+    mode.ops === 'reject' ? 400 : filePrioStatus(key, idField, priorityField)
+  const call = { op: 'filePrio', hash: key, ids, priority }
+  opLog.push(status === 200 ? call : { ...call, rejected: true })
+  if (status !== 200) return status
+  const set = filePriorities.get(key) ?? new Map()
+  for (const id of ids) set.set(id, priority)
+  filePriorities.set(key, set)
+  return 200
 }
 
 const CATEGORIES = {
@@ -673,6 +770,26 @@ const fakeQbit = createServer(async (req, res) => {
     applyOp(OP_PATHS[url.pathname], hashes)
     return send(res, 200, '')
   }
+  if (req.method === 'GET' && url.pathname === '/api/v2/torrents/files') {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    filesLog.push(url.searchParams.get('hash') ?? '')
+    if (mode.files === 'slow') {
+      await new Promise((resolve) => setTimeout(resolve, SLOW_MS))
+    }
+    if (mode.files === 'fail') return send(res, 500, 'Internal Server Error')
+    const files = filesOf(url.searchParams.get('hash') ?? '')
+    if (files === null) return send(res, 404, 'Not Found')
+    return send(res, 200, JSON.stringify(files), {
+      'content-type': 'application/json',
+    })
+  }
+  if (req.method === 'POST' && url.pathname === '/api/v2/torrents/filePrio') {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    const status = applyFilePrio(new URLSearchParams(await readBody(req)))
+    return send(res, status, status === 200 ? '' : 'Rejected')
+  }
   if (req.method === 'GET' && url.pathname === '/api/v2/sync/maindata') {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
       return send(res, 403, 'Forbidden')
@@ -716,6 +833,7 @@ function controlMode(req, res, url) {
       data: DATA_MODES,
       grow: GROW_MODES,
       ops: OPS_MODES,
+      files: FILES_MODES,
     }
     const next = {}
     for (const [name, values] of Object.entries(allowed)) {
@@ -733,11 +851,13 @@ function controlMode(req, res, url) {
     // Any data parameter starts from the data set as written.
     if (next.data) {
       stateOverrides.clear()
+      filePriorities.clear()
+      filesLog.length = 0
       opLog.length = 0
     }
     Object.assign(mode, next)
     console.log(
-      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops}`,
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files}`,
     )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
@@ -747,7 +867,7 @@ function controlMode(req, res, url) {
   })
 }
 
-/** Story 2.6: the stop/start calls so far (loopback only, GET). */
+/** Stories 2.6, 2.7: the stop/start and filePrio calls so far (loopback only, GET). */
 function controlOps(req, res) {
   if (!isLoopback(req.socket.remoteAddress))
     return send(res, 403, 'loopback only\n')
@@ -757,11 +877,22 @@ function controlOps(req, res) {
   })
 }
 
+/** Story 2.7: the hashes torrents/files was asked for (loopback only, GET). */
+function controlFiles(req, res) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'GET') return send(res, 405, 'GET\n')
+  send(res, 200, `${JSON.stringify({ requests: filesLog })}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
 function frontHandler(appPort) {
   return (req, res) => {
     const url = new URL(req.url ?? '/', 'http://front')
     if (url.pathname === '/__fake/mode') return controlMode(req, res, url)
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
+    if (url.pathname === '/__fake/files') return controlFiles(req, res)
     if (mode.front === 'down' && url.pathname.startsWith(SERVER_FN_PREFIX)) {
       return send(res, 502, '<html><body>Bad gateway</body></html>', {
         'content-type': 'text/html; charset=utf-8',
@@ -914,13 +1045,15 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal'
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states
   grow:  0 | 1
   ops:   normal | reject
-stop/start calls: curl '${origin}/__fake/ops'
+  files: normal | slow | fail
+stop/start and filePrio calls: curl '${origin}/__fake/ops'
+torrents/files requests: curl '${origin}/__fake/files'
 Ctrl+C stops everything.`)
 }
 

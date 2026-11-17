@@ -13,6 +13,11 @@ import { selectTorrents, useMaindata } from '#/state/maindata'
 //   no longer the op sent, judged only for the ops that reader sends), or
 //   the torrent is gone from maindata.
 // While a hash has an entry, the control that sent it is disabled.
+// Story 2.7: a file's tick or priority is keyed `file:<hash>:<index>`
+// (`filePendingKey`), which can never equal a torrent hash; pruning by
+// maindata skips those keys. The files tab clears its key itself once the
+// `['files', hash]` refetch after the call settled, or on failure; the 30 s
+// timer is the fallback.
 
 export const PENDING_TIMEOUT_MS = 30_000
 
@@ -28,6 +33,13 @@ function setOps(
   update: (ops: Record<string, string>) => Record<string, string>,
 ): void {
   pendingStore.setState((state) => ({ ops: update({ ...state.ops }) }))
+}
+
+const FILE_KEY_PREFIX = 'file:'
+
+/** Story 2.7: the pending key of one file of one torrent. */
+export function filePendingKey(hash: string, index: number): string {
+  return `${FILE_KEY_PREFIX}${hash}:${index}`
 }
 
 /** Marks `hash` as waiting for `op` to show; restarts its 30 s. */
@@ -61,11 +73,20 @@ export function pendingOpOf(hash: string): string | null {
   return Object.hasOwn(ops, hash) ? ops[hash] : null
 }
 
-/** Drops the entries of torrents `exists` no longer knows. */
+/**
+ * Drops the entries of torrents `exists` no longer knows. File keys are not
+ * torrent hashes: they stay (their owner or the 30 s timer clears them).
+ */
 export function prunePending(exists: (hash: string) => boolean): void {
-  for (const hash of Object.keys(pendingStore.state.ops)) {
-    if (!exists(hash)) clearPending(hash)
+  for (const key of Object.keys(pendingStore.state.ops)) {
+    if (key.startsWith(FILE_KEY_PREFIX)) continue
+    if (!exists(key)) clearPending(key)
   }
+}
+
+/** Whether `key` has an entry (story 2.7's file rows read their own key). */
+export function useIsPending(key: string): boolean {
+  return useSelector(pendingStore, (state) => Object.hasOwn(state.ops, key))
 }
 
 /** Tests: no entries, no timers. */

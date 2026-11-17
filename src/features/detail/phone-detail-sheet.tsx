@@ -9,7 +9,7 @@ import { useBoardDetailTarget } from '#/features/detail/board-detail'
 import {
   DetailPanelBody,
   DetailTop,
-  useDetailIds,
+  useDetailTabs,
 } from '#/features/detail/detail-view'
 import type { DetailTarget } from '#/features/detail/detail-view'
 
@@ -35,8 +35,8 @@ function useListDetailTarget(): DetailTarget | null {
 
 function PhoneDetailSheet({ target }: { target: DetailTarget | null }) {
   const { setHash } = useViewedHash()
-  const ids = useDetailIds()
   const open = target !== null
+  const tabs = useDetailTabs(open)
   // The sheet keeps its content while it slides out after closing.
   const lastRef = useRef<DetailTarget | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -64,7 +64,7 @@ function PhoneDetailSheet({ target }: { target: DetailTarget | null }) {
             onClose={close}
             closeRef={closeRef}
             titleId={titleId}
-            ids={ids}
+            tabs={tabs}
           />
         )
       }
@@ -72,7 +72,7 @@ function PhoneDetailSheet({ target }: { target: DetailTarget | null }) {
       {shown && (
         <DetailPanelBody
           torrent={shown.torrent}
-          ids={ids}
+          tabs={tabs}
           phone
           className="px-4 pt-3 pb-8"
         />
