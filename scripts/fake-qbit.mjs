@@ -38,6 +38,10 @@
 //          (story 2.3): nothing stalled or errored, so the board's 要處理
 //          column is empty: one torrent each downloading, seeding and done,
 //          plus one archived)
+//          states (story 2.5): one torrent per detail hero row, 12 in all
+//          (hashes 0x3001 to 0x300c: 下載中, 抓種子資訊中, 排隊中, 檢查檔
+//          案中, 已暫停, 停滯, 做種中, 已完成, 找不到檔案, 錯誤, 狀態不明,
+//          已整理); the first has a long save path with Chinese in it
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -78,7 +82,14 @@ const QBIT_MODES = new Set([
   'down',
   'rejected',
 ])
-const DATA_MODES = new Set(['sample', 'many', 'empty', 'archived', 'calm'])
+const DATA_MODES = new Set([
+  'sample',
+  'many',
+  'empty',
+  'archived',
+  'calm',
+  'states',
+])
 const GROW_MODES = new Set(['0', '1'])
 const FRONT_MODES = new Set([
   'normal',
@@ -364,8 +375,132 @@ const CALM = Object.fromEntries([
   torrent(5, { state: 'missingFiles', progress: 1 }),
 ])
 
+// Story 2.5 `data=states`: one torrent per row of EXPERIENCE 「詳情狀態區每
+// 種狀態寫什麼」, fake names and code-name categories only.
+const GB = 1024 ** 3
+const STATE_ROWS = [
+  [
+    'Downloading',
+    {
+      state: 'downloading',
+      private: false,
+      dlspeed: 6_510_000,
+      eta: 2040,
+      progress: 0.87,
+      category: 'mteam-tv',
+      num_seeds: 12,
+      num_leechs: 2,
+      save_path:
+        '/data/media/tv/假影集.第一季.Fake.Show.Season.Pack.2160p.WEB-DL',
+    },
+  ],
+  [
+    'Meta',
+    {
+      state: 'metaDL',
+      private: false,
+      progress: 0,
+      size: 0,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Queued',
+    { state: 'queuedDL', private: false, progress: 0.12, category: 'mteam-tv' },
+  ],
+  [
+    'Checking',
+    {
+      state: 'checkingDL',
+      private: false,
+      progress: 0.45,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Paused',
+    {
+      state: 'stoppedDL',
+      private: false,
+      progress: 0.87,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'Stalled',
+    { state: 'stalledDL', private: false, progress: 0.87, category: 'mteam-X' },
+  ],
+  [
+    'Seeding',
+    {
+      state: 'uploading',
+      progress: 1,
+      ratio: 3.12,
+      upspeed: 2_495_611,
+      completion_on: BASE_TIME - 41 * DAY,
+      seeding_time: 41 * DAY,
+      category: 'mteam-tv',
+      save_path: '/data/torrent/mteam-seed',
+      private: true,
+      num_seeds: 0,
+      num_leechs: 3,
+    },
+  ],
+  [
+    'Done',
+    {
+      state: 'stoppedUP',
+      private: false,
+      progress: 1,
+      ratio: 3.12,
+      completion_on: BASE_TIME - 2 * HOUR,
+      category: 'mteam-tv',
+    },
+  ],
+  [
+    'MissingFiles',
+    {
+      state: 'missingFiles',
+      progress: 1,
+      category: 'mteam-X',
+      save_path: '/data/torrent/mteam-seed',
+      private: true,
+    },
+  ],
+  [
+    'Error',
+    { state: 'error', private: false, progress: 0.3, category: 'mteam-tv' },
+  ],
+  [
+    'Unknown',
+    { state: 'unknown', private: false, progress: 0.1, category: 'mteam-tv' },
+  ],
+  [
+    'Archived',
+    {
+      state: 'missingFiles',
+      private: false,
+      progress: 1,
+      completion_on: Math.floor(Date.UTC(2025, 6, 18, 4, 0) / 1000),
+      category: 'X',
+      save_path: '/data/media/X',
+    },
+  ],
+]
+const STATES = Object.fromEntries(
+  STATE_ROWS.map(([kind, fields], index) => {
+    const n = 0x3001 + index
+    return torrent(n, {
+      name: `Fake.State.${String(index + 1).padStart(2, '0')}.${kind}.1080p`,
+      size: 85 * GB,
+      ...fields,
+    })
+  }),
+)
+
 const DATA = {
   sample: SAMPLE,
+  states: STATES,
   many: MANY,
   empty: {},
   archived: ARCHIVED,

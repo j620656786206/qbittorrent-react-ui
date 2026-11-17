@@ -138,21 +138,47 @@ function kindOf(state: string): StateKind {
   return Object.hasOwn(STATE_KINDS, state) ? STATE_KINDS[state] : 'unknown'
 }
 
-function statusOfKind(kind: StateKind, torrent: SlimTorrent): TorrentStatusId {
+/**
+ * Story 2.5: which row of EXPERIENCE 「詳情狀態區每種狀態寫什麼」 a torrent
+ * reads as. Finer than the status (下載中 splits into 抓資訊, 排隊, 檢查;
+ * 錯誤 into missing files, `error` and `unknown`). It is also where the
+ * status comes from (HERO_STATUS), so the detail hero and classify() can
+ * never disagree. Moving text itself is Epic 5.
+ */
+export type HeroKind =
+  | 'downloading'
+  | 'meta'
+  | 'queued'
+  | 'checking'
+  | 'paused'
+  | 'stalled'
+  | 'seeding'
+  | 'done'
+  | 'missing_files'
+  | 'error'
+  | 'unknown'
+  | 'archived'
+
+/** The one place a state kind (plus `private`, `progress`) picks a row. */
+function heroKindOfKind(kind: StateKind, torrent: SlimTorrent): HeroKind {
   switch (kind) {
     case 'error':
-    case 'unknown':
       return 'error'
+    case 'unknown':
+      return 'unknown'
     case 'missing_files':
-      // `private: null` (no metadata yet) counts as a regular torrent.
-      return torrent.private === true ? 'error' : 'archived'
+      // AR-58: `private: null` (no metadata yet) counts as regular.
+      return torrent.private === true ? 'missing_files' : 'archived'
     case 'stalled_dl':
       return 'stalled'
     case 'downloading':
-    case 'meta':
-    case 'queued_dl':
-    case 'checking_dl':
       return 'downloading'
+    case 'meta':
+      return 'meta'
+    case 'queued_dl':
+      return 'queued'
+    case 'checking_dl':
+      return 'checking'
     case 'paused_dl':
       return 'paused'
     case 'seeding':
@@ -164,6 +190,38 @@ function statusOfKind(kind: StateKind, torrent: SlimTorrent): TorrentStatusId {
       // Only reached without a remembered state: the progress decides.
       return torrent.progress >= 1 ? 'seeding' : 'downloading'
   }
+}
+
+const HERO_STATUS: Readonly<Record<HeroKind, TorrentStatusId>> = {
+  downloading: 'downloading',
+  meta: 'downloading',
+  queued: 'downloading',
+  checking: 'downloading',
+  paused: 'paused',
+  stalled: 'stalled',
+  seeding: 'seeding',
+  done: 'done',
+  missing_files: 'error',
+  error: 'error',
+  unknown: 'error',
+  archived: 'archived',
+}
+
+/** The status a hero row belongs to. */
+export function statusOfHeroKind(kind: HeroKind): TorrentStatusId {
+  return HERO_STATUS[kind]
+}
+
+function statusOfKind(kind: StateKind, torrent: SlimTorrent): TorrentStatusId {
+  return HERO_STATUS[heroKindOfKind(kind, torrent)]
+}
+
+/** The hero row; a move keeps the row it had before. */
+export function heroKindOf(
+  torrent: SlimTorrent,
+  stateBeforeMove: Readonly<Record<string, string>>,
+): HeroKind {
+  return heroKindOfKind(effectiveKind(torrent, stateBeforeMove).kind, torrent)
 }
 
 /** The state a moving torrent had before, when the merge remembered one. */

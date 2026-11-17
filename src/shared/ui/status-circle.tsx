@@ -3,7 +3,8 @@ import type { TorrentStatusId } from '#/shared/torrent-status'
 
 // DESIGN status-circle (mockups S01-list-mode-desktop, S02-list-mode-phone,
 // S01-list-desktop, S02-list-phone): 36px in list rows, 32px on board cards,
-// 28px in board column headers. A progress ring drawn with SVG
+// 28px in board column headers, 64px in the detail hero (story 2.5,
+// mockups S04-overview-desktop, S05-overview-phone). A progress ring drawn with SVG
 // stroke-dashoffset over a `track` ring for downloading, paused and
 // stalled; a full ring in the status color otherwise. Inner circle at 80%
 // filled with the status color, the mockup's icon (about 42%) in
@@ -12,7 +13,7 @@ import type { TorrentStatusId } from '#/shared/torrent-status'
 // spin-in yet (Story 2.9). Shared: the list and the board both draw it
 // (story 2.3 moved it out of features/list).
 
-export type StatusCircleSize = 28 | 32 | 36
+export type StatusCircleSize = 28 | 32 | 36 | 64
 
 interface Geometry {
   /** Ring radius: the circle minus half the 3px stroke. */
@@ -26,6 +27,7 @@ interface Geometry {
 
 /** The mockups' numbers per size. */
 const GEOMETRY: Readonly<Record<StatusCircleSize, Geometry>> = {
+  64: { ring: 30.5, inner: 25.6, icon: 27, iconAt: 18.5 },
   36: { ring: 16.5, inner: 14.4, icon: 15, iconAt: 10.5 },
   32: { ring: 14.5, inner: 12.8, icon: 13, iconAt: 9.5 },
   28: { ring: 12.5, inner: 11.2, icon: 12, iconAt: 8 },

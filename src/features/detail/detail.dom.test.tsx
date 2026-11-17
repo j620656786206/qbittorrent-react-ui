@@ -39,7 +39,12 @@ const detailCalls = vi.hoisted(() => ({
     Promise.resolve({
       ok: true,
       data: {
-        detail: { downloaded: 2 * 1024 ** 3, uploaded: 512 * 1024 ** 2 },
+        detail: {
+          downloaded: 2 * 1024 ** 3,
+          uploaded: 512 * 1024 ** 2,
+          num_seeds: 12,
+          num_leechs: 3,
+        },
       },
     }),
 }))
@@ -560,5 +565,286 @@ describe('the phone sheet', () => {
     expect(positionLine()).toBe('第 2 個／共 2 個')
     await act(async () => byLabel('上一個').click())
     expect(writes).toEqual([h(1)])
+  })
+})
+
+// Spec 2.5: the overview's blocks in a DOM. Layout, the real front cut and
+// the real clipboard are checked in e2e (detail.spec.ts).
+describe('the overview (story 2.5)', () => {
+  const LONG_PATH = '/data/media/tv/假影集.Fake.Show.S01.2160p.WEB-DL'
+  const sectionOf = () => q('section[aria-label="儲存位置"]') as HTMLElement
+  const pills = () => [
+    ...sectionOf().querySelectorAll<HTMLButtonElement>(
+      ':scope > div:last-child > button',
+    ),
+  ]
+  const tileTexts = () =>
+    [...(q('[data-slot="stat-tiles"]') as HTMLElement).children].map((tile) =>
+      [...tile.children].map((part) => part.textContent),
+    )
+
+  function setClipboard(value: unknown) {
+    Object.defineProperty(navigator, 'clipboard', {
+      value,
+      configurable: true,
+    })
+  }
+
+  /** Own property descriptors before the tests touch them (restored after). */
+  const ORIGINAL = {
+    clipboard: Object.getOwnPropertyDescriptor(navigator, 'clipboard'),
+    execCommand: Object.getOwnPropertyDescriptor(document, 'execCommand'),
+  }
+  function restore(
+    target: object,
+    name: string,
+    descriptor: PropertyDescriptor | undefined,
+  ) {
+    if (descriptor) Object.defineProperty(target, name, descriptor)
+    else Reflect.deleteProperty(target, name)
+  }
+
+  afterEach(() => {
+    restore(navigator, 'clipboard', ORIGINAL.clipboard)
+    restore(document, 'execCommand', ORIGINAL.execCommand)
+    vi.useRealTimers()
+  })
+
+  async function openSeed(data = board()) {
+    await render(<ListDetailPanel />, { data })
+    await act(async () =>
+      publishShownList({ order: [h(1), h(11)], viewed: h(11) }),
+    )
+  }
+
+  it('order: hero, three tiles, save-path block, info list', async () => {
+    await openSeed()
+    const panel = q('[role="tabpanel"]') as HTMLElement
+    const blocks = [...(panel.firstElementChild as HTMLElement).children]
+    expect(blocks).toHaveLength(4)
+    expect(blocks[0].querySelector('svg')?.getAttribute('width')).toBe('64')
+    expect(blocks[0].textContent).toContain('做種')
+    expect(blocks[1].getAttribute('data-slot')).toBe('stat-tiles')
+    expect(blocks[1].children).toHaveLength(3)
+    expect(blocks[1].className).toContain('grid-cols-3')
+    expect(blocks[2]).toBe(sectionOf())
+    expect(blocks[3].tagName).toBe('DL')
+    // The headline says the status: the circle is decorative.
+    const circle = blocks[0].querySelector('svg') as SVGElement
+    expect(circle.getAttribute('aria-hidden')).toBe('true')
+    expect(circle.hasAttribute('role')).toBe(false)
+    // The panel scrolls and its first content takes no focus: it stays a
+    // tab stop (WAI-ARIA tabs pattern).
+    expect(panel.getAttribute('tabindex')).toBe('0')
+  })
+
+  it('hero: headline in the status colour, muted summary; tiles get the detail counts', async () => {
+    await openSeed()
+    const headline = q('[role="tabpanel"] p') as HTMLElement
+    expect(headline.textContent).toBe('做種 16 分')
+    expect(headline.className).toContain('text-detail-hero')
+    expect(headline.className).toContain('text-status-seeding')
+    const summary = headline.nextElementSibling as HTMLElement
+    expect(summary.className).toContain('text-text-muted')
+    await vi.waitFor(() =>
+      expect(summary.textContent).toBe(
+        '分享率 0.00 · 已上傳 512 MB · 85 GB · X',
+      ),
+    )
+    expect(tileTexts()).toEqual([
+      ['現在上傳', '0 KB/s'],
+      ['在抓的人', '3'],
+      ['最後有人抓', '沒人抓過'],
+    ])
+    const values = [
+      ...document.querySelectorAll(
+        '[data-slot="stat-tiles"] > * > :last-child',
+      ),
+    ]
+    // A missing value is muted, a real one is not.
+    expect(values[2].className).toContain('text-text-muted')
+    expect(values[1].className).not.toContain('text-text-muted')
+  })
+
+  it('save path: tag, full path cut from the front, one solid pill, three disabled', async () => {
+    const data = board().map((torrent) =>
+      torrent.hash === h(11) ? { ...torrent, save_path: LONG_PATH } : torrent,
+    )
+    await openSeed(data)
+    const section = sectionOf()
+    expect(section.textContent).toContain('儲存位置')
+    expect(section.textContent).toContain(
+      'tv/假影集.Fake.Show.S01.2160p.WEB-DL',
+    )
+    const cut = section.querySelector('[dir="rtl"]') as HTMLElement
+    expect(cut.className).toContain('truncate')
+    expect(cut.className).toContain('font-mono')
+    expect(cut.querySelector('bdi')?.getAttribute('dir')).toBe('ltr')
+    expect(cut.textContent).toBe(LONG_PATH)
+    // Desktop: the whole path on hover; no expand button.
+    expect(cut.parentElement?.getAttribute('title')).toBe(LONG_PATH)
+    expect(section.querySelector('[aria-expanded]')).toBeNull()
+    expect(pills().map((pill) => pill.textContent)).toEqual([
+      '複製',
+      '☆ 加到常用',
+      '改路徑',
+      '改檔名',
+    ])
+    expect(pills().map((pill) => pill.disabled)).toEqual([
+      false,
+      true,
+      true,
+      true,
+    ])
+    expect(pills()[2].className).toContain('bg-primary')
+    expect(pills()[0].className).toContain('h-[34px]')
+    expect(
+      pills().filter((pill) => pill.className.includes('bg-primary')),
+    ).toHaveLength(1)
+  })
+
+  it('C1 複製: the full path, 「已複製」 for 1.5 s, a second press restarts it', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    setClipboard({ writeText })
+    await openSeed()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await act(async () => pills()[0].click())
+    expect(writeText).toHaveBeenCalledWith('/data/media/X/incompleted')
+    expect(pills()[0].textContent).toBe('已複製')
+    await act(async () => vi.advanceTimersByTime(1000))
+    await act(async () => pills()[0].click())
+    await act(async () => vi.advanceTimersByTime(1000))
+    // 2 s after the first press, 1 s after the second: still showing.
+    expect(pills()[0].textContent).toBe('已複製')
+    await act(async () => vi.advanceTimersByTime(600))
+    expect(pills()[0].textContent).toBe('複製')
+  })
+
+  it('C2 both ways fail: 「複製失敗」 for 1.5 s, no toast', async () => {
+    setClipboard(undefined)
+    Object.defineProperty(document, 'execCommand', {
+      value: () => false,
+      configurable: true,
+      writable: true,
+    })
+    await openSeed()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await act(async () => pills()[0].click())
+    expect(pills()[0].textContent).toBe('複製失敗')
+    expect(q('[role="status"]')).toBeNull()
+    await act(async () => vi.advanceTimersByTime(1500))
+    expect(pills()[0].textContent).toBe('複製')
+  })
+
+  it('P2 phone: tapping the path wraps it, tapping again cuts it; 2 x 2 44px pills', async () => {
+    await render(<BoardDetailSheet />, {
+      hash: h(11),
+      data: board().map((torrent) =>
+        torrent.hash === h(11) ? { ...torrent, save_path: LONG_PATH } : torrent,
+      ),
+    })
+    const button = sectionOf().querySelector(
+      'button[aria-expanded]',
+    ) as HTMLButtonElement
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    expect(button.className).toContain('min-h-11')
+    expect(button.querySelector('.truncate')).not.toBeNull()
+    await act(async () => button.click())
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(button.querySelector('.truncate')).toBeNull()
+    expect(button.textContent).toBe(LONG_PATH)
+    await act(async () => button.click())
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    expect(button.querySelector('.truncate')).not.toBeNull()
+    expect(pills()[0].parentElement?.className).toContain('grid-cols-2')
+    expect(pills()[0].className).toContain('h-11')
+  })
+
+  it('› resets the save-path block: path collapsed, label 「複製」 again', async () => {
+    setClipboard({ writeText: () => Promise.resolve() })
+    await render(<BoardDetailSheet />, {
+      hash: h(11),
+      data: board().map((torrent) => ({ ...torrent, save_path: LONG_PATH })),
+    })
+    const pathButton = () =>
+      sectionOf().querySelector('button[aria-expanded]') as HTMLButtonElement
+    await act(async () => pathButton().click())
+    expect(pathButton().getAttribute('aria-expanded')).toBe('true')
+    await act(async () => pills()[0].click())
+    expect(pills()[0].textContent).toBe('已複製')
+    await act(async () => byLabel('下一個').click())
+    expect(q('h2')?.textContent).toBe('Seed2')
+    expect(pathButton().getAttribute('aria-expanded')).toBe('false')
+    expect(pills()[0].textContent).toBe('複製')
+  })
+
+  it('a copy still pending when ‹ › remounts the block changes nothing afterwards', async () => {
+    let resolve: () => void = () => {}
+    setClipboard({
+      writeText: () =>
+        new Promise<void>((done) => {
+          resolve = done
+        }),
+    })
+    const errors = vi.spyOn(console, 'error')
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await act(async () => pills()[0].click())
+    expect(pills()[0].textContent).toBe('複製')
+    await act(async () => byLabel('下一個').click())
+    expect(q('h2')?.textContent).toBe('Seed2')
+    const timersBefore = vi.getTimerCount()
+    await act(async () => resolve())
+    // The gone block starts no 1.5 s timer.
+    expect(vi.getTimerCount()).toBe(timersBefore)
+    expect(pills()[0].textContent).toBe('複製')
+    await act(async () => vi.advanceTimersByTime(2000))
+    expect(pills()[0].textContent).toBe('複製')
+    expect(errors).not.toHaveBeenCalled()
+  })
+
+  it('a move keeps the row it had before (stateBeforeMove from maindata)', async () => {
+    const paused = t({
+      hash: h(1),
+      name: 'Down1',
+      state: 'pausedDL',
+      progress: 0.42,
+    })
+    await render(<BoardDetailPanel />, {
+      hash: h(1),
+      data: [paused, ...board().slice(1)],
+    })
+    const headline = () => q('[role="tabpanel"] p') as HTMLElement
+    expect(headline().textContent).toBe('已暫停\u300042%')
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [{ ...paused, state: 'moving' }],
+      }),
+    )
+    expect(headline().textContent).toBe('已暫停\u300042%')
+    expect(headline().className).toContain('text-status-paused')
+  })
+
+  it('X1 names, paths and categories with markup stay plain text', async () => {
+    const markup = '<b>x</b>'
+    const data = board().map((torrent) =>
+      torrent.hash === h(11)
+        ? {
+            ...torrent,
+            name: markup,
+            category: markup,
+            save_path: `/data/javascript:alert(1)/${markup}`,
+          }
+        : torrent,
+    )
+    await openSeed(data)
+    const panel = q('[role="tabpanel"]') as HTMLElement
+    expect(panel.querySelector('b')).toBeNull()
+    expect(panel.querySelector('a')).toBeNull()
+    expect(panel.textContent).toContain(`85 GB · ${markup}`)
+    expect(panel.textContent).toContain(`/data/javascript:alert(1)/${markup}`)
+    expect(q('h2')?.textContent).toBe(markup)
   })
 })

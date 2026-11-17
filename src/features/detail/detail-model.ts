@@ -1,6 +1,16 @@
-import { NO_VALUE, formatCount, formatDate, formatSize } from '#/lib/format'
+import {
+  NO_VALUE,
+  formatAgo,
+  formatCount,
+  formatDate,
+  formatRatio,
+  formatSize,
+  formatSpeed,
+  formatTimeLeft,
+} from '#/lib/format'
 import type { DetailPosition } from '#/lib/detail-position'
 import type { SlimTorrent } from '#/shared/maindata'
+import type { TorrentStatusId } from '#/shared/torrent-status'
 import type { TorrentDetail } from '#/shared/torrent-detail'
 
 // Story 2.4: the detail's text, pure, so it is tested in node. Every value
@@ -56,4 +66,82 @@ export function infoRows(
     row('已下載', traffic('downloaded')),
     row('已上傳', traffic('uploaded')),
   ]
+}
+
+export interface StatTile {
+  title: string
+  value: string
+  /** No value (「沒有」, 「不明」, 「沒人抓過」) or 「…」: `text-muted`. */
+  muted: boolean
+}
+
+const MUTED_TILE_VALUES: ReadonlySet<string> = new Set([
+  NO_VALUE,
+  LOADING_VALUE,
+  '不明',
+  '沒人抓過',
+])
+
+const tile = (title: string, value: string): StatTile => ({
+  title,
+  value,
+  muted: MUTED_TILE_VALUES.has(value),
+})
+
+/** A peer count: qBittorrent's -1 or a missing value is 「沒有」. */
+function peerCount(
+  detail: TorrentDetail | null | undefined,
+  name: 'num_seeds' | 'num_leechs',
+): string {
+  if (detail === undefined) return LOADING_VALUE
+  const value = detail?.[name]
+  return value === null || value === undefined || value < 0
+    ? NO_VALUE
+    : formatCount(value)
+}
+
+/**
+ * Story 2.5, EXPERIENCE 「數字小卡依狀態換」: the three stat tiles by
+ * status group. 下載中 (with 抓資訊, 排隊, 檢查), 已暫停, 停滯: 下載速度,
+ * 剩餘時間, 來源數; 做種中, 已完成: 現在上傳, 在抓的人, 最後有人抓; 錯誤
+ * (all three kinds) and 已整理: 大小, 完成時間, 分享率. 來源數 and 在抓的人
+ * are qBittorrent's connected seeds and leechers from getTorrentDetail
+ * (`undefined` before the first answer: 「…」). `today` is for dates,
+ * `now` (the minute tick) for 「3 天前」.
+ */
+export function statTiles(
+  torrent: SlimTorrent,
+  status: TorrentStatusId,
+  { today, now }: { today: number; now: number },
+  detail: TorrentDetail | null | undefined,
+): [StatTile, StatTile, StatTile] {
+  switch (status) {
+    case 'downloading':
+    case 'paused':
+    case 'stalled':
+      return [
+        tile('下載速度', formatSpeed(torrent.dlspeed)),
+        tile('剩餘時間', formatTimeLeft(torrent.eta, torrent.dlspeed)),
+        tile('來源數', peerCount(detail, 'num_seeds')),
+      ]
+    case 'seeding':
+    case 'done':
+      return [
+        tile('現在上傳', formatSpeed(torrent.upspeed)),
+        tile('在抓的人', peerCount(detail, 'num_leechs')),
+        tile(
+          '最後有人抓',
+          torrent.last_activity > 0
+            ? formatAgo(torrent.last_activity, now)
+            : '沒人抓過',
+        ),
+      ]
+    case 'error':
+    case 'archived':
+      return [
+        tile('大小', formatSize(torrent.size)),
+        tile('完成時間', formatDate(torrent.completion_on, today)),
+        tile('分享率', formatRatio(torrent.ratio)),
+      ]
+  }
 }

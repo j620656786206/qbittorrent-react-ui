@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { fakeHash, t } from '#/lib/testing'
-import { classify, statusOf } from '#/lib/torrent-status'
+import {
+  classify,
+  heroKindOf,
+  statusOf,
+  statusOfHeroKind,
+} from '#/lib/torrent-status'
 import type { BoardColumn, TorrentStatusId } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 
@@ -240,4 +245,57 @@ describe('C5 plain text', () => {
     expect(typeof result.detail).toBe('string')
     expect(result.detail).toBe('卡在 50%，沒有來源')
   })
+})
+
+// Spec 2.5: the detail hero's row and the status come from one place, so
+// they agree on every state code, an unlisted one, every `private` value
+// and moves with and without a remembered state.
+describe('heroKindOf agrees with classify', () => {
+  const STATES = [
+    'error',
+    'missingFiles',
+    'stalledDL',
+    'downloading',
+    'forcedDL',
+    'metaDL',
+    'forcedMetaDL',
+    'queuedDL',
+    'checkingDL',
+    'allocating',
+    'checkingResumeData',
+    'pausedDL',
+    'stoppedDL',
+    'uploading',
+    'forcedUP',
+    'queuedUP',
+    'checkingUP',
+    'stalledUP',
+    'pausedUP',
+    'stoppedUP',
+    'moving',
+    'unknown',
+    'someFutureState',
+  ]
+  const cases = STATES.flatMap((state) =>
+    [true, false, null].flatMap((isPrivate) =>
+      [0.5, 1].flatMap((progress) => [
+        { state, isPrivate, progress, before: null as string | null },
+        ...(state === 'moving'
+          ? STATES.map((before) => ({ state, isPrivate, progress, before }))
+          : []),
+      ]),
+    ),
+  )
+
+  it.each(cases)(
+    '$state private=$isPrivate progress=$progress before=$before',
+    ({ state, isPrivate, progress, before }) => {
+      const torrent = t({ state, private: isPrivate, progress })
+      const stateBeforeMove = before === null ? {} : { [torrent.hash]: before }
+      const options = { ...OPTIONS, stateBeforeMove }
+      const hero = heroKindOf(torrent, stateBeforeMove)
+      expect(statusOfHeroKind(hero)).toBe(classify(torrent, options).status)
+      expect(statusOfHeroKind(hero)).toBe(statusOf(torrent, stateBeforeMove))
+    },
+  )
 })

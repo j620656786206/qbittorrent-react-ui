@@ -18,6 +18,7 @@ import {
   seedingLimitSeconds,
   sortableRatio,
   formatSpeedLimitFull,
+  formatTimeLeft,
   hasNoSortValue,
   isGoodRatio,
 } from '#/lib/format'
@@ -100,6 +101,19 @@ describe('F4 formatEta', () => {
     ['speed 0', 34 * MINUTE, 0, '剩餘時間不明'],
   ])('%s -> %s', (_name, eta, dlspeed, expected) => {
     expect(formatEta(eta, dlspeed)).toBe(expected)
+  })
+})
+
+describe('formatTimeLeft (spec 2.5 剩餘時間 tile)', () => {
+  const SPEED = 6.21 * MIB
+  it.each([
+    ['30 s', 30, SPEED, '不到 1 分'],
+    ['34 min', 34 * MINUTE, SPEED, '34 分'],
+    ['2 d 5 h', 2 * DAY + 5 * HOUR, SPEED, '2 天 5 小時'],
+    ['infinite eta', QBIT_ETA_INFINITY, SPEED, '不明'],
+    ['speed 0', 34 * MINUTE, 0, '不明'],
+  ])('%s -> %s', (_name, eta, dlspeed, expected) => {
+    expect(formatTimeLeft(eta, dlspeed)).toBe(expected)
   })
 })
 

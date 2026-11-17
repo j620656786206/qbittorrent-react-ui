@@ -246,8 +246,10 @@ describe('the status circle', () => {
     // [size, ring radius, inner radius, icon box, icon start]
     [32, 14.5, 12.8, 13, 9.5],
     [28, 12.5, 11.2, 12, 8],
+    // Story 2.5: the detail hero (mockups S04, S05).
+    [64, 30.5, 25.6, 27, 18.5],
   ] as const)(
-    'the %ipx board size: ring %d, inner %d, icon %d at %d',
+    'the %ipx size: ring %d, inner %d, icon %d at %d',
     (size, ring, inner, icon, at) => {
       const html = renderToStaticMarkup(
         <StatusCircle status="stalled" arcFraction={0.5} size={size} />,

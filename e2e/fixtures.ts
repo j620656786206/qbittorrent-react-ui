@@ -107,7 +107,7 @@ export { expect }
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'
   front?: 'normal' | 'down' | 'cloudflare'
-  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm'
+  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm' | 'states'
   grow?: '0' | '1'
 }
 
@@ -119,10 +119,20 @@ export const DEFAULT_MODES: Required<Modes> = {
 }
 
 /** Switches the fake server through its loopback-only control route. */
+/**
+ * The container reuses a qBittorrent pull for 1 s (syncer
+ * MIN_PULL_INTERVAL_MS), so a page loaded right after a data change can
+ * still get the old torrents. Wait that window out after changing data.
+ */
+const PULL_REUSE_WAIT_MS = 1100
+
 export async function setModes(request: APIRequestContext, modes: Modes) {
   const query = new URLSearchParams(Object.entries(modes)).toString()
   const response = await request.post(`/__fake/mode?${query}`)
   expect(response.ok(), await response.text()).toBe(true)
+  if (modes.data !== undefined) {
+    await new Promise((resolve) => setTimeout(resolve, PULL_REUSE_WAIT_MS))
+  }
 }
 
 export async function login(page: Page) {
