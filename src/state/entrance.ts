@@ -7,12 +7,15 @@ import {
   RISE_MS,
   RISE_PX,
   entranceDelay,
+  intersectBoxes,
   isVisible,
   rowOrdinals,
   sweepDecision,
 } from '#/lib/entrance'
+import type { Box } from '#/lib/entrance'
 import {
   canAnimate,
+  clippingAncestors,
   entranceItems,
   growIn,
   prefersReducedMotion,
@@ -106,7 +109,12 @@ function sweep(
 ): Array<Animation> {
   const items = entranceItems(container, rise)
   if (items.length === 0) return []
-  const box = container.getBoundingClientRect()
+  // The scroll box, cut down by every ancestor that clips (the phone
+  // board's swipe viewport hides the panels beside the selected one).
+  const box = clippingAncestors(container).reduce<Box>(
+    (clip, element) => intersectBoxes(clip, element.getBoundingClientRect()),
+    container.getBoundingClientRect(),
+  )
   const viewport = { width: window.innerWidth, height: window.innerHeight }
   const visible = (element: Element) =>
     isVisible(element.getBoundingClientRect(), box, viewport)

@@ -84,6 +84,22 @@ export function isVisible(
   )
 }
 
+/**
+ * The part of `a` inside `b` (an empty box when they do not meet): the
+ * scroll box cut down by each clipping ancestor, such as the phone board's
+ * swipe viewport around its off-screen panels.
+ */
+export function intersectBoxes(a: Box, b: Box): Box {
+  const top = Math.max(a.top, b.top)
+  const left = Math.max(a.left, b.left)
+  return {
+    top,
+    left,
+    bottom: Math.max(top, Math.min(a.bottom, b.bottom)),
+    right: Math.max(left, Math.min(a.right, b.right)),
+  }
+}
+
 /** One element's delay: its row's place in the stagger, minus the late start. */
 export function entranceDelay(row: number, elapsed: number): number {
   return row * STAGGER_MS - elapsed

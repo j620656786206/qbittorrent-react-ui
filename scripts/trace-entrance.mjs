@@ -78,12 +78,15 @@ function instrument(pause) {
         : element.hasAttribute('data-progress-bar')
           ? 'grow'
           : null
-  const scrollBox = (element) => {
+  const CLIPS = new Set(['hidden', 'clip', 'scroll', 'auto'])
+  const clippers = (element) => {
+    const out = []
     for (let node = element.parentElement; node; node = node.parentElement) {
-      const { overflowY } = getComputedStyle(node)
-      if (overflowY === 'auto' || overflowY === 'scroll') return node
+      const style = getComputedStyle(node)
+      if (CLIPS.has(style.overflowX) || CLIPS.has(style.overflowY))
+        out.push(node)
     }
-    return null
+    return out
   }
   const overlaps = (a, b) =>
     a.bottom > b.top && a.top < b.bottom && a.right > b.left && a.left < b.right
@@ -92,9 +95,14 @@ function instrument(pause) {
     let visible = 0
     for (const arc of document.querySelectorAll('[data-progress-arc]')) {
       const rect = arc.getBoundingClientRect()
-      const box = scrollBox(arc)
       if (!overlaps(rect, view)) continue
-      if (box && !overlaps(rect, box.getBoundingClientRect())) continue
+      // Every ancestor that clips (scroll boxes, the phone swipe viewport).
+      if (
+        clippers(arc).some(
+          (node) => !overlaps(rect, node.getBoundingClientRect()),
+        )
+      )
+        continue
       visible += 1
     }
     return visible

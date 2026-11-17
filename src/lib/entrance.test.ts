@@ -3,6 +3,7 @@ import {
   JOIN_MS,
   STAGGER_MS,
   entranceDelay,
+  intersectBoxes,
   isVisible,
   rowOrdinals,
   sweepDecision,
@@ -63,6 +64,32 @@ describe('isVisible', () => {
         { top: 0, left: 0, bottom: 0, right: 0 },
         viewport,
       ),
+    ).toBe(false)
+  })
+})
+
+describe('intersectBoxes', () => {
+  it('the overlap of two boxes', () => {
+    expect(
+      intersectBoxes(box(0, 0, 600, 400), {
+        top: 0,
+        left: 16,
+        bottom: 844,
+        right: 374,
+      }),
+    ).toEqual({ top: 0, left: 16, bottom: 600, right: 374 })
+  })
+
+  it('boxes that do not meet give an empty box, which shows nothing', () => {
+    const clip = intersectBoxes(box(0, 374, 600, 358), {
+      top: 0,
+      left: 16,
+      bottom: 844,
+      right: 374,
+    })
+    expect(clip.right - clip.left).toBe(0)
+    expect(
+      isVisible(box(10, 374, 60, 358), clip, { width: 390, height: 844 }),
     ).toBe(false)
   })
 })

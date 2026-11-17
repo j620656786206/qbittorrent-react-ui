@@ -73,6 +73,33 @@ export function entranceItems(
   )
 }
 
+const CLIPS = new Set(['hidden', 'clip', 'scroll', 'auto'])
+
+/**
+ * The ancestors of `container` that clip what overflows them (`overflow`
+ * hidden, clip, scroll or auto), nearest first. A panel translated past
+ * the phone board's swipe viewport still lies inside the window, so only
+ * these boxes tell that it shows nothing.
+ */
+export function clippingAncestors(container: HTMLElement): Array<Element> {
+  const out: Array<Element> = []
+  for (
+    let node = container.parentElement;
+    node && node !== document.body;
+    node = node.parentElement
+  ) {
+    const style = getComputedStyle(node)
+    if (
+      CLIPS.has(style.overflow) ||
+      CLIPS.has(style.overflowX) ||
+      CLIPS.has(style.overflowY)
+    ) {
+      out.push(node)
+    }
+  }
+  return out
+}
+
 export interface EntranceTiming {
   delay: number
   duration: number

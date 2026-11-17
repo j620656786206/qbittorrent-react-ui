@@ -43,6 +43,8 @@ beforeEach(() => {
     function (this: Element) {
       const holder = this.closest('[data-top]')
       if (this.hasAttribute('data-surface')) return new DOMRect(0, 0, 400, 600)
+      if (this.hasAttribute('data-clip'))
+        return new DOMRect(0, 0, 400, Number(this.getAttribute('data-clip')))
       if (!holder) return new DOMRect(0, 0, 0, 0)
       return new DOMRect(0, Number(holder.getAttribute('data-top')), 400, 60)
     },
@@ -305,6 +307,21 @@ describe('replays and StrictMode', () => {
     expect(freezeStore.state.animation).toBe(true)
     await settleAll()
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+describe('clipping ancestors', () => {
+  it('rows outside an ancestor that clips (the phone swipe viewport) get nothing', async () => {
+    const container = document.createElement('div')
+    container.setAttribute('data-clip', '100')
+    container.style.overflow = 'hidden'
+    document.body.append(container)
+    const root = createRoot(container)
+    roots.push(root)
+    await act(async () => root.render(<Surface tops={[0, 70, 140]} />))
+    // 0 to 60 and 70 to 130 meet the 0 to 100 clip; 140 to 200 does not.
+    expect(rises()).toHaveLength(2)
+    expect(spins()).toHaveLength(2)
   })
 })
 
