@@ -10,6 +10,9 @@ import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
+import { replayEntrance, resetEntrance } from '#/state/entrance'
+import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
+import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
@@ -211,6 +214,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetEntrance()
   resetShortcuts()
   clearShownList()
   main = document.createElement('main')
@@ -1242,5 +1246,83 @@ describe('the ⋯ menu (story 2.6)', () => {
     expect(menu()).toBeNull()
     expect(q('[role="dialog"]')).not.toBeNull()
     expect(hashNow).toBe(h(11))
+  })
+})
+
+describe('the hero entrance (spec 2.9)', () => {
+  let stub: AnimateStub
+  let now: number
+  const order = [h(1), h(2), h(11)]
+
+  beforeEach(() => {
+    stub = stubElementAnimate()
+    now = 1000
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    stubReducedMotion(() => false)
+    // The hero (anything holding an arc) and the arc are on screen.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: Element) {
+        if (this.hasAttribute('data-progress-arc'))
+          return new DOMRect(0, 0, 64, 64)
+        if (this.querySelector('[data-progress-arc]'))
+          return new DOMRect(0, 0, 400, 100)
+        return new DOMRect(0, 0, 0, 0)
+      },
+    )
+  })
+
+  afterEach(() => {
+    stub.restore()
+  })
+
+  it('a hero mounted with the first data turns its ring in at delay 0, no rise', async () => {
+    await render(<ListDetailPanel />)
+    await act(async () => publishShownList({ order, viewed: h(2) }))
+    expect(stub.calls).toHaveLength(1)
+    const [spin] = stub.calls
+    expect(spin.element.hasAttribute('data-progress-arc')).toBe(true)
+    expect(spin.keyframes).toEqual([
+      {
+        offset: 0,
+        strokeDashoffset: `${spin.element.getAttribute('stroke-dasharray')}px`,
+      },
+    ])
+    expect(spin.options).toMatchObject({ delay: 0, duration: 900 })
+    expect(freezeStore.state.animation).toBe(true)
+    await act(async () => {
+      spin.finish()
+      await Promise.resolve()
+    })
+    expect(freezeStore.state.animation).toBe(false)
+  })
+
+  it('‹ › and a poll start nothing; replayEntrance() turns it again', async () => {
+    await render(<ListDetailPanel />)
+    await act(async () => publishShownList({ order, viewed: h(2) }))
+    stub.calls.length = 0
+    now = 3000
+    await act(async () => publishShownList({ order, viewed: h(1) }))
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [t({ hash: h(1), name: 'Down1', progress: 0.6 })],
+      }),
+    )
+    expect(stub.calls).toHaveLength(0)
+    await act(async () => replayEntrance())
+    expect(stub.calls).toHaveLength(1)
+  })
+
+  it('opened later (a click after the entrance): drawn as is', async () => {
+    await render(<ListDetailPanel />)
+    await act(async () => publishShownList({ order, viewed: h(11) }))
+    // A seeding hero has no arc; the generation is still claimed.
+    expect(stub.calls).toHaveLength(0)
+    await act(async () => root.unmount())
+    now = 5000
+    await render(<ListDetailPanel />)
+    await act(async () => publishShownList({ order, viewed: h(2) }))
+    expect(stub.calls).toHaveLength(0)
   })
 })

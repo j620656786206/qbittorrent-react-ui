@@ -11,6 +11,7 @@ import { cn } from '#/shared/ui/cn'
 import { copyText } from '#/shared/ui/copy-text'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { useEntrance } from '#/state/entrance'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import { useDayClock } from '#/state/now'
 import {
@@ -83,10 +84,17 @@ export function Overview({
   )
 }
 
-/** DESIGN detail-hero. */
+/**
+ * DESIGN detail-hero. Story 2.9: a hero mounted with the first data (the
+ * URL had a `hash`, or the desktop list panel) turns its ring in, delay 0
+ * and no rise (the panel or sheet brings it in already); opened later, or
+ * on prev/next, it draws as is.
+ */
 function HeroBlock({ hero }: { hero: DetailHero }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEntrance(ref, { ready: true, rise: false })
   return (
-    <div className="flex items-center gap-3.5">
+    <div ref={ref} className="flex items-center gap-3.5">
       {/* No label: the headline beside it says the status (the circle's
           word can differ, e.g. 下載中 next to 排隊中), so it is hidden. */}
       <StatusCircle
