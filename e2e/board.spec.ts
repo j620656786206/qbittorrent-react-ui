@@ -3,6 +3,7 @@ import {
   DEFAULT_MODES,
   LIST_SCROLL_ID,
   MAIN_ID,
+  autoCollapseOff,
   expect,
   listScrollTop,
   login,
@@ -296,6 +297,8 @@ test('K9 4165 torrents: each column keeps under 60 cards and scrolls itself', as
   page,
   request,
 }) => {
+  // Each column scrolling on its own (story 2.8's collapse has its spec).
+  await autoCollapseOff(page)
   await setModes(request, { data: 'many' })
   await page.setViewportSize(DESKTOP)
   await login(page)

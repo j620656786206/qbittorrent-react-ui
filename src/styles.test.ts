@@ -417,6 +417,47 @@ describe('Tailwind theme (row 20)', () => {
     expect(declarations(reduced[0].body).get('animation')).toBe('none')
   })
 
+  it('has the anchor frame and the strip fade-in, opacity only, off for reduced motion (spec 2.8)', () => {
+    const frame = byPrelude('@keyframes anchor-frame')
+    expect(frame).toHaveLength(1)
+    const steps = blocks(frame[0].body)
+    for (const step of steps) {
+      expect([...declarations(step.body).keys()]).toEqual(['opacity'])
+    }
+    // Full strength when step 1 starts (no fade-in); fades out at the end.
+    expect(steps.map((step) => step.prelude)).toEqual(['0%', '70%', '100%'])
+    expect(declarations(steps[0].body).get('opacity')).toBe('1')
+    expect(declarations(steps[2].body).get('opacity')).toBe('0')
+    const utility = byPrelude('@utility anchor-frame')
+    expect(utility).toHaveLength(1)
+    const [after, reduced] = blocks(utility[0].body)
+    expect(after.prelude).toBe('&::after')
+    const afterDecl = declarations(after.body)
+    expect(afterDecl.get('box-shadow')).toBe(
+      'inset 0 0 0 2px var(--color-primary)',
+    )
+    expect(afterDecl.get('pointer-events')).toBe('none')
+    expect(afterDecl.get('animation')).toBe(
+      'anchor-frame var(--here-ms, 1.6s) ease-out both',
+    )
+    expect(reduced.prelude).toBe('@media (prefers-reduced-motion: reduce)')
+
+    const strip = byPrelude('@keyframes strip-in')
+    expect(strip).toHaveLength(1)
+    const from = blocks(strip[0].body)
+    expect([...declarations(from[0].body)]).toEqual([['opacity', '0']])
+    const stripUtility = byPrelude('@utility animate-strip-in')
+    expect(stripUtility).toHaveLength(1)
+    expect(declarations(stripUtility[0].body).get('animation')).toBe(
+      'strip-in 0.3s 0.12s both',
+    )
+    const stripReduced = blocks(stripUtility[0].body)
+    expect(stripReduced.map((b) => b.prelude)).toEqual([
+      '@media (prefers-reduced-motion: reduce)',
+    ])
+    expect(declarations(stripReduced[0].body).get('animation')).toBe('none')
+  })
+
   it('sets body, focus and disabled base rules', () => {
     const rule = (prelude: string) => {
       const found = BASE.filter((b) => b.prelude === prelude)

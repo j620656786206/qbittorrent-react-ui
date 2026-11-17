@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   TOUCH_SETTLE_MS,
   freezeStore,
+  holdOrderForAnimation,
   holdOrderForSheet,
+  isBoardFrozen,
   isOrderFrozen,
+  nextBoardColumns,
   nextShownOrder,
   noteScroll,
   resetListFreeze,
@@ -233,6 +236,7 @@ describe('F6 freeze reasons', () => {
       pointerInList: false,
       touchScroll: false,
       sheetOpen: true,
+      animation: false,
     })
     release()
     expect(frozenNow()).toBe(false)
@@ -251,5 +255,69 @@ describe('F6 freeze reasons', () => {
     const live = ['b', 'a']
     shown = shownOrderReducer(shown, { live, frozen: frozenNow() })
     expect(shown).toBe(live)
+  })
+})
+
+describe('F1 the animation reason (spec 2.8)', () => {
+  beforeEach(() => resetOrderFreeze())
+  afterEach(() => resetOrderFreeze())
+
+  const boardFrozen = () => isBoardFrozen(freezeStore.state)
+
+  it('starts with the hold and ends with the last release', () => {
+    expect(boardFrozen()).toBe(false)
+    const release = holdOrderForAnimation()
+    expect(freezeStore.state.animation).toBe(true)
+    expect(boardFrozen()).toBe(true)
+    expect(frozenNow()).toBe(true)
+    const second = holdOrderForAnimation()
+    release()
+    release()
+    expect(boardFrozen()).toBe(true)
+    second()
+    expect(boardFrozen()).toBe(false)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('only the animation freezes the board; hover, touch and sheets do not', () => {
+    setPointerInList(true)
+    const releaseSheet = holdOrderForSheet()
+    touchScrollStart()
+    expect(boardFrozen()).toBe(false)
+    releaseSheet()
+    touchScrollEnd()
+  })
+
+  it('the list unmounting keeps a running animation', () => {
+    const release = holdOrderForAnimation()
+    resetListFreeze()
+    expect(freezeStore.state.animation).toBe(true)
+    release()
+  })
+
+  it('board order holds during the animation, then applies once', () => {
+    type Columns = Record<'a' | 'b', ReadonlyArray<string>>
+    const first: Columns = { a: ['1', '2'], b: ['3'] }
+    let shown = nextBoardColumns<'a' | 'b'>(null, first, false)
+    expect(shown).toBe(first)
+
+    const release = holdOrderForAnimation()
+    // A poll reorders column a, removes 3 and adds 4 (a new torrent).
+    const polled: Columns = { a: ['2', '1', '4'], b: [] }
+    const held = nextBoardColumns(shown ?? null, polled, boardFrozen())
+    expect(held).toEqual({ a: ['1', '2'], b: [] })
+    // The same live data again keeps the same object.
+    expect(
+      nextBoardColumns(held ?? null, { a: ['2', '1', '4'], b: [] }, true),
+    ).toBe(held)
+    shown = held
+
+    release()
+    const applied = nextBoardColumns(shown ?? null, polled, boardFrozen())
+    expect(applied).toBe(polled)
+  })
+
+  it('no data: undefined', () => {
+    expect(nextBoardColumns(null, undefined, true)).toBeUndefined()
   })
 })

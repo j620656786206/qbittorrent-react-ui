@@ -324,6 +324,58 @@
   }
 }
 
+/* Story 2.8, board auto-collapse (demo `.card.here`): the anchor card's 2px
+ * frame in the brand accent, an inset ring on a pseudo-element (no layout
+ * shift), shown for `--here-ms` (the animation plus about 0.9s). It is at
+ * full strength from the first frame, before anything moves, and fades out
+ * at the end with opacity only. Reduced motion keeps the frame still. */
+@keyframes anchor-frame {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility anchor-frame {
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-card);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+    pointer-events: none;
+    animation: anchor-frame var(--here-ms, 1.6s) ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+/* Story 2.8 (demo `.col.collapsed .strip`): a column's collapsed strip
+ * fades in once the column has shrunk; opacity only, off for reduced
+ * motion. */
+@keyframes strip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility animate-strip-in {
+  animation: strip-in 0.3s 0.12s both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* Loading skeleton (mockup `pulse`, spec 1.7): opacity only, off for
  * reduced motion. Story 1.8's row skeletons reuse it. */
 @keyframes skeleton-pulse {

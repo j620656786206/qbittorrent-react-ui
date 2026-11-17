@@ -1,4 +1,11 @@
-import { DEFAULT_MODES, expect, login, setModes, test } from './fixtures'
+import {
+  DEFAULT_MODES,
+  autoCollapseOff,
+  expect,
+  login,
+  setModes,
+  test,
+} from './fixtures'
 
 // Spec 2.4 deferred row, settled in Chromium: a click on a board column's
 // scrollbar is not empty board space, so the floating detail panel stays.
@@ -31,6 +38,9 @@ test('a click on a board column scrollbar keeps the board panel', async ({
   page,
   request,
 }) => {
+  // A page down stays under one column height, but the click is the
+  // subject here, not story 2.8's auto-collapse.
+  await autoCollapseOff(page)
   await setModes(request, { data: 'many' })
   await page.setViewportSize(DESKTOP)
   await login(page)

@@ -11,8 +11,9 @@ import { createStore, useSelector } from '@tanstack/react-store'
 // (story 2.1). Reasons in Epic 1: the mouse resting on the desktop list, and a phone
 // finger scrolling it (from `touchstart` until TOUCH_SETTLE_MS after the
 // last scroll once the finger lifted, so momentum scrolling counts). Story
-// 2.2: an open bottom sheet (EXPERIENCE 「底部面板開著」). The selection and
-// running animations join this store later as further reasons.
+// 2.2: an open bottom sheet (EXPERIENCE 「底部面板開著」). Story 2.8: a
+// running board animation (AD-7 「動畫進行中」; the auto-collapse FLIP holds
+// it from its first measure to its end). The selection joins later.
 
 /** Quiet time after the last scroll before a touch scroll counts as over. */
 export const TOUCH_SETTLE_MS = 300
@@ -24,10 +25,25 @@ export interface FreezeReasons {
   touchScroll: boolean
   /** A bottom sheet is open (story 2.2). */
   sheetOpen: boolean
+  /** A board animation runs (story 2.8, auto-collapse). */
+  animation: boolean
 }
 
 export function isOrderFrozen(reasons: FreezeReasons): boolean {
-  return reasons.pointerInList || reasons.touchScroll || reasons.sheetOpen
+  return (
+    reasons.pointerInList ||
+    reasons.touchScroll ||
+    reasons.sheetOpen ||
+    reasons.animation
+  )
+}
+
+/**
+ * The board's own freeze (story 2.8): only a running animation. Hover, touch
+ * and sheets never freeze the board (EXPERIENCE 「看板不受影響」, story 2.3).
+ */
+export function isBoardFrozen(reasons: FreezeReasons): boolean {
+  return reasons.animation
 }
 
 /** Spec 1.8 row F6: still touching, or the last scroll is under 300 ms old. */
@@ -128,6 +144,7 @@ export const freezeStore = createStore<FreezeReasons>({
   pointerInList: false,
   touchScroll: false,
   sheetOpen: false,
+  animation: false,
 })
 
 function setReason(name: keyof FreezeReasons, value: boolean): void {
@@ -155,6 +172,26 @@ export function holdOrderForSheet(): () => void {
     released = true
     openSheets = Math.max(0, openSheets - 1)
     setReason('sheetOpen', openSheets > 0)
+  }
+}
+
+/** Running animations; a count so overlapping ones end the reason last. */
+let runningAnimations = 0
+
+/**
+ * Story 2.8, AD-7: counts a running animation as a reason until the
+ * returned function is called (once; later calls do nothing). Values keep
+ * updating; shown positions hold and new torrents wait for the release.
+ */
+export function holdOrderForAnimation(): () => void {
+  runningAnimations += 1
+  setReason('animation', true)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    runningAnimations = Math.max(0, runningAnimations - 1)
+    setReason('animation', runningAnimations > 0)
   }
 }
 
@@ -214,7 +251,10 @@ export function noteScroll(): void {
   if (!touch.touching) settle()
 }
 
-/** Clears the list's own reasons (the list unmounts); an open sheet stays. */
+/**
+ * Clears the list's own reasons (the list unmounts); an open sheet and a
+ * running animation stay.
+ */
 export function resetListFreeze(): void {
   clearSettleTimer()
   touch.touching = false
@@ -231,10 +271,52 @@ export function resetOrderFreeze(): void {
   resetListFreeze()
   openSheets = 0
   setReason('sheetOpen', false)
+  runningAnimations = 0
+  setReason('animation', false)
 }
 
 export function useOrderFrozen(): boolean {
   return useSelector(freezeStore, isOrderFrozen)
+}
+
+/** One step of a board column order through the board freeze, pure. */
+export function nextBoardColumns<TKey extends string>(
+  shown: Readonly<Record<TKey, ReadonlyArray<string>>> | null,
+  live: Readonly<Record<TKey, ReadonlyArray<string>>> | undefined,
+  frozen: boolean,
+): Readonly<Record<TKey, ReadonlyArray<string>>> | undefined {
+  if (live === undefined) return undefined
+  if (!frozen || shown === null) return live
+  let same = true
+  const next = {} as Record<TKey, ReadonlyArray<string>>
+  for (const key of Object.keys(live) as Array<TKey>) {
+    next[key] = nextShownOrder(shown[key], live[key], true)
+    if (next[key] !== shown[key]) same = false
+  }
+  return same ? shown : next
+}
+
+/**
+ * Story 2.8, AR-50: the board columns to show. Live, except while a board
+ * animation holds the order: then each column keeps the order shown last
+ * (gone torrents leave, new ones wait) and applies the live one once the
+ * hold ends.
+ */
+export function useBoardShownColumns<TKey extends string>(
+  live: Readonly<Record<TKey, ReadonlyArray<string>>> | undefined,
+): Readonly<Record<TKey, ReadonlyArray<string>>> | undefined {
+  const frozen = useSelector(freezeStore, isBoardFrozen)
+  const shownRef = useRef<Readonly<Record<TKey, ReadonlyArray<string>>> | null>(
+    null,
+  )
+  const shown = useMemo(
+    () => nextBoardColumns(shownRef.current, live, frozen),
+    [live, frozen],
+  )
+  useLayoutEffect(() => {
+    shownRef.current = shown ?? null
+  }, [shown])
+  return shown
 }
 
 export interface FrozenOrderOptions {
