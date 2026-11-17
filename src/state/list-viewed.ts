@@ -16,13 +16,21 @@ export function useListViewed(
 ): string | null {
   const { hash, setHash } = useViewedHash()
   const lastRef = useRef<LastViewed | null>(null)
-  /** A `hash` written and not yet back from the router. */
-  const pendingRef = useRef<{ hash: string | null } | null>(null)
+  /**
+   * A `hash` written and not yet back from the router, with the URL's
+   * `hash` when it was written. Any other URL change (the echo, or a row
+   * Alex clicked meanwhile) ends it.
+   */
+  const pendingRef = useRef<{
+    hash: string | null
+    from: string | null
+  } | null>(null)
 
   let effectiveHash = hash
   const pending = pendingRef.current
   if (pending !== null) {
-    if (pending.hash === hash) pendingRef.current = null
+    if (pending.hash === hash || pending.from !== hash)
+      pendingRef.current = null
     else effectiveHash = pending.hash
   }
   const { viewed, write } = resolveListViewed({
@@ -35,7 +43,7 @@ export function useListViewed(
   useLayoutEffect(() => {
     if (order !== undefined) lastRef.current = { order, viewed }
     if (write === undefined) return
-    pendingRef.current = { hash: write }
+    pendingRef.current = { hash: write, from: hash }
     setHash(write)
   })
 

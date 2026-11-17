@@ -54,7 +54,7 @@ describe('detailPosition (D7, D8)', () => {
     expect(detailPosition([], 'a')).toBeNull()
   })
 
-  it('a frozen order is read as given, not re-sorted', () => {
+  it('an order is read as given, never re-sorted', () => {
     const frozen = Object.freeze(['d', 'a', 'c'])
     expect(detailPosition(frozen, 'a')).toEqual({
       index: 1,
@@ -126,6 +126,25 @@ describe('resolveListViewed (D1, D3, D9, D11)', () => {
         order: ORDER,
         hash: null,
         previous: null,
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('D1 without hash the row shown stays while in the order (a new one on top)', () => {
+    expect(
+      resolveListViewed({
+        order: ['z', 'a', 'b'],
+        hash: null,
+        previous: { order: ['a', 'b'], viewed: 'a' },
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+    expect(
+      resolveListViewed({
+        order: ['b', 'a'],
+        hash: null,
+        previous: { order: ['a', 'b'], viewed: 'a' },
         ...desktop,
       }),
     ).toEqual({ viewed: 'a', write: undefined })

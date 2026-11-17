@@ -20,6 +20,7 @@ import {
   rawTorrent,
 } from '#/server/qbit/testing'
 import { resetSyncerForTests } from '#/server/sync'
+import { DETAIL_PULL_REUSE_MS } from '#/server/sync/syncer'
 import { ERROR_MESSAGES } from '#/shared/errors'
 import type { Result } from '#/shared/errors'
 import { getTorrentDetailInputSchema } from '#/shared/torrent-detail'
@@ -104,8 +105,8 @@ describe('getTorrentDetail server function', () => {
     vi.useFakeTimers()
     await run({ hash: HASH_A })
     nextAnswer = () => ({ rid: 2, torrents: { [HASH_A]: { uploaded: 99 } } })
-    // Past the syncer's 1 s pull reuse.
-    vi.advanceTimersByTime(1500)
+    // Past the detail read's 6 s pull reuse.
+    vi.advanceTimersByTime(DETAIL_PULL_REUSE_MS + 500)
     expect(data(await run({ hash: HASH_A }))).toEqual({
       detail: { downloaded: 1_073_741_824, uploaded: 99 },
     })

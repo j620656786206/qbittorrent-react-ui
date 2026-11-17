@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, Ref } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import type { DetailPosition } from '#/lib/detail-position'
@@ -88,11 +88,31 @@ export function DetailHeader({
   const [expandedFor, setExpandedFor] = useState<string | null>(null)
   const expanded = phone && expandedFor === hash
 
-  const go = (target: string | null) => {
+  const prevRef = useRef<HTMLButtonElement>(null)
+  const nextRef = useRef<HTMLButtonElement>(null)
+  /** The nav button just pressed and where it went, until it gets there. */
+  const pressedRef = useRef<{ which: 'prev' | 'next'; to: string } | null>(null)
+
+  const go = (target: string | null, which: 'prev' | 'next') => {
     if (target === null) return
     setExpandedFor(null)
+    pressedRef.current = { which, to: target }
     onNavigate(target)
   }
+
+  // Reaching the first or last disables the button just pressed, which
+  // would drop focus to `body`: move it to the other one.
+  useLayoutEffect(() => {
+    const pressedInfo = pressedRef.current
+    if (pressedInfo === null || pressedInfo.to !== hash) return
+    pressedRef.current = null
+    const { which } = pressedInfo
+    const pressed = which === 'prev' ? prevRef.current : nextRef.current
+    const other = which === 'prev' ? nextRef.current : prevRef.current
+    if (pressed?.disabled && other && !other.disabled) {
+      other.focus({ preventScroll: true })
+    }
+  })
 
   const nav = (
     <div className="flex flex-none items-center gap-1.5">
@@ -100,7 +120,8 @@ export function DetailHeader({
         label="上一個"
         phone={phone}
         disabled={position.prev === null}
-        onClick={() => go(position.prev)}
+        onClick={() => go(position.prev, 'prev')}
+        buttonRef={prevRef}
       >
         <ChevronLeft {...ICON} />
       </IconButton>
@@ -111,7 +132,8 @@ export function DetailHeader({
         label="下一個"
         phone={phone}
         disabled={position.next === null}
-        onClick={() => go(position.next)}
+        onClick={() => go(position.next, 'next')}
+        buttonRef={nextRef}
       >
         <ChevronRight {...ICON} />
       </IconButton>

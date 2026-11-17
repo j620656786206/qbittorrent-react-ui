@@ -481,12 +481,14 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   expect(Math.abs(fit.visible - fit.content)).toBeLessThanOrEqual(1)
   await hasNoHorizontalScroll(page)
 
-  // B14: the page behind cannot scroll.
-  expect(
-    await page
-      .locator(`#${MAIN_ID}`)
-      .evaluate((main) => getComputedStyle(main).overflowY),
-  ).toBe('hidden')
+  // B14: the page behind cannot scroll: `main` and, since story 2.4, the
+  // list's own scroller.
+  const overflowOf = (id: string) =>
+    page
+      .locator(`#${id}`)
+      .evaluate((element) => getComputedStyle(element).overflowY)
+  expect(await overflowOf(MAIN_ID)).toBe('hidden')
+  expect(await overflowOf(LIST_SCROLL_ID)).toBe('hidden')
 
   await sheet.getByRole('button', { name: '更多' }).click()
   await expect(items).toHaveCount(51)
@@ -501,6 +503,8 @@ test('B1 the phone sort sheet: open, 更多, flip, switch, every way to close', 
   await sheet.getByRole('button', { name: '關閉' }).click()
   await expect(sheet).toBeHidden()
   await expect(pill).toBeFocused()
+  // The lock is undone: the list scrolls again.
+  expect(await overflowOf(LIST_SCROLL_ID)).toBe('auto')
   await openPhoneSheet(page)
   await page.keyboard.press('Escape')
   await expect(sheet).toBeHidden()

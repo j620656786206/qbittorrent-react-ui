@@ -31,10 +31,15 @@ import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 // The same pulls feed the sort extras table (story 2.1). `readSortKeys`
 // pulls like `read` (so it joins or reuses the same pull) and answers one
 // extra sort's values, with versions of the extras table's own counter.
-// `readTorrentDetail` (story 2.4) pulls the same way and answers the detail
-// fields of one torrent from the extras table.
+// `readTorrentDetail` (story 2.4) answers the detail fields of one torrent
+// from the extras table. The detail polls every 5 s next to the 5 s
+// maindata poll, unaligned: it reuses the last pull (success or failure)
+// when that started under DETAIL_PULL_REUSE_MS ago, so it adds no
+// qBittorrent request while maindata is polled, and pulls itself otherwise.
 
 export const MIN_PULL_INTERVAL_MS = 1000
+/** The detail read reuses a pull this recent: a little over one 5 s poll. */
+export const DETAIL_PULL_REUSE_MS = 6000
 
 export interface SyncerOptions {
   client: QbitClient
@@ -118,9 +123,9 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return done
   }
 
-  function pull(): Promise<void> {
+  function pull(reuseMs = MIN_PULL_INTERVAL_MS): Promise<void> {
     if (inflight) return inflight.done
-    if (lastPull && now() - lastPull.startedAt < MIN_PULL_INTERVAL_MS) {
+    if (lastPull && now() - lastPull.startedAt < reuseMs) {
       return 'error' in lastPull
         ? Promise.reject(lastPull.error)
         : Promise.resolve()
@@ -177,7 +182,7 @@ export function createSyncer(options: SyncerOptions): Syncer {
   async function readTorrentDetail(
     hash: string,
   ): Promise<TorrentDetailResponse> {
-    await pull()
+    await pull(DETAIL_PULL_REUSE_MS)
     const raw = extras.rawOf(hash)
     return { detail: raw ? pickTorrentDetail(raw) : null }
   }

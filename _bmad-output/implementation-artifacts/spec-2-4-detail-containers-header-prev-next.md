@@ -2,10 +2,10 @@
 title: 'Story 2.4: Opening detail: three containers, sticky header, prev/next'
 type: 'feature'
 created: '2026-11-17'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: 'eccb660257a2fd554a5273c85dfa8a10d599c0b9'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -111,6 +111,45 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-17: Review pass
+- verdicts: 35 findings: high 0, medium 9, low 19, false 7, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` (blind) no `hash` on desktop: the implicit first row follows `order[0]`, so a new torrent on top or an unfrozen reorder swaps the panel while Alex reads it. Patch: keep `previous.viewed` while it is still in the order.
+  - `[medium]` `[patch]` (blind) `getTorrentDetail` pulls on its own (1 s reuse only), so two unaligned 5 s polls roughly double `sync/maindata` calls against the spine's "no extra request". Patch: the detail read reuses a pull younger than 6 s.
+  - `[low]` `[patch]` (blind) crossing 1024px changes TorrentList's root element and remounts the rows, against the route comment. Patch: always render the wrapper (`contents` without a panel).
+  - `[medium]` `[patch]` (blind) the board panel width assumes the collapsed 已整理 strip; expanded, it no longer covers 完成 plus 已整理. Patch: a width variant from the grid's `data-archived`.
+  - `[low]` `[reject]` (blind) BottomSheet no longer handles Esc itself; callers use `useSheetLayer`. Documented deviation (Design Notes), same caller-side pattern as #19's `useSheetOrderHold`; a fix would re-add a runtime context.
+  - `[low]` `[patch]` (blind) after switching cards, closing returns focus to the first card. Patch: `openerRef` follows the shown hash when focus is outside the panel.
+  - `[low]` `[reject]` (blind) `hover-ring` replaces the card's `shadow-card` on hover. Cosmetic and only while hovering; the fix needs a new combined utility.
+  - `[low]` `[reject]` (blind) `isEmptySpace` also closes on a text-selection drag ending in empty space or `role` elements. Rare on a board of buttons; the fix adds guards.
+  - `[low]` `[reject]` (blind) board cards carry no `aria-current` for the shown torrent. Not in the AC (the ring is list-only); Alex alone uses the app; needs plumbing the viewed hash into every card.
+  - `[false]` `[reject]` (blind) `useListViewed` mutates a ref during render. The only mutation clears `pending` when the committed router `hash` already shows it (and after the patch, when it changed): idempotent, so a discarded render cannot bring the blink back.
+  - `[low]` `[reject]` (blind) the phone list's own scroller changes iOS address-bar collapse and status-bar tap. The spec chose one scroller for both widths (as the mockup); noted as a residual risk for the real-phone check.
+  - `[false]` `[reject]` (blind) narrowing the window with `hash` set opens the phone sheet. `hash` in the URL means the detail is open; D12 asks a reload at phone width to open the sheet, so this is the intended state.
+  - `[low]` `[reject]` (blind) `muted` is decided by comparing to 「沒有」 or 「…」, so a category literally named so is muted. Unlikely in use; the fix changes every row helper call.
+  - `[low]` `[reject]` (blind) e2e aliases (`mainScrollTop`, `scrollMainTo` writing both) and the `as never` cast in `_authed.tsx`. Test and type tidiness with no named failure beyond the aliases.
+  - `[low]` `[reject]` (blind) the closing phone sheet can send one more `getTorrentDetail` during its slide-out. One small read, negligible.
+  - `[low]` `[patch]` (intent) the vitest row 「凍結中」 is covered by an `Object.freeze` test, not the app's freeze. Patch: honest name plus a DOM test that the published order stays frozen.
+  - `[false]` `[reject]` (intent) the board's N of M uses live columns, not the frozen hook. The board is never frozen (2.3) and the spec says live "as the board shows it"; it matches the screen as the AC's binding phrase asks.
+  - `[false]` `[reject]` (intent) the phone sheet closes on archive and on a reload with a hash the phone list lacks. The phone list never holds 已整理, so the torrent has left what is on screen; recorded in Design Notes.
+  - `[false]` `[reject]` (intent) desktop keeps an unknown valid `hash` in the URL. Matches D3 (only invalid hex is dropped).
+  - `[low]` `[patch]` (intent) 「列表全空時列表和詳情面板一起換掉」 has no test. Patch: DOM test for the empty state with a panel.
+  - `[false]` `[reject]` (intent) the list's own scroller and earlier e2e helpers rewritten. Descriptive: the spec asks for the own scroller; all earlier e2e still run and pass.
+  - `[medium]` `[patch]` (verification) a sort change keeping `hash` is tested with `page.goto`, never through `setView`. Patch: pick from the sort menu in e2e.
+  - `[low]` `[patch]` (verification) the B14 scroll lock checks never include `#rt-list-scroll`. Patch: added to the e2e and DOM checks.
+  - `[low]` `[patch]` (verification) the `aside` exclusion of the empty-space close is never reached. Patch: e2e click on an info value.
+  - `[low]` `[patch]` (verification) focus back to the card after closing is untested. Patch: e2e step (with the opener fix).
+  - `[medium]` `[patch]` (verification) `pendingRef`'s guard is never exercised (every test's `setHash` re-renders at once). Patch: DOM test with a deferred `setHash` (with the pending fix).
+  - `[low]` `[patch]` (verification) switching torrents is not checked to clear the previous 已下載/已上傳. Patch: DOM test.
+  - `[medium]` `[patch]` (verification, other) `pendingRef` clears only on the exact echo; a click before the echo leaves the detail stuck. Patch: clear once `hash` moves off the value seen at write time.
+  - `[low]` `[patch]` (edge) TorrentList remount across 1024px (same root cause as the blind finding above). Patched there.
+  - `[medium]` `[patch]` (edge) `pendingRef` never clears when the user sets another hash before the echo (same root cause as the row above). Patched there.
+  - `[medium]` `[patch]` (edge) implicit first row swaps on a new top torrent (same root cause as the first blind finding). Patched there.
+  - `[low]` `[patch]` (edge) a failing first `getTorrentDetail` leaves 「…」 forever. Patch: an error with no data shows 「沒有」.
+  - `[medium]` `[patch]` (edge) the panel width with 已整理 expanded (same root cause as the blind finding). Patched there.
+  - `[low]` `[patch]` (edge) a focused ‹ or › that becomes disabled drops focus to body. Patch: focus moves to the other nav button.
+  - `[false]` `[reject]` (edge) a board click with `hash` set but no panel removes `hash`. With no target the hash is not on the board, and D12 already closes (removes `hash`) in that case.
+
 ## Design Notes
 
 - Alex 2026-11-17: 已下載 and 已上傳 come from `getTorrentDetail` (spine AD-6 detail exception), not the slim table. Claude 代決 (Alex may veto): before its first answer the two rows show 「…」 in `text-muted`; the query keys on the hash so ‹ › never show the previous torrent's numbers. The ✕ is labelled 「關閉」 as the AC says (the mockup's 「關閉詳情」 is not used). Board N of M uses the torrent's current column, which equals the selected tab on the phone. The list moves to its own scroller (as the mockup does) so the panel can fill the height without sticky tricks.
@@ -133,4 +172,23 @@ deferred: []
 
 ## Auto Run Result
 
-(filled after review)
+Status: done (first review pass; a follow-up pass is recommended, see below)
+
+Summary: the detail opens from list rows and board cards in three containers (desktop list panel, desktop board floating panel, phone 70% sheet) with the sticky header, 「第 N 個／共 M 個」 and ‹ ›, `hash` in the URL, vanish handling and the Esc-only shortcut registry. 已下載 and 已上傳 come from the new `getTorrentDetail({ hash })` (spine AD-6 detail exception, Alex 2026-11-17), read from the container's extras table and reusing a pull younger than 6 s.
+
+Files changed (main ones):
+- `src/features/detail/*`: header, tabs, info list, the three containers, board target, DOM tests.
+- `src/lib/detail-position.ts`: N of M, prev/next, the vanished successor, the list's viewed row.
+- `src/state/shortcuts.ts`, `sheet-layer.ts`, `shown-order.ts`, `list-viewed.ts`, `viewed-hash.ts`, `torrent-detail.ts`: Esc layers, the published list order, the viewed row, the URL `hash`, the detail query.
+- `src/shared/torrent-detail.ts`, `src/server/functions/get-torrent-detail.ts`, `src/server/sync/syncer.ts`, `extras-table.ts`: the per-torrent read.
+- `src/features/list/*`, `src/features/board/*`, `src/routes/_authed*.tsx`, `src/shared/ui/bottom-sheet.tsx`, `sheet-session.ts`, `src/styles.css`: row and card buttons, the list's own scroller, the panel slot, the sheet header slot, utilities.
+- `e2e/detail.spec.ts` (new), `e2e/smoke.spec.ts`, `e2e/board.spec.ts`: detail smoke and screenshots, helpers for the own scroller.
+- ARCHITECTURE-SPINE AD-6: the detail exception.
+
+Review: 35 findings. Patched 9 medium and 10 low entries (see the triage log, 14 fixes), deferred none, rejected 16 (9 low not worth the added complexity, 7 false), each with its reason in the log.
+
+Follow-up review recommendation: true. Two or more medium entries were patched on a first pass (9 medium patched, 10 low patched). Named risk: `useListViewed`'s pending-write logic and the new no-`hash` rule in `resolveListViewed` changed behavior in a race-prone hook, and the syncer's 6 s detail reuse window changes when qBittorrent is asked; both are covered by new tests written by the same implementer.
+
+Verification (2026-11-17, after the patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 84 files, 1588 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 38 passed; `check.sh` all ok. Matrix audit: rows D1 to D16 each have at least one covering test that ran and passed.
+
+Residual risks: the phone list now scrolls in its own scroller (iOS address-bar collapse and status-bar tap to top may change); the swipe and sheet feel still needs Alex's real-phone check.

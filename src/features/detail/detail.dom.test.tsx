@@ -349,6 +349,76 @@ describe('the list panel (desktop list mode)', () => {
   })
 })
 
+describe('traffic values (getTorrentDetail)', () => {
+  const dd = () => [...document.querySelectorAll('dd')]
+
+  it('the first call fails: 「沒有」 muted, not 「…」 forever', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const original = detailCalls.answer
+    detailCalls.answer = () =>
+      Promise.resolve({
+        ok: false,
+        error: { code: 'qbit_rejected', message: 'x' },
+      })
+    try {
+      await render(<BoardDetailPanel />, { hash: h(1) })
+      await vi.waitFor(() => expect(dd()[4].textContent).toBe('沒有'))
+      expect(dd()[5].textContent).toBe('沒有')
+      expect(dd()[4].className).toContain('text-text-muted')
+    } finally {
+      detailCalls.answer = original
+    }
+  })
+
+  it("switching torrents never shows the previous one's values", async () => {
+    const original = detailCalls.answer
+    try {
+      await render(<BoardDetailPanel />, { hash: h(1) })
+      await vi.waitFor(() =>
+        expect(
+          dd()
+            .map((cell) => cell.textContent)
+            .slice(4),
+        ).toEqual(['2 GB', '512 MB']),
+      )
+      detailCalls.answer = () => new Promise(() => {})
+      await act(async () => byLabel('下一個').click())
+      expect(q('h2')?.textContent).toBe('Down2')
+      expect(
+        dd()
+          .map((cell) => cell.textContent)
+          .slice(4),
+      ).toEqual(['…', '…'])
+      expect(dd()[4].className).toContain('text-text-muted')
+      expect(dd()[5].className).toContain('text-text-muted')
+    } finally {
+      detailCalls.answer = original
+    }
+  })
+})
+
+describe('focus at the ends', () => {
+  it('a focused › that turns disabled hands focus to ‹ (and back)', async () => {
+    await render(<BoardDetailPanel />, { hash: h(12) })
+    byLabel('下一個').focus()
+    await act(async () => byLabel('下一個').click())
+    expect(byLabel('下一個').disabled).toBe(true)
+    expect(document.activeElement).toBe(byLabel('上一個'))
+    await act(async () => byLabel('上一個').click())
+    await act(async () => byLabel('上一個').click())
+    expect(byLabel('上一個').disabled).toBe(true)
+    expect(document.activeElement).toBe(byLabel('下一個'))
+  })
+
+  it('a press that does not reach an end keeps focus where it is', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    byLabel('下一個').focus()
+    await act(async () => byLabel('下一個').click())
+    expect(positionLine()).toBe('做種中　第 2 個／共 3 個')
+    expect(document.activeElement).toBe(byLabel('下一個'))
+  })
+})
+
 describe('the board panel (desktop board mode)', () => {
   it('closed without hash; D4 D8 open: column name in N of M, ends disable', async () => {
     await render(<BoardDetailPanel />)

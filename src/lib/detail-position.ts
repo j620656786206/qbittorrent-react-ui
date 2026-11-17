@@ -97,7 +97,8 @@ export interface ListViewed {
 
 /**
  * Story 2.4 rows D1, D3, D9, D11: which row the list's detail shows, and
- * whether the URL must follow. The viewed row leaving the order (deleted,
+ * whether the URL must follow. Without a `hash` the first row is shown on
+ * the first load, and stays shown while it is in the order. The viewed row leaving the order (deleted,
  * archived) is told apart from a `hash` that never was in it (D3: the first
  * row, the URL left alone).
  */
@@ -122,6 +123,11 @@ export function resolveListViewed({
   if (vanished) {
     const next = successorOf(previous.order, order, lost)
     return { viewed: next, write: next ?? close }
+  }
+  // Without a hash the row shown stays while it is in the order: a torrent
+  // landing on top, or the order moving, never swaps what Alex reads.
+  if (hash === null && lost !== null && order.includes(lost)) {
+    return { viewed: lost, write: undefined }
   }
   return { viewed: order[0] ?? null, write: undefined }
 }

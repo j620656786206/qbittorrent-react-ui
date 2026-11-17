@@ -80,10 +80,13 @@ const fetchTorrentDetail = bindFetchTorrentDetail(getTorrentDetail)
 export function InfoList({ torrent }: { torrent: SlimTorrent }) {
   const { today } = useDayClock()
   // Polls every 5 s while this detail shows, for this hash only (AD-6).
-  const { data } = useTorrentDetail(torrent.hash, fetchTorrentDetail)
+  const { data, isError } = useTorrentDetail(torrent.hash, fetchTorrentDetail)
+  // The first call failed: 「沒有」 instead of 「…」 until a poll answers. An
+  // answer of `detail: null` (unknown torrent) stays 「沒有」 too.
+  const detail = data ? data.detail : isError ? null : undefined
   return (
     <dl className="m-0 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13px] leading-[1.4] tabular-nums">
-      {infoRows(torrent, today, data?.detail).map((row) => (
+      {infoRows(torrent, today, detail).map((row) => (
         <div key={row.label} className="contents">
           <dt className="text-text-muted">{row.label}</dt>
           <dd

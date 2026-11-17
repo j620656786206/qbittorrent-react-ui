@@ -13,7 +13,8 @@ import {
 // board mode's floating panel. It lies over the 完成 and 已整理 columns
 // inside the board's `position: relative` wrapper: right edge and top and
 // bottom aligned with the columns, as wide as one work column plus the 14px
-// gap plus the 64px 已整理 strip; radius 22px, the float shadow, no scrim.
+// gap plus the 64px 已整理 strip (with 已整理 expanded: two columns and
+// their gap); radius 22px, the float shadow, no scrim.
 // It slides in from 24px right (0.3s, transform and opacity only; none with
 // reduced motion) and stays mounted while Alex switches cards, so a switch
 // does not replay it. The board stays clickable behind it. `Esc` (the
@@ -26,15 +27,27 @@ export function BoardDetailPanel() {
   const ids = useDetailIds()
   const open = target !== null
   const asideRef = useRef<HTMLElement>(null)
-  /** What had focus when the panel opened (the card), for the way back. */
+  /** The card focus goes back to when the panel closes. */
   const openerRef = useRef<HTMLElement | null>(null)
 
+  // The card that opened it, or the one a later click switched to. A ‹ ›
+  // press inside the panel keeps the last card.
+  const shownHash = target?.torrent.hash ?? null
   useLayoutEffect(() => {
-    if (!open) return
+    if (shownHash === null) {
+      openerRef.current = null
+      return
+    }
     const active = document.activeElement
-    openerRef.current =
-      active instanceof HTMLElement && active !== document.body ? active : null
-  }, [open])
+    const aside = asideRef.current
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !aside?.contains(active)
+    ) {
+      openerRef.current = active
+    }
+  }, [shownHash])
 
   const close = useCallback(() => {
     const aside = asideRef.current
@@ -57,7 +70,11 @@ export function BoardDetailPanel() {
       ref={asideRef}
       aria-label="詳情"
       data-slot="board-detail"
-      className="absolute top-0 right-0 bottom-0 z-10 flex w-[calc((100%-120px)/4+78px)] max-w-full animate-panel-in flex-col overflow-hidden rounded-panel bg-surface shadow-float"
+      // Collapsed 已整理: one work column + the 14px gap + the 64px strip.
+      // Expanded (5 equal columns, 4 gaps of 14px): two columns + one gap.
+      // The route's wrapper is `group/board`; the board grid says
+      // `data-archived`.
+      className="absolute top-0 right-0 bottom-0 z-10 flex w-[calc((100%-120px)/4+78px)] max-w-full animate-panel-in flex-col overflow-hidden rounded-panel bg-surface shadow-float group-has-[[data-archived=open]]/board:w-[calc((100%-56px)/5*2+14px)]"
     >
       <DetailTop
         layout="stacked"

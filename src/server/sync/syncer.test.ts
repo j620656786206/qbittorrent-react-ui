@@ -13,7 +13,11 @@ import {
   deferred,
   fullMaindata,
 } from '#/server/qbit/testing'
-import { MIN_PULL_INTERVAL_MS, createSyncer } from '#/server/sync/syncer'
+import {
+  DETAIL_PULL_REUSE_MS,
+  MIN_PULL_INTERVAL_MS,
+  createSyncer,
+} from '#/server/sync/syncer'
 import { TOMBSTONE_MS } from '#/server/sync/torrent-table'
 
 // Spec 1.5 rows S1, S7 to S10 and G1 to G6 through `read()`, plus the
@@ -428,6 +432,53 @@ describe('fresh reads', () => {
     gate.resolve(undefined)
     await expect(plain).rejects.toEqual(failure('timeout'))
     await expect(fresh).resolves.toMatchObject({ full: true })
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+  })
+})
+
+// Spec 2.4 (AD-6 detail exception): the 5 s detail poll rides on the 5 s
+// maindata poll instead of adding qBittorrent requests.
+describe('readTorrentDetail pull reuse', () => {
+  it('a detail read 3 s after a maindata read reuses its pull', async () => {
+    const { syncer, syncMaindata, advance } = setup([raw(fullMaindata())])
+    await syncer.read()
+    advance(3000)
+    await syncer.readTorrentDetail(HASH_A)
+    expect(syncMaindata).toHaveBeenCalledTimes(1)
+  })
+
+  it('a detail read past the window pulls again', async () => {
+    const { syncer, syncMaindata, advance } = setup([
+      raw(fullMaindata()),
+      raw({ rid: 2 }),
+    ])
+    await syncer.read()
+    advance(7000)
+    await syncer.readTorrentDetail(HASH_A)
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+    expect(DETAIL_PULL_REUSE_MS).toBe(6000)
+  })
+
+  it('a failed pull inside the window is rethrown, not retried', async () => {
+    const { syncer, syncMaindata, advance } = setup([
+      new ServerFailure('qbit_unreachable'),
+    ])
+    await expect(syncer.read()).rejects.toEqual(failure('qbit_unreachable'))
+    advance(3000)
+    await expect(syncer.readTorrentDetail(HASH_A)).rejects.toEqual(
+      failure('qbit_unreachable'),
+    )
+    expect(syncMaindata).toHaveBeenCalledTimes(1)
+  })
+
+  it('maindata reads keep the 1 s window', async () => {
+    const { syncer, syncMaindata, advance } = setup([
+      raw(fullMaindata()),
+      raw({ rid: 2 }),
+    ])
+    await syncer.readTorrentDetail(HASH_A)
+    advance(MIN_PULL_INTERVAL_MS)
+    await syncer.read()
     expect(syncMaindata).toHaveBeenCalledTimes(2)
   })
 })

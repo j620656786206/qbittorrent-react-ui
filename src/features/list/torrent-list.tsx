@@ -139,9 +139,10 @@ export function TorrentList({ panel }: TorrentListProps) {
       viewed={viewed}
     />
   )
-  if (panel === undefined) return rows
+  // One wrapper either way, so crossing 1024px keeps the rows mounted
+  // (scroll, virtualizer and freeze); without a panel it adds no box.
   return (
-    <div className={LIST_DETAIL_GRID_CLASS}>
+    <div className={panel === undefined ? 'contents' : LIST_DETAIL_GRID_CLASS}>
       {rows}
       {panel}
     </div>

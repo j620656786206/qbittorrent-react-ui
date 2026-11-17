@@ -192,11 +192,21 @@ test('D1 D2 D7 D12 desktop list mode: the panel, the ring, N of M, prev and next
   await expect(page).toHaveURL(/[?&]sort=added_on/)
   await expect(rowButton(page, 2)).toHaveAttribute('aria-current', 'true')
 
-  // A sort change keeps hash.
-  await page.goto(`/?sort=name&hash=${hashOf(2)}`)
+  // A sort change from the menu (setView) keeps hash and the torrent.
+  await page
+    .getByRole('button', { name: /^排序：.*，列表$/ })
+    .filter({ visible: true })
+    .click()
+  await page
+    .getByRole('menu', { name: '排序' })
+    .getByRole('menuitemradio', { name: '做種時間' })
+    .click()
+  await expect(page).toHaveURL(/[?&]sort=seeding_time/)
+  await expect(page).toHaveURL(new RegExp(`[?&]hash=${hashOf(2)}`))
   await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(
     name(2),
   )
+  await expect(rowButton(page, 2)).toHaveAttribute('aria-current', 'true')
 })
 
 test('D3 an invalid hash is dropped; an unknown one shows the first row', async ({
@@ -278,17 +288,59 @@ test('D4 D5 D8 D12 desktop board: open, switch, close by Esc, ✕ and empty spac
   await expect(panel(page)).toHaveCount(0)
   await expect(page).not.toHaveURL(/hash=/)
 
-  // A click on a card's neighbour column header (empty board space) closes;
-  // the panel covers 完成 and 已整理, the rest of the board stays clickable.
+  // A click inside the panel (on text, not a control) keeps it; a click on
+  // a column header (empty board space) closes it.
   await card(page, 1).click()
   await expect(panel(page)).toBeVisible()
-  await panel(page).getByRole('tab', { name: '概覽' }).click()
+  await panel(page).locator('dd').first().click()
   await expect(panel(page)).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`[?&]hash=${hashOf(1)}`))
   await board(page)
     .getByRole('region', { name: /^下載中/ })
     .getByRole('heading')
     .click()
   await expect(panel(page)).toHaveCount(0)
+
+  // Keyboard: Enter on a card opens it; ✕ gives focus back to that card,
+  // also after switching to another card first.
+  await card(page, 3).focus()
+  await page.keyboard.press('Enter')
+  await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(
+    name(3),
+  )
+  await card(page, 1).focus()
+  await page.keyboard.press('Enter')
+  await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(
+    name(1),
+  )
+  await panel(page).getByRole('button', { name: '關閉' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(panel(page)).toHaveCount(0)
+  await expect(card(page, 1)).toBeFocused()
+
+  // 已整理 expanded (five equal columns): the panel still covers exactly
+  // 完成 and 已整理.
+  await board(page)
+    .getByRole('button', { name: /^展開已整理欄/ })
+    .click()
+  await card(page, 2).click()
+  await expect(panel(page)).toBeVisible()
+  await settled(page)
+  const wideBoard = await board(page).boundingBox()
+  const widePanel = await panel(page).boundingBox()
+  const wideDone = await board(page)
+    .getByRole('region', { name: /^完成/ })
+    .boundingBox()
+  expect(
+    Math.abs((widePanel?.x ?? 0) - (wideDone?.x ?? 0)),
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(
+      (widePanel?.x ?? 0) +
+        (widePanel?.width ?? 0) -
+        ((wideBoard?.x ?? 0) + (wideBoard?.width ?? 0)),
+    ),
+  ).toBeLessThanOrEqual(1)
 })
 
 test('D16 reduced motion: the board panel appears without the slide', async ({

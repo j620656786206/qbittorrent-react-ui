@@ -8,7 +8,7 @@ import {
   SHEET_EASING,
   SHEET_MOTION_MS,
 } from '#/shared/ui/bottom-sheet'
-import { MAIN_ID } from '#/shared/ui/main-scroll'
+import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { bodyTouchAction, shouldDragSheet } from '#/shared/ui/sheet-drag'
 
 // Spec 2.2 rows B1 to B5, B10, B14: the shared bottom sheet's wiring in a
@@ -28,6 +28,15 @@ const REST = 400
 let root: Root
 let container: HTMLElement
 let main: HTMLElement
+/** The list's own scroller (story 2.4), inside `main` as in the app. */
+let listScroll: HTMLElement
+/** Everything the scroll lock must hold still. */
+const scrollers = () => [
+  document.documentElement,
+  document.body,
+  main,
+  listScroll,
+]
 let opener: HTMLButtonElement
 const onOpenChange = vi.fn()
 
@@ -128,6 +137,9 @@ beforeEach(() => {
   main = document.createElement('main')
   main.id = MAIN_ID
   document.body.append(main)
+  listScroll = document.createElement('div')
+  listScroll.id = LIST_SCROLL_ID
+  main.append(listScroll)
   opener = document.createElement('button')
   document.body.append(opener)
   opener.focus()
@@ -164,11 +176,11 @@ describe('B1 open', () => {
 
   it('locks the page scroll while open (B14)', async () => {
     await mount()
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('hidden')
     }
     await act(async () => closeButton()?.click())
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('')
     }
   })
@@ -511,7 +523,7 @@ describe('B10 motion', () => {
     expect(dialog()?.contains(document.activeElement)).toBe(true)
     expect(dialog()?.hasAttribute('inert')).toBe(false)
     // The whole session is back: scroll lock, inert page.
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('hidden')
     }
     expect(main.hasAttribute('inert')).toBe(true)
@@ -584,7 +596,7 @@ describe('page around the sheet', () => {
     await mount()
     await act(async () => root.unmount())
     expect(main.hasAttribute('inert')).toBe(false)
-    for (const element of [document.documentElement, document.body, main]) {
+    for (const element of scrollers()) {
       expect(element.style.overflow).toBe('')
     }
     root = createRoot(container)

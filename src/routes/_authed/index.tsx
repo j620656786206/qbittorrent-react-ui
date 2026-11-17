@@ -51,7 +51,7 @@ function BoardHome({ desktop }: { desktop: boolean }) {
     // The board's own keyboard and buttons stay; the wrapper only catches
     // clicks that fell through to empty space.
     <div
-      className="relative h-full min-h-0"
+      className="group/board relative h-full min-h-0"
       onClick={desktop ? onClick : undefined}
     >
       <TorrentBoard />

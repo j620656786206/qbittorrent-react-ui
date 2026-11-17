@@ -112,6 +112,8 @@ function DesktopBoard({
     <div
       aria-label="看板"
       role="region"
+      // The detail panel (story 2.4) reads this to keep covering 完成 and 已整理.
+      data-archived={archivedOpen ? 'open' : 'closed'}
       className={cn(GRID_CLASS, archivedOpen ? GRID_EXPANDED : GRID_COLLAPSED)}
     >
       {WORK_COLUMNS.map((column) => (

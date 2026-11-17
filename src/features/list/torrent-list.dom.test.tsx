@@ -118,10 +118,19 @@ let view: SortView = { sort: 'added_on', dir: 'desc' }
 /** The URL's `hash` (story 2.4); `setHash` writes it and re-renders. */
 let viewedHash: string | null = null
 let withPanel = false
+/** Writes wait for `applyHash` (the router has not answered yet). */
+let deferWrites = false
 const setHash = vi.fn((next: string | null) => {
+  if (deferWrites) return
   viewedHash = next
   root.render(app())
 })
+
+/** The router answers with `next`. */
+async function applyHash(next: string | null) {
+  viewedHash = next
+  await act(async () => root.render(app()))
+}
 
 function app() {
   return (
@@ -222,6 +231,7 @@ beforeEach(() => {
   view = { sort: 'added_on', dir: 'desc' }
   viewedHash = null
   withPanel = false
+  deferWrites = false
   setHash.mockClear()
   clearShownList()
   clearLoginRequired()
@@ -608,6 +618,70 @@ describe('the detail (spec 2.4)', () => {
     )
     expect(setHash).toHaveBeenLastCalledWith(null)
     expect(shownListStore.state.viewed).toBeNull()
+  })
+
+  it('D1 without hash, a new torrent on top keeps the row shown', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: many(3) }))
+    expect(ringed()).toEqual(['T2'])
+    await poll(delta([torrent(9)]))
+    expect(shownNames()[0]).toBe('T9')
+    expect(ringed()).toEqual(['T2'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(3))
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('D9 a write not yet echoed keeps the successor; another hash then wins', async () => {
+    withPanel = true
+    viewedHash = fakeHash(2)
+    deferWrites = true
+    await render(fakeResponse({ changed: many(3) }))
+    await poll(
+      fakeResponse({
+        version: 'v-removed',
+        full: false,
+        changed: [],
+        removed: [fakeHash(2)],
+      }),
+    )
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(ringed()).toEqual(['T0'])
+    // One more poll before the router answers: still the successor.
+    await poll(delta([torrent(0, { progress: 0.9 })]))
+    expect(ringed()).toEqual(['T0'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(1))
+    // Alex clicked another row meanwhile: that one lands, not the write.
+    await applyHash(fakeHash(3))
+    expect(ringed()).toEqual(['T2'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(3))
+  })
+
+  it('a frozen list publishes its frozen order (the N of M basis)', async () => {
+    withPanel = true
+    viewedHash = fakeHash(2)
+    await render(fakeResponse({ changed: many(3) }))
+    const frozenOrder = shownListStore.state.order
+    await act(async () => pointer('pointerover', section()))
+    await poll(delta([torrent(9)]))
+    expect(shownListStore.state.order).toBe(frozenOrder)
+    expect(shownListStore.state.order).toEqual([
+      fakeHash(3),
+      fakeHash(2),
+      fakeHash(1),
+    ])
+    expect(shownListStore.state.viewed).toBe(fakeHash(2))
+  })
+
+  it('an empty list with a panel shows the empty state and no panel', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: [] }))
+    expect(main.querySelector('aside[aria-label="詳情"]')).toBeNull()
+    expect(main.textContent).toContain('這個分類沒有種子')
+  })
+
+  it('without a panel the rows sit in a box-less wrapper (kept across 1024px)', async () => {
+    await render(fakeResponse({ changed: many(2) }))
+    expect(section().parentElement?.className).toBe('contents')
   })
 
   it('unmounting clears what the list published', async () => {
