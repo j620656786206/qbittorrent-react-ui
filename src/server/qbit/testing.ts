@@ -164,6 +164,9 @@ type Handler = (call: FakeCall) => Response | Promise<Response>
 export interface FakeQbitRoutes {
   login?: Handler
   maindata?: Handler
+  /** `torrents/stop` and `torrents/start`; 200 with an empty body by default. */
+  stop?: Handler
+  start?: Handler
 }
 
 /** A routing fake `fetch` that records every call. */
@@ -173,6 +176,8 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
     '/api/v2/auth/login': routes.login ?? (() => loginOk()),
     '/api/v2/sync/maindata':
       routes.maindata ?? (() => jsonResponse(fullMaindata())),
+    '/api/v2/torrents/stop': routes.stop ?? (() => new Response('')),
+    '/api/v2/torrents/start': routes.start ?? (() => new Response('')),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { fakeHash, t } from '#/lib/testing'
 import {
   classify,
+  KNOWN_STATE_CODES,
+  PAUSE_ACTION_WORDS,
   heroKindOf,
+  pauseActionOf,
   statusOf,
   statusOfHeroKind,
 } from '#/lib/torrent-status'
@@ -298,4 +301,84 @@ describe('heroKindOf agrees with classify', () => {
       expect(statusOfHeroKind(hero)).toBe(statusOf(torrent, stateBeforeMove))
     },
   )
+})
+
+// Spec 2.6 row M1: the 「⋯」 menu item. 繼續 for 已暫停 and 已完成 (paused or
+// stopped, DL or UP, also while moving with such a remembered state), 暫停
+// for every other code, an unlisted one and missing files either way.
+describe('M1 pauseActionOf', () => {
+  const START_STATES = new Set([
+    'pausedDL',
+    'stoppedDL',
+    'pausedUP',
+    'stoppedUP',
+  ])
+  const ALL_STATES = [
+    'error',
+    'missingFiles',
+    'stalledDL',
+    'downloading',
+    'forcedDL',
+    'metaDL',
+    'forcedMetaDL',
+    'queuedDL',
+    'checkingDL',
+    'allocating',
+    'checkingResumeData',
+    'pausedDL',
+    'stoppedDL',
+    'uploading',
+    'forcedUP',
+    'queuedUP',
+    'checkingUP',
+    'stalledUP',
+    'pausedUP',
+    'stoppedUP',
+    'moving',
+    'unknown',
+  ]
+
+  it('walks every code in STATE_KINDS', () => {
+    expect([...ALL_STATES].sort()).toEqual([...KNOWN_STATE_CODES].sort())
+  })
+
+  it.each(ALL_STATES)('%s', (state) => {
+    const torrent = t({ state, progress: state.endsWith('UP') ? 1 : 0.5 })
+    const expected = START_STATES.has(state) ? 'start' : 'stop'
+    expect(pauseActionOf(torrent, {})).toBe(expected)
+  })
+
+  it('an unlisted code reads 暫停', () => {
+    expect(pauseActionOf(t({ state: 'someFutureState' }), {})).toBe('stop')
+  })
+
+  it.each([true, false, null])(
+    'missingFiles with private=%s reads 暫停',
+    (isPrivate) => {
+      const torrent = t({
+        state: 'missingFiles',
+        progress: 1,
+        private: isPrivate,
+      })
+      expect(pauseActionOf(torrent, {})).toBe('stop')
+    },
+  )
+
+  it.each([
+    ['pausedDL', 'start'],
+    ['stoppedUP', 'start'],
+    ['uploading', 'stop'],
+    ['downloading', 'stop'],
+  ] as const)('moving, remembered %s: %s', (before, expected) => {
+    const torrent = t({ state: 'moving', progress: 1 })
+    expect(pauseActionOf(torrent, { [torrent.hash]: before })).toBe(expected)
+  })
+
+  it('moving with nothing remembered reads 暫停', () => {
+    expect(pauseActionOf(t({ state: 'moving', progress: 1 }), {})).toBe('stop')
+  })
+
+  it('words: 暫停 and 繼續', () => {
+    expect(PAUSE_ACTION_WORDS).toEqual({ stop: '暫停', start: '繼續' })
+  })
 })

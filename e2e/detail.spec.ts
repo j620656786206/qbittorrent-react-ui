@@ -126,9 +126,10 @@ test('D1 D2 D7 D12 desktop list mode: the panel, the ring, N of M, prev and next
   await expect(
     panel(page).getByRole('button', { name: '上一個' }),
   ).toBeDisabled()
+  // Story 2.6: ⋯ works (e2e/pause.spec.ts).
   await expect(
     panel(page).getByRole('button', { name: '更多動作' }),
-  ).toBeDisabled()
+  ).toBeEnabled()
   await expect(panel(page).getByRole('tab', { name: '概覽' })).toHaveAttribute(
     'aria-selected',
     'true',

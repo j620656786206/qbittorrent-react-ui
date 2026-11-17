@@ -237,6 +237,28 @@ const SHARED_UI_BAN = {
   message: 'src/shared/ui is for routes and features only.',
 }
 
+// AD-13, story 2.6: features show toasts through src/lib/toast.ts only. The
+// renderer and its store (src/shared/ui/toaster.tsx) may be imported by
+// that file and the root that mounts <Toaster /> (plus the two test files
+// that check the toaster), nowhere else.
+// Any specifier ending in `toaster` (`#/shared/ui/toaster`, `./toaster`).
+const TOASTER_BAN = {
+  regex: '(^|/)toaster(\\.tsx?)?$',
+  message:
+    'AD-13: show toasts with src/lib/toast.ts; only it and src/routes/__root.tsx import the toaster.',
+}
+// src/lib/toast.ts may import src/shared/ui/toaster and nothing else there.
+const SHARED_UI_BUT_TOASTER_BAN = {
+  regex: '(^|/)shared/ui/(?!toaster(\\.tsx?)?$)[^/]+$',
+  message: 'src/shared/ui is for routes and features only.',
+}
+const TOASTER_USERS = [
+  'src/lib/toast.ts',
+  'src/lib/toast.test.ts',
+  'src/routes/__root.tsx',
+  'src/shared/ui/toaster.dom.test.tsx',
+]
+
 // AD-10: the CSP has no 'unsafe-eval'. zod's eval probe runs at schema
 // construction unless jitless is set, so outside src/server every schema
 // takes `z` from src/shared/zod.ts, which sets it first.
@@ -384,12 +406,32 @@ export default [
   // and src/shared/ui bans above.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: NO_UI_LAYERS,
+    ignores: [...NO_UI_LAYERS, ...TOASTER_USERS],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      ZOD_BAN,
+      TOASTER_BAN,
+    ),
+  },
+  {
+    files: ['src/routes/__root.tsx'],
     rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN, ZOD_BAN),
   },
   {
     files: [`${SHARED_UI}/*.{ts,tsx}`],
-    ignores: [CN_FILE],
+    ignores: [CN_FILE, ...TOASTER_USERS],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      ZOD_BAN,
+      TOASTER_BAN,
+    ),
+  },
+  {
+    files: ['src/shared/ui/toaster.dom.test.tsx'],
     rules: restrictImports(CREATE_SERVER_FN_BAN, DEFINE_BAN, CN_BAN, ZOD_BAN),
   },
   {
@@ -413,12 +455,22 @@ export default [
       'src/state/**/*.{ts,tsx}',
       'src/shared/**/*.{ts,tsx}',
     ],
-    ignores: [SHARED_UI, ZOD_FILE],
+    ignores: [SHARED_UI, ZOD_FILE, ...TOASTER_USERS],
     rules: restrictImports(
       CREATE_SERVER_FN_BAN,
       DEFINE_BAN,
       CN_BAN,
       SHARED_UI_BAN,
+      ZOD_BAN,
+    ),
+  },
+  {
+    files: ['src/lib/toast.ts', 'src/lib/toast.test.ts'],
+    rules: restrictImports(
+      CREATE_SERVER_FN_BAN,
+      DEFINE_BAN,
+      CN_BAN,
+      SHARED_UI_BUT_TOASTER_BAN,
       ZOD_BAN,
     ),
   },

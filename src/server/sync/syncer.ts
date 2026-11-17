@@ -42,7 +42,8 @@ export const MIN_PULL_INTERVAL_MS = 1000
 export const DETAIL_PULL_REUSE_MS = 6000
 
 export interface SyncerOptions {
-  client: QbitClient
+  /** The syncer only reads; it never needs the client's write methods. */
+  client: Pick<QbitClient, 'syncMaindata'>
   /** Monotonic milliseconds; `performance.now` (a wall clock can step back). */
   now?: () => number
   /** 8 lowercase hex chars; a new one per container start. */

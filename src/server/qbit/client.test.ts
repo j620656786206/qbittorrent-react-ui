@@ -9,6 +9,7 @@ import {
   FAKE_QBIT_ORIGIN,
   FAKE_USERNAME,
   HASH_A,
+  HASH_B,
   LEAK_MARKERS,
   SORT_KEY_ONLY_MARKERS,
   captureStdout,
@@ -201,19 +202,57 @@ describe('qBittorrent client', () => {
     expect(raw.server_state).toEqual({ dl_info_speed: 1 })
   })
 
-  it('Q11 the client exposes syncMaindata only, frozen', () => {
+  it('Q11 the client exposes its named methods only, frozen', () => {
     const { client } = setup()
-    expect(Object.keys(client)).toEqual(['syncMaindata'])
+    expect(Object.keys(client)).toEqual([
+      'syncMaindata',
+      'stopTorrents',
+      'startTorrents',
+    ])
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login and sync/maindata', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop and torrents/start', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
       '/api/v2/sync/maindata',
+      '/api/v2/torrents/start',
+      '/api/v2/torrents/stop',
     ])
     expect(Object.isFrozen(QBIT_PATHS)).toBe(true)
   })
+
+  it.each([
+    ['stopTorrents', '/api/v2/torrents/stop'],
+    ['startTorrents', '/api/v2/torrents/start'],
+  ] as const)(
+    'story 2.6 %s POSTs exactly the hashes form field, joined with |',
+    async (method, path) => {
+      const { client, calls } = setup()
+      await client[method]([HASH_A, HASH_B])
+      const sent = calls.filter((call) => call.path === path)
+      expect(sent).toHaveLength(1)
+      expect(sent[0].method).toBe('POST')
+      expect([...sent[0].query.keys()]).toEqual([])
+      expect([...new URLSearchParams(sent[0].body).entries()]).toEqual([
+        ['hashes', `${HASH_A}|${HASH_B}`],
+      ])
+      // Logged in first; the cookie went along.
+      expect(sent[0].headers.get('cookie')).toContain('QBT_SID_8080=abc')
+    },
+  )
+
+  it.each([400, 409, 500])(
+    'story 2.6 stopTorrents answered %s: qbit_rejected',
+    async (status) => {
+      const { client } = setup({
+        stop: () => new Response('nope', { status }),
+      })
+      await expect(client.stopTorrents([HASH_A])).rejects.toEqual(
+        failure('qbit_rejected'),
+      )
+    },
+  )
 
   it('Q11 no server source names setPreferences or builds an /api/v2 path from a value', () => {
     const root = join(import.meta.dirname, '..')

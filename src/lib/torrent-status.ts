@@ -133,6 +133,9 @@ const STATE_KINDS: Readonly<Record<string, StateKind>> = {
   unknown: 'unknown',
 }
 
+/** Every qBittorrent state code the table knows (tests walk them all). */
+export const KNOWN_STATE_CODES: ReadonlyArray<string> = Object.keys(STATE_KINDS)
+
 /** Unlisted (future) codes read like `unknown`. */
 function kindOf(state: string): StateKind {
   return Object.hasOwn(STATE_KINDS, state) ? STATE_KINDS[state] : 'unknown'
@@ -253,6 +256,29 @@ export function statusOf(
   stateBeforeMove: Readonly<Record<string, string>>,
 ): TorrentStatusId {
   return statusOfKind(effectiveKind(torrent, stateBeforeMove).kind, torrent)
+}
+
+/** Story 2.6: what the detail's 「⋯」 menu item does. */
+export type PauseAction = 'stop' | 'start'
+
+/**
+ * Story 2.6 (EXPERIENCE detail-header 「⋯」): 「繼續」 (`start`) for a torrent
+ * that reads 已暫停 or 已完成 (`pausedDL`, `stoppedDL`, `pausedUP`,
+ * `stoppedUP`, also while moving with such a remembered state), else
+ * 「暫停」 (`stop`): every other status, 已整理 and errors included.
+ */
+export function pauseActionOf(
+  torrent: SlimTorrent,
+  stateBeforeMove: Readonly<Record<string, string>>,
+): PauseAction {
+  const status = statusOf(torrent, stateBeforeMove)
+  return status === 'paused' || status === 'done' ? 'start' : 'stop'
+}
+
+/** The menu item's word for an action. */
+export const PAUSE_ACTION_WORDS: Readonly<Record<PauseAction, string>> = {
+  stop: '暫停',
+  start: '繼續',
 }
 
 function detailOf(

@@ -18,6 +18,20 @@ export { QBIT_PATHS }
 export interface QbitClient {
   /** `sync/maindata` with the container's own `rid`, parsed and stripped. */
   syncMaindata: (rid: number) => Promise<RawMaindata>
+  /**
+   * `torrents/stop` for these hashes (validated, distinct, never `all`).
+   * qBittorrent answers 200 whatever happened; the next maindata tells.
+   */
+  stopTorrents: (hashes: ReadonlyArray<string>) => Promise<void>
+  /** `torrents/start`, same contract as `stopTorrents`. */
+  startTorrents: (hashes: ReadonlyArray<string>) => Promise<void>
+}
+
+/** The `hashes` form field: `|` between hashes, nothing else. */
+function hashesForm(hashes: ReadonlyArray<string>): URLSearchParams {
+  const form = new URLSearchParams()
+  form.set('hashes', hashes.join('|'))
+  return form
 }
 
 export function createQbitClient(options: QbitSessionOptions): QbitClient {
@@ -56,5 +70,19 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     return parsed.data
   }
 
-  return Object.freeze({ syncMaindata })
+  async function stopTorrents(hashes: ReadonlyArray<string>): Promise<void> {
+    await session.send(QBIT_PATHS.torrentsStop, {
+      method: 'POST',
+      form: hashesForm(hashes),
+    })
+  }
+
+  async function startTorrents(hashes: ReadonlyArray<string>): Promise<void> {
+    await session.send(QBIT_PATHS.torrentsStart, {
+      method: 'POST',
+      form: hashesForm(hashes),
+    })
+  }
+
+  return Object.freeze({ syncMaindata, stopTorrents, startTorrents })
 }

@@ -147,7 +147,7 @@ describe('getMaindata payload size', () => {
   }) => {
     let clock = 0
     const answers = [fullUpdate(), seedingTick()]
-    const client: QbitClient = {
+    const client: Pick<QbitClient, 'syncMaindata'> = {
       syncMaindata: vi.fn(async () => {
         const next = answers.shift()
         if (!next) throw new Error('no more answers')
