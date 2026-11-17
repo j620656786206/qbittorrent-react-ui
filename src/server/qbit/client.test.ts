@@ -25,6 +25,7 @@ import type { FakeQbitRoutes } from '#/server/qbit/testing'
 const MAINDATA = '/api/v2/sync/maindata'
 const FILES = '/api/v2/torrents/files'
 const FILE_PRIO = '/api/v2/torrents/filePrio'
+const LOG_MAIN = '/api/v2/log/main'
 
 function setup(routes: FakeQbitRoutes = {}) {
   const qbit = fakeQbit(routes)
@@ -213,13 +214,15 @@ describe('qBittorrent client', () => {
       'startTorrents',
       'torrentFiles',
       'setFilePriority',
+      'logMain',
     ])
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, files and filePrio', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, files, filePrio and log/main', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
+      '/api/v2/log/main',
       '/api/v2/sync/maindata',
       '/api/v2/torrents/filePrio',
       '/api/v2/torrents/files',
@@ -335,6 +338,58 @@ describe('qBittorrent client', () => {
       await expect(client.setFilePriority(HASH_A, [0], 0)).rejects.toEqual(
         failure('qbit_rejected'),
       )
+    },
+  )
+
+  it('story 2.10 logMain GETs warning lines newer than last_known_id and keeps four fields', async () => {
+    const { client, calls } = setup({
+      log: () =>
+        jsonResponse([
+          { id: 4, message: 'one', timestamp: 1_790_000_000, type: 4, x: 1 },
+          { id: 5, message: 'two', timestamp: 1_790_000_001, type: 4 },
+        ]),
+    })
+    expect(await client.logMain(3)).toEqual([
+      { id: 4, message: 'one', timestamp: 1_790_000_000, type: 4 },
+      { id: 5, message: 'two', timestamp: 1_790_000_001, type: 4 },
+    ])
+    const sent = calls.filter((call) => call.path === LOG_MAIN)
+    expect(sent).toHaveLength(1)
+    expect(sent[0].method).toBe('GET')
+    expect([...sent[0].query.entries()]).toEqual([
+      ['normal', 'false'],
+      ['info', 'false'],
+      ['warning', 'true'],
+      ['critical', 'false'],
+      ['last_known_id', '3'],
+    ])
+  })
+
+  it('story 2.10 logMain(-1) asks for the whole buffer', async () => {
+    const { client, calls } = setup()
+    expect(await client.logMain(-1)).toEqual([])
+    const sent = calls.find((call) => call.path === LOG_MAIN)
+    expect(sent?.query.get('last_known_id')).toBe('-1')
+  })
+
+  it.each([
+    ['not JSON', () => new Response('<html>')],
+    ['not a list', () => jsonResponse({ lines: [] })],
+    [
+      'a line without an id',
+      () => jsonResponse([{ message: 'File error alert. Torrent: "X"' }]),
+    ],
+    [
+      'a fractional id',
+      () => jsonResponse([{ id: 1.5, message: 'm', timestamp: 1, type: 4 }]),
+    ],
+    ['HTTP 500', () => new Response('', { status: 500 })],
+  ])(
+    'story 2.10 logMain answered %s: qbit_rejected, no log text logged',
+    async (_name, log) => {
+      const { client } = setup({ log })
+      await expect(client.logMain(-1)).rejects.toEqual(failure('qbit_rejected'))
+      expect(out.lines.join('')).not.toContain('File error alert')
     },
   )
 

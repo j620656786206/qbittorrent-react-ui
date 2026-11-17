@@ -129,6 +129,8 @@ export interface RowModelOptions {
    * its keys are loading. Slim sorts read the torrent and ignore this.
    */
   sortValue?: SortValue
+  /** Story 2.10: this torrent's reason from getErrorReasons, if any. */
+  errorReason?: string
 }
 
 const TEXT_STYLES: Readonly<Partial<Record<string, BigValueStyle>>> = {
@@ -192,8 +194,13 @@ export function rowModel(
   torrent: SlimTorrent,
   options: RowModelOptions,
 ): RowModel {
-  const { now, timeZone, stateBeforeMove } = options
-  const status = classify(torrent, { now, timeZone, stateBeforeMove })
+  const { now, timeZone, stateBeforeMove, errorReason } = options
+  const status = classify(torrent, {
+    now,
+    timeZone,
+    stateBeforeMove,
+    errorReason,
+  })
   const downloading = torrent.progress < 1
   const speedText = formatRowSpeed(
     downloading ? torrent.dlspeed : torrent.upspeed,
@@ -246,6 +253,11 @@ export interface RowProps {
   sort: SortFieldId
   /** Extra sorts only: this torrent's key, `undefined` while loading. */
   sortValue: SortValue | undefined
+  /**
+   * Story 2.10: this torrent's reason (a string, so the row re-renders
+   * only when its own reason changes); `undefined` for none.
+   */
+  errorReason: string | undefined
 }
 
 /**
@@ -261,6 +273,8 @@ export function rowProps(
   sortKeys?: SortKeys,
   /** The first keys failed: no value instead of "loading". */
   keysFailed = false,
+  /** Story 2.10: getErrorReasons' map; `undefined` before its first answer. */
+  errorReasons?: Readonly<Record<string, string>>,
 ): RowProps | null {
   if (!Object.hasOwn(maindata.torrents, hash)) return null
   // Slim sorts read the torrent; only an extra sort's key is passed, so the
@@ -275,6 +289,10 @@ export function rowProps(
   return {
     sort,
     sortValue,
+    errorReason:
+      errorReasons && Object.hasOwn(errorReasons, hash)
+        ? errorReasons[hash]
+        : undefined,
     torrent: maindata.torrents[hash],
     stateBeforeMove: Object.hasOwn(maindata.stateBeforeMove, hash)
       ? maindata.stateBeforeMove[hash]

@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { detailHero } from '#/lib/detail-hero'
 import type { DetailHero } from '#/lib/detail-hero'
 import { locationLabel } from '#/lib/paths'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { getTorrentDetail } from '#/server/functions/get-torrent-detail'
 import type { SlimTorrent } from '#/shared/maindata'
 import type { TorrentDetail } from '#/shared/torrent-detail'
@@ -12,6 +13,7 @@ import { copyText } from '#/shared/ui/copy-text'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import { useEntrance } from '#/state/entrance'
+import { bindFetchErrorReasons, useErrorReasons } from '#/state/error-reasons'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import { useDayClock } from '#/state/now'
 import {
@@ -30,6 +32,7 @@ import type { StatTile } from '#/features/detail/detail-model'
 // wrap. Names, paths and categories are JSX text, never HTML or links.
 
 const fetchTorrentDetail = bindFetchTorrentDetail(getTorrentDetail)
+const fetchErrorReasons = bindFetchErrorReasons(getErrorReasons)
 
 /** Tailwind needs whole class names. */
 const HERO_COLORS: Readonly<Record<TorrentStatusId, string>> = {
@@ -57,9 +60,16 @@ export function Overview({
   // A failed call: 「沒有」 instead of 「…」 until a poll answers. An answer
   // of `detail: null` (unknown torrent) stays 「沒有」 too.
   const detail = data ? data.detail : failed ? null : undefined
+  // Story 2.10: the `error` summary's reason (polled only while maindata
+  // has an errored torrent).
+  const errorReasons = useErrorReasons(fetchErrorReasons)
   const options = {
     now: clock.today,
     stateBeforeMove: stateBeforeMove ?? {},
+    errorReason:
+      errorReasons && Object.hasOwn(errorReasons, torrent.hash)
+        ? errorReasons[torrent.hash]
+        : undefined,
   }
   const hero = detailHero(torrent, {
     ...options,

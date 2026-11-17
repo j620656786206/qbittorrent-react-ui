@@ -47,6 +47,11 @@ export interface BoardCardProps {
   stateBeforeMove: string | undefined
   /** Changes only at local midnight (`useDayClock().today`). */
   today: number
+  /**
+   * Story 2.10: this torrent's reason (a string, so the card re-renders
+   * only when its own reason changes); `undefined` for none.
+   */
+  errorReason?: string
   /** Stable: opens this card's torrent in the detail. */
   onOpen: (hash: string) => void
 }
@@ -56,12 +61,14 @@ export const BoardCard = memo(function Card({
   torrent,
   stateBeforeMove,
   today,
+  errorReason,
   onOpen,
 }: BoardCardProps) {
   const model = cardModel(torrent, {
     now: today,
     stateBeforeMove:
       stateBeforeMove !== undefined ? { [torrent.hash]: stateBeforeMove } : {},
+    errorReason,
   })
   return <CardContent model={model} onOpen={() => onOpen(torrent.hash)} />
 })
@@ -92,7 +99,11 @@ export function CardContent({
           >
             {model.name}
           </span>
-          <span className="truncate text-meta leading-[17px] text-text-muted tabular-nums">
+          {/* `title`: a long reason (story 2.10) is cut on the card. */}
+          <span
+            title={model.detail}
+            className="truncate text-meta leading-[17px] text-text-muted tabular-nums"
+          >
             {model.detail}
           </span>
         </span>

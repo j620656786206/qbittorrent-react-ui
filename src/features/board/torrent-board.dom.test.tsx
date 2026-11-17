@@ -48,6 +48,21 @@ vi.mock('#/features/board/board-model', async (importOriginal) => {
   }
 })
 
+// Story 2.10: getErrorReasons never reaches a server here; each test sets
+// the map it answers.
+const reasonCalls = vi.hoisted(
+  (): { count: number; reasons: Record<string, string> } => ({
+    count: 0,
+    reasons: {},
+  }),
+)
+vi.mock('#/server/functions/get-error-reasons', () => ({
+  getErrorReasons: () => {
+    reasonCalls.count += 1
+    return Promise.resolve({ ok: true, data: { reasons: reasonCalls.reasons } })
+  },
+}))
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
 }
@@ -168,6 +183,8 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
+  reasonCalls.count = 0
+  reasonCalls.reasons = {}
   desktop = true
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
@@ -360,6 +377,74 @@ describe('the desktop board', () => {
       fakeResponse({ changed: [t({ hash: h(1), state: 'downloading' })] }),
     )
     expect(section('要處理，0 個').textContent).toContain('都沒問題')
+  })
+})
+
+describe('error reasons (spec 2.10)', () => {
+  const errored = () => [
+    ...sample(),
+    t({ hash: h(7), name: 'Broken', state: 'error', last_activity: T0 + 120 }),
+    t({ hash: h(8), name: 'Broken2', state: 'error', last_activity: T0 + 90 }),
+  ]
+  const cardText = (name: string) =>
+    [...main.querySelectorAll('[role="listitem"]')].find((item) =>
+      item.querySelector(`[title="${name}"]`),
+    )?.textContent ?? ''
+
+  it('an errored card shows its reason; one without a reason the fixed text', async () => {
+    reasonCalls.reasons = { [h(7)]: '磁碟空間不足' }
+    await render(fakeResponse({ changed: errored() }))
+    expect(cardText('Broken')).toContain('磁碟空間不足')
+    expect(cardText('Broken')).not.toContain('qBittorrent 回報錯誤')
+    expect(cardText('Broken2')).toContain('qBittorrent 回報錯誤')
+    // Missing files keep their own line.
+    expect(cardText('Error')).toContain('找不到檔案，做不了種')
+    // Every column observes the same query: one call.
+    expect(reasonCalls.count).toBe(1)
+  })
+
+  it('a long reason cut on the card can be read in full from its title', async () => {
+    const long = `fake reason ${'x'.repeat(100)}`
+    reasonCalls.reasons = { [h(7)]: long }
+    await render(fakeResponse({ changed: errored() }))
+    const item = [...main.querySelectorAll('[role="listitem"]')].find((x) =>
+      x.querySelector('[title="Broken"]'),
+    )
+    const line = item?.querySelector(`[title="${long}"]`)
+    expect(line?.textContent).toBe(long)
+    expect(line?.className).toContain('truncate')
+  })
+
+  it('the phone tabs show it too', async () => {
+    desktop = false
+    reasonCalls.reasons = { [h(7)]: '沒有權限' }
+    await render(fakeResponse({ changed: errored() }))
+    expect(cardText('Broken')).toContain('沒有權限')
+  })
+
+  it('a reason is text, never markup', async () => {
+    reasonCalls.reasons = { [h(7)]: '<img src=x onerror=alert(1)>' }
+    await render(fakeResponse({ changed: errored() }))
+    expect(cardText('Broken')).toContain('<img src=x onerror=alert(1)>')
+    expect(main.querySelector('img')).toBeNull()
+  })
+
+  it('matrix 8: no errored torrent, no getErrorReasons call', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    expect(reasonCalls.count).toBe(0)
+  })
+
+  it('a new reason re-renders only that card', async () => {
+    await render(fakeResponse({ changed: errored() }))
+    const before = new Map(modelCalls)
+    reasonCalls.reasons = { [h(7)]: '檔案太大' }
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['error-reasons'] })
+    })
+    expect(cardText('Broken')).toContain('檔案太大')
+    expect(modelCalls.get(h(7))).toBeGreaterThan(before.get(h(7)) ?? 0)
+    expect(modelCalls.get(h(8))).toBe(before.get(h(8)))
+    expect(modelCalls.get(h(3))).toBe(before.get(h(3)))
   })
 })
 

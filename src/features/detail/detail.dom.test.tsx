@@ -59,6 +59,20 @@ vi.mock('#/server/functions/get-torrent-detail', () => ({
   },
 }))
 
+// Story 2.10: getErrorReasons never reaches a server either.
+const reasonCalls = vi.hoisted(
+  (): { count: number; reasons: Record<string, string> } => ({
+    count: 0,
+    reasons: {},
+  }),
+)
+vi.mock('#/server/functions/get-error-reasons', () => ({
+  getErrorReasons: () => {
+    reasonCalls.count += 1
+    return Promise.resolve({ ok: true, data: { reasons: reasonCalls.reasons } })
+  },
+}))
+
 // Story 2.6: stopTorrents and startTorrents never reach a server either;
 // toasts are checked at the feature's API (src/lib/toast.ts).
 const opCalls = vi.hoisted(() => ({
@@ -201,6 +215,8 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   notifyManager.setScheduler((callback) => callback())
   writes.length = 0
+  reasonCalls.count = 0
+  reasonCalls.reasons = {}
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
       ({
@@ -734,6 +750,34 @@ describe('the overview (story 2.5)', () => {
     // A missing value is muted, a real one is not.
     expect(values[2].className).toContain('text-text-muted')
     expect(values[1].className).not.toContain('text-text-muted')
+  })
+
+  it.each([
+    ['its reason', { [h(30)]: '磁碟空間不足' }, '磁碟空間不足'],
+    ['no reason', {}, 'qBittorrent 回報錯誤'],
+  ])(
+    'story 2.10 an errored torrent with %s: the summary says it',
+    async (_name, reasons, text) => {
+      reasonCalls.reasons = reasons
+      const data = [
+        ...board(),
+        t({ hash: h(30), name: 'Broken', state: 'error', progress: 0.3 }),
+      ]
+      await render(<ListDetailPanel />, { data })
+      await act(async () =>
+        publishShownList({ order: [h(1), h(30)], viewed: h(30) }),
+      )
+      const headline = q('[role="tabpanel"] p') as HTMLElement
+      expect(headline.textContent).toBe('錯誤')
+      const summary = headline.nextElementSibling as HTMLElement
+      await vi.waitFor(() => expect(summary.textContent).toBe(text))
+      expect(reasonCalls.count).toBe(1)
+    },
+  )
+
+  it('story 2.10 no errored torrent: no getErrorReasons call', async () => {
+    await openSeed()
+    expect(reasonCalls.count).toBe(0)
   })
 
   it('save path: tag, full path cut from the front, one solid pill, three disabled', async () => {

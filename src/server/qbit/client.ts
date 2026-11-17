@@ -44,7 +44,32 @@ export interface QbitClient {
     ids: ReadonlyArray<number>,
     priority: FilePriority,
   ) => Promise<void>
+  /**
+   * Story 2.10: `log/main`, warning lines only, newer than `lastKnownId`
+   * (`-1` for the whole buffer), oldest first. Read only. An answer that is
+   * not that shape is `qbit_rejected`.
+   */
+  logMain: (lastKnownId: number) => Promise<Array<LogEntry>>
 }
+
+/** One `log/main` line (qBittorrent 5.1.4 `Log::Msg`). */
+export interface LogEntry {
+  id: number
+  message: string
+  /** Unix seconds. */
+  timestamp: number
+  /** 1 normal, 2 info, 4 warning, 8 critical. */
+  type: number
+}
+
+const rawLogSchema = z.array(
+  z.object({
+    id: z.int(),
+    message: z.string(),
+    timestamp: z.number(),
+    type: z.int(),
+  }),
+)
 
 // The fields the files tab draws; anything else qBittorrent sends (piece
 // range, availability, is_seed) is dropped by the parse.
@@ -149,11 +174,37 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     await session.send(QBIT_PATHS.torrentsFilePrio, { method: 'POST', form })
   }
 
+  async function logMain(lastKnownId: number): Promise<Array<LogEntry>> {
+    const path = QBIT_PATHS.logMain
+    const query = new URLSearchParams()
+    query.set('normal', 'false')
+    query.set('info', 'false')
+    query.set('warning', 'true')
+    query.set('critical', 'false')
+    query.set('last_known_id', String(lastKnownId))
+    const response = await session.send(path, { method: 'GET', query })
+    let json: unknown
+    try {
+      json = JSON.parse(response.body)
+    } catch {
+      logger.warn('qbit_bad_response', { path, reason: 'not_json' })
+      throw new ServerFailure('qbit_rejected', 'log: not json')
+    }
+    const parsed = rawLogSchema.safeParse(json)
+    if (!parsed.success) {
+      // The reason only: log lines carry names and paths.
+      logger.warn('qbit_bad_response', { path, reason: 'schema' })
+      throw new ServerFailure('qbit_rejected', 'log: schema')
+    }
+    return parsed.data
+  }
+
   return Object.freeze({
     syncMaindata,
     stopTorrents,
     startTorrents,
     torrentFiles,
     setFilePriority,
+    logMain,
   })
 }

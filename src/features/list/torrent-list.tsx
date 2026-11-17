@@ -8,11 +8,13 @@ import {
 import type { ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SortKeys } from '#/lib/visible-torrents'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useEntrance } from '#/state/entrance'
+import { bindFetchErrorReasons, useErrorReasons } from '#/state/error-reasons'
 import { useListView, viewKeyOf } from '#/state/list-view'
 import { useListViewed } from '#/state/list-viewed'
 import {
@@ -86,6 +88,7 @@ function mouseRestsOn(element: HTMLElement | null): boolean {
 }
 
 const fetchSortKeys = bindFetchSortKeys(getSortKeys)
+const fetchErrorReasons = bindFetchErrorReasons(getErrorReasons)
 
 export interface TorrentListProps {
   /**
@@ -169,6 +172,8 @@ function TorrentRows({
   const { setHash } = useViewedHash()
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
+  // Story 2.10: polled only while maindata has an errored torrent.
+  const errorReasons = useErrorReasons(fetchErrorReasons)
   const clock = useDayClock()
   // Only a sort shown as 「N 前」 makes the rows read the minute tick.
   const today = rowClock(sort, clock.today, clock.now)
@@ -274,6 +279,7 @@ function TorrentRows({
                     sort,
                     sortKeys,
                     keysFailed,
+                    errorReasons,
                   )
                 : null
             return (

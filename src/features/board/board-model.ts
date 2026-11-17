@@ -155,13 +155,20 @@ export interface CardModelOptions {
   now: number
   timeZone?: string
   stateBeforeMove: Readonly<Record<string, string>>
+  /** Story 2.10: this torrent's reason from getErrorReasons, if any. */
+  errorReason?: string
 }
 
 export function cardModel(
   torrent: SlimTorrent,
-  { now, timeZone, stateBeforeMove }: CardModelOptions,
+  { now, timeZone, stateBeforeMove, errorReason }: CardModelOptions,
 ): CardModel {
-  const status = classify(torrent, { now, timeZone, stateBeforeMove })
+  const status = classify(torrent, {
+    now,
+    timeZone,
+    stateBeforeMove,
+    errorReason,
+  })
   const circle = circleOf(status, torrent.progress)
   return {
     circle,

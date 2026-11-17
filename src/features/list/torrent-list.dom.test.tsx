@@ -59,6 +59,21 @@ vi.mock('#/server/functions/get-sort-keys', () => ({
     }),
 }))
 
+// Story 2.10: getErrorReasons never reaches a server here; each test sets
+// the map it answers.
+const reasonCalls = vi.hoisted(
+  (): { count: number; reasons: Record<string, string> } => ({
+    count: 0,
+    reasons: {},
+  }),
+)
+vi.mock('#/server/functions/get-error-reasons', () => ({
+  getErrorReasons: () => {
+    reasonCalls.count += 1
+    return Promise.resolve({ ok: true, data: { reasons: reasonCalls.reasons } })
+  },
+}))
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
 }
@@ -232,6 +247,8 @@ beforeEach(() => {
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
   sortKeyCalls.length = 0
+  reasonCalls.count = 0
+  reasonCalls.reasons = {}
   view = { sort: 'added_on', dir: 'desc' }
   viewedHash = null
   withPanel = false
@@ -278,6 +295,66 @@ describe('a poll', () => {
       ([hash, calls]) => calls !== before.get(hash),
     )
     expect(rerendered.map(([hash]) => hash)).toEqual([fakeHash(20)])
+  })
+})
+
+describe('error reasons (spec 2.10)', () => {
+  const rowText = (name: string) =>
+    [...main.querySelectorAll('[role="listitem"]')].find((item) =>
+      item.querySelector(`[title="${name}"]`),
+    )?.textContent ?? ''
+
+  it('an errored row shows its reason; one without a reason the fixed text', async () => {
+    reasonCalls.reasons = { [fakeHash(2)]: '找不到檔案或資料夾' }
+    await render(
+      fakeResponse({
+        changed: [
+          torrent(1, { state: 'error' }),
+          torrent(2, { state: 'error' }),
+          torrent(3),
+        ],
+      }),
+    )
+    expect(rowText('T1')).toContain('找不到檔案或資料夾')
+    expect(rowText('T2')).toContain('qBittorrent 回報錯誤')
+    expect(reasonCalls.count).toBe(1)
+  })
+
+  it('a long reason cut on the row can be read in full from its title', async () => {
+    const long = `fake reason ${'x'.repeat(100)}`
+    reasonCalls.reasons = { [fakeHash(2)]: long }
+    await render(fakeResponse({ changed: [torrent(1, { state: 'error' })] }))
+    const line = main.querySelector(`[role="listitem"] [title="${long}"]`)
+    expect(line?.textContent).toBe(long)
+    expect(line?.className).toContain('truncate')
+  })
+
+  it('matrix 8: no errored torrent, no getErrorReasons call', async () => {
+    await render(fakeResponse({ changed: many(5) }))
+    expect(reasonCalls.count).toBe(0)
+  })
+
+  it('a new reason re-renders only that row', async () => {
+    await render(
+      fakeResponse({
+        changed: [
+          torrent(1, { state: 'error' }),
+          torrent(2, { state: 'error' }),
+          torrent(3),
+        ],
+      }),
+    )
+    const before = new Map(modelCalls)
+    reasonCalls.reasons = { [fakeHash(2)]: '沒有權限' }
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['error-reasons'] })
+    })
+    expect(rowText('T1')).toContain('沒有權限')
+    expect(modelCalls.get(fakeHash(2))).toBeGreaterThan(
+      before.get(fakeHash(2)) ?? 0,
+    )
+    expect(modelCalls.get(fakeHash(3))).toBe(before.get(fakeHash(3)))
+    expect(modelCalls.get(fakeHash(4))).toBe(before.get(fakeHash(4)))
   })
 })
 

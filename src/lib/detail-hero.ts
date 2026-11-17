@@ -8,6 +8,7 @@ import {
   formatSpeed,
 } from '#/lib/format'
 import {
+  errorLineOf,
   heroKindOf,
   progressFraction,
   showsProgress,
@@ -129,8 +130,8 @@ function summaryPartsOf(
   torrent: SlimTorrent,
   options: DetailHeroOptions,
 ): Array<string> {
-  // The fixed text until story 2.10, the same as classify().detail.
-  if (kind === 'error') return ['qBittorrent 回報錯誤']
+  // Story 2.10: the reason, else the fixed text; the same as classify().detail.
+  if (kind === 'error') return [errorLineOf(options.errorReason)]
   const category = torrent.category === '' ? null : torrent.category
   const size = kind === 'meta' ? '還不知道大小' : formatSize(torrent.size)
   return [...leadOf(kind, torrent, options), size, category].filter(

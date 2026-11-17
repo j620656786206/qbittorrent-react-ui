@@ -166,12 +166,54 @@ describe('TorrentRow (the memoized row)', () => {
         today={NOW}
         sort="added_on"
         sortValue={undefined}
+        errorReason={undefined}
         viewing={false}
         onOpen={() => {}}
       />,
     )
     expect(html).toMatch(/role="img" aria-label="已完成"/)
     expect(html.match(/搬移中/g)).toHaveLength(1)
+  })
+
+  it.each([
+    ['磁碟空間不足', '磁碟空間不足'],
+    [undefined, 'qBittorrent 回報錯誤'],
+  ])(
+    'story 2.10 an errored row with reason %s says %s, as text',
+    (errorReason, text) => {
+      const torrent = t({ hash: fakeHash(6), state: 'error' })
+      const html = renderToStaticMarkup(
+        <TorrentRow
+          torrent={torrent}
+          stateBeforeMove={undefined}
+          today={NOW}
+          sort="added_on"
+          sortValue={undefined}
+          errorReason={errorReason}
+          viewing={false}
+          onOpen={() => {}}
+        />,
+      )
+      expect(html).toContain(`>${text}</span>`)
+    },
+  )
+
+  it('story 2.10 a reason with markup stays text', () => {
+    const torrent = t({ hash: fakeHash(7), state: 'error' })
+    const html = renderToStaticMarkup(
+      <TorrentRow
+        torrent={torrent}
+        stateBeforeMove={undefined}
+        today={NOW}
+        sort="added_on"
+        sortValue={undefined}
+        errorReason="<b>x</b>"
+        viewing={false}
+        onOpen={() => {}}
+      />,
+    )
+    expect(html).toContain('&lt;b&gt;x&lt;/b&gt;')
+    expect(html).not.toContain('<b>x</b>')
   })
 })
 

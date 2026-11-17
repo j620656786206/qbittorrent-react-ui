@@ -42,6 +42,22 @@ export interface ClassifyOptions {
    * there is no Maindata (tests).
    */
   stateBeforeMove: Readonly<Record<string, string>>
+  /**
+   * Story 2.10: this torrent's reason from getErrorReasons (cleaned plain
+   * text), used only while it is in the `error` state; without one the
+   * fixed ERROR_FALLBACK_TEXT shows.
+   */
+  errorReason?: string
+}
+
+/** The `error` line when qBittorrent's log gave no reason (story 2.10). */
+export const ERROR_FALLBACK_TEXT = 'qBittorrent 回報錯誤'
+
+/** The `error` state's line: the torrent's reason, else the fixed text. */
+export function errorLineOf(errorReason: string | undefined): string {
+  return errorReason !== undefined && errorReason !== ''
+    ? errorReason
+    : ERROR_FALLBACK_TEXT
 }
 
 const WORDS: Readonly<Record<TorrentStatusId, string>> = {
@@ -306,12 +322,13 @@ export const PAUSE_ACTION_WORDS: Readonly<Record<PauseAction, string>> = {
 function detailOf(
   kind: StateKind,
   torrent: SlimTorrent,
-  { now, timeZone }: ClassifyOptions,
+  { now, timeZone, errorReason }: ClassifyOptions,
 ): string {
   switch (kind) {
     case 'error':
-      // qBittorrent 5.1.4 sends no reason in maindata (Story 2.10 adds it).
-      return 'qBittorrent 回報錯誤'
+      // qBittorrent 5.1.4 sends no reason in maindata; story 2.10 reads it
+      // from qBittorrent's log (getErrorReasons).
+      return errorLineOf(errorReason)
     case 'unknown':
       return '狀態不明'
     case 'missing_files':

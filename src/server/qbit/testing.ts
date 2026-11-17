@@ -170,6 +170,8 @@ export interface FakeQbitRoutes {
   /** Story 2.7: `torrents/files` (two fake files) and `torrents/filePrio`. */
   files?: Handler
   filePrio?: Handler
+  /** Story 2.10: `log/main`; an empty list by default. */
+  log?: Handler
 }
 
 /** Story 2.7: a raw `torrents/files` entry with qBittorrent's extra fields. */
@@ -204,6 +206,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
           rawFile({ index: 1, name: 'Fake.Show/Fake.Show.E02.mkv' }),
         ])),
     '/api/v2/torrents/filePrio': routes.filePrio ?? (() => new Response('')),
+    '/api/v2/log/main': routes.log ?? (() => jsonResponse([])),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
