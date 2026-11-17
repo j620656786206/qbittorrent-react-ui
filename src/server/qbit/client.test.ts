@@ -16,12 +16,15 @@ import {
   fakeQbit,
   fullMaindata,
   jsonResponse,
+  rawFile,
 } from '#/server/qbit/testing'
 import type { FakeQbitRoutes } from '#/server/qbit/testing'
 
 // Spec 1.5 rows Q10 and Q11: the named-method client.
 
 const MAINDATA = '/api/v2/sync/maindata'
+const FILES = '/api/v2/torrents/files'
+const FILE_PRIO = '/api/v2/torrents/filePrio'
 
 function setup(routes: FakeQbitRoutes = {}) {
   const qbit = fakeQbit(routes)
@@ -208,14 +211,18 @@ describe('qBittorrent client', () => {
       'syncMaindata',
       'stopTorrents',
       'startTorrents',
+      'torrentFiles',
+      'setFilePriority',
     ])
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop and torrents/start', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, files and filePrio', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
       '/api/v2/sync/maindata',
+      '/api/v2/torrents/filePrio',
+      '/api/v2/torrents/files',
       '/api/v2/torrents/start',
       '/api/v2/torrents/stop',
     ])
@@ -249,6 +256,83 @@ describe('qBittorrent client', () => {
         stop: () => new Response('nope', { status }),
       })
       await expect(client.stopTorrents([HASH_A])).rejects.toEqual(
+        failure('qbit_rejected'),
+      )
+    },
+  )
+
+  it('story 2.7 torrentFiles GETs exactly hash and keeps five fields per file, in order', async () => {
+    const { client, calls } = setup({
+      files: () =>
+        jsonResponse([
+          rawFile({ index: 3, name: 'b.mkv', priority: 0 }),
+          rawFile({ index: 1, name: 'a.mkv', priority: 6, progress: 1 }),
+        ]),
+    })
+    expect(await client.torrentFiles(HASH_A)).toEqual([
+      {
+        index: 3,
+        name: 'b.mkv',
+        size: 1_073_741_824,
+        progress: 0.5,
+        priority: 0,
+      },
+      {
+        index: 1,
+        name: 'a.mkv',
+        size: 1_073_741_824,
+        progress: 1,
+        priority: 6,
+      },
+    ])
+    const sent = calls.filter((call) => call.path === FILES)
+    expect(sent).toHaveLength(1)
+    expect(sent[0].method).toBe('GET')
+    expect([...sent[0].query.entries()]).toEqual([['hash', HASH_A]])
+  })
+
+  it.each([
+    ['not JSON', () => new Response('<html>')],
+    ['not a list', () => jsonResponse({ files: [] })],
+    ['a file without index', () => jsonResponse([{ name: 'x', size: 1 }])],
+    ['a negative index', () => jsonResponse([rawFile({ index: -1 })])],
+    [
+      'qBittorrent 404 (unknown torrent)',
+      () => new Response('', { status: 404 }),
+    ],
+  ])(
+    'story 2.7 torrentFiles answered %s: qbit_rejected',
+    async (_name, files) => {
+      const { client } = setup({ files })
+      await expect(client.torrentFiles(HASH_A)).rejects.toEqual(
+        failure('qbit_rejected'),
+      )
+      // Never a file name in the log.
+      expect(out.lines.join('')).not.toContain('Fake.Show')
+    },
+  )
+
+  it('story 2.7 setFilePriority POSTs exactly hash, id joined with | and priority', async () => {
+    const { client, calls } = setup()
+    await client.setFilePriority(HASH_A, [3, 1], 6)
+    const sent = calls.filter((call) => call.path === FILE_PRIO)
+    expect(sent).toHaveLength(1)
+    expect(sent[0].method).toBe('POST')
+    expect([...sent[0].query.keys()]).toEqual([])
+    expect([...new URLSearchParams(sent[0].body).entries()]).toEqual([
+      ['hash', HASH_A],
+      ['id', '3|1'],
+      ['priority', '6'],
+    ])
+  })
+
+  it.each([400, 404, 409])(
+    'story 2.7 setFilePriority answered %s: qbit_rejected',
+    async (status) => {
+      const { client } = setup({
+        filePrio: () => new Response('nope', { status }),
+      })
+      await expect(client.setFilePriority(HASH_A, [0], 0)).rejects.toEqual(
         failure('qbit_rejected'),
       )
     },

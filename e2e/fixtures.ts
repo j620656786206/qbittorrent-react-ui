@@ -109,8 +109,13 @@ export interface Modes {
   front?: 'normal' | 'down' | 'cloudflare'
   data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm' | 'states'
   grow?: '0' | '1'
-  /** Story 2.6: `reject` answers torrents/stop and /start with HTTP 400. */
+  /**
+   * Story 2.6: `reject` answers torrents/stop and /start with HTTP 400
+   * (story 2.7: torrents/filePrio too).
+   */
   ops?: 'normal' | 'reject'
+  /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
+  files?: 'normal' | 'slow' | 'fail'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -119,17 +124,39 @@ export const DEFAULT_MODES: Required<Modes> = {
   data: 'sample',
   grow: '0',
   ops: 'normal',
+  files: 'normal',
 }
 
-/** Story 2.6: the stop/start calls the fake qBittorrent received. */
+/** A filePrio call as fake-qbit logs it (story 2.7). */
+export interface FilePrioCall {
+  op: 'filePrio'
+  hash: string
+  ids: Array<number>
+  priority: number
+  rejected?: true
+}
+
+/** Stories 2.6, 2.7: the stop/start and filePrio calls the fake received. */
 export async function opCalls(
   request: APIRequestContext,
 ): Promise<
-  Array<{ op: 'stop' | 'start'; hashes: Array<string>; rejected?: true }>
+  Array<
+    | { op: 'stop' | 'start'; hashes: Array<string>; rejected?: true }
+    | FilePrioCall
+  >
 > {
   const response = await request.get('/__fake/ops')
   expect(response.ok(), await response.text()).toBe(true)
   return ((await response.json()) as { calls: never }).calls
+}
+
+/** Story 2.7: the hashes the fake's torrents/files was asked for. */
+export async function filesRequests(
+  request: APIRequestContext,
+): Promise<Array<string>> {
+  const response = await request.get('/__fake/files')
+  expect(response.ok(), await response.text()).toBe(true)
+  return ((await response.json()) as { requests: Array<string> }).requests
 }
 
 /** Switches the fake server through its loopback-only control route. */

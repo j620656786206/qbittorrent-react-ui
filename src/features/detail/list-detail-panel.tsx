@@ -5,7 +5,7 @@ import { useViewedHash } from '#/state/viewed-hash'
 import {
   DetailPanelBody,
   DetailTop,
-  useDetailIds,
+  useDetailTabs,
 } from '#/features/detail/detail-view'
 
 // Story 2.4, DESIGN detail-panel (mockup S01-list-mode-desktop): desktop
@@ -18,12 +18,12 @@ export function ListDetailPanel() {
   const { order, viewed } = useShownList()
   const { setHash } = useViewedHash()
   const { data: torrents } = useMaindata(selectTorrents)
-  const ids = useDetailIds()
   const torrent =
     viewed !== null && torrents && Object.hasOwn(torrents, viewed)
       ? torrents[viewed]
       : undefined
   const position = order ? detailPosition(order, viewed) : null
+  const tabs = useDetailTabs(torrent !== undefined && position !== null)
 
   return (
     <aside
@@ -36,11 +36,11 @@ export function ListDetailPanel() {
             layout="row"
             target={{ torrent, position }}
             onNavigate={setHash}
-            ids={ids}
+            tabs={tabs}
           />
           <DetailPanelBody
             torrent={torrent}
-            ids={ids}
+            tabs={tabs}
             className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-[22px] [scrollbar-width:thin]"
           />
         </>

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ERROR_TEXT,
+  FILES_LOAD_FAILED,
   LIST_LOAD_FAILED,
   OPERATION_FAILURE_CODES,
   errorText,
+  fileActionFailureText,
   isOperationFailureCode,
   pauseActionFailureText,
 } from '#/lib/error-text'
@@ -80,5 +82,18 @@ describe('pause and resume failure text (spec 2.6 F1)', () => {
   ] as const)('%s %s', (action, code, text) => {
     expect(pauseActionFailureText(action, code)).toBe(text)
     expect(text).not.toContain(EM_DASH)
+  })
+
+  it.each([
+    ['qbit_rejected', '改檔案設定失敗：qBittorrent 拒絕這個操作'],
+    ['timeout', '改檔案設定失敗：qBittorrent 沒有回應，請再試一次'],
+    ['invalid_input', '改檔案設定失敗：送出的資料格式不對'],
+  ] as const)('story 2.7 files tab %s', (code, text) => {
+    expect(fileActionFailureText(code)).toBe(text)
+    expect(text).not.toContain(EM_DASH)
+  })
+
+  it('story 2.7 the files tab load failure reads 讀不到檔案清單', () => {
+    expect(FILES_LOAD_FAILED).toBe('讀不到檔案清單')
   })
 })

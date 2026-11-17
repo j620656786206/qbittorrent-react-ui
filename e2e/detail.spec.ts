@@ -134,7 +134,12 @@ test('D1 D2 D7 D12 desktop list mode: the panel, the ring, N of M, prev and next
     'aria-selected',
     'true',
   )
-  await expect(panel(page).getByRole('tab', { name: '檔案' })).toBeDisabled()
+  // Story 2.7: 檔案 works now (e2e/files.spec.ts covers the tab).
+  await expect(panel(page).getByRole('tab', { name: '檔案' })).toBeEnabled()
+  await expect(panel(page).getByRole('tab', { name: '檔案' })).toHaveAttribute(
+    'aria-selected',
+    'false',
+  )
   await expect(panel(page).locator('dt')).toHaveText([
     '分類',
     '大小',

@@ -18,6 +18,9 @@ export function errorText(code: ErrorCode): string {
  */
 export const LIST_LOAD_FAILED = '讀不到種子清單'
 
+/** Story 2.7: the files tab's first load failed (any code, with 「重試」). */
+export const FILES_LOAD_FAILED = '讀不到檔案清單'
+
 /**
  * AD-9: the codes an operation handles itself (with its failure toast and
  * 「重試」). Login-stop and connection codes and `bad_origin` belong to the
@@ -46,4 +49,12 @@ export function pauseActionFailureText(
   code: OperationFailureCode,
 ): string {
   return `${PAUSE_ACTION_WORDS[action]}失敗：${errorText(code)}`
+}
+
+/**
+ * Story 2.7: the failure toast of a tick or a priority change in the files
+ * tab, 「改檔案設定失敗：qBittorrent 拒絕這個操作」.
+ */
+export function fileActionFailureText(code: OperationFailureCode): string {
+  return `改檔案設定失敗：${errorText(code)}`
 }

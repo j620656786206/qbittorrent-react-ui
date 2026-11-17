@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { ServerFailure } from '#/server/errors/server-failure'
 import { log as defaultLog } from '#/server/log'
 import {
   knownConnectionStatus,
@@ -8,6 +10,7 @@ import { BadMaindata, issuePaths } from '#/server/qbit/bad-maindata'
 import { QBIT_PATHS } from '#/server/qbit/paths'
 import { createQbitSession } from '#/server/qbit/session'
 import type { QbitSessionOptions } from '#/server/qbit/session'
+import type { FilePriority, TorrentFile } from '#/shared/torrent-files'
 
 // AD-5 / AR-24: the whitelist. One named method per qBittorrent endpoint the
 // app uses, constant paths only, parameters built with URLSearchParams. No
@@ -25,7 +28,35 @@ export interface QbitClient {
   stopTorrents: (hashes: ReadonlyArray<string>) => Promise<void>
   /** `torrents/start`, same contract as `stopTorrents`. */
   startTorrents: (hashes: ReadonlyArray<string>) => Promise<void>
+  /**
+   * `torrents/files` for one validated hash: each file's index, name, size,
+   * progress and priority only, in qBittorrent's order. A torrent
+   * qBittorrent does not know answers 404 (`qbit_rejected`); an answer that
+   * is not that shape is `qbit_rejected` too.
+   */
+  torrentFiles: (hash: string) => Promise<Array<TorrentFile>>
+  /**
+   * `torrents/filePrio`: these file ids (validated, distinct) of one torrent
+   * get `priority`. qBittorrent's 400, 404 and 409 are `qbit_rejected`.
+   */
+  setFilePriority: (
+    hash: string,
+    ids: ReadonlyArray<number>,
+    priority: FilePriority,
+  ) => Promise<void>
 }
+
+// The fields the files tab draws; anything else qBittorrent sends (piece
+// range, availability, is_seed) is dropped by the parse.
+const rawFilesSchema = z.array(
+  z.object({
+    index: z.int().min(0),
+    name: z.string(),
+    size: z.number().min(0),
+    progress: z.number(),
+    priority: z.int(),
+  }),
+)
 
 /** The `hashes` form field: `|` between hashes, nothing else. */
 function hashesForm(hashes: ReadonlyArray<string>): URLSearchParams {
@@ -84,5 +115,45 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     })
   }
 
-  return Object.freeze({ syncMaindata, stopTorrents, startTorrents })
+  async function torrentFiles(hash: string): Promise<Array<TorrentFile>> {
+    const path = QBIT_PATHS.torrentsFiles
+    const query = new URLSearchParams()
+    query.set('hash', hash)
+    const response = await session.send(path, { method: 'GET', query })
+    let json: unknown
+    try {
+      json = JSON.parse(response.body)
+    } catch {
+      logger.warn('qbit_bad_response', { path, reason: 'not_json' })
+      throw new ServerFailure('qbit_rejected', 'files: not json')
+    }
+    const parsed = rawFilesSchema.safeParse(json)
+    if (!parsed.success) {
+      // The reason only: file names are data.
+      logger.warn('qbit_bad_response', { path, reason: 'schema' })
+      throw new ServerFailure('qbit_rejected', 'files: schema')
+    }
+    // `z.object` strips the fields it does not name.
+    return parsed.data
+  }
+
+  async function setFilePriority(
+    hash: string,
+    ids: ReadonlyArray<number>,
+    priority: FilePriority,
+  ): Promise<void> {
+    const form = new URLSearchParams()
+    form.set('hash', hash)
+    form.set('id', ids.join('|'))
+    form.set('priority', String(priority))
+    await session.send(QBIT_PATHS.torrentsFilePrio, { method: 'POST', form })
+  }
+
+  return Object.freeze({
+    syncMaindata,
+    stopTorrents,
+    startTorrents,
+    torrentFiles,
+    setFilePriority,
+  })
 }

@@ -10,6 +10,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import {
   PENDING_TIMEOUT_MS,
   clearPending,
+  filePendingKey,
   markPending,
   pendingOpOf,
   prunePending,
@@ -78,6 +79,25 @@ describe('the pending store', () => {
     prunePending((hash) => hash === B)
     expect(pendingOpOf(A)).toBeNull()
     expect(pendingOpOf(B)).toBe('start')
+  })
+
+  it('story 2.7 file keys never meet a torrent hash and survive pruning', () => {
+    const key = filePendingKey(A, 3)
+    expect(key).toBe(`file:${A}:3`)
+    expect(key).not.toBe(A)
+    expect(filePendingKey(A, 3)).not.toBe(filePendingKey(A, 30))
+    markPending(key, 'file')
+    markPending(A, 'stop')
+    prunePending(() => false)
+    expect(pendingOpOf(key)).toBe('file')
+    expect(pendingOpOf(A)).toBeNull()
+  })
+
+  it('story 2.7 a file key still clears itself after 30 s', () => {
+    const key = filePendingKey(A, 0)
+    markPending(key, 'file')
+    vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
+    expect(pendingOpOf(key)).toBeNull()
   })
 })
 
@@ -174,10 +194,13 @@ describe('usePendingOp', () => {
     await act(async () => {
       markPending(A, 'stop')
       markPending(B, 'start')
+      markPending(filePendingKey(A, 1), 'file')
     })
     await view.poll(fakeResponse({ changed: [t({ hash: A })] }))
     expect(pendingOpOf(B)).toBeNull()
     expect(pendingOpOf(A)).toBe('stop')
+    // Story 2.7: a file key is not a torrent maindata knows; it stays.
+    expect(pendingOpOf(filePendingKey(A, 1))).toBe('file')
     await view.unmount()
   })
 })
