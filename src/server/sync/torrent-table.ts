@@ -47,7 +47,20 @@ export interface TorrentTable {
   readonly size: number
   /** `null` means "send everything". */
   changesSince: (counter: number | null) => TableChanges
+  /**
+   * Story 2.10: visits every torrent, read only, without copying; the row
+   * must not be kept past the call.
+   */
+  forEach: (visit: (torrent: Readonly<SlimTorrent>) => void) => void
+  /**
+   * Story 2.10: the state each moving torrent had before its move, by hash,
+   * kept the way the browser's maindata-merge keeps it (a torrent first
+   * seen moving has none). A copy.
+   */
+  readonly stateBeforeMove: Record<string, string>
 }
+
+const MOVING = 'moving'
 
 interface Row {
   torrent: SlimTorrent
@@ -66,6 +79,7 @@ function sameSlimFields(a: SlimTorrent, b: SlimTorrent): boolean {
 
 export function createTorrentTable(now: () => number = Date.now): TorrentTable {
   const rows = new Map<string, Row>()
+  const beforeMove = new Map<string, string>()
   const tombstones = new Map<string, Tombstone>()
   let categories = new Map<string, Category>()
   let serverState: ServerState | null = null
@@ -155,6 +169,10 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     }
     for (const { hash, torrent, changed } of updates) {
       const existing = rows.get(hash)
+      if (torrent.state !== MOVING) beforeMove.delete(hash)
+      else if (existing && existing.torrent.state !== MOVING) {
+        beforeMove.set(hash, existing.torrent.state)
+      }
       rows.set(hash, {
         torrent,
         changedAt: changed || !existing ? version : existing.changedAt,
@@ -165,6 +183,7 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     const at = now()
     for (const hash of removed) {
       rows.delete(hash)
+      beforeMove.delete(hash)
       tombstones.set(hash, { removedAt: version, at })
     }
     for (const [hash, tombstone] of tombstones) {
@@ -197,9 +216,17 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     return { full: false, changed, removed }
   }
 
+  function forEach(visit: (torrent: Readonly<SlimTorrent>) => void): void {
+    for (const row of rows.values()) visit(row.torrent)
+  }
+
   return {
     apply,
     changesSince,
+    forEach,
+    get stateBeforeMove() {
+      return Object.fromEntries(beforeMove)
+    },
     get serverState() {
       if (serverState === null) {
         throw new Error('torrent table: read before the first answer')

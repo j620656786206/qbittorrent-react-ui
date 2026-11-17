@@ -415,3 +415,45 @@ describe('pauseActionFlips', () => {
     )
   })
 })
+
+describe('story 2.10 the error reason', () => {
+  it('an errored torrent says its reason when one is passed', () => {
+    const torrent = t({ state: 'error' })
+    expect(
+      classify(torrent, { ...OPTIONS, errorReason: '磁碟空間不足' }).detail,
+    ).toBe('磁碟空間不足')
+  })
+
+  it.each([undefined, ''])('no reason (%j): the fixed text', (errorReason) => {
+    const torrent = t({ state: 'error' })
+    expect(classify(torrent, { ...OPTIONS, errorReason }).detail).toBe(
+      'qBittorrent 回報錯誤',
+    )
+  })
+
+  it.each([
+    ['missingFiles', { private: true }, '找不到檔案，做不了種'],
+    ['missingFiles', { private: false }, '已整理'],
+    ['unknown', {}, '狀態不明'],
+    ['stalledDL', { progress: 0.5 }, '卡在 50%，沒有來源'],
+  ] as const)(
+    'a reason never replaces the line of %s %j',
+    (state, overrides, detail) => {
+      const torrent = t({ state, ...overrides })
+      expect(
+        classify(torrent, { ...OPTIONS, errorReason: '磁碟空間不足' }).detail,
+      ).toBe(detail)
+    },
+  )
+
+  it('a move remembered as error still says 搬移中', () => {
+    const torrent = t({ hash: fakeHash(9), state: 'moving' })
+    expect(
+      classify(torrent, {
+        ...OPTIONS,
+        stateBeforeMove: { [fakeHash(9)]: 'error' },
+        errorReason: '磁碟空間不足',
+      }).detail,
+    ).toBe('搬移中')
+  })
+})

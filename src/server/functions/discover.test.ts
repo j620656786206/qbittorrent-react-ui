@@ -70,7 +70,7 @@ describe('server function discovery', () => {
     expect(await auditServerFunctions(realModules)).toEqual([])
   })
 
-  it('finds the real login, getSession, getMaindata, getSortKeys, getTorrentDetail, stopTorrents, startTorrents, getFiles and setFilePriority functions', () => {
+  it('finds the real login, getSession, getMaindata, getSortKeys, getTorrentDetail, stopTorrents, startTorrents, getFiles, setFilePriority and getErrorReasons functions', () => {
     const found = Object.entries(realModules).flatMap(([file, exports]) =>
       Object.keys(exports).map((name) => `${file}#${name}`),
     )
@@ -83,6 +83,7 @@ describe('server function discovery', () => {
     expect(found).toContain('./start-torrents.ts#startTorrents')
     expect(found).toContain('./get-files.ts#getFiles')
     expect(found).toContain('./set-file-priority.ts#setFilePriority')
+    expect(found).toContain('./get-error-reasons.ts#getErrorReasons')
     expect(guardedOf(realModules['./login.ts'].login)?.spec.auth).toBe('public')
   })
 

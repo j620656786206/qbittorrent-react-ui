@@ -137,6 +137,24 @@ describe('the card', () => {
     expect(cardHeight(model)).toBe(CARD_HEIGHT)
   })
 
+  it('story 2.10 error: the reason when there is one, else the fixed text', () => {
+    expect(
+      cardModel(t({ state: 'error' }), { ...OPTIONS, errorReason: '沒有權限' })
+        .detail,
+    ).toBe('沒有權限')
+    expect(card({ state: 'error' }).detail).toBe('qBittorrent 回報錯誤')
+  })
+
+  it('story 2.10 only an error card has a tooltip on its line', () => {
+    expect(
+      cardModel(t({ state: 'error' }), { ...OPTIONS, errorReason: '沒有權限' })
+        .detailTitle,
+    ).toBe('沒有權限')
+    expect(card({ state: 'error' }).detailTitle).toBe('qBittorrent 回報錯誤')
+    expect(card({ state: 'downloading', dlspeed: 1000 }).detailTitle).toBeNull()
+    expect(card({ state: 'uploading', progress: 1 }).detailTitle).toBeNull()
+  })
+
   it('moving: 搬移中 replaces the line', () => {
     const model = cardModel(t({ hash: fakeHash(5), state: 'moving' }), {
       ...OPTIONS,

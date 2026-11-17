@@ -150,6 +150,23 @@ describe('H1 the 12 hero rows', () => {
     expect(hero.summaryParts.join(' · ')).toBe(summary)
   })
 
+  it('story 2.10 錯誤 with a reason: the summary is the reason alone', () => {
+    const hero = detailHero(t({ ...TV, state: 'error', progress: 0.3 }), {
+      ...OPTIONS,
+      errorReason: '找不到檔案或資料夾',
+    })
+    expect(hero.headline).toBe('錯誤')
+    expect(hero.summaryParts).toEqual(['找不到檔案或資料夾'])
+  })
+
+  it('story 2.10 a reason does not change other rows', () => {
+    const hero = detailHero(
+      t({ ...TV, state: 'missingFiles', progress: 1, private: true }),
+      { ...OPTIONS, errorReason: '找不到檔案或資料夾' },
+    )
+    expect(hero.summaryParts.join(' · ')).toBe('做不了種 · 85 GB · mteam-tv')
+  })
+
   it('an unlisted (future) state reads as 狀態不明', () => {
     const hero = detailHero(t({ ...TV, state: 'someNewState' }), OPTIONS)
     expect(hero.headline).toBe('狀態不明')

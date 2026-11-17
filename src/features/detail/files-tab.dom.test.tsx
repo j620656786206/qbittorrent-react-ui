@@ -73,6 +73,9 @@ vi.mock('#/server/functions/get-torrent-detail', () => ({
     })
   },
 }))
+vi.mock('#/server/functions/get-error-reasons', () => ({
+  getErrorReasons: () => Promise.resolve({ ok: true, data: { reasons: {} } }),
+}))
 vi.mock('#/server/functions/stop-torrents', () => ({
   stopTorrents: () => Promise.resolve({ ok: true, data: { items: [] } }),
 }))

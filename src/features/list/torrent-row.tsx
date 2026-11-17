@@ -34,6 +34,7 @@ export const TorrentRow = memo(function Row({
   today,
   sort,
   sortValue,
+  errorReason,
   viewing,
   onOpen,
 }: RowProps & RowActionProps) {
@@ -42,6 +43,7 @@ export const TorrentRow = memo(function Row({
     stateBeforeMove: stateBeforeMove ? { [torrent.hash]: stateBeforeMove } : {},
     sort,
     sortValue,
+    errorReason,
   })
   return (
     <RowContent
@@ -166,7 +168,11 @@ function SecondLine({ model }: { model: RowModel }) {
       {errorDetail !== null && (
         // Phone: no width of its own when wrapping, so it stays on the line
         // and ellipsizes instead of dropping.
-        <span className="flex-none truncate max-lg:min-w-0 max-lg:flex-1 max-lg:basis-0">
+        // `title`: a long reason (story 2.10) is cut on the line.
+        <span
+          title={errorDetail}
+          className="flex-none truncate max-lg:min-w-0 max-lg:flex-1 max-lg:basis-0"
+        >
           {errorDetail}
         </span>
       )}

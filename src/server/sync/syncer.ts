@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { isErroredTorrent } from '#/lib/error-reason'
 import { log as defaultLog } from '#/server/log'
 import type { Logger } from '#/server/log'
 import { BadMaindata } from '#/server/qbit/bad-maindata'
@@ -36,6 +37,9 @@ import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 // maindata poll, unaligned: it reuses the last pull (success or failure)
 // when that started under DETAIL_PULL_REUSE_MS ago, so it adds no
 // qBittorrent request while maindata is polled, and pulls itself otherwise.
+// `readErrorCandidates` (story 2.10) answers the torrents in the `error`
+// state whose name no other torrent has (the log names torrents by name
+// only), with the same pull reuse as the detail.
 
 export const MIN_PULL_INTERVAL_MS = 1000
 /** The detail read reuses a pull this recent: a little over one 5 s poll. */
@@ -67,6 +71,16 @@ export interface Syncer {
   ) => Promise<SortKeysResponse>
   /** `hash` is a valid torrent hash (the server function checked it). */
   readTorrentDetail: (hash: string) => Promise<TorrentDetailResponse>
+  /** Errored torrents with a name no other torrent in the table has. */
+  readErrorCandidates: () => Promise<Array<ErrorCandidate>>
+}
+
+/** Story 2.10: a torrent whose log line may be matched by name. */
+export interface ErrorCandidate {
+  hash: string
+  name: string
+  /** Unix seconds: a log line older than this belongs to an earlier torrent. */
+  added_on: number
 }
 
 interface LastPull {
@@ -188,5 +202,31 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return { detail: raw ? pickTorrentDetail(raw) : null }
   }
 
-  return { instanceId, read, readSortKeys, readTorrentDetail }
+  async function readErrorCandidates(): Promise<Array<ErrorCandidate>> {
+    await pull(DETAIL_PULL_REUSE_MS)
+    const names = new Map<string, number>()
+    const errored: Array<ErrorCandidate> = []
+    // Like the browser: a torrent moving from `error` still counts.
+    const stateBeforeMove = table.stateBeforeMove
+    table.forEach((torrent) => {
+      names.set(torrent.name, (names.get(torrent.name) ?? 0) + 1)
+      if (isErroredTorrent(torrent, stateBeforeMove)) {
+        errored.push({
+          hash: torrent.hash,
+          name: torrent.name,
+          added_on: torrent.added_on,
+        })
+      }
+    })
+    // A shared name: never attribute a reason to the wrong torrent.
+    return errored.filter((candidate) => names.get(candidate.name) === 1)
+  }
+
+  return {
+    instanceId,
+    read,
+    readSortKeys,
+    readTorrentDetail,
+    readErrorCandidates,
+  }
 }

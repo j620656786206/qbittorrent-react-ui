@@ -101,6 +101,33 @@ describe('R6 error rows', () => {
     expect(model({ state: 'stalledDL' }).errorDetail).toBeNull()
   })
 
+  it('story 2.10 an error row says its reason when it has one', () => {
+    const row = rowModel(t({ state: 'error' }), {
+      ...OPTIONS,
+      errorReason: '找不到檔案或資料夾',
+    })
+    expect(row.errorDetail).toBe('找不到檔案或資料夾')
+  })
+
+  it("story 2.10 rowProps passes only this torrent's reason", () => {
+    const data = mergeMaindata(
+      undefined,
+      fakeResponse({
+        changed: [
+          t({ hash: fakeHash(1), state: 'error' }),
+          t({ hash: fakeHash(2), state: 'error' }),
+        ],
+      }),
+    )
+    const reasons = { [fakeHash(1)]: '磁碟空間不足' }
+    const args = [NOW, 'added_on', undefined, false, reasons] as const
+    expect(rowProps(data, fakeHash(1), ...args)?.errorReason).toBe(
+      '磁碟空間不足',
+    )
+    expect(rowProps(data, fakeHash(2), ...args)?.errorReason).toBeUndefined()
+    expect(rowProps(data, fakeHash(1), NOW)?.errorReason).toBeUndefined()
+  })
+
   it('a move from an error kind says 搬移中 once, no reason', () => {
     const torrent = t({ hash: fakeHash(8), state: 'moving', private: true })
     const row = rowModel(torrent, {

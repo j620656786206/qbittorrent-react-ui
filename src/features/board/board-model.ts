@@ -142,6 +142,11 @@ export interface CardModel {
   percent: string | null
   /** Remaining time and speed, or classify()'s line (「搬移中」 while moving). */
   detail: string
+  /**
+   * Story 2.10: the line's tooltip on an error card (a long reason is cut),
+   * like the list row's error line; `null` otherwise.
+   */
+  detailTitle: string | null
   /** 0 to 1 for the 4px bar (same statuses as `percent`), else `null`. */
   progress: number | null
   /** The category tag; `null` when the torrent has none. */
@@ -155,19 +160,28 @@ export interface CardModelOptions {
   now: number
   timeZone?: string
   stateBeforeMove: Readonly<Record<string, string>>
+  /** Story 2.10: this torrent's reason from getErrorReasons, if any. */
+  errorReason?: string
 }
 
 export function cardModel(
   torrent: SlimTorrent,
-  { now, timeZone, stateBeforeMove }: CardModelOptions,
+  { now, timeZone, stateBeforeMove, errorReason }: CardModelOptions,
 ): CardModel {
-  const status = classify(torrent, { now, timeZone, stateBeforeMove })
+  const status = classify(torrent, {
+    now,
+    timeZone,
+    stateBeforeMove,
+    errorReason,
+  })
   const circle = circleOf(status, torrent.progress)
   return {
     circle,
     name: torrent.name,
     percent: status.showsProgress ? formatPercent(torrent.progress) : null,
     detail: status.detail,
+    detailTitle:
+      status.status === 'error' && !status.moving ? status.detail : null,
     progress: circle.arcFraction,
     category: torrent.category === '' ? null : torrent.category,
     location: locationLabel(torrent.save_path),

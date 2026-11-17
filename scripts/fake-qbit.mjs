@@ -41,7 +41,9 @@
 //          states (story 2.5): one torrent per detail hero row, 12 in all
 //          (hashes 0x3001 to 0x300c: 下載中, 抓種子資訊中, 排隊中, 檢查檔
 //          案中, 已暫停, 停滯, 做種中, 已完成, 找不到檔案, 錯誤, 狀態不明,
-//          已整理); the first has a long save path with Chinese in it
+//          已整理); the first has a long save path with Chinese in it;
+//          story 2.10 adds a 13th (0x300d), another 錯誤 whose log reason
+//          has a fake path and a 203.0.113.x address
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 //   ops:   normal | reject (story 2.6: reject answers torrents/stop and
 //          torrents/start with HTTP 400, which the container maps to
@@ -50,8 +52,8 @@
 //          25 s, fail answers it with HTTP 500, which the container maps
 //          to qbit_rejected; for the loading and failure screenshots)
 //   Any `data` parameter (even the current one) also clears the stop/start
-//   state overrides, the file priorities set, the call log and the
-//   torrents/files request log below.
+//   state overrides, the file priorities set, the call log, the
+//   torrents/files request log and the log/main request log below.
 // Story 2.6: POST /api/v2/torrents/stop and /start (cookie required, form
 // field `hashes`, `|` between) record each call and override those
 // torrents' states for the next maindata: stop gives stoppedUP when complete
@@ -69,6 +71,20 @@
 // hashes torrents/files was asked for: curl 'http://localhost:3100/__fake/files'
 // The calls (loopback only, rejected ones marked `rejected: true`):
 //   curl 'http://localhost:3100/__fake/ops'
+// Story 2.10: GET /api/v2/log/main (cookie required) answers one fake log
+// for all data sets: a normal, an info and a critical line, a warning
+// about a torrent that is not errored, and for each `error` torrent of
+// `many`, `states` and `sample` an older 「File error alert」 (Permission
+// denied) then a newer line: 「File error alert」 with No such file or
+// directory and fake /data paths for many's markup name (picked by name), a
+// 「Torrent errored」 upload-only line with No space left on device for the
+// others (states' Fake.State.10.Error), and for states' 0x300d an unknown
+// reason with a fake path and 203.0.113.7. Every line is newer than every
+// fake torrent's added_on. Ids start at 0 and never change;
+// `last_known_id` (default -1) and the `normal`, `info`, `warning`,
+// `critical` flags (default true) filter like qBittorrent 5.1.4. Every
+// request (its `last_known_id` and time) is logged:
+//   curl 'http://localhost:3100/__fake/log'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
@@ -521,6 +537,12 @@ const STATE_ROWS = [
       save_path: '/data/media/X',
     },
   ],
+  // Story 2.10: a second `error` torrent whose log reason needs cleaning
+  // (an unknown reason with a fake path and a documentation address).
+  [
+    'ErrorUnknown',
+    { state: 'error', private: false, progress: 0.6, category: 'X' },
+  ],
 ]
 const STATES = Object.fromEntries(
   STATE_ROWS.map(([kind, fields], index) => {
@@ -707,6 +729,86 @@ function applyFilePrio(form) {
   return 200
 }
 
+// Story 2.10: qBittorrent's log (WARNING lines name torrents by name).
+const LOG_TYPES = { normal: 1, info: 2, warning: 4, critical: 8 }
+/** Every log/main request, oldest first (`/__fake/log`). */
+const logLog = []
+
+function fileErrorLine(name, reason) {
+  const file = `/data/media/X/incompleted/${name}/${name}.mkv`
+  return `File error alert. Torrent: "${name}". File: "${file}". Reason: "${name} file_open (${file}) error: ${reason}"`
+}
+
+/**
+ * The fake log, oldest first, ids from 0: one history for every data set
+ * (qBittorrent's log outlives what the torrent list shows), so the
+ * container's cached reasons hold whichever data set is on. Built once.
+ */
+let fakeLog = null
+
+function logLines() {
+  if (fakeLog) return fakeLog
+  const errored = [MANY, STATES, SAMPLE]
+    .flatMap((set) => Object.values(set))
+    .filter((torrent) => torrent.state === 'error')
+  const lines = [
+    [LOG_TYPES.normal, 'qBittorrent v5.1.4 started'],
+    [LOG_TYPES.info, 'Fake info line'],
+    [
+      LOG_TYPES.warning,
+      'Fast resume data was rejected. Torrent: "Fake.Show.S01E01.1080p". Reason: "fake"',
+    ],
+  ]
+  for (const torrent of errored) {
+    lines.push([
+      LOG_TYPES.warning,
+      fileErrorLine(torrent.name, 'Permission denied'),
+    ])
+  }
+  lines.push([LOG_TYPES.critical, 'Fake critical line'])
+  for (const torrent of errored) {
+    lines.push([
+      LOG_TYPES.warning,
+      torrent.name.includes('ErrorUnknown')
+        ? `Torrent errored. Torrent: "${torrent.name}". Error: "fake tracker 203.0.113.7 refused /data/media/X/incompleted/${torrent.name}.mkv"`
+        : // many's errored torrent (the e2e expects this reason on it).
+          torrent.name === MARKUP_NAMES[1]
+          ? fileErrorLine(torrent.name, 'No such file or directory')
+          : `Torrent errored. Torrent: "${torrent.name}". Error: "Couldn't write to file. Reason: \"No space left on device\". Torrent is now in \"upload only\" mode."`,
+    ])
+  }
+  // Written after every fake torrent was added: a line older than its
+  // torrent belongs to an earlier one of that name (the container drops it).
+  const start =
+    Math.max(
+      ...[MANY, STATES, SAMPLE].flatMap((set) =>
+        Object.values(set).map((torrent) => torrent.added_on),
+      ),
+    ) + 60
+  fakeLog = lines.map(([type, message], id) => ({
+    id,
+    message,
+    timestamp: start + id,
+    type,
+  }))
+  return fakeLog
+}
+
+/** log/main as qBittorrent answers it: newer than last_known_id, by flag. */
+function logAnswer(params) {
+  const flag = (name) => params.get(name) !== 'false'
+  const lastKnownId = Number(params.get('last_known_id') ?? '-1')
+  logLog.push({ lastKnownId, at: Date.now() })
+  const shown = new Set(
+    Object.entries(LOG_TYPES)
+      .filter(([name]) => flag(name))
+      .map(([, type]) => type),
+  )
+  return logLines().filter(
+    (line) => line.id > lastKnownId && shown.has(line.type),
+  )
+}
+
 const CATEGORIES = {
   X: { name: 'X', savePath: '/data/media/X' },
   'mteam-X': { name: 'mteam-X', savePath: '/data/torrent/mteam-seed' },
@@ -796,6 +898,13 @@ const fakeQbit = createServer(async (req, res) => {
     const status = applyFilePrio(new URLSearchParams(await readBody(req)))
     return send(res, status, status === 200 ? '' : 'Rejected')
   }
+  if (req.method === 'GET' && url.pathname === '/api/v2/log/main') {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    return send(res, 200, JSON.stringify(logAnswer(url.searchParams)), {
+      'content-type': 'application/json',
+    })
+  }
   if (req.method === 'GET' && url.pathname === '/api/v2/sync/maindata') {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
       return send(res, 403, 'Forbidden')
@@ -860,6 +969,7 @@ function controlMode(req, res, url) {
       filePriorities.clear()
       filesLog.length = 0
       opLog.length = 0
+      logLog.length = 0
     }
     Object.assign(mode, next)
     console.log(
@@ -893,12 +1003,23 @@ function controlFiles(req, res) {
   })
 }
 
+/** Story 2.10: every log/main request so far (loopback only, GET). */
+function controlLog(req, res) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'GET') return send(res, 405, 'GET\n')
+  send(res, 200, `${JSON.stringify({ requests: logLog })}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
 function frontHandler(appPort) {
   return (req, res) => {
     const url = new URL(req.url ?? '/', 'http://front')
     if (url.pathname === '/__fake/mode') return controlMode(req, res, url)
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
     if (url.pathname === '/__fake/files') return controlFiles(req, res)
+    if (url.pathname === '/__fake/log') return controlLog(req, res)
     if (mode.front === 'down' && url.pathname.startsWith(SERVER_FN_PREFIX)) {
       return send(res, 502, '<html><body>Bad gateway</body></html>', {
         'content-type': 'text/html; charset=utf-8',

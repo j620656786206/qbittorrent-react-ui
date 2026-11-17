@@ -10,6 +10,10 @@ export const QBIT_PATHS = Object.freeze({
   // Story 2.7: a torrent's files and their priority (same wiki page).
   torrentsFiles: '/api/v2/torrents/files',
   torrentsFilePrio: '/api/v2/torrents/filePrio',
+  // Story 2.10: qBittorrent's own log, read only for errored torrents'
+  // reasons (warning level, incremental by `last_known_id`).
+  // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#get-log
+  logMain: '/api/v2/log/main',
 } as const)
 
 export type QbitPath = (typeof QBIT_PATHS)[keyof typeof QBIT_PATHS]
