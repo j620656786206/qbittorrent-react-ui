@@ -419,3 +419,76 @@ describe('torrent table', () => {
     expect(table.changesSince(table.version + 1).full).toBe(true)
   })
 })
+
+describe('story 2.10 forEach and stateBeforeMove', () => {
+  const moving = (rid: number, hash = HASH_A) =>
+    raw({ rid, torrents: { [hash]: { state: 'moving' } } })
+
+  it('forEach visits every torrent once', () => {
+    const { table } = setup()
+    const seen: Array<string> = []
+    table.forEach((torrent) => seen.push(torrent.hash))
+    expect(seen.sort()).toEqual([HASH_A, HASH_B, HASH_C].sort())
+  })
+
+  it('is set only when a torrent leaves a non-moving state', () => {
+    const { table } = setup()
+    expect(table.stateBeforeMove).toEqual({})
+    table.apply(moving(2))
+    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
+  })
+
+  it('is kept across further moving deltas, and cleared when the move ends', () => {
+    const { table } = setup()
+    table.apply(moving(2))
+    table.apply(
+      raw({
+        rid: 3,
+        torrents: { [HASH_A]: { state: 'moving', progress: 0.7 } },
+      }),
+    )
+    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
+    table.apply(raw({ rid: 4, torrents: { [HASH_A]: { state: 'stoppedDL' } } }))
+    expect(table.stateBeforeMove).toEqual({})
+  })
+
+  it('is cleared on removal', () => {
+    const { table } = setup()
+    table.apply(moving(2))
+    table.apply(raw({ rid: 3, torrents_removed: [HASH_A] }))
+    expect(table.stateBeforeMove).toEqual({})
+  })
+
+  it('is cleared by a full update that drops the torrent', () => {
+    const { table } = setup()
+    table.apply(moving(2))
+    table.apply(
+      raw(
+        fullMaindata({
+          rid: 3,
+          torrents: { [HASH_B]: rawTorrent({ name: 'B' }) },
+        }),
+      ),
+    )
+    expect(table.stateBeforeMove).toEqual({})
+  })
+
+  it('is never set for a torrent first seen moving', () => {
+    const { table } = setup()
+    table.apply(
+      raw({
+        rid: 2,
+        torrents: { [HASH_D]: rawTorrent({ name: 'D', state: 'moving' }) },
+      }),
+    )
+    table.apply(moving(3, HASH_D))
+    expect(table.stateBeforeMove).toEqual({})
+  })
+
+  it('hands out a copy', () => {
+    const { table } = setup()
+    table.apply(moving(2))
+    table.stateBeforeMove[HASH_A] = 'error'
+    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
+  })
+})

@@ -13,8 +13,8 @@ import type { ErrorReasonsResponse } from '#/shared/error-reasons'
 // again (`last_known_id` = its id - 1), so the answer must start with that
 // same entry. An empty answer, or one that starts with anything else, means
 // qBittorrent restarted (its ids start at 0 again) or the entry rotated out
-// of its buffer: what was kept is dropped and the whole buffer is read in
-// the same refresh. Only the newest line per torrent name is kept (its id,
+// of its buffer: what was kept is dropped and the next allowed read asks
+// for the whole buffer (still one call per window). Only the newest line per torrent name is kept (its id,
 // time and cleaned reason, or no reason when it has nothing to show), at
 // most MAX_REMEMBERED_NAMES names, never the log itself. A line older than
 // the torrent (`added_on`) belongs to an earlier torrent of that name.
@@ -102,9 +102,11 @@ export function createErrorReasonReader(
         apply(entries.slice(1))
         return
       }
-      // Restarted or rotated: start over.
+      // Restarted or rotated: forget it all; the next allowed read starts
+      // over from -1 (one qBittorrent call per window).
       latest.clear()
       newest = null
+      return
     }
     apply(await options.client.logMain(-1))
   }

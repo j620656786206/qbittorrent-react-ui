@@ -413,6 +413,11 @@ describe('error reasons (spec 2.10)', () => {
     const line = item?.querySelector(`[title="${long}"]`)
     expect(line?.textContent).toBe(long)
     expect(line?.className).toContain('truncate')
+    // Other cards' lines (speed, time) have no tooltip: only the name does.
+    const down = [...main.querySelectorAll('[role="listitem"]')].find((x) =>
+      x.querySelector('[title="Down"]'),
+    )
+    expect(down?.querySelectorAll('[title]')).toHaveLength(1)
   })
 
   it('the phone tabs show it too', async () => {

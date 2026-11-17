@@ -111,11 +111,37 @@ const ACCOUNT_PATTERN = /[^\s"'()<>@]+@[^\s"'()<>@]+/g
 /** `C:\dir\file`, `C:/dir`, and UNC `\\server\share\...`. */
 const WINDOWS_PATH_PATTERN = /(?:\b[a-z]:[\\/]|\\\\)[^\s"'()<>]*/gi
 /** `/dir/file`, at the start or after a space, bracket, quote, `:` or `,`. */
-const POSIX_PATH_PATTERN = /(^|[\s("'=[<:,])\/[^\s"'()<>]+/g
+const POSIX_PATH_PATTERN = /(^|[\s("'=[<:,])\/[^\s"'()<>,]+/g
+/**
+ * A quoted string ("…", '…' after a space or bracket, 「…」): replaced whole
+ * when it holds a slash or backslash (a path with spaces in it).
+ */
+const QUOTED_PATTERN = /"[^"]*"|(?<=^|[\s(=:,])'[^']*'|「[^「」]*」/g
 /** OS words with a slash that are not paths. */
-const SLASH_WORDS = /^(?:i\/o|input\/output)$/i
+const SLASH_WORDS = /^(?:i\/o|input\/output|read\/write)$/i
 /** Punctuation around a word: `(I/O),` is still I/O. */
-const EDGE_PUNCTUATION = /^["'(]+|[.,;:!?)"']+$/g
+const LEADING_PUNCTUATION = /^["'(「]+/
+const TRAILING_PUNCTUATION = /[.,;:!?)"'」]+$/
+/**
+ * A file name: a dot and a 2 to 5 character extension, where the extension
+ * has a letter (`1.mkv`) or the name has one (`Fake.part.001`), never a
+ * version like 2.0.11 or v5.1.4.
+ */
+const FILE_NAME = /^(\S+)\.([a-z0-9]{2,5})$/i
+const VERSION = /^v?\d+(?:\.\d+)*$/i
+
+function isFileName(token: string): boolean {
+  const match = FILE_NAME.exec(token)
+  if (!match || VERSION.test(token)) return false
+  const [, name, extension] = match
+  return /[a-z]/i.test(extension) || /[a-z]/i.test(name)
+}
+/**
+ * A dotted host name whose last label is letters, with an optional port
+ * (`tracker.example.com:443`, `nas.lan:8080`); versions never match.
+ */
+const HOST_PATTERN =
+  /(?<![\w.-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?![\w.-])/gi
 /** A bracketed IPv6 address with an optional port: `[2001:db8::1]:6881`. */
 const BRACKETED_IPV6_PATTERN = /\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d{1,5})?/gi
 /** IPv6 candidates; `isIpv6` decides (a time like 12:30:45 is not one). */
@@ -149,15 +175,34 @@ const TRANSLATIONS: ReadonlyMap<string, string> = new Map([
 ])
 
 /**
- * What the patterns missed (a path with spaces leaves its tail): any token
- * left with a slash or backslash, except `I/O` and `Input/output`.
+ * A host name with a port, or with two or more dots in lower case, is an
+ * address; a single dotted word (`fake.mkv`, `nas.lan`) is left to
+ * `leftoverPaths`, which reads it as a file name. Either way it is gone.
+ */
+function hostNames(text: string): string {
+  return text.replace(HOST_PATTERN, (match) => {
+    const hasPort = /:\d+$/.test(match)
+    const dots = match.split('.').length - 1
+    return hasPort || (dots >= 2 && match === match.toLowerCase())
+      ? ADDRESS_PLACEHOLDER
+      : match
+  })
+}
+
+/**
+ * What the patterns missed: any token left with a slash or backslash
+ * (except `I/O`, `Input/output`, `read/write`) or ending in a file
+ * extension. Punctuation around the token stays.
  */
 function leftoverPaths(text: string): string {
-  return text.replace(/\S*[\\/]\S*/g, (token) =>
-    SLASH_WORDS.test(token.replace(EDGE_PUNCTUATION, ''))
-      ? token
-      : PATH_PLACEHOLDER,
-  )
+  return text.replace(/\S+/g, (token) => {
+    const lead = LEADING_PUNCTUATION.exec(token)?.[0] ?? ''
+    const trail = TRAILING_PUNCTUATION.exec(token.slice(lead.length))?.[0] ?? ''
+    const core = token.slice(lead.length, token.length - trail.length)
+    const isPath =
+      (/[\\/]/.test(core) && !SLASH_WORDS.test(core)) || isFileName(core)
+    return isPath ? `${lead}${PATH_PLACEHOLDER}${trail}` : token
+  })
 }
 
 /** 「（路徑） （路徑）」 reads as one placeholder. */
@@ -170,21 +215,34 @@ function collapsePlaceholders(text: string): string {
 function capped(text: string): string {
   const chars = Array.from(text)
   if (chars.length <= ERROR_REASON_MAX_CHARS) return text
-  return `${chars
-    .slice(0, ERROR_REASON_MAX_CHARS - 1)
-    .join('')
-    .trimEnd()}…`
+  let cut = chars.slice(0, ERROR_REASON_MAX_CHARS - 1).join('')
+  // Never cut inside a placeholder: drop a partial 「（路徑）」 or 「（位址）」.
+  const open = cut.lastIndexOf('（')
+  if (open >= 0 && !cut.includes('）', open)) {
+    const tail = cut.slice(open)
+    if (
+      PATH_PLACEHOLDER.startsWith(tail) ||
+      ADDRESS_PLACEHOLDER.startsWith(tail)
+    ) {
+      cut = cut.slice(0, open)
+    }
+  }
+  return `${cut.trimEnd()}…`
 }
 
 /**
- * A raw reason as shown: paths become 「（路徑）」, IP addresses, URLs and
- * `user@host` forms 「（位址）」, whitespace collapses, at most 120
+ * A raw reason as shown: paths, quoted paths and file names become
+ * 「（路徑）」, IP addresses, host names, URLs and `user@host` forms
+ * 「（位址）」 (adjacent ones collapse), whitespace collapses, at most 120
  * characters, and a known OS error reads in Traditional Chinese.
  */
 export function errorReasonText(raw: string): string {
   const replaced = raw
     .replace(URL_PATTERN, ADDRESS_PLACEHOLDER)
     .replace(ACCOUNT_PATTERN, ADDRESS_PLACEHOLDER)
+    .replace(QUOTED_PATTERN, (quoted) =>
+      /[\\/]/.test(quoted) ? PATH_PLACEHOLDER : quoted,
+    )
     .replace(WINDOWS_PATH_PATTERN, PATH_PLACEHOLDER)
     .replace(
       POSIX_PATH_PATTERN,
@@ -195,7 +253,7 @@ export function errorReasonText(raw: string): string {
       isIpv6(match) ? ADDRESS_PLACEHOLDER : match,
     )
     .replace(IPV4_PATTERN, ADDRESS_PLACEHOLDER)
-  const cleaned = collapsePlaceholders(leftoverPaths(replaced))
+  const cleaned = collapsePlaceholders(leftoverPaths(hostNames(replaced)))
     .replace(/\s+/g, ' ')
     .trim()
   return TRANSLATIONS.get(cleaned.toLowerCase()) ?? capped(cleaned)

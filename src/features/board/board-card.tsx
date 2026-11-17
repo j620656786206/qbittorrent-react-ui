@@ -101,7 +101,7 @@ export function CardContent({
           </span>
           {/* `title`: a long reason (story 2.10) is cut on the card. */}
           <span
-            title={model.detail}
+            title={model.detailTitle ?? undefined}
             className="truncate text-meta leading-[17px] text-text-muted tabular-nums"
           >
             {model.detail}

@@ -189,16 +189,39 @@ describe('errorReasonText', () => {
       'file_open (/data/media/X/a.mkv)',
       'file_open (（路徑）)',
     ],
-    ['a quoted path', 'open "/data/media/X/a b.mkv"', 'open "（路徑） b.mkv"'],
+    ['a quoted path', 'open "/data/media/X/a b.mkv"', 'open （路徑）'],
+    [
+      'a single-quoted path',
+      "open '/data/X/fake secret.mkv' now",
+      'open （路徑） now',
+    ],
+    ['a 「」 quoted path', 'open 「/data/X/假 檔名.mkv」', 'open （路徑）'],
     [
       'a path with spaces',
       'cannot open /data/X/My Show/ep 1.mkv now',
-      'cannot open （路徑） 1.mkv now',
+      'cannot open （路徑） now',
+    ],
+    ['a bare file name', 'cannot open fake-secret.mkv', 'cannot open （路徑）'],
+    [
+      'a file name with punctuation around it',
+      'open (Fake.Show.S01E05.1080p.mkv), again',
+      'open (（路徑）), again',
     ],
     ['a path after a colon', 'failed:/data/X/a.mkv', 'failed:（路徑）'],
-    ['a path after a comma', 'a,/data/X/a.mkv,b', 'a,（路徑）'],
+    ['a path after a comma', 'a,/data/X/a.mkv,b', 'a,（路徑）,b'],
     ['a Windows path with spaces', 'at C:\\My Docs\\X\\a.mkv', 'at （路徑）'],
-    ['a slash inside a word', 'read/write failed', '（路徑） failed'],
+    ['a slash inside a word', 'fake/thing failed', '（路徑） failed'],
+    [
+      'a host name with a port',
+      'cannot reach tracker.example.com:443 now',
+      'cannot reach （位址） now',
+    ],
+    ['a .lan host with a port', 'nas.lan:8080 refused', '（位址） refused'],
+    [
+      'a host name without a port',
+      'tracker.example.com said no',
+      '（位址） said no',
+    ],
     [
       'an IPv4 address with a port',
       'peer 198.51.100.7:6881 hung up',
@@ -227,7 +250,23 @@ describe('errorReasonText', () => {
       'GET （位址） failed',
     ],
   ])('removes %s', (_name, raw, text) => {
-    expect(errorReasonText(raw)).toBe(text)
+    const cleaned = errorReasonText(raw)
+    expect(cleaned).toBe(text)
+    // No piece of a file name, path or host is left.
+    for (const piece of [
+      'mkv',
+      'data',
+      'Show',
+      'secret',
+      'Docs',
+      'example',
+      'nas.lan',
+      '檔名',
+      'ep 1',
+      'thing',
+    ]) {
+      expect(cleaned).not.toContain(piece)
+    }
   })
 
   it.each([
@@ -243,6 +282,13 @@ describe('errorReasonText', () => {
       'libtorrent::file_open failed',
     ],
     ['a version', 'libtorrent 2.0.11 said no', 'libtorrent 2.0.11 said no'],
+    ['a version with v', 'v5.1.4 said no', 'v5.1.4 said no'],
+    [
+      'read/write as a word',
+      'Read/write failed, read/write again',
+      'Read/write failed, read/write again',
+    ],
+    ['a sentence end', 'it failed. Try again.', 'it failed. Try again.'],
   ])('keeps %s', (_name, raw, text) => {
     expect(errorReasonText(raw)).toBe(text)
   })
@@ -251,6 +297,23 @@ describe('errorReasonText', () => {
     const text = errorReasonText(`${'磁'.repeat(80)} ${'x'.repeat(80)}`)
     expect(Array.from(text)).toHaveLength(ERROR_REASON_MAX_CHARS)
     expect(text.endsWith('…')).toBe(true)
+  })
+
+  it('the cap never cuts inside a placeholder', () => {
+    // 117 characters, then a path: the cut at 119 lands inside 「（路徑）」.
+    const text = errorReasonText(`${'y'.repeat(117)} /data/X/a.mkv tail`)
+    expect(text).toBe(`${'y'.repeat(117)}…`)
+    const address = errorReasonText(`${'y'.repeat(116)} 203.0.113.9 more`)
+    expect(address).toBe(`${'y'.repeat(116)}…`)
+  })
+
+  it('adjacent placeholders collapse into one', () => {
+    expect(errorReasonText('at /data/X/a.mkv /data/X/b.mkv')).toBe(
+      'at （路徑）',
+    )
+    expect(errorReasonText('peers 203.0.113.1 203.0.113.2')).toBe(
+      'peers （位址）',
+    )
   })
 
   it('a reason of exactly 120 characters stays whole', () => {

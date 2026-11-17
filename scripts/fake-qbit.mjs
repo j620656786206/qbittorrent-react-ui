@@ -76,7 +76,7 @@
 // about a torrent that is not errored, and for each `error` torrent of
 // `many`, `states` and `sample` an older 「File error alert」 (Permission
 // denied) then a newer line: 「File error alert」 with No such file or
-// directory and fake /data paths for the first (many's markup name), a
+// directory and fake /data paths for many's markup name (picked by name), a
 // 「Torrent errored」 upload-only line with No space left on device for the
 // others (states' Fake.State.10.Error), and for states' 0x300d an unknown
 // reason with a fake path and 203.0.113.7. Every line is newer than every
@@ -766,16 +766,17 @@ function logLines() {
     ])
   }
   lines.push([LOG_TYPES.critical, 'Fake critical line'])
-  errored.forEach((torrent, index) => {
+  for (const torrent of errored) {
     lines.push([
       LOG_TYPES.warning,
       torrent.name.includes('ErrorUnknown')
         ? `Torrent errored. Torrent: "${torrent.name}". Error: "fake tracker 203.0.113.7 refused /data/media/X/incompleted/${torrent.name}.mkv"`
-        : index === 0
+        : // many's errored torrent (the e2e expects this reason on it).
+          torrent.name === MARKUP_NAMES[1]
           ? fileErrorLine(torrent.name, 'No such file or directory')
           : `Torrent errored. Torrent: "${torrent.name}". Error: "Couldn't write to file. Reason: \"No space left on device\". Torrent is now in \"upload only\" mode."`,
     ])
-  })
+  }
   // Written after every fake torrent was added: a line older than its
   // torrent belongs to an earlier one of that name (the container drops it).
   const start =

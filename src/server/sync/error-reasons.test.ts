@@ -198,14 +198,16 @@ describe('error reason reader', () => {
     expect(ids()).toEqual([-1, 7, 8])
   })
 
-  it('matrix 10: a restart whose new log is shorter: an empty answer starts over in the same read', async () => {
+  it('matrix 10: a restart whose new log is shorter: an empty answer forgets everything; the next window reads from -1', async () => {
     const { reader, log, ids, readLater } = setup(
       [N, M],
       [line(40, fileError(N.name, 'File too large'))],
     )
     expect((await reader.read()).reasons).toEqual({ [HASH_A]: '檔案太大' })
     log.buffer = [line(0, fileError(M.name, 'Permission denied'), T0 + 500)]
-    // The old reason is gone with the old buffer.
+    // The old reason is gone with the old buffer; one call in this window.
+    expect(await readLater()).toEqual({})
+    expect(ids()).toEqual([-1, 39])
     expect(await readLater()).toEqual({ [HASH_B]: '沒有權限' })
     expect(ids()).toEqual([-1, 39, -1])
   })
@@ -222,7 +224,9 @@ describe('error reason reader', () => {
       line(2, 'qBittorrent started', T0 + 502),
       line(3, 'other', T0 + 503),
     ]
-    // The new session's early line (id 0) is read; the old reason is gone.
+    // The old reason is gone at once; the next window reads the new
+    // session from its first line (id 0).
+    expect(await readLater()).toEqual({})
     expect(await readLater()).toEqual({ [HASH_B]: '沒有權限' })
     expect(ids()).toEqual([-1, 1, -1])
   })
@@ -234,6 +238,7 @@ describe('error reason reader', () => {
     )
     expect((await reader.read()).reasons).toEqual({ [HASH_A]: '檔案太大' })
     log.buffer = [line(5, fileError(N.name, 'Permission denied'), T0 + 900)]
+    expect(await readLater()).toEqual({})
     expect(await readLater()).toEqual({ [HASH_A]: '沒有權限' })
   })
 
@@ -308,7 +313,9 @@ describe('syncer readErrorCandidates', () => {
         torrents: { [HASH_A]: rawTorrent({ name: 'N', state: 'error' }) },
       }),
       { rid: 2, torrents: { [HASH_A]: { state: 'moving' } } },
-      { rid: 3, torrents: { [HASH_A]: { state: 'stoppedDL' } } },
+      // Still moving: the remembered state stays.
+      { rid: 3, torrents: { [HASH_A]: { state: 'moving', progress: 0.4 } } },
+      { rid: 4, torrents: { [HASH_A]: { state: 'stoppedDL' } } },
     ]
     let clock = 0
     const syncMaindata = vi.fn(() =>
@@ -316,6 +323,10 @@ describe('syncer readErrorCandidates', () => {
     )
     const syncer = createSyncer({ client: { syncMaindata }, now: () => clock })
     expect(await syncer.readErrorCandidates()).toHaveLength(1)
+    clock += 10_000
+    expect(await syncer.readErrorCandidates()).toEqual([
+      { hash: HASH_A, name: 'N', added_on: 1_700_000_000 },
+    ])
     clock += 10_000
     expect(await syncer.readErrorCandidates()).toEqual([
       { hash: HASH_A, name: 'N', added_on: 1_700_000_000 },

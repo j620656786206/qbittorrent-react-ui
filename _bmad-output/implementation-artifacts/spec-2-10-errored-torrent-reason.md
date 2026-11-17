@@ -5,7 +5,7 @@ created: '2026-11-18'
 status: 'done'
 baseline_revision: 'cabf8b1aa9e83e9e49db26e06306e0dc427b1a3c'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -141,6 +141,49 @@ deferred: []
   - `[low]` `[patch]` (edge) Poll period equals the server window : same as the blind latency entry; fixed there.
   - `[low]` `[reject]` (edge) A torrent that recovers and errors again within 60 s shows the previous reason until the next poll : at most one poll late; invalidating on every flip adds state for a rare case.
 
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 39 findings, high 0, medium 0, low 27, false 12, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (intent) Window is 55 s, not 60 s : recorded in the Spec Change Log; still about one call a minute, and the story's AC asks only for a rate limit off the 5 s poll.
+  - `[false]` `[reject]` (intent) `last_known_id` is the newest id minus one : the overlap entry is how a restart is detected; recorded in the Spec Change Log.
+  - `[low]` `[patch]` (intent) A restart mismatch reads `-1` in the same refresh (two calls in one window) : grouped with the edge entry below; the next window reads `-1`.
+  - `[low]` `[patch]` (intent) Two calls inside one window on restart : same root cause; fixed there.
+  - `[false]` `[reject]` (intent) A file error without 「error: 」 gives no reason instead of the whole text : that text is libtorrent's `<name> <op> (<file>)`; showing it would leak the file path; recorded in the Spec Change Log.
+  - `[low]` `[reject]` (intent) No test uses a real qBittorrent log : AD-15 allows real reads only by hand; the templates come from the 5.1.4 source and translation files, and the deployment checklist asks Alex to confirm on the NAS.
+  - `[false]` `[reject]` (intent) Chinese templates beyond the English ones : first-pass fix, recorded.
+  - `[false]` `[reject]` (intent) Fifteen translations instead of eight : first-pass fix, Claude 代決.
+  - `[false]` `[reject]` (intent) Extra cleaning (URLs, slash tokens, merged placeholders) : first-pass fix serving the AC's no-path, no-address rule.
+  - `[false]` `[reject]` (intent) Lines older than `added_on` are dropped : first-pass fix, recorded.
+  - `[false]` `[reject]` (intent) A torrent moving from `error` stays a candidate : first-pass fix matching the browser's rule.
+  - `[false]` `[reject]` (intent) A failure is reused inside its window : the matrix asks that a failing qBittorrent is not asked again each time.
+  - `[false]` `[reject]` (intent) The reason also appears as a `title` : plain text, the same reason, first-pass fix for readability.
+  - `[low]` `[patch]` (verification-gap) No test sends a second delta while a torrent stays `moving` : test added; torrent-table tests added for `forEach` and `stateBeforeMove`.
+  - `[low]` `[patch]` (blind) `title` on every card's second line : set only when the card shows an error reason.
+  - `[low]` `[patch]` (blind) Bare hostnames pass : dotted hostnames with a letter TLD and optional port become 「（位址）」; versions stay.
+  - `[low]` `[patch]` (blind) Paths with spaces leak their tail : quoted strings with a separator are replaced whole; tokens with a file extension become 「（路徑）」.
+  - `[low]` `[patch]` (blind) `read/write` and comma false positives : `read/write` allowed; path body stops at `,`.
+  - `[low]` `[reject]` (blind) A newly errored torrent waits for the next poll : the server window caches for 55 s anyway, so a refetch would not show it sooner.
+  - `[low]` `[patch]` (blind) Torrent table's new API has no unit tests : same as the verification-gap entry; fixed there.
+  - `[low]` `[reject]` (blind) The e2e never exercises the incremental read : the reader's unit tests run against a fake buffer that answers `last_known_id` like qBittorrent.
+  - `[low]` `[reject]` (blind) The reason lookup is copied three times : carried.
+  - `[low]` `[reject]` (blind) The response schema is looser than the promise : carried.
+  - `[low]` `[reject]` (blind) The snapshot-cache test asserts a stale answer : carried.
+  - `[low]` `[reject]` (blind) Name and hash off-by-one in list tests : test readability only.
+  - `[low]` `[patch]` (blind) The fake log picks its line by array position : picked by torrent name.
+  - `[low]` `[reject]` (blind) More errno and Windows texts : the container is Linux; untranslated text stays readable as cleaned English.
+  - `[low]` `[patch]` (blind) The checklist covers only the card : list row, detail summary and the no-errored-torrent case added.
+  - `[low]` `[patch]` (edge) Two `log/main` calls in one refresh on a mismatch : the mismatch clears and returns; the next window reads `-1`.
+  - `[low]` `[reject]` (edge) Over 1000 newer names evict a still-errored torrent's line : needs a thousand distinct errored names; not an everyday state.
+  - `[low]` `[reject]` (edge) Rotation clears known reasons : a full re-read follows and finds every line still in the buffer; a line that left the buffer is gone anyway.
+  - `[low]` `[patch]` (edge) A path whose last segment has spaces : same root cause as the blind path entry; fixed there.
+  - `[low]` `[patch]` (edge) Bare hostname or host:port : same as the blind hostname entry; fixed there.
+  - `[low]` `[patch]` (edge) A bare file name with no slash passes : extension tokens become 「（路徑）」.
+  - `[low]` `[patch]` (edge) The cap can cut inside a placeholder : cut backs off before a partial placeholder.
+  - `[low]` `[reject]` (edge) Several browsers share the 55 s window : one person uses this app; at most one window late.
+  - `[low]` `[reject]` (edge) A re-error within the cache time shows the previous reason : carried.
+  - `[false]` `[reject]` (edge, claim) "At most once per 60 s" : the window is 55 s by a recorded decision, and the double call is fixed above.
+  - `[false]` `[reject]` (edge, claim) "No path" while a tail leaked : fixed above.
+
 ## Design Notes
 
 Research (qBittorrent `release-5.1.4` source and the 5.0 WebUI API wiki): `log/main` takes `normal`, `info`, `warning`, `critical` (default true) and `last_known_id` (default -1, returns only newer ids), answers `[{id, timestamp (seconds), type (1 normal, 2 info, 4 warning, 8 critical), message}]` oldest first from a 20000-message in-memory buffer that restarts at id 0 when qBittorrent restarts; a normal WebUI login may read it and it changes nothing. The `error` state's lines are WARNING: `SessionImpl::handleFileErrorAlert` (「File error alert…」, logged once per torrent per second) and `SessionImpl::createTorrent` (「Torrent errored…」 for torrents restored already errored). Both name the torrent by name only. `missingFiles` wins over `error` in `TorrentImpl::updateState`, so fast-resume-rejected lines belong to `missingFiles` and are ignored. Some `error` causes log nothing (libtorrent `torrent_error_alert` is unhandled), so the fixed text stays for them.
@@ -170,3 +213,7 @@ Status: done (first review pass)
 **Follow-up review: recommended.** Patched by verdict: medium 4, low 7. The named risk: the reader's read loop and the cleaner were rewritten after review, so a second pass should re-check restart handling, the overlap read and the slash-token rule together.
 
 **Verification (2026-11-18).** lint and typecheck clean; `npm test` 103 files, 2427 tests passed; `npm run build` then `npx playwright test` 74 passed, 0 CSP violations; `check.sh` all ok. `npm audit --omit=dev --audit-level=high` now reports 11 high findings from one new advisory (GHSA-fc5q-39xc-vjpf, picomatch <= 4.0.7, no patched version, updated 2026-11-17) reached through `@tanstack/react-start` build tooling; this story changes no dependency.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 39 findings, no high or medium: patched the low ones (one `log/main` call per window on a restart mismatch, whole quoted paths and file-extension tokens removed, bare hostnames, placeholder-safe cap, `title` only on error cards, moving and torrent-table tests, fake log picked by name, checklist wording); rejected the rest with reasons in the triage log. Follow-up review: not recommended (no high patched on a follow-up pass).
