@@ -627,19 +627,25 @@ test('screenshots: list panel, board panel, phone sheet (70%, full, name), light
 
 const SCREENSHOT_DIR_25 = 'e2e-output/screenshots/2-5'
 const STATE_ROWS = [
-  ['downloading', '下載中　87%'],
-  ['meta', '抓種子資訊中'],
-  ['queued', '排隊中　12%'],
-  ['checking', '檢查檔案中　45%'],
-  ['paused', '已暫停　87%'],
-  ['stalled', '停滯　87%'],
-  ['seeding', '做種 41 天'],
-  ['done', '已完成'],
-  ['missing-files', '找不到檔案'],
-  ['error', '錯誤'],
-  ['unknown', '狀態不明'],
-  ['archived', '已整理'],
+  ['downloading', '下載中\u300087%', 'downloading'],
+  ['meta', '抓種子資訊中', 'downloading'],
+  ['queued', '排隊中\u300012%', 'downloading'],
+  ['checking', '檢查檔案中\u300045%', 'downloading'],
+  ['paused', '已暫停\u300087%', 'paused'],
+  ['stalled', '停滯\u300087%', 'stalled'],
+  ['seeding', '做種 41 天', 'seeding'],
+  ['done', '已完成', 'done'],
+  ['missing-files', '找不到檔案', 'error'],
+  ['error', '錯誤', 'error'],
+  ['unknown', '狀態不明', 'error'],
+  ['archived', '已整理', 'archived'],
 ] as const
+/** The summary line of some rows (the fake rows' own numbers). */
+const SUMMARIES: Partial<Record<(typeof STATE_ROWS)[number][0], string>> = {
+  downloading: '剩 34 分 · ↓ 6.21 MB/s · 85 GB · mteam-tv',
+  seeding: '分享率 3.12 · 已上傳 265.2 GB · 85 GB · mteam-tv',
+  archived: '留著當紀錄 · 2025/07/18 下載好了 · 85 GB · X',
+}
 const stateHash = (index: number) => hashOf(0x3001 + index)
 const ARCHIVED_INDEX = 11
 const LONG_SAVE_PATH =
@@ -728,7 +734,7 @@ test.describe('story 2.5 overview', () => {
     await login(page)
     for (const scheme of SCHEMES) {
       await page.emulateMedia({ colorScheme: scheme })
-      for (const [index, [slug, headline]] of STATE_ROWS.entries()) {
+      for (const [index, [slug, headline, status]] of STATE_ROWS.entries()) {
         const archived = index === ARCHIVED_INDEX
         await page.goto(
           archived
@@ -736,9 +742,15 @@ test.describe('story 2.5 overview', () => {
             : `/?sort=added_on&hash=${stateHash(index)}`,
         )
         await expect(panel(page)).toBeVisible()
-        await expect(overview(panel(page)).locator('p').first()).toHaveText(
-          headline,
+        const heroText = overview(panel(page)).locator('p')
+        await expect(heroText.first()).toHaveText(headline)
+        await expect(heroText.first()).toHaveClass(
+          new RegExp(`(^| )text-status-${status}( |$)`),
         )
+        const summary = SUMMARIES[slug]
+        if (summary !== undefined) {
+          await expect(heroText.nth(1)).toHaveText(summary)
+        }
         expect(await blockKinds(panel(page))).toEqual([
           'hero',
           'tiles:3',
@@ -770,13 +782,16 @@ test.describe('story 2.5 overview', () => {
     ).toHaveText('剩餘時間34 分')
     await expect(
       overview(panel(page)).locator('[data-slot="stat-tiles"] > *').nth(2),
-    ).toHaveText(/^來源數\d+$/)
+    ).toHaveText('來源數12')
     await page.goto(`/?sort=added_on&hash=${stateHash(6)}`)
     await expect(tileTitles(panel(page))).toHaveText([
       '現在上傳',
       '在抓的人',
       '最後有人抓',
     ])
+    await expect(
+      overview(panel(page)).locator('[data-slot="stat-tiles"] > *').nth(1),
+    ).toHaveText('在抓的人3')
     await page.goto(`/?sort=added_on&hash=${stateHash(9)}`)
     await expect(tileTitles(panel(page))).toHaveText([
       '大小',

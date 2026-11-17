@@ -7,7 +7,7 @@ import {
   formatSize,
   formatSpeed,
 } from '#/lib/format'
-import { classify, heroKindOf } from '#/lib/torrent-status'
+import { classify, heroKindOf, statusOfHeroKind } from '#/lib/torrent-status'
 import type { ClassifyOptions, HeroKind } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import type { TorrentStatusId } from '#/shared/torrent-status'
@@ -146,16 +146,19 @@ export function detailHero(
   torrent: SlimTorrent,
   options: DetailHeroOptions,
 ): DetailHero {
-  const status = classify(torrent, options)
+  // The row decides the colour; classify() (whose status comes from the
+  // same row) adds the word and whether a ring shows.
   const kind = heroKindOf(torrent, options.stateBeforeMove)
+  const colour = statusOfHeroKind(kind)
+  const status = classify(torrent, options)
   const summaryParts = summaryPartsOf(kind, torrent, options)
   return {
-    status: status.status,
+    status: colour,
     headline: headlineOf(kind, torrent),
     summaryParts,
     summary: summaryParts.join(' · '),
     circle: {
-      status: status.status,
+      status: colour,
       label: status.showsProgress
         ? `${status.word}，${formatPercent(torrent.progress)}`
         : status.word,

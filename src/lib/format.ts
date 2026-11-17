@@ -154,26 +154,39 @@ function etaParts(seconds: number): string {
   return `${minutes} 分`
 }
 
+/** timeLeft()'s marker for under a minute (never shown). */
+const UNDER_A_MINUTE = 'under a minute'
+
 /**
  * 「剩不到 1 分」 「剩 34 分」 「剩 3 小時 12 分」 「剩 2 天 5 小時」; no download
  * speed, a negative or the infinite `eta`: 「剩餘時間不明」.
  */
 export function formatEta(eta: number, dlspeed: number): string {
+  const left = timeLeft(eta, dlspeed)
+  if (left === null) return '剩餘時間不明'
+  return left === UNDER_A_MINUTE ? '剩不到 1 分' : `剩 ${left}`
+}
+
+/**
+ * The time left before any wording, shared by formatEta and
+ * formatTimeLeft: `null` when unknown (no download speed, a negative or the
+ * infinite `eta`), UNDER_A_MINUTE, or the two largest parts 「3 小時 12 分」.
+ */
+function timeLeft(eta: number, dlspeed: number): string | null {
   const unknown = !(dlspeed > 0) || !(eta >= 0) || eta >= QBIT_ETA_INFINITY
-  if (unknown) return '剩餘時間不明'
-  if (eta < MINUTE) return '剩不到 1 分'
-  return `剩 ${etaParts(eta)}`
+  if (unknown) return null
+  return eta < MINUTE ? UNDER_A_MINUTE : etaParts(eta)
 }
 
 /**
  * The detail's 剩餘時間 tile (story 2.5, mockup S05-overview-phone): the
- * `formatEta` text without 「剩 」: 「34 分」 「不到 1 分」 「2 天 5 小時」;
- * unknown is 「不明」 (EXPERIENCE 數字小卡依狀態換).
+ * time left without 「剩」: 「34 分」 「不到 1 分」 「2 天 5 小時」; unknown is
+ * 「不明」 (EXPERIENCE 數字小卡依狀態換).
  */
 export function formatTimeLeft(eta: number, dlspeed: number): string {
-  const text = formatEta(eta, dlspeed)
-  if (text === '剩餘時間不明') return '不明'
-  return text.startsWith('剩 ') ? text.slice('剩 '.length) : text.slice(1)
+  const left = timeLeft(eta, dlspeed)
+  if (left === null) return '不明'
+  return left === UNDER_A_MINUTE ? '不到 1 分' : left
 }
 
 interface ZonedParts {

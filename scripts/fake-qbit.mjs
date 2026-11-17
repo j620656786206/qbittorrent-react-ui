@@ -39,7 +39,7 @@
 //          column is empty: one torrent each downloading, seeding and done,
 //          plus one archived)
 //          states (story 2.5): one torrent per detail hero row, 12 in all
-//          (hashes 3001 to 3012 in hex: 下載中, 抓種子資訊中, 排隊中, 檢查檔
+//          (hashes 0x3001 to 0x300c: 下載中, 抓種子資訊中, 排隊中, 檢查檔
 //          案中, 已暫停, 停滯, 做種中, 已完成, 找不到檔案, 錯誤, 狀態不明,
 //          已整理); the first has a long save path with Chinese in it
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
@@ -386,6 +386,8 @@ const STATE_ROWS = [
       eta: 2040,
       progress: 0.87,
       category: 'mteam-tv',
+      num_seeds: 12,
+      num_leechs: 2,
       save_path:
         '/data/media/tv/假影集.第一季.Fake.Show.Season.Pack.2160p.WEB-DL',
     },
@@ -407,6 +409,8 @@ const STATE_ROWS = [
       category: 'mteam-tv',
       save_path: '/data/torrent/mteam-seed',
       private: true,
+      num_seeds: 0,
+      num_leechs: 3,
     },
   ],
   [

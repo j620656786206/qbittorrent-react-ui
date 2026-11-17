@@ -139,8 +139,10 @@ export function DetailPanelBody({
       role="tabpanel"
       id={ids.panelId}
       aria-labelledby={ids.tabId}
-      // No `tabIndex`: since story 2.5 the 複製 button is the first stop
+      // The panel is the scroller and its first content (hero, tiles) takes
+      // no focus, so the panel itself is a tab stop
       // (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+      tabIndex={0}
       className={className}
     >
       <Overview torrent={torrent} phone={phone} />

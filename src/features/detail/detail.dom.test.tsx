@@ -590,8 +590,23 @@ describe('the overview (story 2.5)', () => {
     })
   }
 
+  /** Own property descriptors before the tests touch them (restored after). */
+  const ORIGINAL = {
+    clipboard: Object.getOwnPropertyDescriptor(navigator, 'clipboard'),
+    execCommand: Object.getOwnPropertyDescriptor(document, 'execCommand'),
+  }
+  function restore(
+    target: object,
+    name: string,
+    descriptor: PropertyDescriptor | undefined,
+  ) {
+    if (descriptor) Object.defineProperty(target, name, descriptor)
+    else Reflect.deleteProperty(target, name)
+  }
+
   afterEach(() => {
-    setClipboard(undefined)
+    restore(navigator, 'clipboard', ORIGINAL.clipboard)
+    restore(document, 'execCommand', ORIGINAL.execCommand)
     vi.useRealTimers()
   })
 
@@ -614,8 +629,9 @@ describe('the overview (story 2.5)', () => {
     expect(blocks[1].className).toContain('grid-cols-3')
     expect(blocks[2]).toBe(sectionOf())
     expect(blocks[3].tagName).toBe('DL')
-    // The panel is no tab stop now: 複製 is.
-    expect(panel.hasAttribute('tabindex')).toBe(false)
+    // The panel scrolls and its first content takes no focus: it stays a
+    // tab stop (WAI-ARIA tabs pattern).
+    expect(panel.getAttribute('tabindex')).toBe('0')
   })
 
   it('hero: headline in the status colour, muted summary; tiles get the detail counts', async () => {
@@ -636,6 +652,14 @@ describe('the overview (story 2.5)', () => {
       ['在抓的人', '3'],
       ['最後有人抓', '沒人抓過'],
     ])
+    const values = [
+      ...document.querySelectorAll(
+        '[data-slot="stat-tiles"] > * > :last-child',
+      ),
+    ]
+    // A missing value is muted, a real one is not.
+    expect(values[2].className).toContain('text-text-muted')
+    expect(values[1].className).not.toContain('text-text-muted')
   })
 
   it('save path: tag, full path cut from the front, one solid pill, three disabled', async () => {
@@ -730,6 +754,24 @@ describe('the overview (story 2.5)', () => {
     expect(button.querySelector('.truncate')).not.toBeNull()
     expect(pills()[0].parentElement?.className).toContain('grid-cols-2')
     expect(pills()[0].className).toContain('h-11')
+  })
+
+  it('› resets the save-path block: path collapsed, label 「複製」 again', async () => {
+    setClipboard({ writeText: () => Promise.resolve() })
+    await render(<BoardDetailSheet />, {
+      hash: h(11),
+      data: board().map((torrent) => ({ ...torrent, save_path: LONG_PATH })),
+    })
+    const pathButton = () =>
+      sectionOf().querySelector('button[aria-expanded]') as HTMLButtonElement
+    await act(async () => pathButton().click())
+    expect(pathButton().getAttribute('aria-expanded')).toBe('true')
+    await act(async () => pills()[0].click())
+    expect(pills()[0].textContent).toBe('已複製')
+    await act(async () => byLabel('下一個').click())
+    expect(q('h2')?.textContent).toBe('Seed2')
+    expect(pathButton().getAttribute('aria-expanded')).toBe('false')
+    expect(pills()[0].textContent).toBe('複製')
   })
 
   it('X1 names, paths and categories with markup stay plain text', async () => {

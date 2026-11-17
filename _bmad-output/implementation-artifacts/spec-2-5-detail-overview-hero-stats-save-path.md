@@ -5,7 +5,7 @@ created: '2026-11-17'
 status: 'in-review'
 baseline_revision: '5f16c22fd3069d0ac8435850c34bff1405d93d64'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -89,6 +89,40 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-17: Review pass
+- verdicts: 30 findings: high 0, medium 3, low 22, false 5, maybe-false 0
+- findings:
+  - `[low]` `[patch]` (blind) the copy's setState and 1.5 s timer can run after the save-path block unmounted. Patch: a mounted ref, return after the await when gone.
+  - `[low]` `[patch]` (blind) the tab panel lost `tabIndex={0}`, against the APG pattern (first content not focusable, the panel is the scroller) and 2.4's behaviour. Patch: restored, DOM test flipped.
+  - `[low]` `[reject]` (blind) the copy result has no live region. The label change on the pressed button is what the AC asks; Alex alone uses the app; a live region adds a component.
+  - `[false]` `[reject]` (blind) the desktop full path is only in `title`. The AC says 「電腦 hover 看全文」.
+  - `[medium]` `[patch]` (blind) the textarea fallback selects nothing on iOS Safari (readOnly plus `select()`), so copy fails on the phone over plain http. Patch: editable while selecting, `setSelectionRange`, 16px font.
+  - `[low]` `[patch]` (blind) `formatTimeLeft` parses `formatEta`'s text. Patch: both built from the eta parts.
+  - `[low]` `[reject]` (blind) tile `muted` decided by string and a second `LOADING` constant in `detail-hero.ts`. Same accepted pattern as 2.4's info rows; the fix moves constants across layers (lib cannot import features).
+  - `[medium]` `[patch]` (blind) `heroKindOf` repeats `statusOfKind`'s AR-58 and moving rules; status and hero kind can drift. Patch: one source decides, plus a consistency test over all state codes.
+  - `[low]` `[patch]` (blind) test doubles for `execCommand` and `navigator.clipboard` leak between tests. Patch: descriptors restored.
+  - `[low]` `[patch]` (blind) no test that ‹ › resets the path expansion and 「已複製」. Patch: DOM test.
+  - `[low]` `[patch]` (blind) the fake-qbit comment says 3001 to 3012 hex; the code ends at 0x300c. Patch: comment fixed.
+  - `[low]` `[patch]` (blind) e2e H1 checks only headlines; seed and leecher counts unset in the fixture. Patch: explicit counts, exact tile values, summaries on three rows.
+  - `[low]` `[reject]` (blind) `blockKinds` finds blocks by `svg[width="64"]` and `DL`. Test brittleness only, no behaviour at risk.
+  - `[low]` `[reject]` (blind) the C1 e2e does not bound the 1.5 s from below. The DOM test checks the timing with fake timers.
+  - `[low]` `[patch]` (verification) the path expansion and copy label are not checked to reset on a torrent switch (same root cause as the blind row). Patched there.
+  - `[low]` `[patch]` (verification) the headline colour is checked for 做種中 only. Patch: e2e asserts `text-status-<status>` on all 12 rows.
+  - `[low]` `[patch]` (verification) the tiles' muted class is never checked in the DOM. Patch: DOM assertion on a muted and a real value.
+  - `[false]` `[reject]` (intent) the `error` summary is fixed text, not qBittorrent's reason. Alex decided 2026-11-16 (Story 1.6) to show 「qBittorrent 回報錯誤」 until Story 2.10 brings the real reason.
+  - `[low]` `[reject]` (intent) no test measures contrast. The implementer computed the ratios from the tokens (lowest headline 4.06:1, muted text on tiles 4.95:1 and 5.09:1); the PR carries them, as the AC asks.
+  - `[false]` `[reject]` (intent) the 已整理 screenshot comes from the board panel. 已整理 never appears in list mode by design (Story 2.1); recorded as Claude 代決.
+  - `[low]` `[reject]` (intent) the front cut is checked in the narrow panel only and the bidi order only by screenshots. `textContent` cannot show bidi order; the screenshots in both widths do.
+  - `[low]` `[reject]` (intent) the C2 e2e checks the label, not the copied text. The unit test checks the textarea path's text; C1 checks real clipboard content.
+  - `[low]` `[patch]` (intent) the tab panel's `tabIndex` change alters 2.4 (same root cause as the blind row). Patched there.
+  - `[false]` `[reject]` (intent) "沒有 `private` 欄位時照 Alex 當時的決定" unverified. The hero follows `classify`, which already encodes Story 1.5's AR-58 result (`private: null` counts as regular).
+  - `[low]` `[patch]` (edge) setState after unmount during a pending copy (same root cause as the first blind row). Patched there.
+  - `[medium]` `[patch]` (edge) iOS readOnly textarea selects nothing (same root cause as the blind row). Patched there.
+  - `[low]` `[reject]` (edge) an empty `save_path` leaves the phone expand button unnamed and copies an empty string. qBittorrent always reports a save path; rare.
+  - `[low]` `[patch]` (edge) `execCommand` override never restored (same root cause as the blind test-doubles row). Patched there.
+  - `[low]` `[patch]` (edge) `navigator.clipboard` set to undefined for good (same root cause). Patched there.
+  - `[false]` `[reject]` (edge) 11 list-mode shots plus one board-panel shot. Same as the intent row: 已整理 cannot show in list mode.
+
 ## Design Notes
 
 - Claude 代決 (Alex may veto): 來源數 is `num_seeds` (connected seeds) and 在抓的人 `num_leechs` (connected leechers), the counts qBittorrent's own UI shows as connected; an empty category is left out of the summary; the hero's 下載中 summary reuses `formatEta` and `formatSpeed` with 「↓ 」 as the list's second line does; the 剩餘時間 tile shows the `formatEta` text without its 「剩 」 prefix when that reads better in the mockup (follow the mockup); a second 複製 press restarts the 1.5 s.
@@ -96,13 +130,14 @@ deferred: []
 - Docs to read first (AD-11): MDN `Clipboard.writeText` (https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/writeText), MDN `Document.execCommand` (https://developer.mozilla.org/en-US/docs/Web/API/Document/execCommand), MDN `<bdi>` (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdi), Tailwind v4 arbitrary values if used (https://tailwindcss.com/docs/adding-custom-styles). Record the URLs actually read.
 - URLs actually read (2026-11-17): `https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/writeText` (secure contexts only; a promise that rejects with `NotAllowedError`), `https://developer.mozilla.org/en-US/docs/Web/API/Document/execCommand` (deprecated, `copy` copies the current selection, returns `false` when it did not run, needs a user interaction), `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdi` (isolates its run both ways; `<bdi dir="ltr">` equals an LTR span with isolation). Tailwind arbitrary values were used only in the forms the codebase already uses (`h-[34px]`, `[overflow-wrap:anywhere]`), so that page was not reopened.
 - Implementation notes (Claude 代決, Alex may veto):
-  - The hero row comes from a new `heroKindOf()` export in `src/lib/torrent-status.ts` (same internal kinds as `classify`); the text is built in `src/lib/detail-hero.ts`. A moving torrent with no remembered state reads by progress (做種 or 下載中), matching `classify`.
+  - The hero row comes from a new `heroKindOf()` export in `src/lib/torrent-status.ts`; `classify`/`statusOf` now derive the status from that row (`HERO_STATUS`), so the two cannot drift (a test covers every state code, `private` value and move). The text is built in `src/lib/detail-hero.ts`. A moving torrent with no remembered state reads by progress (做種 or 下載中), matching `classify`.
   - 已上傳 in the 做種中 summary: 「已上傳 …」 before the first answer, left out when `getTorrentDetail` says unknown (「已上傳 沒有」 reads badly).
   - Tile values wrap instead of overflowing (at 1024px the board panel's tiles are about 47px wide inside), so 「6.21 MB/s」 can take two lines in the narrow panel; summary parts are kept whole and wrap between parts. Tile padding follows the spec (12px 14px) on the phone too, not the phone mockup's 12px.
   - The phone path button's accessible name is the path itself (no `aria-label`), so screen readers still hear the path; `aria-expanded` carries the state.
   - The location tag uses the neutral tag look from the list row (the desktop mockup's purple media-library tag is a common-path name, Epic 5).
   - The copy fallback's textarea is appended inside the save-path block, not `body`, so the phone sheet's focus trap and `inert` background do not take the selection away; focus returns to 複製.
-  - The tabpanel lost `tabIndex={0}`: the 複製 button is now its first focusable element (WAI-ARIA tabs pattern).
+  - The tabpanel keeps `tabIndex={0}` (it is the scroller and its first content takes no focus).
+  - The copy fallback's textarea is editable while selected, gets `setSelectionRange(0, length)` and a 16px font, for iOS Safari over plain http.
   - 已整理 is never in list mode, so its desktop screenshot comes from the board panel; the 12-row set is otherwise the list panel.
   - Contrast (computed from the tokens): headline on `surface` at least 4.06:1 light (paused) and 4.74:1 dark (done), above 3:1; `text-muted` on `surface-muted` 5.09:1 light, 4.95:1 dark. No token changed.
 
@@ -112,3 +147,25 @@ deferred: []
 - `source ~/.nvm/nvm.sh && nvm use && npm run lint && npm run typecheck && npm test` -- expected: all pass.
 - `source ~/.nvm/nvm.sh && nvm use && npm run build && npm run smoke && CI=1 npm run smoke:browser` -- expected: all pass, 0 CSP violations.
 - `bash .claude/skills/next-story/check.sh` -- expected: every line ok.
+
+## Auto Run Result
+
+Status: done (first review pass; a follow-up pass is recommended)
+
+Summary: the overview now shows the status hero (64px circle, 28px status-coloured headline, muted summary for the 12 rows), three stat tiles by status group, the save-path block (label with location tag, front-cut path with hover and phone expand, four pills with only 複製 working, clipboard plus textarea fallback, 1.5 s labels) and the 2.4 info list. `getTorrentDetail` also sends `num_seeds` and `num_leechs`.
+
+Files changed (main ones):
+- `src/lib/detail-hero.ts` (new), `src/lib/torrent-status.ts` (`heroKindOf`, one source for status and hero row), `src/lib/format.ts` (`formatTimeLeft`).
+- `src/features/detail/overview.tsx` (new: hero, tiles, save-path block, info list), `detail-model.ts` (`statTiles`), `detail-view.tsx`, `phone-detail-sheet.tsx`.
+- `src/shared/ui/copy-text.ts` (new), `src/shared/ui/status-circle.tsx` (size 64), `src/shared/torrent-detail.ts` (two fields).
+- `scripts/fake-qbit.mjs` (`states` mode), `e2e/detail.spec.ts`, `e2e/fixtures.ts`, tests beside each file.
+- `_bmad-output/implementation-artifacts/epic-2-context.md` recompiled (the spine had changed).
+
+Review: 30 findings. Patched 2 medium entries and 9 low entries (10 fixes), deferred none, rejected 15 (9 low, 6 false counting grouped rows once; every row has its reason in the log).
+
+Follow-up review recommendation: true. Two medium entries were patched on a first pass. Named risk: `classify()`'s status now comes through the new hero-kind map in `src/lib/torrent-status.ts` (the core state mapping every screen uses), and the iOS textarea fallback cannot be exercised here.
+
+Verification (2026-11-17, after the patches): `npm run lint` clean; `npm run typecheck` clean; `npm test` 86 files, 1916 tests passed; `npm run build` ok; `npm run smoke` built server ok; `CI=1 npm run smoke:browser` 43 passed, 0 CSP violations; `check.sh` all ok. Matrix audit: H1, H2, T1, T2, P1, P2, C1, C2, X1 each have covering tests that ran and passed.
+
+Residual risks: copy over plain http on iOS Safari needs Alex's phone; contrast computed from tokens (lowest headline 4.06:1 light paused; muted text on tiles 4.95:1 dark, 5.09:1 light), not measured in a test.
+

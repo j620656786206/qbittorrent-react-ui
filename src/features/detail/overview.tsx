@@ -165,14 +165,19 @@ const COPY_LABELS: Readonly<Record<CopyState, string>> = {
 function useCopyButton(path: string, hostRef: RefObject<HTMLElement | null>) {
   const [state, setState] = useState<CopyState>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
+  // The block can go (detail closed, ‹ › remount by key) while a copy is
+  // pending: then no state and no new timer after the cleanup.
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
-    },
-    [],
-  )
+    }
+  }, [])
   const copy = async () => {
     const copied = await copyText(path, hostRef.current ?? undefined)
+    if (!mountedRef.current) return
     if (timerRef.current !== null) clearTimeout(timerRef.current)
     setState(copied ? 'copied' : 'failed')
     timerRef.current = setTimeout(() => {

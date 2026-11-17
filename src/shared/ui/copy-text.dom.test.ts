@@ -10,7 +10,29 @@ const PATH = '/data/media/tv/假影集.Fake.Show.S01'
 let host: HTMLElement
 let execCommand: ReturnType<typeof vi.fn>
 /** What the textarea held when `copy` ran, and how it was styled. */
-let seen: Array<{ value: string; position: string; styleAttr: string | null }>
+let seen: Array<{
+  value: string
+  position: string
+  fontSize: string
+  readOnly: boolean
+  selectionStart: number | null
+  selectionEnd: number | null
+}>
+
+/** Own property descriptors before the tests touch them (restored after). */
+const ORIGINAL = {
+  clipboard: Object.getOwnPropertyDescriptor(navigator, 'clipboard'),
+  execCommand: Object.getOwnPropertyDescriptor(document, 'execCommand'),
+}
+
+function restore(
+  target: object,
+  name: string,
+  descriptor: PropertyDescriptor | undefined,
+) {
+  if (descriptor) Object.defineProperty(target, name, descriptor)
+  else Reflect.deleteProperty(target, name)
+}
 
 function setClipboard(value: unknown) {
   Object.defineProperty(navigator, 'clipboard', {
@@ -29,7 +51,10 @@ beforeEach(() => {
       seen.push({
         value: area.value,
         position: area.style.position,
-        styleAttr: area.getAttribute('style'),
+        fontSize: area.style.fontSize,
+        readOnly: area.readOnly,
+        selectionStart: area.selectionStart,
+        selectionEnd: area.selectionEnd,
       })
       return true
     }
@@ -44,7 +69,8 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.replaceChildren()
-  setClipboard(undefined)
+  restore(navigator, 'clipboard', ORIGINAL.clipboard)
+  restore(document, 'execCommand', ORIGINAL.execCommand)
   vi.restoreAllMocks()
 })
 
@@ -63,8 +89,17 @@ describe('copyText', () => {
     host.append(button)
     button.focus()
     expect(await copyText(PATH, host)).toBe(true)
+    // Editable and selected end to end (iOS Safari copies nothing from a
+    // read-only textarea or after select() alone); 16px: no zoom on iOS.
     expect(seen).toEqual([
-      expect.objectContaining({ value: PATH, position: 'fixed' }),
+      {
+        value: PATH,
+        position: 'fixed',
+        fontSize: '16px',
+        readOnly: false,
+        selectionStart: 0,
+        selectionEnd: PATH.length,
+      },
     ])
     // Removed again, and focus is back on the button.
     expect(host.querySelector('textarea')).toBeNull()

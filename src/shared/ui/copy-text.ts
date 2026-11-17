@@ -32,7 +32,8 @@ export async function copyText(
 function copyWithTextarea(text: string, host: HTMLElement): boolean {
   const area = document.createElement('textarea')
   area.value = text
-  area.readOnly = true
+  // Not `readOnly`: iOS Safari selects nothing in a read-only textarea, so
+  // the copy would be empty. 16px so focusing it does not zoom on iOS.
   area.setAttribute('aria-hidden', 'true')
   area.tabIndex = -1
   area.style.position = 'fixed'
@@ -40,12 +41,15 @@ function copyWithTextarea(text: string, host: HTMLElement): boolean {
   area.style.left = '-9999px'
   area.style.opacity = '0'
   area.style.pointerEvents = 'none'
+  area.style.fontSize = '16px'
   const before = document.activeElement
   host.append(area)
   let copied = false
   try {
     area.focus({ preventScroll: true })
     area.select()
+    // iOS Safari ignores select() alone.
+    area.setSelectionRange(0, text.length)
     copied = document.execCommand('copy')
   } catch {
     copied = false
