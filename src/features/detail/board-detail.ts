@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { detailPosition } from '#/lib/detail-position'
 import { BOARD_COLUMN_NAMES } from '#/lib/torrent-status'
 import { boardColumnOf } from '#/lib/visible-torrents'
+import { useListView } from '#/state/list-view'
 import { selectTorrents, useBoardColumns, useMaindata } from '#/state/maindata'
 import { useViewedHash } from '#/state/viewed-hash'
 import type { DetailTarget } from '#/features/detail/detail-view'
@@ -22,7 +23,8 @@ export function useBoardDetailTarget({
   phone: boolean
 }): DetailTarget | null {
   const { hash, setHash } = useViewedHash()
-  const { data: columns } = useBoardColumns()
+  // Story 3.2: the selected category's columns, like the board.
+  const { data: columns } = useBoardColumns(useListView().view.category)
   const { data: torrents } = useMaindata(selectTorrents)
 
   const found = hash !== null && columns ? boardColumnOf(columns, hash) : null

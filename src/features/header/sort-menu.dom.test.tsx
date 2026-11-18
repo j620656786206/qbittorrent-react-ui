@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL } from '#/shared/categories'
 import type { SortView } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
@@ -18,6 +19,8 @@ let root: Root
 let container: HTMLElement
 let main: HTMLElement
 let view: SortView
+/** Story 3.2: the app switched to the category's remembered sort. */
+let rememberedHint = false
 /** Story 3.1: a pick from the menu is never an app-driven change. */
 const appSetView = vi.fn()
 const pickView = vi.fn((next: SortView) => {
@@ -28,7 +31,14 @@ const pickView = vi.fn((next: SortView) => {
 function render() {
   root.render(
     <ListViewContext
-      value={{ view, viewReady: true, setView: appSetView, pickView }}
+      value={{
+        view: { ...view, category: ALL },
+        viewReady: true,
+        setView: appSetView,
+        pickView,
+        selectCategory: () => {},
+        rememberedHint,
+      }}
     >
       <DesktopSortMenu />
     </ListViewContext>,
@@ -75,6 +85,7 @@ beforeEach(() => {
   root = createRoot(container)
   pickView.mockClear()
   appSetView.mockClear()
+  rememberedHint = false
 })
 
 afterEach(async () => {
@@ -204,5 +215,30 @@ describe('the desktop sort menu', () => {
     await click(radio('狀態'))
     expect(pickView).not.toHaveBeenCalled()
     expect(menu()).not.toBeNull()
+  })
+})
+
+// Story 3.2: 「（這個分類記住的）」 after the app switched to the category's
+// remembered sort; the tooltip stays the sort in words.
+describe('the remembered hint (story 3.2)', () => {
+  it('shows muted after the bold sort, also in the label; never in the tooltip', async () => {
+    rememberedHint = true
+    await mount({ sort: 'seeding_time', dir: 'desc' })
+    const hint = [...trigger().querySelectorAll('span')].find(
+      (span) => span.textContent === '（這個分類記住的）',
+    )
+    expect(hint?.className).toContain('text-text-muted')
+    expect(trigger().getAttribute('aria-label')).toBe(
+      '排序：做種時間，久的在前（這個分類記住的），列表',
+    )
+    expect(trigger().title).toBe('排序：做種時間，久的在前')
+  })
+
+  it('absent without the hint', async () => {
+    await mount({ sort: 'seeding_time', dir: 'desc' })
+    expect(trigger().textContent).not.toContain('記住的')
+    expect(trigger().getAttribute('aria-label')).toBe(
+      '排序：做種時間，久的在前，列表',
+    )
   })
 })

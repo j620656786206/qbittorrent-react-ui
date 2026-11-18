@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { resolveListViewed } from '#/lib/detail-position'
 import type { LastViewed } from '#/lib/detail-position'
+import { ALL } from '#/shared/categories'
 import { useViewedHash } from '#/state/viewed-hash'
 
 // Story 2.4: the row the list's detail shows, from the URL's `hash` and the
@@ -12,10 +13,22 @@ import { useViewedHash } from '#/state/viewed-hash'
 
 export function useListViewed(
   order: ReadonlyArray<string> | undefined,
-  { fallbackFirst }: { fallbackFirst: boolean },
+  {
+    fallbackFirst,
+    scope = ALL,
+  }: {
+    fallbackFirst: boolean
+    /**
+     * Story 3.2: the category. Another category's rows are a new list, not
+     * the old one changing: the row viewed before is forgotten, so without
+     * a usable `hash` the first row is viewed (never a "successor" picked
+     * from the old category's order).
+     */
+    scope?: string
+  },
 ): string | null {
   const { hash, setHash } = useViewedHash()
-  const lastRef = useRef<LastViewed | null>(null)
+  const lastRef = useRef<(LastViewed & { scope: string }) | null>(null)
   /**
    * A `hash` written and not yet back from the router, with the URL's
    * `hash` when it was written. Any other URL change (the echo, or a row
@@ -33,15 +46,16 @@ export function useListViewed(
       pendingRef.current = null
     else effectiveHash = pending.hash
   }
+  const last = lastRef.current
   const { viewed, write } = resolveListViewed({
     order,
     hash: effectiveHash,
-    previous: lastRef.current,
+    previous: last !== null && last.scope === scope ? last : null,
     fallbackFirst,
   })
 
   useLayoutEffect(() => {
-    if (order !== undefined) lastRef.current = { order, viewed }
+    if (order !== undefined) lastRef.current = { order, viewed, scope }
     if (write === undefined) return
     pendingRef.current = { hash: write, from: hash }
     setHash(write)

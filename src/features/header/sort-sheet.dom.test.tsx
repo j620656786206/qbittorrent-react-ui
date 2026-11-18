@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL } from '#/shared/categories'
 import type { SortView } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
@@ -24,6 +25,8 @@ let root: Root
 let container: HTMLElement
 let main: HTMLElement
 let view: SortView
+/** Story 3.2: the app switched to the category's remembered sort. */
+let rememberedHint = false
 /** Story 3.1: a pick from the menu is never an app-driven change. */
 const appSetView = vi.fn()
 const pickView = vi.fn((next: SortView) => {
@@ -34,7 +37,14 @@ const pickView = vi.fn((next: SortView) => {
 function render() {
   root.render(
     <ListViewContext
-      value={{ view, viewReady: true, setView: appSetView, pickView }}
+      value={{
+        view: { ...view, category: ALL },
+        viewReady: true,
+        setView: appSetView,
+        pickView,
+        selectCategory: () => {},
+        rememberedHint,
+      }}
     >
       <PhoneSortPill />
     </ListViewContext>,
@@ -99,6 +109,7 @@ beforeEach(() => {
   root = createRoot(container)
   pickView.mockClear()
   appSetView.mockClear()
+  rememberedHint = false
 })
 
 afterEach(async () => {
@@ -113,6 +124,13 @@ afterEach(async () => {
 })
 
 describe('the phone sort pill', () => {
+  it('story 3.2: never shows 「（這個分類記住的）」 (desktop only until 3.4)', async () => {
+    rememberedHint = true
+    await mount({ sort: 'seeding_time', dir: 'desc' })
+    expect(pill().textContent).not.toContain('記住的')
+    expect(pill().getAttribute('aria-label')).not.toContain('記住的')
+  })
+
   it('enabled, 44px, only icon, name, arrow and ▾; the words in the label', async () => {
     await mount({ sort: 'seeding_time', dir: 'desc' })
     expect(pill().disabled).toBe(false)

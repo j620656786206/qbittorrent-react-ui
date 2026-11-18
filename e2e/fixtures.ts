@@ -157,7 +157,15 @@ export async function resetSettings(request: APIRequestContext) {
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'
   front?: 'normal' | 'down' | 'cloudflare'
-  data?: 'sample' | 'many' | 'empty' | 'archived' | 'calm' | 'states'
+  data?:
+    | 'sample'
+    | 'many'
+    | 'empty'
+    | 'archived'
+    | 'calm'
+    | 'states'
+    | 'categories'
+    | 'categories-emptied'
   grow?: '0' | '1'
   /**
    * Story 2.6: `reject` answers torrents/stop and /start with HTTP 400

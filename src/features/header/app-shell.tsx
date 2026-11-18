@@ -1,10 +1,14 @@
 import { ChevronDown, Keyboard, Plus, Search, Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { categoryLabel } from '#/lib/category-tabs'
 import { formatCount } from '#/lib/format'
+import { ALL } from '#/shared/categories'
 import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
 import { MAIN_ID, getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { useCategoryTabs, useListView } from '#/state/list-view'
+import { DesktopCategoryTabs } from '#/features/header/category-tabs'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
 import { DesktopSortMenu } from '#/features/header/sort-menu'
 import { PhoneSortPill } from '#/features/header/sort-sheet'
@@ -18,7 +22,11 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // both are rendered and the other one is `display: none`.
 //
 // The desktop sort pill opens the sort menu (story 2.1, sort-menu.tsx); the
-// phone one opens the sort sheet (story 2.2, sort-sheet.tsx).
+// phone one opens the sort sheet (story 2.2, sort-sheet.tsx). Story 3.2:
+// the desktop category tabs (category-tabs.tsx) fill the row left of the
+// sort pill, which stays at the right and never shrinks; the phone's
+// category button stays inert until story 3.4 but names the category on
+// screen and its count.
 // Epic 1 placeholders (search, 新增, shortcuts, settings, phone category)
 // carry the native `disabled`: 50% and not-allowed from the base rule,
 // no hover, not focusable, and no `title` (their shortcuts do not exist yet).
@@ -85,32 +93,12 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="hidden flex-none items-center gap-2 lg:flex">
-          <div className="min-w-0 flex-1">
-            <div
-              role="tablist"
-              aria-label="分類"
-              className="flex gap-1.5 p-[3px]"
-            >
-              {/* Selected and inert until the category story; not disabled,
-                  50% would misstate the selection. */}
-              <AllTab />
-            </div>
-          </div>
+          <DesktopCategoryTabs />
           <DesktopSortMenu />
         </div>
 
         <div className="flex flex-none items-center justify-between gap-2 lg:hidden">
-          <button
-            type="button"
-            disabled
-            aria-haspopup="dialog"
-            aria-label="分類：全部"
-            className="inline-flex h-11 flex-none items-center gap-1.5 rounded-full border bg-surface pr-2.5 pl-3.5 whitespace-nowrap hover-outline"
-          >
-            <b className="font-semibold">全部</b>
-            <PhoneCount />
-            <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          <PhoneCategoryButton />
           <PhoneSortPill />
         </div>
 
@@ -146,38 +134,44 @@ function IconButton({
 
 // The count is a skeleton while loading and left out once the first load
 // failed (spec 1.8 option A).
-function DesktopCount() {
-  const { allCount: count, loading } = useHeader().model
-  if (count === null)
-    return loading ? <Skeleton className="h-2.5 w-5 rounded-[5px]" /> : null
-  return <span className="tabular-nums opacity-75">{formatCount(count)}</span>
-}
-
-function PhoneCount() {
-  const { allCount: count, loading } = useHeader().model
-  if (count === null)
-    return loading ? (
-      <Skeleton className="h-2.5 w-[22px] rounded-[5px]" />
-    ) : null
-  return (
-    <span className="text-text-muted tabular-nums">{formatCount(count)}</span>
-  )
-}
-
-/** The selected 「全部」 tab, `aria-busy` until the count is known. */
-function AllTab() {
-  const { allCount, loading: modelLoading } = useHeader().model
-  const loading = allCount === null && modelLoading
+/**
+ * The phone category button: inert until story 3.4 (native `disabled`),
+ * but since story 3.2 it names the category on screen and its count, so a
+ * `?category=` filter is never silent. The count comes from the tabs (no
+ * archived torrents); before they are known, 「全部」 shows the header's
+ * count and a category a skeleton while loading.
+ */
+function PhoneCategoryButton() {
+  const { category } = useListView().view
+  const tabs = useCategoryTabs()
+  const { allCount, loading } = useHeader().model
+  const label = categoryLabel(category)
+  const tabCount = tabs?.find((tab) => tab.key === category)?.count
+  const count =
+    tabCount ?? (tabs === undefined && category === ALL ? allCount : null)
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected="true"
-      aria-busy={loading || undefined}
-      className="inline-flex h-[34px] flex-none items-center gap-1.5 rounded-full border border-primary bg-primary px-[13px] whitespace-nowrap text-primary-foreground"
+      disabled
+      aria-haspopup="dialog"
+      aria-label={`分類：${label}`}
+      className="inline-flex h-11 max-w-[60%] min-w-0 flex-none items-center gap-1.5 rounded-full border bg-surface pr-2.5 pl-3.5 whitespace-nowrap hover-outline"
     >
-      <span>全部</span>
-      <DesktopCount />
+      <b className="min-w-0 truncate font-semibold">{label}</b>
+      {count !== null ? (
+        <span className="text-text-muted tabular-nums">
+          {formatCount(count)}
+        </span>
+      ) : (
+        tabs === undefined &&
+        loading && <Skeleton className="h-2.5 w-[22px] rounded-[5px]" />
+      )}
+      <ChevronDown
+        size={16}
+        strokeWidth={2.2}
+        aria-hidden="true"
+        className="flex-none"
+      />
     </button>
   )
 }

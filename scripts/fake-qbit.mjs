@@ -44,6 +44,12 @@
 //          已整理); the first has a long save path with Chinese in it;
 //          story 2.10 adds a 13th (0x300d), another 錯誤 whose log reason
 //          has a fake path and a 203.0.113.x address (never shown)
+//          categories (story 3.2): 22 code-name categories (mteam-X,
+//          mteam-tv, X, cat-01 to cat-16, uncategorized, a markup name,
+//          2024)
+//          of 1 to 4 torrents each, plus `only-archived` with one archived
+//          torrent, so the desktop tab row overflows; categories-emptied:
+//          the same without mteam-X
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 //   ops:   normal | reject (story 2.6: reject answers torrents/stop and
 //          torrents/start with HTTP 400, which the container maps to
@@ -136,6 +142,8 @@ const DATA_MODES = new Set([
   'archived',
   'calm',
   'states',
+  'categories',
+  'categories-emptied',
 ])
 const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject'])
@@ -561,6 +569,59 @@ const STATES = Object.fromEntries(
   }),
 )
 
+// Story 3.2 `data=categories`: enough categories to overflow the desktop
+// tab row. Code names only: mteam-X, mteam-tv, X, cat-01 to cat-16, the
+// uncategorized key '', a markup name (shown as plain text), `2024` (a
+// name the router reads as a number when typed in a URL) and
+// `only-archived`, which holds archived torrents only (its tab reads 0).
+// Each category holds 1 to 4 torrents, alternately downloading and
+// seeding. `categories-emptied` is the same set without mteam-X (the
+// selected category emptying on screen).
+const CATEGORY_NAMES = [
+  'mteam-X',
+  'mteam-tv',
+  'X',
+  ...Array.from(
+    { length: 16 },
+    (_, index) => `cat-${String(index + 1).padStart(2, '0')}`,
+  ),
+  '',
+  '<script>alert(1)</script>',
+  // A name the router parses as a number from a typed URL.
+  '2024',
+]
+const CATEGORY_SET = CATEGORY_NAMES.flatMap((category, c) =>
+  Array.from({ length: (c % 4) + 1 }, (_, i) => {
+    const seeding = i % 2 === 1
+    return torrent(0x4000 + c * 16 + i, {
+      name: `Fake.Cat${String(c + 1).padStart(2, '0')}.S01E0${i + 1}.1080p`,
+      category,
+      state: seeding ? 'uploading' : 'downloading',
+      progress: seeding ? 1 : 0.25 + i * 0.2,
+      dlspeed: seeding ? 0 : 1_500_000,
+      eta: seeding ? 8_640_000 : 1800 * (i + 1),
+      completion_on: seeding ? BASE_TIME - c * HOUR : -1,
+      seeding_time: seeding ? (c + 1) * (i + 1) * 6 * HOUR : 0,
+      ratio: seeding ? 0.5 + c / 10 : 0,
+    })
+  }),
+)
+const CATEGORIES_DATA = Object.fromEntries([
+  ...CATEGORY_SET,
+  torrent(0x4fff, {
+    name: 'Fake.Archived.Only.1080p',
+    category: 'only-archived',
+    state: 'missingFiles',
+    progress: 1,
+    private: false,
+  }),
+])
+const CATEGORIES_EMPTIED = Object.fromEntries(
+  Object.entries(CATEGORIES_DATA).filter(
+    ([, value]) => value.category !== 'mteam-X',
+  ),
+)
+
 const DATA = {
   sample: SAMPLE,
   states: STATES,
@@ -568,6 +629,8 @@ const DATA = {
   empty: {},
   archived: ARCHIVED,
   calm: CALM,
+  categories: CATEGORIES_DATA,
+  'categories-emptied': CATEGORIES_EMPTIED,
 }
 
 /** `grow=1`: one newer torrent per maindata request, newest on top. */
@@ -1200,7 +1263,7 @@ switch modes:
   curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
-  data:  sample | many | empty | archived | calm | states
+  data:  sample | many | empty | archived | calm | states | categories | categories-emptied
   grow:  0 | 1
   ops:   normal | reject
   files: normal | slow | fail

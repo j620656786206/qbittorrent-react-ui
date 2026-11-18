@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
+import { ALL } from '#/shared/categories'
 
 // AR-50, AD-13: the one owner of "do not reorder right now" (EXPERIENCE
 // 「資料一直更新時先不重排」). While frozen, values keep updating but the shown
@@ -304,18 +305,30 @@ export function nextBoardColumns<TKey extends string>(
  */
 export function useBoardShownColumns<TKey extends string>(
   live: Readonly<Record<TKey, ReadonlyArray<string>>> | undefined,
+  /**
+   * Story 3.2: the columns' category. A new key applies the live columns
+   * at once, even while held (another category's torrents never wait).
+   */
+  viewKey: string = ALL,
 ): Readonly<Record<TKey, ReadonlyArray<string>>> | undefined {
   const frozen = useSelector(freezeStore, isBoardFrozen)
   const shownRef = useRef<Readonly<Record<TKey, ReadonlyArray<string>>> | null>(
     null,
   )
+  const appliedKeyRef = useRef(viewKey)
   const shown = useMemo(
-    () => nextBoardColumns(shownRef.current, live, frozen),
-    [live, frozen],
+    () =>
+      nextBoardColumns(
+        shownRef.current,
+        live,
+        frozen && appliedKeyRef.current === viewKey,
+      ),
+    [live, frozen, viewKey],
   )
   useLayoutEffect(() => {
     shownRef.current = shown ?? null
-  }, [shown])
+    if (shown !== undefined) appliedKeyRef.current = viewKey
+  }, [shown, viewKey])
   return shown
 }
 

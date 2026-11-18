@@ -205,14 +205,16 @@ describe('categorySortOp', () => {
     sendOp(categorySortOp(call), client, input)
     await flush()
     expect(call.mock.calls[0][0]).toEqual(input)
-    expect(isSavingSort(client)).toBe(true)
+    expect(isSavingSort(client, ALL)).toBe(true)
+    // Story 3.2: only that category's saves count.
+    expect(isSavingSort(client, 'mteam-X')).toBe(false)
     // A newer pick closes the toast of an older one.
     expect(toastCalls.dismissed).toEqual([`settings:sort:${ALL}`])
     answer(withSort('seeding_time'))
     await flush()
     await flush()
     expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('seeding_time'))
-    expect(isSavingSort(client)).toBe(false)
+    expect(isSavingSort(client, ALL)).toBe(false)
     expect(toastCalls.failures).toEqual([])
   })
 

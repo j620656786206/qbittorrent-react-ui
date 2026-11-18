@@ -44,7 +44,7 @@ import {
 } from '#/features/board/use-board-collapse'
 
 // Story 2.3, FR-15: the board, what the 「狀態」 sort shows (EXPERIENCE
-// 排序決定長相). Columns and their orders come from `useBoardColumns()`
+// 排序決定長相). Columns and their orders come from `useBoardColumns(category)`
 // (selectBoardColumns in src/lib), live: the board is never frozen and
 // never sets the list's pointer freeze (EXPERIENCE 「看板不受影響」).
 // Desktop (from 1024px, mockup S01-list-desktop): four equal work columns
@@ -58,7 +58,10 @@ import {
 // cards 2 to 3 per row (board-collapse-controller.ts). The order shown
 // holds while that animation runs (`useBoardShownColumns`, AD-7); the
 // detail panel keeps its place and width (it reads `data-archived`, which
-// only the 已整理 toggle changes).
+// only the 已整理 toggle changes). Story 3.2: only the selected category's
+// torrents, the 已整理 column too; a category with only archived torrents
+// shows the four work columns as 「沒有」 and 已整理 as usual, one with none
+// the empty block 「這個分類沒有種子」.
 
 const GRID_CLASS = 'grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-board-gap'
 /** The 已整理 strip is 64px; expanded it is as wide as the others. */
@@ -66,8 +69,9 @@ const GRID_COLLAPSED = 'grid-cols-[repeat(4,minmax(0,1fr))_64px]'
 const GRID_EXPANDED = 'grid-cols-[repeat(5,minmax(0,1fr))]'
 
 export function TorrentBoard() {
-  const { data: liveColumns } = useBoardColumns()
-  const columns = useBoardShownColumns(liveColumns)
+  const { view, viewReady } = useListView()
+  const { data: liveColumns } = useBoardColumns(view.category)
+  const columns = useBoardShownColumns(liveColumns, view.category)
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   // Sticky: Query clears its own `error` each time a fetch starts.
@@ -75,7 +79,6 @@ export function TorrentBoard() {
   const { retry, retrying } = useMaindataRetry()
   const desktop = useIsDesktop()
   const { today } = useDayClock()
-  const { viewReady } = useListView()
 
   // Story 3.1 (AD-8): the first load also waits for the settings, which
   // may turn a URL without `sort` into the list.
@@ -99,8 +102,11 @@ export function TorrentBoard() {
   if (state === 'empty' || !columns || !torrents || !stateBeforeMove) {
     return <ListEmpty />
   }
+  // Story 3.2: another category is a new board, keyed on it: every column
+  // back at the top, the auto-collapse and the 已整理 column reset.
   return desktop ? (
     <DesktopBoard
+      key={view.category}
       columns={columns}
       torrents={torrents}
       stateBeforeMove={stateBeforeMove}
@@ -108,6 +114,7 @@ export function TorrentBoard() {
     />
   ) : (
     <PhoneBoard
+      key={view.category}
       columns={columns}
       torrents={torrents}
       stateBeforeMove={stateBeforeMove}

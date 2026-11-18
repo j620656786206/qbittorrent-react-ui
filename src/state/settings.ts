@@ -148,7 +148,16 @@ export function categorySortOp(
   }
 }
 
-/** One of this tab's sort saves is still in flight. */
-export function isSavingSort(client: QueryClient): boolean {
-  return client.isMutating({ mutationKey: [SORT_SAVE_OP] }) > 0
+/**
+ * One of this tab's sort saves of `category` is still in flight (story
+ * 3.2: a save of another category never holds this one's follow rule).
+ */
+export function isSavingSort(client: QueryClient, category: string): boolean {
+  const scope = `${SORT_SAVE_OP}:${category}`
+  return (
+    client.isMutating({
+      mutationKey: [SORT_SAVE_OP],
+      predicate: (mutation) => mutation.options.scope?.id === scope,
+    }) > 0
+  )
 }

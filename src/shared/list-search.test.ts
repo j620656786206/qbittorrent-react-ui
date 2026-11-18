@@ -1,9 +1,16 @@
+import {
+  defaultParseSearch,
+  defaultStringifySearch,
+} from '@tanstack/react-router'
 import { describe, expect, it } from 'vitest'
+import { ALL } from '#/shared/categories'
 import {
   DEFAULT_SORT_VIEW,
+  categoryOfSearch,
   fixListSearch,
   listSearchSchema,
   normalizeSortView,
+  searchWithCategory,
   searchWithHash,
   sortViewOf,
 } from '#/shared/list-search'
@@ -191,5 +198,98 @@ describe('hash in the search', () => {
     const closed = searchWithHash(previous, null)
     expect(closed).toEqual({ sort: 'ratio', dir: 'asc' })
     expect('hash' in closed).toBe(false)
+  })
+})
+
+// Story 3.2: `category`, absent for 「全部」, `category=` for uncategorized.
+describe('category in the search', () => {
+  it('keeps a name and the uncategorized empty string', () => {
+    expect(listSearchSchema.parse({ category: 'mteam-X' }).category).toBe(
+      'mteam-X',
+    )
+    expect(listSearchSchema.parse({ category: '' }).category).toBe('')
+    expect(
+      listSearchSchema.parse({ category: '<script>alert(1)</script>' })
+        .category,
+    ).toBe('<script>alert(1)</script>')
+  })
+
+  it.each([
+    [{ name: 'x' }],
+    [['a']],
+    [ALL],
+    ['bad\u0001name'],
+    ['x'.repeat(256)],
+    ['__proto__'],
+  ])('reads %j as missing (「全部」)', (category) => {
+    expect(listSearchSchema.parse({ category }).category).toBeUndefined()
+  })
+
+  it('categoryOfSearch: absent is ALL', () => {
+    expect(categoryOfSearch({})).toBe(ALL)
+    expect(categoryOfSearch({ category: '' })).toBe('')
+    expect(categoryOfSearch({ category: 'X' })).toBe('X')
+  })
+
+  it('fixListSearch drops a bad category alone and keeps a good one', () => {
+    expect(fixListSearch({ category: 'mteam-X', sort: 'ratio' })).toBeNull()
+    expect(fixListSearch({ category: '' })).toBeNull()
+    expect(
+      fixListSearch({ category: { x: 1 }, sort: 'ratio', dir: 'asc' }),
+    ).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+    })
+    expect(fixListSearch({ category: ALL, hash: 'nope' })).toEqual({})
+  })
+
+  it('searchWithCategory sets it, removes it for 「全部」, keeps the rest', () => {
+    const previous = { sort: 'ratio', dir: 'asc', category: 'X' }
+    expect(searchWithCategory(previous, 'mteam-X')).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+      category: 'mteam-X',
+    })
+    expect(searchWithCategory(previous, '')).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+      category: '',
+    })
+    expect(searchWithCategory(previous, ALL)).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+    })
+  })
+})
+
+// Review: the router JSON-parses search values, so a name like `2024`
+// arrives as a number from a typed URL and must still be that category.
+describe('category names the router parses as JSON', () => {
+  it.each([
+    [2024, '2024'],
+    [-5, '-5'],
+    [true, 'true'],
+    [false, 'false'],
+    [null, 'null'],
+  ])('%j reads as the text %j', (raw, text) => {
+    expect(listSearchSchema.parse({ category: raw }).category).toBe(text)
+    expect(fixListSearch({ category: raw })).toBeNull()
+  })
+
+  it('round-trips through the router serializer, written and typed', () => {
+    for (const name of ['2024', 'true', 'null', 'mteam-X', '']) {
+      const url = defaultStringifySearch({ category: name })
+      const parsed = defaultParseSearch(url) as Record<string, unknown>
+      expect(listSearchSchema.parse(parsed).category).toBe(name)
+    }
+    // Typed by hand, unquoted.
+    for (const [url, name] of [
+      ['?category=2024', '2024'],
+      ['?category=true', 'true'],
+      ['?category=null', 'null'],
+    ] as const) {
+      const parsed = defaultParseSearch(url) as Record<string, unknown>
+      expect(listSearchSchema.parse(parsed).category).toBe(name)
+    }
   })
 })

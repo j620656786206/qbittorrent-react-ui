@@ -16,6 +16,7 @@ describe('sortPillModel', () => {
       shortText: '做種時間 ↓',
       title: '排序：做種時間，久的在前',
       ariaLabel: '排序：做種時間，久的在前，列表',
+      hint: null,
     })
     expect(sortPillModel({ sort: 'name', dir: 'asc' }).title).toBe(
       '排序：名稱，Z 到 A',
@@ -30,8 +31,22 @@ describe('sortPillModel', () => {
       shortText: '狀態',
       title: '排序：狀態',
       ariaLabel: '排序：狀態，看板',
+      hint: null,
     })
     expect(directionWords({ sort: 'state', dir: 'desc' })).toBeNull()
+  })
+
+  it('story 3.2: the hint goes in the label before the view word, never the tooltip', () => {
+    const pill = sortPillModel(
+      { sort: 'seeding_time', dir: 'desc' },
+      { rememberedHint: true },
+    )
+    expect(pill.hint).toBe('（這個分類記住的）')
+    expect(pill.ariaLabel).toBe(
+      '排序：做種時間，久的在前（這個分類記住的），列表',
+    )
+    expect(pill.title).toBe('排序：做種時間，久的在前')
+    expect(pill.text).toBe('排序：做種時間 ↓')
   })
 })
 
