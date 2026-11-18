@@ -63,7 +63,7 @@ development_status:
 
   epic-3: in-progress
   3-1-設定檔和-全部-記住排序: done # PR #33：排序記憶存在 NAS 的設定檔，「全部」記住手動選的排序
-  3-2-電腦分類分頁: backlog
+  3-2-電腦分類分頁: review
   3-3-設定頁: backlog
   3-4-手機分類清單: backlog
   3-5-列表內搜尋: backlog
