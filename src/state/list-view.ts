@@ -49,11 +49,13 @@ export interface ListViewControl {
   selectCategory: (category: string) => void
   /**
    * Story 3.2: the app switched the sort to the category's remembered one
-   * (showsRememberedHint): the desktop pill adds 「（這個分類記住的）」.
+   * (showsRememberedHint): the desktop pill adds 「（這個分類記住的）」;
+   * story 3.4: the phone shows a line under the third row.
    */
   rememberedHint: boolean
   /**
-   * Story 3.3: the desktop header's 設定 button. Opens `/settings` with
+   * Story 3.3: the desktop header's 設定 button (story 3.4: and the phone
+   * category sheet's 「設定」 row). Opens `/settings` with
    * the list's search in its URL and `fromList` in the history entry; on
    * the settings page it does nothing.
    */

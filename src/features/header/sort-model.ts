@@ -43,6 +43,19 @@ export interface SortPillModel {
 /** Story 3.2: the desktop pill's muted hint. */
 export const REMEMBERED_HINT = '（這個分類記住的）'
 
+/** Story 3.4 (UX-DR21): the start of the phone's line. */
+export const REMEMBERED_HINT_LINE_PREFIX = '排序換成這個分類記住的：'
+
+/**
+ * Story 3.4 (UX-DR21): the phone's muted line under the third row in place
+ * of the desktop pill's hint: 「排序換成這個分類記住的：做種時間 ↓」, the sort
+ * as the phone pill shows it (name and arrow), so a switch that only flips
+ * the direction still reads right.
+ */
+export function rememberedHintLine(view: SortView): string {
+  return `${REMEMBERED_HINT_LINE_PREFIX}${sortPillModel(view).shortText}`
+}
+
 /** The direction in words, or `null` for a field without one. */
 export function directionWords(view: SortView): string | null {
   const field = sortField(view.sort)

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   directionWords,
+  REMEMBERED_HINT_LINE_PREFIX,
   pickSort,
+  rememberedHintLine,
   sortPillModel,
 } from '#/features/header/sort-model'
 
@@ -81,5 +83,23 @@ describe('pickSort', () => {
       view: { sort: 'name', dir: 'desc' },
       keepOpen: false,
     })
+  })
+})
+
+describe('rememberedHintLine (story 3.4)', () => {
+  it('the sort as the phone pill shows it: name and arrow', () => {
+    expect(REMEMBERED_HINT_LINE_PREFIX).toBe('排序換成這個分類記住的：')
+    expect(rememberedHintLine({ sort: 'seeding_time', dir: 'desc' })).toBe(
+      `${REMEMBERED_HINT_LINE_PREFIX}做種時間 ↓`,
+    )
+    expect(rememberedHintLine({ sort: 'state', dir: 'desc' })).toBe(
+      `${REMEMBERED_HINT_LINE_PREFIX}狀態`,
+    )
+  })
+
+  it('a switch that only flips the direction reads differently', () => {
+    expect(rememberedHintLine({ sort: 'seeding_time', dir: 'asc' })).toBe(
+      `${REMEMBERED_HINT_LINE_PREFIX}做種時間 ↑`,
+    )
   })
 })

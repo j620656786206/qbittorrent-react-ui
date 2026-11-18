@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
+import { fromCrossJSON, fromJSON } from 'seroval'
 import { PREF_KEYS } from '../src/lib/prefs'
 
 // Story 2.0 row P3: every test records CSP violations, console errors and
@@ -294,4 +295,56 @@ export async function autoCollapseOff(page: Page) {
       // No storage: the test then sees the default.
     }
   }, PREF_KEYS.autoCollapse)
+}
+
+// Stories 3.2 and 3.4: a sort pick saves the category's sort.
+/**
+ * The `category` field of a server function call's input, decoded (Start
+ * sends it with seroval's `toJSONAsync`), or `undefined` when it has none.
+ */
+function savedCategory(body: string | null): unknown {
+  if (body === null) return undefined
+  let decoded: unknown
+  try {
+    decoded = fromJSON(JSON.parse(body) as never)
+  } catch {
+    return undefined
+  }
+  const find = (value: unknown, depth: number): unknown => {
+    if (value === null || typeof value !== 'object' || depth > 4) {
+      return undefined
+    }
+    if (Object.hasOwn(value, 'category') && Object.hasOwn(value, 'sort')) {
+      return (value as { category: unknown }).category
+    }
+    for (const child of Object.values(value)) {
+      const found = find(child, depth + 1)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  return find(decoded, 0)
+}
+
+/** The next setCategorySort answer for exactly `category`; asserts `ok: true`. */
+export async function expectSaveOf(
+  page: Page,
+  category: string,
+  act: () => Promise<void>,
+) {
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/_serverFn/') &&
+      savedCategory(response.request().postData()) === category,
+  )
+  await act()
+  const response = await saved
+  expect(response.ok()).toBe(true)
+  const body: unknown = JSON.parse(await response.text())
+  const decoded = response.headers()['x-tss-serialized']
+    ? fromCrossJSON<{ result: unknown }>(body as never, { refs: new Map() })
+        .result
+    : body
+  expect(decoded).toMatchObject({ ok: true })
 }

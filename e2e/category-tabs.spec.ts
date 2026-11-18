@@ -1,11 +1,11 @@
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import { fromCrossJSON, fromJSON } from 'seroval'
 import {
   DEFAULT_MODES,
   LIST_SCROLL_ID,
   MAIN_ID,
   expect,
+  expectSaveOf,
   login,
   setModes,
   test,
@@ -64,57 +64,6 @@ async function settle(page: Page) {
         .map((animation) => animation.finished.catch(() => null)),
     )
   })
-}
-
-/**
- * The `category` field of a server function call's input, decoded (Start
- * sends it with seroval's `toJSONAsync`), or `undefined` when it has none.
- */
-function savedCategory(body: string | null): unknown {
-  if (body === null) return undefined
-  let decoded: unknown
-  try {
-    decoded = fromJSON(JSON.parse(body) as never)
-  } catch {
-    return undefined
-  }
-  const find = (value: unknown, depth: number): unknown => {
-    if (value === null || typeof value !== 'object' || depth > 4) {
-      return undefined
-    }
-    if (Object.hasOwn(value, 'category') && Object.hasOwn(value, 'sort')) {
-      return (value as { category: unknown }).category
-    }
-    for (const child of Object.values(value)) {
-      const found = find(child, depth + 1)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
-  return find(decoded, 0)
-}
-
-/** The next setCategorySort answer for exactly `category`; asserts `ok: true`. */
-async function expectSaveOf(
-  page: Page,
-  category: string,
-  act: () => Promise<void>,
-) {
-  const saved = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      response.url().includes('/_serverFn/') &&
-      savedCategory(response.request().postData()) === category,
-  )
-  await act()
-  const response = await saved
-  expect(response.ok()).toBe(true)
-  const body: unknown = JSON.parse(await response.text())
-  const decoded = response.headers()['x-tss-serialized']
-    ? fromCrossJSON<{ result: unknown }>(body as never, { refs: new Map() })
-        .result
-    : body
-  expect(decoded).toMatchObject({ ok: true })
 }
 
 /** Picks `label` in the desktop sort menu. */
