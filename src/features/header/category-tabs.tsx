@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { formatCount } from '#/lib/format'
+import { categoryLabel } from '#/lib/category-tabs'
 import type { CategoryTab } from '#/lib/category-tabs'
 import { ALL } from '#/shared/categories'
 import { cn } from '#/shared/ui/cn'
@@ -25,8 +26,10 @@ import { useHeader } from '#/features/header/header-context'
 // switches the category (`selectCategory`); the layout ignores a click on
 // the selected one, except on the settings page (story 3.3: back to that
 // list).
-// Before the first maindata answer only 「全部」 shows, its count a
-// skeleton; after a failed first load its count is left out (spec 1.8).
+// Before the tabs are known only the selected category shows (the URL's,
+// like the phone's category button): 「全部」 with its count a skeleton
+// until maindata answers, another category by name only; after a failed
+// first load the count is left out (spec 1.8).
 // Shortcut tooltips come in story 3.7.
 // https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
 // https://www.w3.org/WAI/ARIA/apg/patterns/button/
@@ -65,7 +68,7 @@ export function DesktopCategoryTabs() {
         className="flex scroll-pe-6 gap-1.5 overflow-x-auto overscroll-x-contain p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs === undefined ? (
-          <LoadingAllTab />
+          <LoadingTab category={selected} />
         ) : (
           tabs.map((tab) => (
             <Tab
@@ -123,12 +126,14 @@ function Tab({
 }
 
 /**
- * 「全部」 alone before the tabs are known (maindata or the settings have
- * not answered): selected, its count once maindata answered, a skeleton
- * (`aria-busy`) while loading, left out once the first load failed.
+ * The selected category alone before the tabs are known (maindata or the
+ * settings have not answered): 「全部」 with its count once maindata
+ * answered, a skeleton (`aria-busy`) while loading, left out once the
+ * first load failed; another category by name only.
  */
-function LoadingAllTab() {
-  const { allCount, loading } = useHeader().model
+function LoadingTab({ category }: { category: string }) {
+  const { allCount: all, loading } = useHeader().model
+  const allCount = category === ALL ? all : null
   const busy = allCount === null && loading
   return (
     <button
@@ -137,7 +142,7 @@ function LoadingAllTab() {
       aria-busy={busy || undefined}
       className={cn(TAB_CLASS, SELECTED_CLASS)}
     >
-      <span>全部</span>
+      <span>{categoryLabel(category)}</span>
       {allCount !== null ? (
         <span className="tabular-nums opacity-75">{formatCount(allCount)}</span>
       ) : (
