@@ -1,6 +1,7 @@
 import { environmentManager } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '#/lib/app-error'
+import { OPERATION_FAILURE_CODES } from '#/lib/error-text'
 import type { ErrorCode } from '#/shared/errors'
 import { clearConnectionErrors, getConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
@@ -41,12 +42,12 @@ afterEach(() => {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-async function failWith<TCode extends ErrorCode>(
+async function failWith(
   code: ErrorCode,
-  failureCodes?: ReadonlyArray<TCode>,
+  failureCodes: ReadonlyArray<ErrorCode> = OPERATION_FAILURE_CODES,
 ) {
   const client = createQueryClient({ currentPath: () => '/' })
-  const op: TrackedOp<{ id: string }, TCode> = {
+  const op: TrackedOp<{ id: string }, ErrorCode> = {
     name: 'test-op',
     call: () => Promise.reject(new AppError(code)),
     keysOf: ({ id }) => [id],
@@ -61,13 +62,13 @@ async function failWith<TCode extends ErrorCode>(
 
 describe('sendOp failure codes', () => {
   it.each([['qbit_rejected'], ['timeout'], ['invalid_input']] as const)(
-    'default codes: %s shows the toast',
+    'torrent operation codes: %s shows the toast',
     async (code) => {
       expect(await failWith(code)).toEqual([`failed: ${code}`])
     },
   )
 
-  it('default codes: settings_write_failed shows none', async () => {
+  it('torrent operation codes: settings_write_failed shows none', async () => {
     expect(await failWith('settings_write_failed')).toEqual([])
   })
 
@@ -93,6 +94,7 @@ describe('sendOp failure codes', () => {
         name: 'answer-op',
         call: () => Promise.resolve({ value: 7 }),
         keysOf: () => [],
+        failureCodes: OPERATION_FAILURE_CODES,
         failureText: () => '',
         onSuccess,
       },

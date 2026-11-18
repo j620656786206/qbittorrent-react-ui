@@ -389,8 +389,7 @@ function AuthedLayout() {
     (next: string | null) => {
       void navigate({
         to: LIST_PATH,
-        search: (previous) =>
-          searchWithHash(previous, next) as never,
+        search: (previous) => searchWithHash(previous, next) as never,
         replace: true,
         // The detail never moves the list or the board.
         resetScroll: false,

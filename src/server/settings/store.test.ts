@@ -172,11 +172,11 @@ describe('missing section (row 2)', () => {
 
   it('an unknown top-level key is kept through reads and writes, never served', async () => {
     // A section a newer image added without a new version (spine AD-8).
-    const file = { ...defaultSettings(), later: { kept: [1] } }
-    await writeRaw(file)
+    const onDisk = { ...defaultSettings(), later: { kept: [1] } }
+    await writeRaw(onDisk)
     expect(await store.read()).toEqual(defaultSettings())
     // Not a repair: the file is not rewritten.
-    expect(await readJson()).toEqual(file)
+    expect(await readJson()).toEqual(onDisk)
     const written = await store.update((current) => ({
       ...current,
       categoryOrder: ['mteam-X'],
@@ -185,7 +185,7 @@ describe('missing section (row 2)', () => {
       ok: true,
       settings: { ...defaultSettings(), categoryOrder: ['mteam-X'] },
     })
-    expect(await readJson()).toEqual({ ...file, categoryOrder: ['mteam-X'] })
+    expect(await readJson()).toEqual({ ...onDisk, categoryOrder: ['mteam-X'] })
   })
 
   it('an unknown top-level key survives a repair write too', async () => {
