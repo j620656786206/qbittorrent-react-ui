@@ -17,7 +17,7 @@ export type FilePriority = (typeof FILE_PRIORITIES)[number]
 /**
  * At most this many ids in one call. Start's client sends about 19 bytes
  * per id (seroval wraps each number), so 3000 seven-digit ids stay under
- * the default 64 KB body limit (AD-12: only hash lists get 384 KB).
+ * the default 64 KB body limit (AD-12: only hash lists get 400 KB).
  */
 export const MAX_FILE_IDS = 3000
 

@@ -140,7 +140,7 @@ inputDocuments:
 - AR-24：白名單：每個 qBittorrent 操作一個 server function（`getMaindata`、`getFiles`、`deleteTorrents`、`addTorrents`、`setLocation`、`renameFiles`、`stopTorrents`、`startTorrents`、`setFilePriority`），沒有 `/api/v2/*` 通用轉送；`app/setPreferences` 和其他改 qBittorrent 設定的 API 一律不開。（AD-5）
 - AR-25：改東西一律 POST、讀取才 GET 且沒有副作用；只有 `login` 和 `/healthz` 不用登入，vitest 列出所有 server function 檢查沒登入時都回 `not_logged_in`；參數用 `URLSearchParams` 或 `FormData` 組，每個 schema 只取自己的欄位。（AD-5）
 - AR-26：`src/start.ts` 明確掛 `createCsrfMiddleware`，`failureResponse` 回 JSON 的 `bad_origin`；再加全域 request middleware：`Host`、`Origin` 要在 `APP_ORIGINS` 裡，而且要有 `X-Requested-With`，`/healthz` 例外。先檢查來源和 cookie，再讀 body。（AD-12）
-- AR-27：body 上限：`.torrent` 每個 10 MB、一次 20 個、整個請求 50 MB；收 hash 陣列的請求 384 KB；其他 64 KB。先看 `Content-Length`，讀的時候也邊讀邊算。（AD-12）
+- AR-27：body 上限：`.torrent` 每個 10 MB、一次 20 個、整個請求 50 MB；收 hash 陣列的請求 400 KB（2026-11-18 從 384 KB 提高，見 AD-12）；其他 64 KB。先看 `Content-Length`，讀的時候也邊讀邊算。（AD-12）
 - AR-28：hash 只收 40 或 64 位小寫 hex，陣列 1 到 5000 個；永遠不把 `all` 或含 `|` 的值送給 qBittorrent。（AD-12）
 - AR-29：路徑共用 `src/shared` 一個 schema：絕對路徑，不含 NUL、反斜線、控制字元，任何一段是 `..` 就拒絕，正規化後要在 `SAVE_ROOTS` 某個根目錄底下，長度上限 1024。改名的新路徑相對於種子自己的資料夾，可以有好幾段，每一段各自檢查：不含 `\`、NUL、控制字元，不是 `.` 或 `..`，每段 1 到 255 bytes，不能以 `/` 開頭；舊路徑要在這個種子目前的檔案清單裡（容器去查）。（AD-12）
 - AR-30：`addTorrents` 只收 `magnet:` 和 `.torrent`，不收 http 網址和 `savepath`，檔案開頭要是 bencode 字典，容器不抓使用者給的網址；`setFilePriority` 的 id 是非負整數、priority 只能 `0`、`1`、`6`、`7`；刪除的一併刪檔是明確 boolean。（AD-12）
@@ -1234,7 +1234,7 @@ Alex 選「狀態」排序時用看板看種子（電腦 4 個工作欄加已整
 
 **Given** `stopTorrents` 和 `startTorrents` 兩個 server function
 **When** 用工廠建立
-**Then** 都是 POST，zod 只收 1 到 5000 個 40 或 64 位小寫 hex 的 hash，永遠不送 `all` 或含 `|` 的值；body 上限照 AD-12 收 hash 陣列的 384 KB（不是 64 KB）；參數用 `URLSearchParams` 組，打 qBittorrent 5.1.4 的停止和開始 API（端點名稱照官方文件確認，PR 附網址）
+**Then** 都是 POST，zod 只收 1 到 5000 個 40 或 64 位小寫 hex 的 hash，永遠不送 `all` 或含 `|` 的值；body 上限照 AD-12 收 hash 陣列的 384 KB（不是 64 KB；2026-11-18 起是 400 KB）；參數用 `URLSearchParams` 組，打 qBittorrent 5.1.4 的停止和開始 API（端點名稱照官方文件確認，PR 附網址）
 **And** 回 AR-54 的批次形狀，qBittorrent 接受就每筆都算成功
 **And** vitest 只用假的 qBittorrent 回應：送對端點和參數、擋掉不合法的 hash、沒登入回 `not_logged_in`、qBittorrent 拒絕回 `qbit_rejected`；不對真的 qBittorrent 呼叫
 
@@ -1786,7 +1786,7 @@ Alex 勾選多個種子（電腦滑上去勾，手機長按進入選取），從
 
 **底稿衝突（2026-11-15 已改架構 AD-12，Claude 代決）：**
 
-- AR-27 規定 `.torrent` 以外的 body 上限 64 KB，AR-28 又允許一次 5000 個 hash。64 KB 的 JSON 大約只放得下 1,500 個 40 位的 hash，UX 的例子「刪除 3,626 個種子」送不出去。已改 AD-12：收 hash 陣列的請求上限 384 KB（5000 個 64 位 hash 的 JSON 約 330 KB）。Story 4.3 和 Story 5.5 照新的 AD-12 做。
+- AR-27 規定 `.torrent` 以外的 body 上限 64 KB，AR-28 又允許一次 5000 個 hash。64 KB 的 JSON 大約只放得下 1,500 個 40 位的 hash，UX 的例子「刪除 3,626 個種子」送不出去。已改 AD-12：收 hash 陣列的請求上限 384 KB（5000 個 64 位 hash 的 JSON 約 330 KB）。2026-11-18 更新：Story 2.6 實測 TanStack Start 實際送出的是 395,140 bytes，超過 384 KB，Alex 同意上限改成 400 KB。Story 4.3 和 Story 5.5 照新的 AD-12 做。
 
 ### Story 4.1：電腦勾選和選取列
 
@@ -1885,7 +1885,7 @@ Alex 勾選多個種子（電腦滑上去勾，手機長按進入選取），從
 **When** 用工廠建立
 **Then** POST，zod 收 `{ hashes, deleteFiles }`：hash 照 AR-28（40 或 64 位小寫 hex，不收 `all`、不含 `|`），`deleteFiles` 是必填的 boolean，沒傳就回 `invalid_input`，不用預設值
 **And** hash 由容器用 qBittorrent 的格式串起來，參數用 `URLSearchParams` 組；qBittorrent 接受就回 AR-54 的批次形狀、每筆成功；qBittorrent 拒絕回整體的 `qbit_rejected`
-**And** body 上限照新的 AD-12（384 KB），選 3,626 個時送得出去
+**And** body 上限照新的 AD-12（400 KB），選 3,626 個時送得出去
 **And** vitest 只用假的 qBittorrent 回應：送對端點和參數、`deleteFiles` 的 true 和 false、擋掉不合法的 hash 和缺 `deleteFiles`、沒登入回 `not_logged_in`；不對真的 qBittorrent 呼叫
 
 **Given** 共用的對話框元件
@@ -2321,7 +2321,7 @@ Alex 從詳情改一個種子的儲存路徑，或從選取列一次搬好幾個
 **And** 標題「搬 5 個種子」，下面一行「5 個種子現在在 2 個位置」（位置照正規化後的 `save_path` 算）
 **And** 每個常用路徑右邊寫「目前 N 個」，N 是這一批裡現在在那裡的數量；「會搬到」預設空著
 **And** 全部選的都已經在框裡的路徑時「搬過去」不能按
-**And** body 上限照新的 AD-12（384 KB）
+**And** body 上限照新的 AD-12（400 KB）
 
 **Given** 按「搬過去」，全部成功
 **When** 結果回來
