@@ -43,8 +43,8 @@ export interface ClassifyOptions {
    */
   stateBeforeMove: Readonly<Record<string, string>>
   /**
-   * Story 2.10: this torrent's reason from getErrorReasons (cleaned plain
-   * text), used only while it is in the `error` state; without one the
+   * Story 2.10: this torrent's reason from getErrorReasons (allow-listed
+   * plain text), used only while it is in the `error` state; without one the
    * fixed ERROR_FALLBACK_TEXT shows.
    */
   errorReason?: string
@@ -266,6 +266,11 @@ function effectiveKind(
   }
 }
 
+/** qBittorrent is moving the torrent's files (whatever it was before). */
+export function isMovingTorrent(torrent: SlimTorrent): boolean {
+  return kindOf(torrent.state) === 'moving'
+}
+
 /** The status alone (no text): for filters and counts. */
 export function statusOf(
   torrent: SlimTorrent,
@@ -309,7 +314,7 @@ export function pauseActionFlips(
   torrent: SlimTorrent,
   stateBeforeMove: Readonly<Record<string, string>>,
 ): boolean {
-  if (kindOf(torrent.state) === 'moving') return false
+  if (isMovingTorrent(torrent)) return false
   return !KEPT_AFTER_PAUSE.has(effectiveKind(torrent, stateBeforeMove).kind)
 }
 

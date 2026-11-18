@@ -13,11 +13,15 @@ import type { ErrorReasonsResponse } from '#/shared/error-reasons'
 // again (`last_known_id` = its id - 1), so the answer must start with that
 // same entry. An empty answer, or one that starts with anything else, means
 // qBittorrent restarted (its ids start at 0 again) or the entry rotated out
-// of its buffer: what was kept is dropped and the next allowed read asks
-// for the whole buffer (still one call per window). Only the newest line per torrent name is kept (its id,
-// time and cleaned reason, or no reason when it has nothing to show), at
-// most MAX_REMEMBERED_NAMES names, never the log itself. A line older than
-// the torrent (`added_on`) belongs to an earlier torrent of that name.
+// of its buffer (it holds about two days): what was kept is dropped and the
+// whole buffer is read at once, in the same refresh (two calls in that
+// window). Only the newest line per torrent name is kept (its id, time and
+// shown reason, or no reason when it has nothing to show), at most
+// MAX_REMEMBERED_NAMES names, never the log itself. A line older than the
+// torrent (`added_on`) belongs to an earlier torrent of that name; one
+// older than the moment the torrent was last seen outside `error`
+// (`errorStartedAfter`, less ERROR_START_SLACK_S) belongs to an earlier
+// error of this torrent.
 
 /**
  * At most one `log/main` call per window (Claude 代決): a little under the
@@ -27,11 +31,16 @@ import type { ErrorReasonsResponse } from '#/shared/error-reasons'
 export const ERROR_REASON_REFRESH_MS = 55_000
 /** Names whose latest reason is kept; the least recently updated go first. */
 export const MAX_REMEMBERED_NAMES = 1000
+/**
+ * Seconds a line may predate `errorStartedAfter` and still count (Claude
+ * 代決): the container's and qBittorrent's clocks may differ a little.
+ */
+export const ERROR_START_SLACK_S = 10
 
 export interface ErrorReasonReaderOptions {
   /** Reads only the log; never a write or settings method. */
   client: Pick<QbitClient, 'logMain'>
-  /** Errored torrents with a unique name (the syncer's table). */
+  /** Errored or moving torrents with a unique name (the syncer's table). */
   candidates: () => Promise<ReadonlyArray<ErrorCandidate>>
   /** Monotonic milliseconds; `performance.now`. */
   now?: () => number
@@ -102,11 +111,9 @@ export function createErrorReasonReader(
         apply(entries.slice(1))
         return
       }
-      // Restarted or rotated: forget it all; the next allowed read starts
-      // over from -1 (one qBittorrent call per window).
+      // Restarted or rotated: forget it all and read the whole buffer now.
       latest.clear()
       newest = null
-      return
     }
     apply(await options.client.logMain(-1))
   }
@@ -137,10 +144,12 @@ export function createErrorReasonReader(
     if (candidates.length === 0) return { reasons: {} }
     await refresh()
     const reasons: Record<string, string> = {}
-    for (const { hash, name, added_on } of candidates) {
+    for (const { hash, name, added_on, errorStartedAfter } of candidates) {
       const known = latest.get(name)
-      // A line older than the torrent was about an earlier one of that name.
-      if (known && known.reason !== null && known.timestamp >= added_on) {
+      // Older than the torrent: an earlier one of that name. Older than its
+      // last moment outside `error`: an earlier error.
+      const since = Math.max(added_on, errorStartedAfter - ERROR_START_SLACK_S)
+      if (known && known.reason !== null && known.timestamp >= since) {
         reasons[hash] = known.reason
       }
     }

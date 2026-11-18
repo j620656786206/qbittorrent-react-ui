@@ -8,13 +8,12 @@ import {
 import type { ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SortKeys } from '#/lib/visible-torrents'
-import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
-import { useEntrance } from '#/state/entrance'
-import { bindFetchErrorReasons, useErrorReasons } from '#/state/error-reasons'
+import { useEmptyEntrance, useEntrance } from '#/state/entrance'
+import { useErrorReasons } from '#/state/error-reasons'
 import { useListView, viewKeyOf } from '#/state/list-view'
 import { useListViewed } from '#/state/list-viewed'
 import {
@@ -88,7 +87,6 @@ function mouseRestsOn(element: HTMLElement | null): boolean {
 }
 
 const fetchSortKeys = bindFetchSortKeys(getSortKeys)
-const fetchErrorReasons = bindFetchErrorReasons(getErrorReasons)
 
 export interface TorrentListProps {
   /**
@@ -130,6 +128,8 @@ export function TorrentList({ panel }: TorrentListProps) {
     visibleCount: shown?.length ?? 0,
     error: failure,
   })
+  // Story 2.9: an empty list still has its entrance moment.
+  useEmptyEntrance(state === 'empty')
   if (state === 'skeleton') return <ListSkeleton />
   if (state === 'error')
     return <ListLoadError onRetry={retry} busy={retrying} />
@@ -173,7 +173,7 @@ function TorrentRows({
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   // Story 2.10: polled only while maindata has an errored torrent.
-  const errorReasons = useErrorReasons(fetchErrorReasons)
+  const errorReasons = useErrorReasons()
   const clock = useDayClock()
   // Only a sort shown as 「N 前」 makes the rows read the minute tick.
   const today = rowClock(sort, clock.today, clock.now)
@@ -272,15 +272,13 @@ function TorrentRows({
             const hash = shown[item.index]
             const props =
               torrents && stateBeforeMove
-                ? rowProps(
-                    { torrents, stateBeforeMove },
-                    hash,
+                ? rowProps({ torrents, stateBeforeMove }, hash, {
                     today,
                     sort,
                     sortKeys,
                     keysFailed,
                     errorReasons,
-                  )
+                  })
                 : null
             return (
               <div

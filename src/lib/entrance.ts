@@ -21,6 +21,11 @@ export const ENTRANCE_EASING = 'cubic-bezier(.2,.8,.2,1)'
  * delays shifted by the time since (Claude 代決).
  */
 export const JOIN_MS = 150
+/**
+ * The order hold ends this long after the sweep's last animation should
+ * have ended, even if a `finished` never settles (Claude 代決).
+ */
+export const HOLD_SLACK_MS = 500
 /** Elements whose tops differ by at most this much are one row, px. */
 export const ROW_TOLERANCE_PX = 1
 

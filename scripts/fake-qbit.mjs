@@ -43,7 +43,7 @@
 //          案中, 已暫停, 停滯, 做種中, 已完成, 找不到檔案, 錯誤, 狀態不明,
 //          已整理); the first has a long save path with Chinese in it;
 //          story 2.10 adds a 13th (0x300d), another 錯誤 whose log reason
-//          has a fake path and a 203.0.113.x address
+//          has a fake path and a 203.0.113.x address (never shown)
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
 //   ops:   normal | reject (story 2.6: reject answers torrents/stop and
 //          torrents/start with HTTP 400, which the container maps to
@@ -79,7 +79,8 @@
 // directory and fake /data paths for many's markup name (picked by name), a
 // 「Torrent errored」 upload-only line with No space left on device for the
 // others (states' Fake.State.10.Error), and for states' 0x300d an unknown
-// reason with a fake path and 203.0.113.7. Every line is newer than every
+// reason with a fake path and 203.0.113.7 (the allow-list shows nothing).
+// Every line is newer than every
 // fake torrent's added_on. Ids start at 0 and never change;
 // `last_known_id` (default -1) and the `normal`, `info`, `warning`,
 // `critical` flags (default true) filter like qBittorrent 5.1.4. Every
@@ -537,8 +538,9 @@ const STATE_ROWS = [
       save_path: '/data/media/X',
     },
   ],
-  // Story 2.10: a second `error` torrent whose log reason needs cleaning
-  // (an unknown reason with a fake path and a documentation address).
+  // Story 2.10: a second `error` torrent whose log reason the allow-list
+  // never shows (an unknown reason with a fake path and a documentation
+  // address): the fixed text stays.
   [
     'ErrorUnknown',
     { state: 'error', private: false, progress: 0.6, category: 'X' },

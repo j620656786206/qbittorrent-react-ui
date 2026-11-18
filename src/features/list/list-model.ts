@@ -1,4 +1,5 @@
 import { isFirstLoadError } from '#/lib/app-error'
+import { reasonOf } from '#/lib/error-reason'
 import {
   formatPercent,
   formatRatio,
@@ -260,6 +261,18 @@ export interface RowProps {
   errorReason: string | undefined
 }
 
+export interface RowPropsOptions {
+  /** Local midnight, epoch ms. */
+  today: number
+  sort?: SortFieldId
+  /** The active extra sort's keys; `undefined` while loading. */
+  sortKeys?: SortKeys
+  /** The first keys failed: no value instead of "loading". */
+  keysFailed?: boolean
+  /** Story 2.10: useErrorReasons' map; `undefined` for none. */
+  errorReasons?: Readonly<Record<string, string>>
+}
+
 /**
  * What the memoized row gets. Every prop keeps its identity across polls
  * when the torrent did not change, so the row does not re-render.
@@ -267,14 +280,13 @@ export interface RowProps {
 export function rowProps(
   maindata: Pick<Maindata, 'torrents' | 'stateBeforeMove'>,
   hash: string,
-  today: number,
-  sort: SortFieldId = FALLBACK_SORT,
-  /** The active extra sort's keys; `undefined` while loading. */
-  sortKeys?: SortKeys,
-  /** The first keys failed: no value instead of "loading". */
-  keysFailed = false,
-  /** Story 2.10: getErrorReasons' map; `undefined` before its first answer. */
-  errorReasons?: Readonly<Record<string, string>>,
+  {
+    today,
+    sort = FALLBACK_SORT,
+    sortKeys,
+    keysFailed = false,
+    errorReasons,
+  }: RowPropsOptions,
 ): RowProps | null {
   if (!Object.hasOwn(maindata.torrents, hash)) return null
   // Slim sorts read the torrent; only an extra sort's key is passed, so the
@@ -289,10 +301,7 @@ export function rowProps(
   return {
     sort,
     sortValue,
-    errorReason:
-      errorReasons && Object.hasOwn(errorReasons, hash)
-        ? errorReasons[hash]
-        : undefined,
+    errorReason: reasonOf(errorReasons, hash),
     torrent: maindata.torrents[hash],
     stateBeforeMove: Object.hasOwn(maindata.stateBeforeMove, hash)
       ? maindata.stateBeforeMove[hash]

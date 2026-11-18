@@ -15,6 +15,8 @@ import { replayEntrance, resetEntrance } from '#/state/entrance'
 import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
 import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
+import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import {
@@ -175,6 +177,7 @@ async function render(first: MaindataResponse | AppError) {
   answers = [first]
   fetchCount = 0
   client = createQueryClient({
+    fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
       const answer = answers[Math.min(fetchCount - 1, answers.length - 1)]

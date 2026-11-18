@@ -420,9 +420,9 @@ describe('torrent table', () => {
   })
 })
 
-describe('story 2.10 forEach and stateBeforeMove', () => {
-  const moving = (rid: number, hash = HASH_A) =>
-    raw({ rid, torrents: { [hash]: { state: 'moving' } } })
+describe('story 2.10 forEach and errorStartedAfter', () => {
+  const state = (rid: number, value: string, hash = HASH_A) =>
+    raw({ rid, torrents: { [hash]: { state: value } } })
 
   it('forEach visits every torrent once', () => {
     const { table } = setup()
@@ -431,64 +431,50 @@ describe('story 2.10 forEach and stateBeforeMove', () => {
     expect(seen.sort()).toEqual([HASH_A, HASH_B, HASH_C].sort())
   })
 
-  it('is set only when a torrent leaves a non-moving state', () => {
-    const { table } = setup()
-    expect(table.stateBeforeMove).toEqual({})
-    table.apply(moving(2))
-    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
+  it('is the time of the last answer that showed the torrent outside error', () => {
+    const { table, advance } = setup()
+    advance(5_000)
+    table.apply(state(2, 'stalledDL'))
+    advance(7_500)
+    table.apply(state(3, 'error'))
+    expect(table.errorStartedAfter(HASH_A)).toBe(5)
   })
 
-  it('is kept across further moving deltas, and cleared when the move ends', () => {
-    const { table } = setup()
-    table.apply(moving(2))
-    table.apply(
-      raw({
-        rid: 3,
-        torrents: { [HASH_A]: { state: 'moving', progress: 0.7 } },
-      }),
-    )
-    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
-    table.apply(raw({ rid: 4, torrents: { [HASH_A]: { state: 'stoppedDL' } } }))
-    expect(table.stateBeforeMove).toEqual({})
+  it('is kept while errored or moving, and cleared when the torrent is fine again', () => {
+    const { table, advance } = setup()
+    advance(5_000)
+    table.apply(state(2, 'stalledDL'))
+    advance(5_000)
+    table.apply(state(3, 'error'))
+    advance(60_000)
+    table.apply(state(4, 'moving'))
+    table.apply(state(5, 'error'))
+    expect(table.errorStartedAfter(HASH_A)).toBe(5)
+    table.apply(state(6, 'stoppedDL'))
+    expect(table.errorStartedAfter(HASH_A)).toBe(0)
   })
 
-  it('is cleared on removal', () => {
-    const { table } = setup()
-    table.apply(moving(2))
-    table.apply(raw({ rid: 3, torrents_removed: [HASH_A] }))
-    expect(table.stateBeforeMove).toEqual({})
-  })
-
-  it('is cleared by a full update that drops the torrent', () => {
-    const { table } = setup()
-    table.apply(moving(2))
-    table.apply(
-      raw(
-        fullMaindata({
-          rid: 3,
-          torrents: { [HASH_B]: rawTorrent({ name: 'B' }) },
-        }),
-      ),
-    )
-    expect(table.stateBeforeMove).toEqual({})
-  })
-
-  it('is never set for a torrent first seen moving', () => {
+  it('is 0 for a torrent errored the first time the table sees it', () => {
     const { table } = setup()
     table.apply(
       raw({
         rid: 2,
-        torrents: { [HASH_D]: rawTorrent({ name: 'D', state: 'moving' }) },
+        torrents: { [HASH_D]: rawTorrent({ name: 'D', state: 'error' }) },
       }),
     )
-    table.apply(moving(3, HASH_D))
-    expect(table.stateBeforeMove).toEqual({})
+    expect(table.errorStartedAfter(HASH_D)).toBe(0)
   })
 
-  it('hands out a copy', () => {
-    const { table } = setup()
-    table.apply(moving(2))
-    table.stateBeforeMove[HASH_A] = 'error'
-    expect(table.stateBeforeMove).toEqual({ [HASH_A]: 'downloading' })
+  it('is cleared on removal', () => {
+    const { table, advance } = setup()
+    advance(5_000)
+    table.apply(state(2, 'error'))
+    expect(table.errorStartedAfter(HASH_A)).toBe(0)
+    advance(5_000)
+    table.apply(state(3, 'stalledDL'))
+    table.apply(state(4, 'error'))
+    expect(table.errorStartedAfter(HASH_A)).toBe(10)
+    table.apply(raw({ rid: 3, torrents_removed: [HASH_A] }))
+    expect(table.errorStartedAfter(HASH_A)).toBe(0)
   })
 })

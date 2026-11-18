@@ -5,24 +5,22 @@ import type { SlimTorrent } from '#/shared/maindata'
 // Story 2.10: the reason text of a torrent in qBittorrent's `error` state.
 // qBittorrent 5.1.4 writes it only into its log (WARNING lines from
 // SessionImpl::handleFileErrorAlert and SessionImpl::createTorrent), naming
-// the torrent by name. Pure: parse one log line, clean the reason (no
-// paths, addresses or accounts leave the container) and say it in
-// Traditional Chinese when it is a common OS error. Sources:
+// the torrent by name. Pure: parse one log line and pass its reason
+// through an allow-list (a common OS error in Traditional Chinese, or plain
+// English words; anything else is never shown). Sources:
 // https://github.com/qbittorrent/qBittorrent/tree/release-5.1.4
 // (src/base/bittorrent/sessionimpl.cpp, torrentimpl.cpp) and libtorrent
 // 2.0.11 file_error_alert::message()
 // (https://github.com/arvidn/libtorrent/blob/v2.0.11/src/alert.cpp).
 
-/** The longest reason shown, 「…」 included (Claude 代決). */
+/** The longest untranslated reason shown (Claude 代決); longer: none. */
 export const ERROR_REASON_MAX_CHARS = 120
-export const PATH_PLACEHOLDER = '（路徑）'
-export const ADDRESS_PLACEHOLDER = '（位址）'
 
 export interface ErrorLine {
   /** The torrent's name as qBittorrent wrote it. */
   name: string
   /**
-   * The cleaned, translated reason (never empty), or `null` when the line
+   * The allowed or translated reason (never empty), or `null` when the line
    * is one of these but has nothing to show (the fixed text shows; it still
    * replaces an older reason).
    */
@@ -93,69 +91,20 @@ function rawReasonOf(
 }
 
 /**
- * The torrent name and cleaned reason of a qBittorrent log line that
+ * The torrent name and shown reason of a qBittorrent log line that
  * explains an `error` state, or `null` for any other line. A recognised
  * line with nothing to show has `reason: null`.
  */
 export function parseErrorLine(message: string): ErrorLine | null {
   const found = rawReasonOf(message)
   if (!found) return null
-  const reason = found.raw === null ? '' : errorReasonText(found.raw)
-  return { name: found.name, reason: reason === '' ? null : reason }
+  return {
+    name: found.name,
+    reason: found.raw === null ? null : errorReasonText(found.raw),
+  }
 }
 
-// Order matters: URLs and accounts first (they hold hosts and paths), then
-// paths, then addresses.
-const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi
-const ACCOUNT_PATTERN = /[^\s"'()<>@]+@[^\s"'()<>@]+/g
-/** `C:\dir\file`, `C:/dir`, and UNC `\\server\share\...`. */
-const WINDOWS_PATH_PATTERN = /(?:\b[a-z]:[\\/]|\\\\)[^\s"'()<>]*/gi
-/** `/dir/file`, at the start or after a space, bracket, quote, `:` or `,`. */
-const POSIX_PATH_PATTERN = /(^|[\s("'=[<:,])\/[^\s"'()<>,]+/g
-/**
- * A quoted string ("…", '…' after a space or bracket, 「…」): replaced whole
- * when it holds a slash or backslash (a path with spaces in it).
- */
-const QUOTED_PATTERN = /"[^"]*"|(?<=^|[\s(=:,])'[^']*'|「[^「」]*」/g
-/** OS words with a slash that are not paths. */
-const SLASH_WORDS = /^(?:i\/o|input\/output|read\/write)$/i
-/** Punctuation around a word: `(I/O),` is still I/O. */
-const LEADING_PUNCTUATION = /^["'(「]+/
-const TRAILING_PUNCTUATION = /[.,;:!?)"'」]+$/
-/**
- * A file name: a dot and a 2 to 5 character extension, where the extension
- * has a letter (`1.mkv`) or the name has one (`Fake.part.001`), never a
- * version like 2.0.11 or v5.1.4.
- */
-const FILE_NAME = /^(\S+)\.([a-z0-9]{2,5})$/i
-const VERSION = /^v?\d+(?:\.\d+)*$/i
-
-function isFileName(token: string): boolean {
-  const match = FILE_NAME.exec(token)
-  if (!match || VERSION.test(token)) return false
-  const [, name, extension] = match
-  return /[a-z]/i.test(extension) || /[a-z]/i.test(name)
-}
-/**
- * A dotted host name whose last label is letters, with an optional port
- * (`tracker.example.com:443`, `nas.lan:8080`); versions never match.
- */
-const HOST_PATTERN =
-  /(?<![\w.-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?![\w.-])/gi
-/** A bracketed IPv6 address with an optional port: `[2001:db8::1]:6881`. */
-const BRACKETED_IPV6_PATTERN = /\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d{1,5})?/gi
-/** IPv6 candidates; `isIpv6` decides (a time like 12:30:45 is not one). */
-const IPV6_PATTERN =
-  /(?<![\w:.])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?:\.\d{1,3}){0,3}(?:%[\w.-]+)?(?![\w:])/gi
-const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b/g
-
-function isIpv6(candidate: string): boolean {
-  const core = candidate.replace(/%.*$/, '')
-  if (!/[0-9a-f]/i.test(core)) return false
-  return core.includes('::') || core.split(':').length === 8
-}
-
-/** Known OS texts (the whole cleaned reason, any case), Claude 代決. */
+/** Known OS texts (the whole reason, any case), Claude 代決. */
 const TRANSLATIONS: ReadonlyMap<string, string> = new Map([
   ['no such file or directory', '找不到檔案或資料夾'],
   ['no space left on device', '磁碟空間不足'],
@@ -175,88 +124,29 @@ const TRANSLATIONS: ReadonlyMap<string, string> = new Map([
 ])
 
 /**
- * A host name with a port, or with two or more dots in lower case, is an
- * address; a single dotted word (`fake.mkv`, `nas.lan`) is left to
- * `leftoverPaths`, which reads it as a file name. Either way it is gone.
+ * An untranslated reason shown as written: English words, spaces and
+ * `, ' -` only, at most ERROR_REASON_MAX_CHARS. No digit, dot, slash, `@`,
+ * colon, bracket or non-ASCII letter, so no path, file name, address or
+ * account can pass (Alex 2026-11-18, option A).
  */
-function hostNames(text: string): string {
-  return text.replace(HOST_PATTERN, (match) => {
-    const hasPort = /:\d+$/.test(match)
-    const dots = match.split('.').length - 1
-    return hasPort || (dots >= 2 && match === match.toLowerCase())
-      ? ADDRESS_PLACEHOLDER
-      : match
-  })
-}
+const SAFE_REASON = new RegExp(
+  `^[a-z][a-z ,'-]{0,${ERROR_REASON_MAX_CHARS - 1}}$`,
+  'i',
+)
 
 /**
- * What the patterns missed: any token left with a slash or backslash
- * (except `I/O`, `Input/output`, `read/write`) or ending in a file
- * extension. Punctuation around the token stays.
+ * A raw reason as shown, or `null` (the fixed text shows). An allow-list:
+ * a known OS error reads in Traditional Chinese, a reason of plain English
+ * words stays as written, anything else is never shown. qBittorrent 5.1.4
+ * fills these reasons from libtorrent error_code messages, which carry no
+ * path, but its other log lines do carry whole paths, so nothing outside
+ * the list leaves the container.
  */
-function leftoverPaths(text: string): string {
-  return text.replace(/\S+/g, (token) => {
-    const lead = LEADING_PUNCTUATION.exec(token)?.[0] ?? ''
-    const trail = TRAILING_PUNCTUATION.exec(token.slice(lead.length))?.[0] ?? ''
-    const core = token.slice(lead.length, token.length - trail.length)
-    const isPath =
-      (/[\\/]/.test(core) && !SLASH_WORDS.test(core)) || isFileName(core)
-    return isPath ? `${lead}${PATH_PLACEHOLDER}${trail}` : token
-  })
-}
-
-/** 「（路徑） （路徑）」 reads as one placeholder. */
-function collapsePlaceholders(text: string): string {
-  return text
-    .replace(/（路徑）(?:\s*（路徑）)+/g, PATH_PLACEHOLDER)
-    .replace(/（位址）(?:\s*（位址）)+/g, ADDRESS_PLACEHOLDER)
-}
-
-function capped(text: string): string {
-  const chars = Array.from(text)
-  if (chars.length <= ERROR_REASON_MAX_CHARS) return text
-  let cut = chars.slice(0, ERROR_REASON_MAX_CHARS - 1).join('')
-  // Never cut inside a placeholder: drop a partial 「（路徑）」 or 「（位址）」.
-  const open = cut.lastIndexOf('（')
-  if (open >= 0 && !cut.includes('）', open)) {
-    const tail = cut.slice(open)
-    if (
-      PATH_PLACEHOLDER.startsWith(tail) ||
-      ADDRESS_PLACEHOLDER.startsWith(tail)
-    ) {
-      cut = cut.slice(0, open)
-    }
-  }
-  return `${cut.trimEnd()}…`
-}
-
-/**
- * A raw reason as shown: paths, quoted paths and file names become
- * 「（路徑）」, IP addresses, host names, URLs and `user@host` forms
- * 「（位址）」 (adjacent ones collapse), whitespace collapses, at most 120
- * characters, and a known OS error reads in Traditional Chinese.
- */
-export function errorReasonText(raw: string): string {
-  const replaced = raw
-    .replace(URL_PATTERN, ADDRESS_PLACEHOLDER)
-    .replace(ACCOUNT_PATTERN, ADDRESS_PLACEHOLDER)
-    .replace(QUOTED_PATTERN, (quoted) =>
-      /[\\/]/.test(quoted) ? PATH_PLACEHOLDER : quoted,
-    )
-    .replace(WINDOWS_PATH_PATTERN, PATH_PLACEHOLDER)
-    .replace(
-      POSIX_PATH_PATTERN,
-      (_match, before: string) => `${before}${PATH_PLACEHOLDER}`,
-    )
-    .replace(BRACKETED_IPV6_PATTERN, ADDRESS_PLACEHOLDER)
-    .replace(IPV6_PATTERN, (match) =>
-      isIpv6(match) ? ADDRESS_PLACEHOLDER : match,
-    )
-    .replace(IPV4_PATTERN, ADDRESS_PLACEHOLDER)
-  const cleaned = collapsePlaceholders(leftoverPaths(hostNames(replaced)))
-    .replace(/\s+/g, ' ')
-    .trim()
-  return TRANSLATIONS.get(cleaned.toLowerCase()) ?? capped(cleaned)
+export function errorReasonText(raw: string): string | null {
+  const text = raw.replace(/\s+/g, ' ').trim()
+  const translated = TRANSLATIONS.get(text.toLowerCase())
+  if (translated) return translated
+  return SAFE_REASON.test(text) ? text : null
 }
 
 /**
@@ -289,4 +179,12 @@ export function hasErroredTorrent(
   }
   erroredBySnapshot.set(maindata, found)
   return found
+}
+
+/** One torrent's reason from a hash-to-reason map, if it has one. */
+export function reasonOf(
+  reasons: Readonly<Record<string, string>> | undefined,
+  hash: string,
+): string | undefined {
+  return reasons && Object.hasOwn(reasons, hash) ? reasons[hash] : undefined
 }

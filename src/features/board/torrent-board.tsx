@@ -15,6 +15,7 @@ import {
   useBoardColumns,
   useMaindata,
 } from '#/state/maindata'
+import { useEmptyEntrance } from '#/state/entrance'
 import { useMaindataFailure } from '#/state/maindata-failure'
 import { useMaindataRetry } from '#/state/maindata-retry'
 import { useDayClock } from '#/state/now'
@@ -79,6 +80,8 @@ export function TorrentBoard() {
     total: columns ? totalOf(columns) : 0,
     error: failure,
   })
+  // Story 2.9: an empty board still has its entrance moment.
+  useEmptyEntrance(state === 'empty')
   if (state === 'skeleton') return <BoardSkeleton desktop={desktop} />
   if (state === 'error') {
     return (

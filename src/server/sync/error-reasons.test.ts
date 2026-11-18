@@ -13,6 +13,7 @@ import {
 } from '#/server/qbit/testing'
 import {
   ERROR_REASON_REFRESH_MS,
+  ERROR_START_SLACK_S,
   MAX_REMEMBERED_NAMES,
   createErrorReasonReader,
 } from '#/server/sync/error-reasons'
@@ -71,8 +72,18 @@ function setup(
   }
 }
 
-const N = { hash: HASH_A, name: 'Fake.Show.S01E05', added_on: T0 }
-const M = { hash: HASH_B, name: 'mteam-X.Fake.Movie', added_on: T0 }
+const N = {
+  hash: HASH_A,
+  name: 'Fake.Show.S01E05',
+  added_on: T0,
+  errorStartedAfter: 0,
+}
+const M = {
+  hash: HASH_B,
+  name: 'mteam-X.Fake.Movie',
+  added_on: T0,
+  errorStartedAfter: 0,
+}
 
 describe('error reason reader', () => {
   it('the window is under the browser 60 s poll', () => {
@@ -139,6 +150,26 @@ describe('error reason reader', () => {
     expect((await reader.read()).reasons).toEqual({})
   })
 
+  it('a line from before the torrent was last seen outside error is about an earlier error', async () => {
+    const after = T0 + 1000
+    const again = { ...N, errorStartedAfter: after }
+    const { reader, log, readLater } = setup(
+      [again],
+      [line(1, fileError(N.name, 'No space left on device'), T0 + 10)],
+    )
+    // The new error logged nothing: the old reason is not shown.
+    expect((await reader.read()).reasons).toEqual({})
+    // A line a little before (clock difference) still counts.
+    log.buffer.push(
+      line(
+        2,
+        fileError(N.name, 'Permission denied'),
+        after - ERROR_START_SLACK_S,
+      ),
+    )
+    expect(await readLater()).toEqual({ [HASH_A]: '沒有權限' })
+  })
+
   it('matrix 7: a torrent that left error is not in the map', async () => {
     const { reader, state } = setup(
       [N],
@@ -198,18 +229,19 @@ describe('error reason reader', () => {
     expect(ids()).toEqual([-1, 7, 8])
   })
 
-  it('matrix 10: a restart whose new log is shorter: an empty answer forgets everything; the next window reads from -1', async () => {
+  it('matrix 10: a restart whose new log is shorter: an empty answer forgets everything and reads from -1 at once', async () => {
     const { reader, log, ids, readLater } = setup(
       [N, M],
       [line(40, fileError(N.name, 'File too large'))],
     )
     expect((await reader.read()).reasons).toEqual({ [HASH_A]: '檔案太大' })
     log.buffer = [line(0, fileError(M.name, 'Permission denied'), T0 + 500)]
-    // The old reason is gone with the old buffer; one call in this window.
-    expect(await readLater()).toEqual({})
-    expect(ids()).toEqual([-1, 39])
+    // The old reason is gone with the old buffer; the new one shows now.
     expect(await readLater()).toEqual({ [HASH_B]: '沒有權限' })
     expect(ids()).toEqual([-1, 39, -1])
+    // Back to incremental reads.
+    expect(await readLater()).toEqual({ [HASH_B]: '沒有權限' })
+    expect(ids()).toEqual([-1, 39, -1, -1])
   })
 
   it('a restart whose new log already passed the old id: the first entry differs, so it starts over', async () => {
@@ -224,9 +256,8 @@ describe('error reason reader', () => {
       line(2, 'qBittorrent started', T0 + 502),
       line(3, 'other', T0 + 503),
     ]
-    // The old reason is gone at once; the next window reads the new
-    // session from its first line (id 0).
-    expect(await readLater()).toEqual({})
+    // The old reason is gone at once; the new session is read from its
+    // first line (id 0) in the same refresh.
     expect(await readLater()).toEqual({ [HASH_B]: '沒有權限' })
     expect(ids()).toEqual([-1, 1, -1])
   })
@@ -238,7 +269,6 @@ describe('error reason reader', () => {
     )
     expect((await reader.read()).reasons).toEqual({ [HASH_A]: '檔案太大' })
     log.buffer = [line(5, fileError(N.name, 'Permission denied'), T0 + 900)]
-    expect(await readLater()).toEqual({})
     expect(await readLater()).toEqual({ [HASH_A]: '沒有權限' })
   })
 
@@ -273,12 +303,8 @@ describe('error reason reader', () => {
     const lines = Array.from({ length: MAX_REMEMBERED_NAMES + 1 }, (_, i) =>
       line(i, fileError(`Fake.${i}`, 'File too large')),
     )
-    const first = { hash: HASH_C, name: 'Fake.0', added_on: T0 }
-    const last = {
-      hash: HASH_D,
-      name: `Fake.${MAX_REMEMBERED_NAMES}`,
-      added_on: T0,
-    }
+    const first = { ...N, hash: HASH_C, name: 'Fake.0' }
+    const last = { ...N, hash: HASH_D, name: `Fake.${MAX_REMEMBERED_NAMES}` }
     const { reader } = setup([first, last], lines)
     expect((await reader.read()).reasons).toEqual({ [HASH_D]: '檔案太大' })
   })
@@ -295,7 +321,7 @@ describe('syncer readErrorCandidates', () => {
     }
   }
 
-  it('only errored torrents, and matrix 5: never a name shared by two torrents', async () => {
+  it('errored and moving torrents, and matrix 5: never a name shared by two torrents', async () => {
     const { syncer } = syncerWith({
       [HASH_A]: rawTorrent({ name: 'N', state: 'error' }),
       [HASH_B]: rawTorrent({ name: 'N', state: 'downloading' }),
@@ -303,36 +329,52 @@ describe('syncer readErrorCandidates', () => {
       [HASH_D]: rawTorrent({ name: 'Fake.Missing', state: 'missingFiles' }),
     })
     expect(await syncer.readErrorCandidates()).toEqual([
-      { hash: HASH_C, name: 'mteam-X.Fake', added_on: 1_700_000_000 },
+      {
+        hash: HASH_C,
+        name: 'mteam-X.Fake',
+        added_on: 1_700_000_000,
+        errorStartedAfter: 0,
+      },
     ])
   })
 
-  it('a torrent moving from error is still a candidate, like in the browser', async () => {
+  it('a moving torrent is a candidate (the browser decides whether it reads as error)', async () => {
+    const { syncer } = syncerWith({
+      [HASH_A]: rawTorrent({ name: 'N', state: 'moving' }),
+      [HASH_B]: rawTorrent({ name: 'O', state: 'stalledUP' }),
+    })
+    expect(await syncer.readErrorCandidates()).toEqual([
+      {
+        hash: HASH_A,
+        name: 'N',
+        added_on: 1_700_000_000,
+        errorStartedAfter: 0,
+      },
+    ])
+  })
+
+  it('a torrent that errors after being seen fine carries that moment', async () => {
     const answers = [
       fullMaindata({
-        torrents: { [HASH_A]: rawTorrent({ name: 'N', state: 'error' }) },
+        torrents: { [HASH_A]: rawTorrent({ name: 'N', state: 'stalledDL' }) },
       }),
-      { rid: 2, torrents: { [HASH_A]: { state: 'moving' } } },
-      // Still moving: the remembered state stays.
-      { rid: 3, torrents: { [HASH_A]: { state: 'moving', progress: 0.4 } } },
-      { rid: 4, torrents: { [HASH_A]: { state: 'stoppedDL' } } },
+      { rid: 2, torrents: { [HASH_A]: { state: 'error' } } },
     ]
-    let clock = 0
+    let clock = 1_800_000_000_000
     const syncMaindata = vi.fn(() =>
       Promise.resolve(rawMaindataSchema.parse(answers.shift())),
     )
     const syncer = createSyncer({ client: { syncMaindata }, now: () => clock })
-    expect(await syncer.readErrorCandidates()).toHaveLength(1)
-    clock += 10_000
-    expect(await syncer.readErrorCandidates()).toEqual([
-      { hash: HASH_A, name: 'N', added_on: 1_700_000_000 },
-    ])
-    clock += 10_000
-    expect(await syncer.readErrorCandidates()).toEqual([
-      { hash: HASH_A, name: 'N', added_on: 1_700_000_000 },
-    ])
-    clock += 10_000
     expect(await syncer.readErrorCandidates()).toEqual([])
+    clock += 10_000
+    expect(await syncer.readErrorCandidates()).toEqual([
+      {
+        hash: HASH_A,
+        name: 'N',
+        added_on: 1_700_000_000,
+        errorStartedAfter: 1_800_000_000,
+      },
+    ])
   })
 
   it('reuses the last maindata pull', async () => {

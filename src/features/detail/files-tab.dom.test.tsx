@@ -20,6 +20,8 @@ import type { TorrentFile } from '#/shared/torrent-files'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
+import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { resetOrderFreeze } from '#/state/order-freeze'
@@ -146,6 +148,7 @@ function Url({
 
 async function render(ui: ReactNode, hash: string | null = null) {
   client = createQueryClient({
+    fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => Promise.resolve(fakeResponse({ changed: torrents() })),
     currentPath: () => '/',
   })

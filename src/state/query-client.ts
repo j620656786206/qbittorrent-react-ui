@@ -17,6 +17,11 @@ import {
   markLoginRequired,
   unlessLoginRequired,
 } from '#/state/login-required'
+import {
+  ERROR_REASONS_KEY,
+  errorReasonsQueryDefaults,
+} from '#/state/error-reasons'
+import type { FetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY, maindataQueryDefaults } from '#/state/maindata'
 import {
   clearMaindataFailure,
@@ -42,6 +47,11 @@ export interface CreateQueryClientOptions {
    * `['maindata']` query options are registered on the client.
    */
   fetchMaindata?: FetchMaindata
+  /**
+   * The `getErrorReasons` call (bound in src/router.tsx). When given, the
+   * `['error-reasons']` query options are registered on the client.
+   */
+  fetchErrorReasons?: FetchErrorReasons
 }
 
 function locationPath(): string {
@@ -69,6 +79,7 @@ const MAINDATA_HASH = hashKey(MAINDATA_KEY)
 export function createQueryClient({
   currentPath = locationPath,
   fetchMaindata,
+  fetchErrorReasons,
 }: CreateQueryClientOptions = {}): QueryClient {
   // bad_origin repeats on every poll; once per client is enough to see it.
   let badOriginLogged = false
@@ -141,6 +152,12 @@ export function createQueryClient({
 
   if (fetchMaindata) {
     client.setQueryDefaults(MAINDATA_KEY, maindataQueryDefaults(fetchMaindata))
+  }
+  if (fetchErrorReasons) {
+    client.setQueryDefaults(
+      ERROR_REASONS_KEY,
+      errorReasonsQueryDefaults(fetchErrorReasons),
+    )
   }
 
   // The server builds a router (and so a client) for every request, /healthz

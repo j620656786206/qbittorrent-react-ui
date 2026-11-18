@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
 import {
   ENTRANCE_EASING,
+  HOLD_SLACK_MS,
   RING_MS,
   RISE_MS,
   RISE_PX,
@@ -34,13 +35,16 @@ import { holdOrderForAnimation } from '#/state/order-freeze'
 // unclaimed generation: every mounted surface sweeps the rows it has on its
 // next commit, the first one claiming it and the others joining as on the
 // first load. A surface not ready then (no data yet) claims or joins once
-// it is.
+// it is. An empty list or board (`useEmptyEntrance`) handles a generation
+// like a surface with nothing to animate, so rows that arrive on a later
+// poll never claim a generation whose moment passed.
 //
 // A sweep runs in a layout effect, so the first painted frame of the rows
 // is already the animation's first frame. It reads every box once, keeps
 // what shows (its scroll box and the window), staggers rows 60ms apart and
 // holds the list and board order (AD-7 「動畫進行中」) until its animations
-// settle, a replay, or unmount. Reduced motion or no Web Animations: no
+// settle (at the latest HOLD_SLACK_MS after the last should have ended), a
+// replay, or unmount. Reduced motion or no Web Animations: no
 // sweep, no hold. Docs: https://react.dev/reference/react/useLayoutEffect ,
 // https://developer.mozilla.org/en-US/docs/Web/API/Animation/finished ,
 // TanStack Store `createStore` and `useSelector` as in
@@ -101,14 +105,16 @@ function stop(run: Run | null): void {
   run.release()
 }
 
+interface Sweep {
+  animations: Array<Animation>
+  /** When the last one should end, ms from now. */
+  endsIn: number
+}
+
 /** Starts the entrance on what `container` shows; one layout read. */
-function sweep(
-  container: HTMLElement,
-  rise: boolean,
-  elapsed: number,
-): Array<Animation> {
+function sweep(container: HTMLElement, rise: boolean, elapsed: number): Sweep {
   const items = entranceItems(container, rise)
-  if (items.length === 0) return []
+  if (items.length === 0) return { animations: [], endsIn: 0 }
   // The scroll box, cut down by every ancestor that clips (the phone
   // board's swipe viewport hides the panels beside the selected one).
   const box = clippingAncestors(container).reduce<Box>(
@@ -133,9 +139,11 @@ function sweep(
     )
   const rows = rowOrdinals(shown.map((item) => item.rect.top))
   const started: Array<Animation> = []
+  let endsIn = 0
   shown.forEach((item, index) => {
     const delay = entranceDelay(rows[index], elapsed)
     const ring = { delay, duration: RING_MS, easing: ENTRANCE_EASING }
+    const before = started.length
     if (item.rise) {
       started.push(
         riseIn(
@@ -150,8 +158,11 @@ function sweep(
       if (animation) started.push(animation)
     }
     for (const bar of item.bars) started.push(growIn(bar, ring))
+    if (started.length > before) {
+      endsIn = Math.max(endsIn, delay + Math.max(RING_MS, RISE_MS))
+    }
   })
-  return started
+  return { animations: started, endsIn }
 }
 
 export interface EntranceOptions {
@@ -207,7 +218,7 @@ export function useEntrance(
     }
     const container = containerRef.current
     if (!container || prefersReducedMotion() || !canAnimate(container)) return
-    const animations = sweep(
+    const { animations, endsIn } = sweep(
       container,
       rise,
       decision.kind === 'join' ? decision.elapsed : 0,
@@ -215,14 +226,19 @@ export function useEntrance(
     if (animations.length === 0) return
     const run: Run = { animations, release: holdOrderForAnimation() }
     runRef.current = run
-    // A cancelled animation (replay, unmount, a removed arc) rejects its
-    // `finished`; every outcome counts as settled.
-    void Promise.allSettled(
-      animations.map((animation) => animation.finished),
-    ).then(() => {
+    const settle = () => {
+      window.clearTimeout(backstop)
       run.release()
       if (runRef.current === run) runRef.current = null
-    })
+    }
+    // A cancelled animation (replay, unmount) rejects its `finished`; an
+    // element React removed keeps its animation until it ends. Every
+    // outcome counts as settled, and should a `finished` never settle, the
+    // timer releases the order anyway.
+    const backstop = window.setTimeout(settle, endsIn + HOLD_SLACK_MS)
+    void Promise.allSettled(
+      animations.map((animation) => animation.finished),
+    ).then(settle)
   })
 
   useLayoutEffect(
@@ -234,4 +250,16 @@ export function useEntrance(
     },
     [],
   )
+}
+
+const NO_SURFACE: RefObject<HTMLElement | null> = { current: null }
+
+/**
+ * Story 2.9: the list or board while it shows its empty view. It handles
+ * each generation like a surface with nothing to animate (claims or joins
+ * it), so the first rows to arrive on a later poll draw as they are. Call
+ * it on every render of the list or board, with whether it is empty now.
+ */
+export function useEmptyEntrance(empty: boolean): void {
+  useEntrance(NO_SURFACE, { ready: empty })
 }

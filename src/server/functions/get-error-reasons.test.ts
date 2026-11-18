@@ -91,7 +91,7 @@ describe('getErrorReasons server function', () => {
     )
   })
 
-  it('matrix 1: answers the cleaned reason of the errored torrent only', async () => {
+  it('matrix 1: answers the shown reason of the errored torrent only', async () => {
     const result = await run()
     expect(result).toEqual({
       ok: true,

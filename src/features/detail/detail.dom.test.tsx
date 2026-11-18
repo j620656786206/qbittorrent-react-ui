@@ -14,6 +14,8 @@ import { replayEntrance, resetEntrance } from '#/state/entrance'
 import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
 import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
+import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
@@ -164,6 +166,7 @@ async function render(
   answers = [fakeResponse({ changed: data })]
   fetchCount = 0
   client = createQueryClient({
+    fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
       return Promise.resolve(
