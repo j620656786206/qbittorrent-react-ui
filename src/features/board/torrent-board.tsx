@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
 import { formatCount } from '#/lib/format'
+import { noResultText } from '#/lib/name-search'
 import type { BoardColumn } from '#/lib/torrent-status'
 import type { BoardColumns } from '#/lib/visible-torrents'
+import { ALL } from '#/shared/categories'
 import type { SlimTorrent } from '#/shared/maindata'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { cn } from '#/shared/ui/cn'
-import { ListEmpty, ListLoadError } from '#/shared/ui/list-blocks'
+import { ListEmpty, ListLoadError, ListNoResult } from '#/shared/ui/list-blocks'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import {
@@ -14,6 +16,7 @@ import {
   selectTorrents,
   useBoardColumns,
   useMaindata,
+  useMatchCount,
 } from '#/state/maindata'
 import { useAutoCollapse } from '#/state/auto-collapse'
 import { useEmptyEntrance } from '#/state/entrance'
@@ -59,7 +62,14 @@ import { useBoardCollapse } from '#/features/board/use-board-collapse'
 // only the 已整理 toggle changes). Story 3.2: only the selected category's
 // torrents, the 已整理 column too; a category with only archived torrents
 // shows the four work columns as 「沒有」 and 已整理 as usual, one with none
-// the empty block 「這個分類沒有種子」.
+// the empty block 「這個分類沒有種子」. Story 3.5: with a keyword only the
+// names holding it, 已整理 too (its collapsed count is the matches); a
+// partly empty board keeps its four columns, each empty one 「沒有」; only
+// when the four and 已整理 are all empty the no-result block covers it.
+// The board stays mounted (hidden) under that block and its key is the
+// category only, so a keyword that matches nothing for a moment keeps the
+// open 已整理 column, the collapse and the scroll. A category with no
+// torrent at all still says 「這個分類沒有種子」.
 
 const GRID_CLASS = 'grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-board-gap'
 /** The 已整理 strip is 64px; expanded it is as wide as the others. */
@@ -67,9 +77,13 @@ const GRID_COLLAPSED = 'grid-cols-[repeat(4,minmax(0,1fr))_64px]'
 const GRID_EXPANDED = 'grid-cols-[repeat(5,minmax(0,1fr))]'
 
 export function TorrentBoard() {
-  const { view, viewReady } = useListView()
-  const { data: liveColumns } = useBoardColumns(view.category)
-  const columns = useBoardShownColumns(liveColumns, view.category)
+  const { view, viewReady, selectCategory } = useListView()
+  const { data: liveColumns } = useBoardColumns(view.category, view.query)
+  // Another category or keyword applies at once, even mid-animation.
+  const columns = useBoardShownColumns(
+    liveColumns,
+    JSON.stringify([view.category, view.query]),
+  )
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   // Sticky: Query clears its own `error` each time a fetch starts.
@@ -77,6 +91,8 @@ export function TorrentBoard() {
   const { retry, retrying } = useMaindataRetry()
   const desktop = useIsDesktop()
   const { today } = useDayClock()
+  // Story 3.5: the category's own size (archived included), keyword aside.
+  const { data: categoryTotal = 0 } = useMatchCount(view.category, '', true)
 
   // Story 3.1 (AD-8): the first load also waits for the settings, which
   // may turn a URL without `sort` into the list.
@@ -84,9 +100,10 @@ export function TorrentBoard() {
     hasData: columns !== undefined && viewReady,
     total: columns ? totalOf(columns) : 0,
     error: failure,
+    searching: view.query !== '' && categoryTotal > 0,
   })
   // Story 2.9: an empty board still has its entrance moment.
-  useEmptyEntrance(state === 'empty')
+  useEmptyEntrance(state === 'empty' || state === 'no-result')
   if (state === 'skeleton') return <BoardSkeleton desktop={desktop} />
   if (state === 'error') {
     return (
@@ -100,24 +117,41 @@ export function TorrentBoard() {
   if (state === 'empty' || !columns || !torrents || !stateBeforeMove) {
     return <ListEmpty />
   }
+  const noResult = state === 'no-result'
   // Story 3.2: another category is a new board, keyed on it: every column
   // back at the top, the auto-collapse and the 已整理 column reset.
-  return desktop ? (
-    <DesktopBoard
-      key={view.category}
-      columns={columns}
-      torrents={torrents}
-      stateBeforeMove={stateBeforeMove}
-      today={today}
-    />
-  ) : (
-    <PhoneBoard
-      key={view.category}
-      columns={columns}
-      torrents={torrents}
-      stateBeforeMove={stateBeforeMove}
-      today={today}
-    />
+  return (
+    <div className="relative h-full min-h-0">
+      <div className={cn('h-full min-h-0', noResult && 'invisible')}>
+        {desktop ? (
+          <DesktopBoard
+            key={view.category}
+            columns={columns}
+            torrents={torrents}
+            stateBeforeMove={stateBeforeMove}
+            today={today}
+          />
+        ) : (
+          <PhoneBoard
+            key={view.category}
+            columns={columns}
+            torrents={torrents}
+            stateBeforeMove={stateBeforeMove}
+            today={today}
+          />
+        )}
+      </div>
+      {noResult && (
+        <div className="absolute inset-0">
+          <ListNoResult
+            text={noResultText(view.query, view.category)}
+            onSearchAll={
+              view.category === ALL ? undefined : () => selectCategory(ALL)
+            }
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -137,6 +171,7 @@ function DesktopBoard({
   stateBeforeMove,
   today,
 }: BoardDataProps) {
+  const searching = useListView().view.query !== ''
   const [archivedOpen, setArchivedOpen] = useState(false)
   const autoCollapse = useAutoCollapse()
   const { view, controller } = useBoardCollapse(autoCollapse)
@@ -199,7 +234,7 @@ function DesktopBoard({
             torrents={torrents}
             stateBeforeMove={stateBeforeMove}
             today={today}
-            empty={emptyText(column, columns)}
+            empty={emptyText(column, columns, searching)}
             bodyRef={controller.scrollerRef(column)}
             {...wide(column)}
           />

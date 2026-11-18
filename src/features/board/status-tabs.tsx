@@ -9,6 +9,7 @@ import type { BoardColumns } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { useListView } from '#/state/list-view'
 import {
   COLUMN_META,
   WORK_COLUMNS,
@@ -114,6 +115,8 @@ export function PhoneBoard({
   stateBeforeMove,
   today,
 }: PhoneBoardProps) {
+  // Story 3.5: while searching every empty column says 「沒有」.
+  const searching = useListView().view.query !== ''
   const [index, setIndex] = useState(0)
   const idPrefix = useId()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -274,7 +277,7 @@ export function PhoneBoard({
               torrents={torrents}
               stateBeforeMove={stateBeforeMove}
               today={today}
-              empty={emptyText(column, columns)}
+              empty={emptyText(column, columns, searching)}
               label={COLUMN_META[column].name}
               paddingStart={0}
               paddingEnd={4}

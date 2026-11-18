@@ -20,6 +20,7 @@ import { categoryTabs, resolveCategory } from '#/lib/category-tabs'
 import type { Maindata } from '#/lib/maindata-merge'
 import { showsRememberedHint } from '#/lib/remembered-hint'
 import type { SortChange } from '#/lib/remembered-hint'
+import { nameMatches, searchNeedle } from '#/lib/name-search'
 import { rememberedSortOf, sameSort } from '#/lib/remembered-sort'
 import { inCategory } from '#/lib/visible-torrents'
 import { setCategorySort } from '#/server/functions/set-category-sort'
@@ -32,6 +33,7 @@ import {
   normalizeSortView,
   searchWithCategory,
   searchWithHash,
+  searchWithQuery,
   sortViewOf,
 } from '#/shared/list-search'
 import type { SortView } from '#/shared/list-search'
@@ -92,6 +94,14 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // runs on the list: off it, a change made meanwhile is judged when the
 // list is back.
 // https://tanstack.com/router/latest/docs/framework/react/guide/navigation
+// Story 3.5: `q`, the search keyword, in the URL too (trimmed; written with
+// `replace`, removed when empty), in the view as `query` so the selectors
+// filter by it. The search box is open while a keyword is set (a reload
+// with `q` opens it) and from the magnifier or `/` until ✕, 「取消」 or
+// `Esc` closes it, which also removes `q`. Typing writes the list's URL
+// (like the other setters) and puts the list back at the top; a category
+// switch keeps the keyword (and the box), and so does the settings page
+// round trip (the whole list search rides along).
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -152,6 +162,7 @@ function AuthedLayout() {
     [rawSearch],
   )
   const { sort, dir, hash, category: urlCategory } = listSearch
+  const query = listSearch.q ?? ''
 
   useEffect(() => {
     const fixed = fixListSearch(rawSearch)
@@ -203,9 +214,18 @@ function AuthedLayout() {
   // settings answer keeps `view` (and the visible list) as it is.
   const rememberedForView = sort === undefined ? remembered : null
   const view = useMemo<ListView>(
-    () => ({ ...sortViewOf({ sort, dir }, rememberedForView), category }),
-    [sort, dir, rememberedForView, category],
+    () => ({
+      ...sortViewOf({ sort, dir }, rememberedForView),
+      category,
+      query,
+    }),
+    [sort, dir, rememberedForView, category, query],
   )
+
+  // Open while a keyword is set; the magnifier or `/` opens it without one.
+  const [searchOpened, setSearchOpened] = useState(query !== '')
+  if (query !== '' && !searchOpened) setSearchOpened(true)
+  const searchOpen = searchOpened || query !== ''
   const latestRef = useRef<Latest>({
     category,
     settings,
@@ -292,14 +312,16 @@ function AuthedLayout() {
       const nextView = nextRemembered
         ? normalizeSortView(nextRemembered)
         : DEFAULT_SORT_VIEW
-      // The viewed torrent stays only when the new category holds it.
+      // The viewed torrent stays only when the new category holds it (and
+      // its name holds the keyword).
       const torrents = client.getQueryData<Maindata>(MAINDATA_KEY)?.torrents
       const viewed = latest.hash
       const keepHash =
         viewed !== undefined &&
         torrents !== undefined &&
         Object.hasOwn(torrents, viewed) &&
-        inCategory(torrents[viewed], next)
+        inCategory(torrents[viewed], next) &&
+        nameMatches(torrents[viewed], searchNeedle(latest.view.query))
       setSortChange({
         before: { sort: latest.view.sort, dir: latest.view.dir },
         after: nextView,
@@ -348,6 +370,35 @@ function AuthedLayout() {
     })
   }, [navigate])
 
+  const openSearch = useCallback(() => setSearchOpened(true), [])
+  const setQuery = useCallback(
+    (text: string) => {
+      setSearchOpened(true)
+      // A new filter goes back to the top (EXPERIENCE 換篩選回到最上面).
+      if (text.trim() !== latestRef.current.view.query) resetListScroll()
+      // Always written: the view can lag behind a keystroke still on its
+      // way to the URL, and the same search again changes nothing.
+      void navigate({
+        to: LIST_PATH,
+        search: (previous) => searchWithQuery(previous, text) as never,
+        replace: true,
+        resetScroll: false,
+      })
+    },
+    [navigate],
+  )
+  const closeSearch = useCallback(() => {
+    setSearchOpened(false)
+    if (latestRef.current.view.query !== '') resetListScroll()
+    // The page stays (the settings page keeps showing its list without it).
+    void navigate({
+      to: '.',
+      search: (previous) => searchWithQuery(previous, '') as never,
+      replace: true,
+      resetScroll: false,
+    })
+  }, [navigate])
+
   const control = useMemo(
     () => ({
       view,
@@ -358,6 +409,10 @@ function AuthedLayout() {
       rememberedHint,
       openSettings,
       settingsOpen,
+      searchOpen,
+      openSearch,
+      setQuery,
+      closeSearch,
     }),
     [
       view,
@@ -368,6 +423,10 @@ function AuthedLayout() {
       rememberedHint,
       openSettings,
       settingsOpen,
+      searchOpen,
+      openSearch,
+      setQuery,
+      closeSearch,
     ],
   )
 

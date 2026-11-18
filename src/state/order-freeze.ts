@@ -90,6 +90,12 @@ export interface ShownOrderInput {
    */
   viewChanged?: boolean
   /**
+   * Story 3.5: Alex changed the filter (the category or the search
+   * keyword) since the order shown last: the live order applies at once,
+   * even while holding for an extra sort's keys (matches never stay hidden).
+   */
+  filterChanged?: boolean
+  /**
    * The new sort's values are still loading (an extra sort's first keys):
    * keep the order shown, like a freeze, until they arrive.
    */
@@ -126,11 +132,13 @@ export function shownOrderReducer(
     live,
     frozen,
     viewChanged = false,
+    filterChanged = false,
     hold = false,
     holdAddsNew = false,
   }: ShownOrderInput,
 ): ShownOrder {
   if (live === undefined) return null
+  if (filterChanged) return live
   if (hold) {
     return holdAddsNew
       ? keepWithNewOnTop(shown, live)
@@ -335,6 +343,11 @@ export function useBoardShownColumns<TKey extends string>(
 export interface FrozenOrderOptions {
   /** Changes when Alex picks another sort or direction (e.g. `sort:dir`). */
   viewKey?: string
+  /**
+   * Story 3.5: changes when Alex changes the filter (category, keyword);
+   * applies at once even while `hold`.
+   */
+  filterKey?: string
   /** The view's values are still loading: keep the order shown. */
   hold?: boolean
   /** While holding, show new torrents on top at once. */
@@ -348,13 +361,20 @@ export interface FrozenOrderOptions {
  */
 export function useFrozenOrder(
   live: ReadonlyArray<string> | undefined,
-  { viewKey = '', hold = false, holdAddsNew = false }: FrozenOrderOptions = {},
+  {
+    viewKey = '',
+    filterKey = '',
+    hold = false,
+    holdAddsNew = false,
+  }: FrozenOrderOptions = {},
 ): ReadonlyArray<string> | undefined {
   const frozen = useOrderFrozen()
   const shownRef = useRef<ShownOrder>(null)
   // The view the order shown last was sorted by; `null` until one was (a
   // first load that waits for an extra sort's keys must still apply them).
   const appliedKeyRef = useRef<string | null>(null)
+  // The filter of the order shown last (`null` before any).
+  const appliedFilterRef = useRef<string | null>(null)
   const shown = useMemo(
     () =>
       shownOrderReducer(shownRef.current, {
@@ -363,13 +383,17 @@ export function useFrozenOrder(
         hold,
         holdAddsNew,
         viewChanged: appliedKeyRef.current !== viewKey,
+        filterChanged:
+          appliedFilterRef.current !== null &&
+          appliedFilterRef.current !== filterKey,
       }),
-    [live, frozen, hold, holdAddsNew, viewKey],
+    [live, frozen, hold, holdAddsNew, viewKey, filterKey],
   )
   // Only a committed order counts as "shown".
   useLayoutEffect(() => {
     shownRef.current = shown
+    if (shown !== null) appliedFilterRef.current = filterKey
     if (!hold && shown !== null) appliedKeyRef.current = viewKey
-  }, [shown, hold, viewKey])
+  }, [shown, hold, viewKey, filterKey])
   return shown ?? undefined
 }

@@ -141,6 +141,10 @@ let view: SortView = { sort: 'added_on', dir: 'desc' }
 let viewReady = true
 /** Story 3.2: the selected category. */
 let category: string = ALL
+/** Story 3.5: the search keyword. */
+let searchQuery = ''
+/** Story 3.5: 「在全部裡找」 calls this with `ALL`. */
+const selectCategory = vi.fn()
 /** The URL's `hash` (story 2.4); `setHash` writes it and re-renders. */
 let viewedHash: string | null = null
 let withPanel = false
@@ -163,14 +167,18 @@ function app() {
     <QueryClientProvider client={client}>
       <ListViewContext
         value={{
-          view: { ...view, category },
+          view: { ...view, category, query: searchQuery },
           viewReady,
           setView: () => {},
           pickView: () => {},
-          selectCategory: () => {},
+          selectCategory,
           rememberedHint: false,
           openSettings: () => {},
           settingsOpen: false,
+          searchOpen: false,
+          openSearch: () => {},
+          setQuery: () => {},
+          closeSearch: () => {},
         }}
       >
         <ViewedHashContext value={{ hash: viewedHash, setHash }}>
@@ -271,6 +279,8 @@ beforeEach(() => {
   view = { sort: 'added_on', dir: 'desc' }
   viewReady = true
   category = ALL
+  searchQuery = ''
+  selectCategory.mockReset()
   viewedHash = null
   withPanel = false
   deferWrites = false
@@ -1017,5 +1027,110 @@ describe('the category (story 3.2)', () => {
     await setCategory('X')
     expect(ringed()).toEqual(['T1'])
     expect(setHash).not.toHaveBeenCalled()
+  })
+})
+
+// Story 3.5: the keyword filters inside the selector (view.query); typing
+// applies at once, even while the order is frozen; a viewed row the
+// keyword filters out follows story 2.4; no match shows the no-result
+// block.
+describe('the search keyword (story 3.5)', () => {
+  const named = () => [
+    torrent(0, { name: 'Show.A', category: 'mteam-tv' }),
+    torrent(1, { name: 'Other.B', category: 'mteam-tv' }),
+    torrent(2, { name: 'SHOW.C', category: 'X' }),
+  ]
+
+  async function setQuery(next: string) {
+    searchQuery = next
+    await act(async () => root.render(app()))
+  }
+
+  it('only matching names (any case), applied at once even while frozen', async () => {
+    await render(fakeResponse({ changed: named() }))
+    expect(shownNames()).toEqual(['SHOW.C', 'Other.B', 'Show.A'])
+    await act(async () => pointer('pointerover', section()))
+    await setQuery('show')
+    expect(shownNames()).toEqual(['SHOW.C', 'Show.A'])
+    expect(section().getAttribute('aria-label')).toBe('種子列表，共 2 個')
+    await setQuery('')
+    expect(shownNames()).toEqual(['SHOW.C', 'Other.B', 'Show.A'])
+  })
+
+  it('only inside the category', async () => {
+    category = 'mteam-tv'
+    searchQuery = 'show'
+    await render(fakeResponse({ changed: named() }))
+    expect(shownNames()).toEqual(['Show.A'])
+  })
+
+  it('a viewed row the keyword filters out: the row that took its place', async () => {
+    withPanel = true
+    viewedHash = fakeHash(2)
+    await render(fakeResponse({ changed: named() }))
+    expect(ringed()).toEqual(['Other.B'])
+    await setQuery('show')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(ringed()).toEqual(['Show.A'])
+  })
+
+  it('no match in a category: the line and 「在全部裡找」', async () => {
+    category = 'mteam-tv'
+    searchQuery = '牧神記'
+    await render(fakeResponse({ changed: named() }))
+    const block = main.querySelector(
+      'section[aria-label="搜尋結果"]',
+    ) as HTMLElement
+    expect(block.querySelector('[role="status"]')?.textContent).toBe(
+      '『牧神記』在 mteam-tv 找不到',
+    )
+    expect(main.textContent).not.toContain('這個分類沒有種子')
+    const button = block.querySelector('button') as HTMLButtonElement
+    expect(button.textContent).toBe('在全部裡找')
+    await act(async () => button.click())
+    expect(selectCategory).toHaveBeenCalledWith(ALL)
+  })
+
+  it('no match in 「全部」: only 「找不到『…』」; literal characters stay text', async () => {
+    searchQuery = '(.*)'
+    await render(fakeResponse({ changed: named() }))
+    const block = main.querySelector(
+      'section[aria-label="搜尋結果"]',
+    ) as HTMLElement
+    expect(block.textContent).toBe('找不到『(.*)』')
+    expect(block.querySelector('button')).toBeNull()
+  })
+
+  it('a category with no torrent at all: 「這個分類沒有種子」, not no-result', async () => {
+    category = 'emptied'
+    searchQuery = 'show'
+    await render(fakeResponse({ changed: named() }))
+    expect(main.textContent).toContain('這個分類沒有種子')
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).toBeNull()
+  })
+
+  it('a keyword changed while an extra sort holds for its keys applies at once', async () => {
+    view = { sort: 'num_seeds', dir: 'desc' }
+    searchQuery = 'show'
+    await render(fakeResponse({ changed: named() }))
+    // The keys never answer: the order is held.
+    expect(shownNames()).toEqual(['SHOW.C', 'Show.A'])
+    await setQuery('')
+    expect(shownNames()).toEqual(['SHOW.C', 'Other.B', 'Show.A'])
+    await setQuery('other')
+    expect(shownNames()).toEqual(['Other.B'])
+  })
+
+  it('a match only among archived torrents: no result in the list', async () => {
+    searchQuery = 'gone'
+    await render(
+      fakeResponse({
+        changed: [
+          ...named(),
+          torrent(3, { name: 'Gone', state: 'missingFiles', private: false }),
+        ],
+      }),
+    )
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).not.toBeNull()
   })
 })

@@ -51,7 +51,7 @@ function render() {
   root.render(
     <ListViewContext
       value={{
-        view: { sort: 'state', dir: 'desc', category },
+        view: { sort: 'state', dir: 'desc', category, query: '' },
         viewReady,
         setView: () => {},
         pickView: () => {},
@@ -59,6 +59,10 @@ function render() {
         rememberedHint: false,
         openSettings,
         settingsOpen,
+        searchOpen: false,
+        openSearch: () => {},
+        setQuery: () => {},
+        closeSearch: () => {},
       }}
     >
       <CategoryTabsContext value={tabs}>

@@ -18,12 +18,20 @@ import type { SortView } from '#/shared/list-search'
 // Story 3.3: the settings page sits under the same layout (header as
 // usual) and shows the list Alex came from, so the setters always write
 // the list's URL (`/`): a tab click or a sort pick there goes back to it.
+// Story 3.5: the search keyword is the URL's `q` (`view.query`, trimmed,
+// `''` for none) and filters inside the selectors; whether the header's
+// search box is open is the layout's (open while a keyword is set, and
+// from the magnifier or `/` until it is closed).
 // Without a provider (node tests) it is the default view in 「全部」,
 // ready, and setting does nothing.
 
-/** The view on screen: the sort, and the category (`ALL` for 「全部」). */
+/**
+ * The view on screen: the sort, the category (`ALL` for 「全部」) and, since
+ * story 3.5, the search keyword (trimmed; `''` for none).
+ */
 export interface ListView extends SortView {
   category: string
+  query: string
 }
 
 export interface ListViewControl {
@@ -62,11 +70,23 @@ export interface ListViewControl {
   openSettings: () => void
   /** Story 3.3: the settings page is on screen (the 設定 button is current). */
   settingsOpen: boolean
+  /** Story 3.5: the header's search box is open. */
+  searchOpen: boolean
+  /** Story 3.5: opens the search box (the magnifier, or `/` on desktop). */
+  openSearch: () => void
+  /**
+   * Story 3.5: the keyword as typed. Writes `q` trimmed with `replace`
+   * (removed when that is empty) and puts the list back at the top.
+   */
+  setQuery: (text: string) => void
+  /** Story 3.5: ✕, 「取消」 or `Esc`: clears the keyword and closes the box. */
+  closeSearch: () => void
 }
 
 const DEFAULT_VIEW: ListView = Object.freeze({
   ...DEFAULT_SORT_VIEW,
   category: ALL,
+  query: '',
 })
 
 export const ListViewContext = createContext<ListViewControl>({
@@ -78,15 +98,30 @@ export const ListViewContext = createContext<ListViewControl>({
   rememberedHint: false,
   openSettings: () => {},
   settingsOpen: false,
+  searchOpen: false,
+  openSearch: () => {},
+  setQuery: () => {},
+  closeSearch: () => {},
 })
 
 export function useListView(): ListViewControl {
   return useContext(ListViewContext)
 }
 
-/** Changes when the sort, the direction or the category does. */
-export function viewKeyOf(view: SortView & { category?: string }): string {
-  return `${view.sort}:${view.dir}:${view.category ?? ALL}`
+/**
+ * Changes when the sort, the direction, the category or (story 3.5) the
+ * keyword does: Alex's own change, applied at once even while the order
+ * is frozen.
+ */
+export function viewKeyOf(
+  view: SortView & { category?: string; query?: string },
+): string {
+  return JSON.stringify([
+    view.sort,
+    view.dir,
+    view.category ?? ALL,
+    view.query ?? '',
+  ])
 }
 
 /**

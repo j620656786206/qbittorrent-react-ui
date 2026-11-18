@@ -1,5 +1,6 @@
 import { slimSortValue, sortKeyOf } from '#/lib/sort-values'
 import { columnOf, statusOf } from '#/lib/torrent-status'
+import { nameMatches, searchNeedle } from '#/lib/name-search'
 import type { Maindata } from '#/lib/maindata-merge'
 import type { BoardColumn } from '#/lib/torrent-status'
 import { ALL } from '#/shared/categories'
@@ -20,10 +21,11 @@ import type { SortValue } from '#/shared/sort-keys'
 
 /**
  * What the visible list depends on. Story 3.2: `category`, `ALL` (the
- * default) for every torrent, `''` for uncategorized ones; search joins in
- * story 3.5.
+ * default) for every torrent, `''` for uncategorized ones. Story 3.5:
+ * `query`, the search keyword (src/lib/name-search.ts); empty or absent is
+ * no filter.
  */
-export type TorrentView = SortView & { category?: string }
+export type TorrentView = SortView & { category?: string; query?: string }
 
 /** Story 3.2: the torrent is in `category` (`ALL` holds every torrent). */
 export function inCategory(
@@ -97,13 +99,15 @@ export function selectVisibleTorrents(
   sortKeys?: SortKeys,
 ): Array<string> {
   const { torrents, stateBeforeMove } = maindata
-  const { sort, dir, category = ALL } = view
+  const { sort, dir, category = ALL, query } = view
+  const needle = searchNeedle(query)
   const extra = isExtraSortField(sort)
   const plain = sortField(sort).kind === 'hash'
   const sign = dir === 'desc' ? 1 : -1
   const entries: Array<Entry> = []
   for (const torrent of Object.values(torrents)) {
     if (!inCategory(torrent, category)) continue
+    if (!nameMatches(torrent, needle)) continue
     if (!isVisible(torrent, stateBeforeMove)) continue
     const value: SortValue | undefined = extra
       ? sortKeys && Object.hasOwn(sortKeys, torrent.hash)
@@ -147,13 +151,16 @@ function boardKey(value: number): number | null {
  * like `selectVisibleTorrents` (`added_on` newest, then `hash`). Archived
  * torrents get their own column here: only the desktop board shows them.
  * Story 3.2: only `category`'s torrents (`ALL`, the default: every one), in
- * the 已整理 column too.
+ * the 已整理 column too. Story 3.5: only names holding `query` (empty is
+ * every name), the 已整理 column too.
  */
 export function selectBoardColumns(
   maindata: Maindata,
   category: string = ALL,
+  query = '',
 ): BoardColumns {
   const { torrents, stateBeforeMove } = maindata
+  const needle = searchNeedle(query)
   const entries: Record<BoardColumn, Array<Entry>> = {
     attention: [],
     downloading: [],
@@ -163,6 +170,7 @@ export function selectBoardColumns(
   }
   for (const torrent of Object.values(torrents)) {
     if (!inCategory(torrent, category)) continue
+    if (!nameMatches(torrent, needle)) continue
     const column = columnOf(statusOf(torrent, stateBeforeMove))
     entries[column].push({
       hash: torrent.hash,
@@ -210,6 +218,29 @@ export function countAll(maindata: Maindata): number {
   let count = 0
   for (const torrent of Object.values(maindata.torrents)) {
     if (isVisible(torrent, maindata.stateBeforeMove)) count += 1
+  }
+  return count
+}
+
+/**
+ * Story 3.5: how many of `category`'s torrents hold `query` in their name
+ * (empty: every one), archived ones only with `withArchived` (the desktop
+ * board shows them). No sorting: the header's count and the "is this
+ * category empty at all" check.
+ */
+export function countMatches(
+  maindata: Maindata,
+  category: string,
+  query: string,
+  withArchived: boolean,
+): number {
+  const needle = searchNeedle(query)
+  let count = 0
+  for (const torrent of Object.values(maindata.torrents)) {
+    if (!inCategory(torrent, category)) continue
+    if (!nameMatches(torrent, needle)) continue
+    if (!withArchived && !isVisible(torrent, maindata.stateBeforeMove)) continue
+    count += 1
   }
   return count
 }

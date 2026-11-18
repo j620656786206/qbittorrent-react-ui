@@ -48,7 +48,7 @@ function render(loaded = true) {
     >
       <ListViewContext
         value={{
-          view: { ...DEFAULT_SORT_VIEW, category: selected },
+          view: { ...DEFAULT_SORT_VIEW, category: selected, query: '' },
           viewReady: true,
           setView: () => {},
           pickView: () => {},
@@ -56,6 +56,10 @@ function render(loaded = true) {
           rememberedHint: false,
           openSettings: () => {},
           settingsOpen: false,
+          searchOpen: false,
+          openSearch: () => {},
+          setQuery: () => {},
+          closeSearch: () => {},
         }}
       >
         <CategoryTabsContext value={tabs}>

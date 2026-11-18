@@ -123,17 +123,16 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4); only the sort pill has a title',
+    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4, search since 3.5); only the sort pill has a title',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
         /\sdisabled=""/.test(tag),
       )
+      // Story 3.5: both magnifiers open the search box.
       expect(disabled.map((tag) => attr(tag, 'aria-label') ?? null)).toEqual([
-        '搜尋',
         null, // desktop 新增 has its text
         '快捷鍵',
-        '搜尋',
         '新增種子',
       ])
       // Only the desktop sort pill has a tooltip (story 2.1).
@@ -207,7 +206,7 @@ describe('the shell markup', () => {
       const html = renderToStaticMarkup(
         <ListViewContext
           value={{
-            view: { ...view, category: ALL },
+            view: { ...view, category: ALL, query: '' },
             viewReady: true,
             setView: () => {},
             pickView: () => {},
@@ -215,6 +214,10 @@ describe('the shell markup', () => {
             rememberedHint: false,
             openSettings: () => {},
             settingsOpen: false,
+            searchOpen: false,
+            openSearch: () => {},
+            setQuery: () => {},
+            closeSearch: () => {},
           }}
         >
           <HeaderContext
@@ -542,7 +545,7 @@ describe('the phone category button (stories 3.2 and 3.4)', () => {
     return renderToStaticMarkup(
       <ListViewContext
         value={{
-          view: { sort, dir: 'desc', category },
+          view: { sort, dir: 'desc', category, query: '' },
           viewReady: true,
           setView: () => {},
           pickView: () => {},
@@ -550,6 +553,10 @@ describe('the phone category button (stories 3.2 and 3.4)', () => {
           rememberedHint,
           openSettings: () => {},
           settingsOpen,
+          searchOpen: false,
+          openSearch: () => {},
+          setQuery: () => {},
+          closeSearch: () => {},
         }}
       >
         <CategoryTabsContext value={tabs}>

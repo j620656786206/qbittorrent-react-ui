@@ -81,9 +81,15 @@ export const COLUMN_META: Readonly<Record<BoardColumn, ColumnMeta>> = {
  * What an empty column says (EXPERIENCE State Patterns): 「沒有」, and
  * 「都沒問題」 for an empty 要處理 while other work columns have torrents.
  * With all four work columns empty (only archived ones, or none) every one
- * says 「沒有」 (Claude 代決, memlog #124).
+ * says 「沒有」 (Claude 代決, memlog #124). Story 3.5: while searching every
+ * empty column says 「沒有」 (nothing matched, not "no problem").
  */
-export function emptyText(column: BoardColumn, columns: BoardColumns): string {
+export function emptyText(
+  column: BoardColumn,
+  columns: BoardColumns,
+  searching = false,
+): string {
+  if (searching) return '沒有'
   if (column !== 'attention') return COLUMN_META[column].empty
   const othersEmpty = WORK_COLUMNS.every(
     (work) => work === 'attention' || columns[work].length === 0,
@@ -103,26 +109,31 @@ export const CARD_HEIGHT_WITH_BAR = 101
 export const CARD_GAP = 10
 
 /** The board's state before the columns (spec 2.3 K11, K14). */
-export type BoardView = 'skeleton' | 'error' | 'empty' | 'board'
+export type BoardView = 'skeleton' | 'error' | 'empty' | 'no-result' | 'board'
 
 /**
  * Like the list: without data the first-load error block when the failure
  * has no other surface, skeletons otherwise. With data and no torrent at
  * all (archived ones count: they fill the 已整理 column), the list's empty
- * block.
+ * block; story 3.5: while searching, the no-result block instead (only
+ * when the four columns and 已整理 are all empty).
  */
 export function boardView({
   hasData,
   total,
   error,
+  searching = false,
 }: {
   hasData: boolean
   /** Every torrent, archived ones included. */
   total: number
   error: unknown
+  /** A search keyword is set. */
+  searching?: boolean
 }): BoardView {
   if (!hasData) return isFirstLoadError(error) ? 'error' : 'skeleton'
-  return total === 0 ? 'empty' : 'board'
+  if (total > 0) return 'board'
+  return searching ? 'no-result' : 'empty'
 }
 
 export function totalOf(columns: BoardColumns): number {

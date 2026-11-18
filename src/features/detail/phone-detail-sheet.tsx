@@ -44,7 +44,7 @@ function PhoneDetailSheet({ target }: { target: DetailTarget | null }) {
   const shown = target ?? lastRef.current
 
   const close = useCallback(() => setHash(null), [setHash])
-  useSheetLayer(open, close)
+  useSheetLayer(open, close, 'detail')
 
   return (
     <BottomSheet

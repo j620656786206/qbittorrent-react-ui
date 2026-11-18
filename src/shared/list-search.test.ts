@@ -12,6 +12,7 @@ import {
   normalizeSortView,
   searchWithCategory,
   searchWithHash,
+  searchWithQuery,
   sortViewOf,
 } from '#/shared/list-search'
 
@@ -291,5 +292,88 @@ describe('category names the router parses as JSON', () => {
       const parsed = defaultParseSearch(url) as Record<string, unknown>
       expect(listSearchSchema.parse(parsed).category).toBe(name)
     }
+  })
+})
+
+// Story 3.5: `q`, the search keyword.
+describe('q in the search', () => {
+  it('reads the keyword trimmed; only spaces or nothing is no keyword', () => {
+    expect(listSearchSchema.parse({ q: 'Show.S01' }).q).toBe('Show.S01')
+    expect(listSearchSchema.parse({ q: '  Show.S01 ' }).q).toBe('Show.S01')
+    expect(listSearchSchema.parse({ q: '   ' }).q).toBeUndefined()
+    expect(listSearchSchema.parse({ q: '' }).q).toBeUndefined()
+    expect(listSearchSchema.parse({ q: { x: 1 } }).q).toBeUndefined()
+    expect(listSearchSchema.parse({}).q).toBeUndefined()
+  })
+
+  it.each(['(', '.*', '<script>', '[a-z]+', '\\', '牧神記'])(
+    'keeps %j as typed (a keyword, not a pattern)',
+    (text) => {
+      expect(listSearchSchema.parse({ q: text }).q).toBe(text)
+      expect(fixListSearch({ q: text })).toBeNull()
+    },
+  )
+
+  it.each([
+    [2024, '2024'],
+    [true, 'true'],
+    [null, 'null'],
+  ])('%j from a typed URL reads as the text %j', (raw, text) => {
+    expect(listSearchSchema.parse({ q: raw }).q).toBe(text)
+    expect(fixListSearch({ q: raw })).toBeNull()
+  })
+
+  it('round-trips through the router serializer', () => {
+    for (const text of ['Show.S01', '2024', '(', '<script>', 'a b']) {
+      const url = defaultStringifySearch({ q: text })
+      const parsed = defaultParseSearch(url) as Record<string, unknown>
+      expect(listSearchSchema.parse(parsed).q).toBe(text)
+    }
+  })
+
+  it('fixListSearch trims q, drops an empty one, keeps the rest', () => {
+    expect(fixListSearch({ q: 'x', sort: 'ratio' })).toBeNull()
+    expect(fixListSearch({ q: '  x ', sort: 'ratio' })).toEqual({
+      q: 'x',
+      sort: 'ratio',
+    })
+    expect(fixListSearch({ q: '   ', category: 'X' })).toEqual({
+      category: 'X',
+    })
+    expect(fixListSearch({ q: { x: 1 } })).toEqual({})
+    // Another bad param keeps a good q.
+    expect(fixListSearch({ q: 'x', hash: 'nope' })).toEqual({ q: 'x' })
+  })
+
+  it('a keyword over 200 characters or with a control character is dropped', () => {
+    const long = 'a'.repeat(201)
+    expect(listSearchSchema.parse({ q: 'a'.repeat(200) }).q).toHaveLength(200)
+    expect(listSearchSchema.parse({ q: long }).q).toBeUndefined()
+    expect(fixListSearch({ q: long, sort: 'ratio' })).toEqual({ sort: 'ratio' })
+    for (const bad of ['a\u0000b', 'a\nb', 'a\u007fb', 'a\u0085b']) {
+      expect(listSearchSchema.parse({ q: bad }).q).toBeUndefined()
+      expect(fixListSearch({ q: bad })).toEqual({})
+    }
+  })
+
+  it('searchWithQuery writes the keyword trimmed, removes an empty one', () => {
+    expect(searchWithQuery({ category: 'X' }, '  Show.S01 ')).toEqual({
+      category: 'X',
+      q: 'Show.S01',
+    })
+    expect(searchWithQuery({ q: 'old', sort: 'ratio' }, '   ')).toEqual({
+      sort: 'ratio',
+    })
+    expect(searchWithQuery({ q: 'old' }, '')).toEqual({})
+  })
+
+  it('a category change keeps the keyword', () => {
+    expect(searchWithCategory({ q: 'x', category: 'X' }, ALL)).toEqual({
+      q: 'x',
+    })
+    expect(searchWithCategory({ q: 'x' }, 'mteam-X')).toEqual({
+      q: 'x',
+      category: 'mteam-X',
+    })
   })
 })

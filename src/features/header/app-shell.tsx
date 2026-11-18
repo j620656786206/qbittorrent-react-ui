@@ -1,4 +1,4 @@
-import { ChevronDown, Keyboard, Plus, Search, Settings } from 'lucide-react'
+import { ChevronDown, Keyboard, Plus, Settings } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { categoryLabel } from '#/lib/category-tabs'
@@ -12,6 +12,12 @@ import { useCategoryTabs, useListView } from '#/state/list-view'
 import { PhoneCategorySheet } from '#/features/header/category-sheet'
 import { DesktopCategoryTabs } from '#/features/header/category-tabs'
 import { HeaderProvider, useHeader } from '#/features/header/header-context'
+import { IconButton } from '#/features/header/icon-button'
+import {
+  DesktopSearch,
+  PhoneSearchHeader,
+  SearchStatus,
+} from '#/features/header/search-box'
 import { DesktopSortMenu } from '#/features/header/sort-menu'
 import { rememberedHintLine } from '#/features/header/sort-model'
 import { PhoneSortPill } from '#/features/header/sort-sheet'
@@ -34,9 +40,12 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // change category and reach 設定; after a category switch that applied a
 // remembered sort, a muted line under the third row names it (the desktop
 // pill's 「（這個分類記住的）」 instead), in the flow so it pushes the
-// content down. Epic 1 placeholders (search, 新增, shortcuts) carry the
-// native `disabled`: 50% and not-allowed from the base rule, no hover, not
-// focusable, and no `title` (their shortcuts do not exist yet).
+// content down. Story 3.5: the magnifier opens the search box
+// (search-box.tsx): on desktop it turns in place into the 240px pill, on
+// the phone the field covers the first row. Epic 1 placeholders (新增,
+// shortcuts) carry the native `disabled`: 50% and not-allowed from the
+// base rule, no hover, not focusable, and no `title` (their shortcuts do
+// not exist yet).
 //
 // The header model is computed once per tick in HeaderProvider; the layout
 // and the page (`children`) keep their identity, so only the small leaves
@@ -59,9 +68,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
           <h1 className="text-page-title">種子</h1>
           <DesktopSpeed />
           <div className="flex-1" />
-          <IconButton label="搜尋">
-            <Search size={20} strokeWidth={2.2} aria-hidden="true" />
-          </IconButton>
+          <DesktopSearch />
           <button
             type="button"
             disabled
@@ -78,12 +85,8 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         <DesktopBar />
 
         <div className="flex flex-none flex-col gap-1.5 lg:hidden">
-          <header className="flex items-center justify-between gap-2">
-            <h1 className="text-page-title">種子</h1>
-            <div className="flex gap-2">
-              <IconButton label="搜尋" phone>
-                <Search size={20} strokeWidth={2.2} aria-hidden="true" />
-              </IconButton>
+          <PhoneSearchHeader
+            add={
               <button
                 type="button"
                 disabled
@@ -92,8 +95,8 @@ export function ShellLayout({ children }: { children: ReactNode }) {
               >
                 <Plus size={20} strokeWidth={2.4} aria-hidden="true" />
               </button>
-            </div>
-          </header>
+            }
+          />
           <PhoneLine />
         </div>
 
@@ -114,6 +117,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
         </div>
 
         <ContentDim>{children}</ContentDim>
+        <SearchStatus />
       </div>
     </div>
   )
@@ -126,38 +130,6 @@ function SettingsButton() {
     <IconButton label="設定" onClick={openSettings} current={settingsOpen}>
       <Settings size={20} strokeWidth={2} aria-hidden="true" />
     </IconButton>
-  )
-}
-
-/** A header icon button; without `onClick` an inert Epic 1 placeholder. */
-function IconButton({
-  label,
-  phone = false,
-  onClick,
-  current = false,
-  children,
-}: {
-  label: string
-  phone?: boolean
-  onClick?: () => void
-  /** The page this button opens is on screen. */
-  current?: boolean
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      disabled={onClick === undefined}
-      onClick={onClick}
-      aria-label={label}
-      aria-current={current ? 'page' : undefined}
-      className={cn(
-        'inline-flex flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline',
-        phone ? 'size-11' : 'size-9',
-      )}
-    >
-      {children}
-    </button>
   )
 }
 

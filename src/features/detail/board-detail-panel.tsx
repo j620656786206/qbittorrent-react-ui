@@ -62,7 +62,8 @@ export function BoardDetailPanel() {
     back?.focus({ preventScroll: true })
   }, [setHash])
 
-  useEscapeLayer(open, close)
+  // Story 3.5: below a dialog and the search box in `Esc`'s order.
+  useEscapeLayer(open, close, 'detail')
 
   if (!target) return null
   return (
