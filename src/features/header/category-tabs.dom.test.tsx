@@ -230,4 +230,13 @@ describe('the desktop category tabs', () => {
     expect(tabButtons()[0].textContent).toBe('全部7')
     expect(tabButtons()[0].getAttribute('aria-busy')).toBeNull()
   })
+
+  it('before the tabs are known on another category: that one alone, pressed, no 全部 count', async () => {
+    tabs = undefined
+    selected = 'mteam-X'
+    await act(async () => render(true))
+    expect(tabButtons()).toHaveLength(1)
+    expect(tabButtons()[0].textContent).toBe('mteam-X')
+    expect(tabButtons()[0].getAttribute('aria-pressed')).toBe('true')
+  })
 })

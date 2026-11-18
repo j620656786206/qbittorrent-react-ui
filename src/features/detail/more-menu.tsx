@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { pauseActionFailureText } from '#/lib/error-text'
+import {
+  OPERATION_FAILURE_CODES,
+  pauseActionFailureText,
+} from '#/lib/error-text'
 import {
   PAUSE_ACTION_WORDS,
   pauseActionFlips,
@@ -68,6 +71,7 @@ const pauseOp: TrackedOp<OpVariables> = {
       : callFn(startTorrents, input)
   },
   keysOf: ({ hash }) => [hash],
+  failureCodes: OPERATION_FAILURE_CODES,
   failureText: ({ op }, code) => pauseActionFailureText(op, code),
   onSend: ({ hash, op }) => markPending(hash, op),
   onSuccess: async (client, { hash, flips }) => {

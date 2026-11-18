@@ -2,7 +2,11 @@ import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
-import { FILES_LOAD_FAILED, fileActionFailureText } from '#/lib/error-text'
+import {
+  fileActionFailureText,
+  FILES_LOAD_FAILED,
+  OPERATION_FAILURE_CODES,
+} from '#/lib/error-text'
 import {
   FILE_PRIORITY_CHOICES,
   FILE_PRIORITY_WORDS,
@@ -87,6 +91,7 @@ const fileOp: TrackedOp<SetFilePriorityInput> = {
   name: 'set-file-priority',
   call: (variables) => callFn(setFilePriority, variables),
   keysOf: ({ hash, ids }) => ids.map((id) => `file:${hash}:${id}`),
+  failureCodes: OPERATION_FAILURE_CODES,
   failureText: (_variables, code) => fileActionFailureText(code),
   // Awaited: the call stays in flight (the row locked) until the refetch.
   onSuccess: (client, { hash }) =>

@@ -254,34 +254,31 @@ describe('categorySortOp', () => {
     expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('seeding_time'))
   })
 
-  it('an answer of an older save is never applied over a newer one', async () => {
+  it('saves of different categories also run one after another', async () => {
     const client = sortClient()
     await flush()
-    const op = categorySortOp(() => Promise.resolve(defaultSettings()))
-    const older: SetCategorySortInput = {
-      category: ALL,
-      sort: 'ratio',
-      dir: 'desc',
-    }
-    const newer: SetCategorySortInput = {
-      category: ALL,
-      sort: 'seeding_time',
-      dir: 'desc',
-    }
-    await op.call(older)
-    await op.call(newer)
-    await op.onSuccess?.(client, newer, withSort('seeding_time'))
-    await op.onSuccess?.(client, older, withSort('ratio'))
-    expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('seeding_time'))
-    // Another category is ordered on its own.
-    const other: SetCategorySortInput = {
-      category: 'X',
-      sort: 'ratio',
-      dir: 'asc',
-    }
-    await op.call(other)
-    await op.onSuccess?.(client, other, withSort('ratio'))
-    expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('ratio'))
+    const answers: Array<(value: Settings) => void> = []
+    const call = vi.fn(
+      (_values: SetCategorySortInput) =>
+        new Promise<Settings>((resolve) => {
+          answers.push(resolve)
+        }),
+    )
+    const op = categorySortOp(call)
+    sendOp(op, client, { category: ALL, sort: 'ratio', dir: 'desc' })
+    sendOp(op, client, { category: 'X', sort: 'ratio', dir: 'asc' })
+    await flush()
+    // One settings write queue: the container writes them in send order.
+    expect(call).toHaveBeenCalledTimes(1)
+    // Each category's own save counts, queued or sent.
+    expect(isSavingSort(client, ALL)).toBe(true)
+    expect(isSavingSort(client, 'X')).toBe(true)
+    answers[0](withSort('ratio'))
+    await flush()
+    await flush()
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(isSavingSort(client, ALL)).toBe(false)
+    expect(isSavingSort(client, 'X')).toBe(true)
   })
 
   it.each([
@@ -515,7 +512,7 @@ describe('categoryOrderOp (story 3.3)', () => {
     },
   )
 
-  it('an older sort-save answer landing after the order answer never reverts the order', async () => {
+  it('an order save waits for a sort save sent before it, then builds on its answer', async () => {
     const client = await orderClient()
     let answerSort: (value: Settings) => void = () => {}
     const sortOp = categorySortOp(
@@ -525,11 +522,12 @@ describe('categoryOrderOp (story 3.3)', () => {
         }),
     )
     const { call, answers } = deferredCall()
-    // The sort save goes out first and is written before the order...
     sendOp(sortOp, client, { category: 'a', sort: 'ratio', dir: 'asc' })
     await flush()
     sendOp(categoryOrderOp(call, client), client, { key: 'c', direction: -1 })
     await flush()
+    // Queued behind the sort save: nothing sent yet.
+    expect(call).not.toHaveBeenCalled()
     const sortWritten: Settings = {
       ...withOrder('b'),
       categorySort: {
@@ -537,24 +535,19 @@ describe('categoryOrderOp (story 3.3)', () => {
         a: { sort: 'ratio', dir: 'asc' },
       },
     }
+    answerSort(sortWritten)
+    await flush()
+    await flush()
+    expect(call).toHaveBeenCalledTimes(1)
     const orderWritten: Settings = {
       ...sortWritten,
       categoryOrder: ['b', 'c', 'a', 'd'],
     }
-    // ...but the order's answer arrives first, the sort's after it.
     answers[0](orderWritten)
     await flush()
     await flush()
+    // The last answer holds both writes.
     expect(client.getQueryData(SETTINGS_KEY)).toEqual(orderWritten)
-    answerSort(sortWritten)
-    await flush()
-    await flush()
-    expect(client.getQueryData<Settings>(SETTINGS_KEY)?.categoryOrder).toEqual([
-      'b',
-      'c',
-      'a',
-      'd',
-    ])
   })
 
   it('refreshSettings reads the settings again', async () => {

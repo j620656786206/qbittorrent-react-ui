@@ -37,6 +37,10 @@ import type { CommonPath, Settings, SortChoice } from '#/shared/settings'
 //   closed), then `rename`, then the folder is `fsync`ed where the platform
 //   allows, so a power cut leaves the old file or the new one. A file over
 //   256 KB is refused.
+// - A top-level key this code does not know (a section a later image
+//   added without a new `version`, spine AD-8) is kept as it is through
+//   every write and never served or counted as a repair, so running an
+//   older image never erases it.
 // - A common path outside `SAVE_ROOTS` stays in the file (a boot with a
 //   wrong `SAVE_ROOTS` must not erase it) and is only left out of what is
 //   served.
@@ -78,8 +82,15 @@ export interface SettingsStore {
   update: (change: (current: Settings) => Settings) => Promise<SettingsWrite>
 }
 
+/** Top-level keys this code does not know, kept as the file had them. */
+type Unknown = Readonly<Record<string, unknown>>
+
+const KNOWN_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(settingsSchema.shape),
+)
+
 type Loaded =
-  | { kind: 'ok'; settings: Settings; repaired: boolean }
+  | { kind: 'ok'; settings: Settings; unknown: Unknown; repaired: boolean }
   | { kind: 'missing' }
   | { kind: 'broken' }
   | { kind: 'newer'; version: number }
@@ -132,8 +143,15 @@ export function createSettingsStore(
     })
   }
 
-  /** The repaired settings and whether anything had to change. */
-  function repair(raw: RawSettings): { settings: Settings; repaired: boolean } {
+  /**
+   * The repaired settings, the unknown top-level keys, and whether anything
+   * had to change.
+   */
+  function repair(raw: RawSettings): {
+    settings: Settings
+    unknown: Unknown
+    repaired: boolean
+  } {
     let repaired = false
     const dropped = (section: string, count: number) => {
       if (count === 0) return
@@ -169,15 +187,9 @@ export function createSettingsStore(
       return value
     }
 
-    for (const key of Object.keys(raw)) {
-      if (
-        !['version', 'categorySort', 'categoryOrder', 'commonPaths'].includes(
-          key,
-        )
-      ) {
-        repaired = true
-      }
-    }
+    const unknown = Object.fromEntries(
+      Object.entries(raw).filter(([key]) => !KNOWN_KEYS.has(key)),
+    )
     if (raw.version == null) repaired = true
 
     const sortRaw = section('categorySort', isPlainObject) ?? {}
@@ -224,6 +236,7 @@ export function createSettingsStore(
         categoryOrder: order,
         commonPaths: paths,
       },
+      unknown,
       repaired,
     }
   }
@@ -258,10 +271,11 @@ export function createSettingsStore(
     if (version > SETTINGS_VERSION) return { kind: 'newer', version }
     const migrated = migrateSettings(raw, version)
     if (migrated === null) return { kind: 'broken' }
-    const { settings, repaired } = repair(migrated)
+    const { settings, unknown, repaired } = repair(migrated)
     return {
       kind: 'ok',
       settings,
+      unknown,
       repaired: repaired || version < SETTINGS_VERSION,
     }
   }
@@ -307,12 +321,13 @@ export function createSettingsStore(
   }
 
   /**
-   * Writes `settings` as the schema parses it (paths normalized) and
-   * answers what was written; `null` (logged through `fail`) when refused
-   * or failed.
+   * Writes `settings` as the schema parses it (paths normalized), with the
+   * file's unknown top-level keys kept, and answers the settings written;
+   * `null` (logged through `fail`) when refused or failed.
    */
   async function write(
     settings: Settings,
+    unknown: Unknown,
     fail: typeof writeFailed = writeFailed,
   ): Promise<Settings | null> {
     const checked = settingsSchema.safeParse(settings)
@@ -320,7 +335,7 @@ export function createSettingsStore(
       fail('invalid')
       return null
     }
-    const text = serialize(checked.data)
+    const text = `${JSON.stringify({ ...unknown, ...checked.data }, null, 2)}\n`
     const bytes = Buffer.byteLength(text, 'utf8')
     if (bytes > MAX_SETTINGS_BYTES) {
       fail('too_large', { bytes, maxBytes: MAX_SETTINGS_BYTES })
@@ -397,17 +412,22 @@ export function createSettingsStore(
    */
   async function current(): Promise<{
     settings: Settings
+    unknown: Unknown
     mustWrite: boolean
   } | null> {
     const loaded = await load()
     switch (loaded.kind) {
       case 'ok':
-        return { settings: loaded.settings, mustWrite: loaded.repaired }
+        return {
+          settings: loaded.settings,
+          unknown: loaded.unknown,
+          mustWrite: loaded.repaired,
+        }
       case 'missing':
-        return { settings: defaultSettings(), mustWrite: true }
+        return { settings: defaultSettings(), unknown: {}, mustWrite: true }
       case 'broken':
         return (await keepBroken())
-          ? { settings: defaultSettings(), mustWrite: true }
+          ? { settings: defaultSettings(), unknown: {}, mustWrite: true }
           : null
       case 'newer':
         noteNewer(loaded.version)
@@ -423,7 +443,9 @@ export function createSettingsStore(
       locked(async () => {
         const state = await current()
         if (state === null) return defaultSettings()
-        if (state.mustWrite) await write(state.settings, repairWriteFailed)
+        if (state.mustWrite) {
+          await write(state.settings, state.unknown, repairWriteFailed)
+        }
         return served(state.settings)
       }),
     update: (change) =>
@@ -438,7 +460,7 @@ export function createSettingsStore(
         if (unchanged && !state.mustWrite) {
           return { ok: true, settings: served(next) }
         }
-        const written = await write(next)
+        const written = await write(next, state.unknown)
         return written ? { ok: true, settings: served(written) } : { ok: false }
       }),
   }

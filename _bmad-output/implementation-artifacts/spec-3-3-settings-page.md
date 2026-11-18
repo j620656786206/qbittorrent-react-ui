@@ -27,7 +27,7 @@ deferred: []
 **Always:**
 - Route `/settings` under `src/routes/_authed` (`ssr: false` like the layout); the header shows as usual; the page has `aria-label`「設定」 on its main region (or an `h1` 「設定」 plus that label on the header button). Old layout to follow (from `git show 82551ad^:src/routes/settings.tsx`): a top row with a ghost icon back button and the title, content centered with a max width; rewrite the code with this app's tokens (DESIGN.md), no i18n.
 - Desktop header settings button (`app-shell.tsx`, `IconButton label="設定"`) loses `disabled` and navigates to `/settings`. The phone entry is Story 3.4; the phone can still open `/settings` by URL and the page works at 390px.
-- Back button returns to the list URL Alex came from, with its `category`, `sort`, `dir` (and `hash` if present) (Claude 代決, already in the epic): remember the list search when leaving for `/settings` (a small `src/state` value, not localStorage); opened directly, back goes to `/`.
+- Back button returns to the list URL Alex came from, with its `category`, `sort`, `dir` (and `hash` if present) (Claude 代決, already in the epic): the 設定 button opens `/settings` with the list's search in its URL and `fromList` in the history entry's state (not localStorage); opened directly, back goes to `/`.
 - Exactly two items on the page; no common paths, shortcut customizing or theme switch.
 - Category order list:
   - 「全部」 fixed first, no arrows;
@@ -96,6 +96,7 @@ deferred: []
 ## Spec Change Log
 
 - 2026-11-18, first review pass: (1) the order op carries the move (`key`, `direction`) and builds the whole order from the current settings and maindata when the call runs, keeping stored entries that are not listed; a later 重試 or a queued press reapplies the move to the newest order; the page refetches settings on mount; while settings are unknown the list is read-only. (2) On `/settings` the header follows the remembered list search; any tab click and a sort pick go to the list on that category. (3) The return URL is recorded whenever the list search changes; 「回到列表」 replaces the history entry. KEEP: no optimistic move; only the pressed row's arrows wait; one shared order scope.
+- 2026-11-18, multi-model review after merge (opus, fable, sonnet, haiku; Alex picked the fixes, PR "fix(epic-3)"): (1) The list's search rides in the `/settings` URL and `fromList` in the history entry's state (typed in `src/router.tsx`); `src/state/settings-return.ts` and the layout's in-memory return search are gone, so the header on `/settings` reads the same URL as the list, the URL fix-ups run there too, and a later entry point (story 3.4) cannot inherit a stale flag. (2) Pressing the selected tab on `/settings` returns to the list as it was, its sort too (no remembered-sort switch, no hint). (3) The order list is also read-only while the latest settings read failed (`useSettings().readFailed`), so an older cached order is never sent. (4) Order saves share the one settings write scope with sort saves (spec 3.1); the known trade-off in Auto Run Result no longer applies. KEEP: no optimistic move; the move is rebuilt from the newest order when the call runs.
 
 ## Review Triage Log
 
@@ -176,7 +177,7 @@ deferred: []
 
 ## Design Notes
 
-Claude 代決 (list in the PR): the return URL kept in memory (not localStorage); 「未分類」 listed when used; the failure text 「順序沒存到：…」; a hand-made switch (`role="switch"`) instead of adding Radix Switch; the old page's layout rebuilt with current tokens.
+Claude 代決 (list in the PR): the return URL carried in the `/settings` URL with `fromList` in history state (not localStorage; changed from in-memory by the post-merge review); 「未分類」 listed when used; the failure text 「順序沒存到：…」; a hand-made switch (`role="switch"`) instead of adding Radix Switch; the old page's layout rebuilt with current tokens.
 
 Docs (AD-11): TanStack Router file routes and `navigate` https://tanstack.com/router/latest/docs/framework/react/routing/file-based-routing , https://tanstack.com/router/latest/docs/framework/react/guide/navigation ; WAI-ARIA switch pattern https://www.w3.org/WAI/ARIA/apg/patterns/switch/ ; TanStack Query mutation scopes https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-scopes ; zod 4 https://zod.dev/api .
 

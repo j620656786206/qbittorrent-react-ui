@@ -1,7 +1,6 @@
 import { MutationObserver, useMutationState } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { isAppError } from '#/lib/app-error'
-import { OPERATION_FAILURE_CODES } from '#/lib/error-text'
 import type { OperationFailureCode } from '#/lib/error-text'
 import { toast } from '#/lib/toast'
 import type { ErrorCode } from '#/shared/errors'
@@ -42,10 +41,11 @@ export interface TrackedOp<
    */
   scopeOf?: (variables: TVariables) => string
   /**
-   * The codes that show the failure toast. Omitted: OPERATION_FAILURE_CODES
-   * (then `TCode` must be its default). Never a connection code.
+   * The codes that show the failure toast (a torrent operation's are
+   * OPERATION_FAILURE_CODES). Required, so the list always matches `TCode`
+   * and `failureText` only sees codes it knows. Never a connection code.
    */
-  failureCodes?: ReadonlyArray<TCode>
+  failureCodes: ReadonlyArray<TCode>
   failureText: (variables: TVariables, code: TCode) => string
   onSend?: (variables: TVariables) => void
   /** `data` is the call's answer. */
@@ -64,8 +64,7 @@ export function sendOp<TVariables, TCode extends ErrorCode, TData>(
   client: QueryClient,
   variables: TVariables,
 ): void {
-  const codes: ReadonlyArray<ErrorCode> =
-    op.failureCodes ?? OPERATION_FAILURE_CODES
+  const codes: ReadonlyArray<ErrorCode> = op.failureCodes
   const isFailureCode = (code: ErrorCode): code is TCode => codes.includes(code)
   const observer = new MutationObserver<TData, Error, TVariables>(client, {
     mutationKey: [op.name],

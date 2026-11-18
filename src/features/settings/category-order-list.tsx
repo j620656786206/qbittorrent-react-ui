@@ -36,8 +36,10 @@ import { sendOp, useOpsInFlight } from '#/state/tracked-op'
 // After the answer, focus follows the moved row's arrow (its other arrow
 // once the pressed one is disabled at the top or bottom) and a polite live
 // region says where it went. The page reads the settings again on mount;
-// while they are unknown (the read failed) the list is read-only, so a
-// press can never overwrite the saved order with the name order.
+// while the latest read failed (settings unknown, or only an older answer
+// that may predate another device's change) the list is read-only, so a
+// press can never overwrite the saved order with the name order or an
+// older one.
 
 type Delta = -1 | 1
 
@@ -50,7 +52,7 @@ export function CategoryOrderList({ labelledBy }: { labelledBy: string }) {
     () => categoryOrderOp((input) => callFn(setCategoryOrder, input), client),
     [client],
   )
-  const { settings, ready } = useSettings()
+  const { settings, ready, readFailed } = useSettings()
   const { data: categories, isError: categoriesFailed } =
     useMaindata(selectCategories)
   const { data: counts } = useCategoryCounts()
@@ -61,7 +63,7 @@ export function CategoryOrderList({ labelledBy }: { labelledBy: string }) {
   // waits for it, so no press builds its order from an older answer.
   const reading = useIsFetching({ queryKey: SETTINGS_KEY, exact: true }) > 0
   const waits = (key: string) => reading || waitingKeys.has(key)
-  const readOnly = ready && settings === undefined
+  const readOnly = ready && (settings === undefined || readFailed)
   const categoryOrder = settings?.categoryOrder
   const rows = useMemo(
     () =>

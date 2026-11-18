@@ -106,6 +106,7 @@ deferred: []
 
 ## Spec Change Log
 - 2026-11-18, first review pass: two rules of the intent contract were tightened in code. (1) "React only to a change in the remembered value" now also goes through the follow path (URL replace, scroll to top) whenever that change alters the sort on screen with a bare URL, including a first read that failed and a remembered value going back to null; the first load is not a change. (2) Common paths outside `SAVE_ROOTS` are filtered from what is served, never dropped from the file. Saves of one category run serially (mutation scope) and an older answer never lands over a newer one. KEEP: the URL is the sort on screen; a manual pick is the only writer; no optimistic update.
+- 2026-11-18, multi-model review after merge (opus, fable, sonnet, haiku; Alex picked the fixes, PR "fix(epic-3)"): (1) every settings write (sort and order saves) runs in one mutation scope, so the container writes them in send order and each answer is newer than the last applied; the per-client send sequence that dropped older answers is gone (it compared send order, not the container's write order). `isSavingSort` filters by the save's category. (2) A top-level key the code does not know is kept in the file through reads and writes, never served and never counted as a repair (spine AD-8 adds sections without a new `version`, so an older image must not erase them); the known keys come from `settingsSchema.shape`. (3) `TrackedOp.failureCodes` is required. KEEP: whole-file answers; no optimistic update.
 
 ## Review Triage Log
 
