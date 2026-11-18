@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { resolveListViewed } from '#/lib/detail-position'
 import type { LastViewed } from '#/lib/detail-position'
+import { readPref } from '#/lib/prefs'
 import { ALL } from '#/shared/categories'
 import { useViewedHash } from '#/state/viewed-hash'
 
@@ -9,7 +10,10 @@ import { useViewedHash } from '#/state/viewed-hash'
 // the order (deleted, archived) the URL follows with `replace`: desktop to
 // the row that took its place, phone to no `hash` (the sheet closes). Until
 // the router answers, the row already written keeps showing, so the panel
-// never blinks to the first row in between.
+// never blinks to the first row in between. Story 3.6: where the first row
+// would be viewed (desktop list mode, `fallbackFirst`), the category's last
+// viewed torrent on this device (`lastViewedHash` in src/lib/prefs.ts) is,
+// when the order holds it. It is never scrolled into view (PRD FR-16).
 
 export function useListViewed(
   order: ReadonlyArray<string> | undefined,
@@ -46,12 +50,22 @@ export function useListViewed(
       pendingRef.current = null
     else effectiveHash = pending.hash
   }
+  // Read again when the category or the URL's `hash` changes: the layout
+  // records each `hash` written, so by the next time no `hash` is usable
+  // the stored value is current. The phone never views a row by itself.
+  const preferred = useMemo(
+    () =>
+      fallbackFirst ? (readPref('lastViewedHash').get(scope) ?? null) : null,
+    // `hash` only says when to read again.
+    [fallbackFirst, scope, hash],
+  )
   const last = lastRef.current
   const { viewed, write } = resolveListViewed({
     order,
     hash: effectiveHash,
     previous: last !== null && last.scope === scope ? last : null,
     fallbackFirst,
+    preferred,
   })
 
   useLayoutEffect(() => {

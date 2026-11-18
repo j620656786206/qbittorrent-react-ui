@@ -253,3 +253,103 @@ describe('resolveListViewed (D1, D3, D9, D11)', () => {
     ).toEqual({ viewed: null, write: undefined })
   })
 })
+
+describe('resolveListViewed with the remembered row (story 3.6)', () => {
+  const desktop = { fallbackFirst: true } as const
+  const phone = { fallbackFirst: false } as const
+  const order = ['a', 'b', 'c']
+
+  it('no hash on a new list: the remembered row when the list holds it', () => {
+    expect(
+      resolveListViewed({
+        order,
+        hash: null,
+        previous: null,
+        preferred: 'c',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'c', write: undefined })
+  })
+
+  it('the remembered row gone (deleted, archived, filtered out): the first row', () => {
+    expect(
+      resolveListViewed({
+        order,
+        hash: null,
+        previous: null,
+        preferred: 'z',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('a hash the list does not hold counts as none: the remembered row', () => {
+    expect(
+      resolveListViewed({
+        order,
+        hash: 'z',
+        previous: null,
+        preferred: 'b',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'b', write: undefined })
+  })
+
+  it('a usable hash wins over the remembered row', () => {
+    expect(
+      resolveListViewed({
+        order,
+        hash: 'a',
+        previous: null,
+        preferred: 'c',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('the row already shown stays while the order holds it', () => {
+    expect(
+      resolveListViewed({
+        order: ['b', 'a', 'c'],
+        hash: null,
+        previous: { order, viewed: 'a' },
+        preferred: 'c',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('every old row gone at once without a hash: the remembered row, else the first', () => {
+    const previous = { order: ['x', 'y'], viewed: 'x' }
+    expect(
+      resolveListViewed({
+        order,
+        hash: null,
+        previous,
+        preferred: 'b',
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'b', write: undefined })
+    expect(
+      resolveListViewed({
+        order,
+        hash: null,
+        previous,
+        preferred: null,
+        ...desktop,
+      }),
+    ).toEqual({ viewed: 'a', write: undefined })
+  })
+
+  it('the phone never views the remembered row by itself', () => {
+    expect(
+      resolveListViewed({
+        order,
+        hash: null,
+        previous: null,
+        preferred: 'b',
+        ...phone,
+      }),
+    ).toEqual({ viewed: null, write: undefined })
+  })
+})

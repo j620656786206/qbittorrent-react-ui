@@ -67,7 +67,7 @@ development_status:
   3-3-設定頁: done # PR #35：設定頁，分類分頁順序和自動收合開關
   3-4-手機分類清單: done # PR #37：手機分類面板，最下面進設定頁
   3-5-列表內搜尋: done # PR #38：列表內搜尋，邊打邊篩目前分類的名稱
-  3-6-打開-app-回到上次的地方: backlog
+  3-6-打開-app-回到上次的地方: done # PR #39：打開 App 回到上次看的分類和種子
   3-7-快捷鍵和說明視窗: backlog
   epic-3-retrospective: optional
 

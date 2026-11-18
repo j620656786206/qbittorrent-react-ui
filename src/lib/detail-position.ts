@@ -74,6 +74,12 @@ export interface ListViewedInput {
    * unless `hash` is in the order, and a vanished one closes the sheet.
    */
   fallbackFirst: boolean
+  /**
+   * Story 3.6: the category's last viewed torrent on this device. With
+   * `fallbackFirst` and no usable `hash`, it is viewed instead of the first
+   * row when the order holds it.
+   */
+  preferred?: string | null
 }
 
 export interface ListViewed {
@@ -88,13 +94,15 @@ export interface ListViewed {
  * list does not hold: D3, the URL left alone) the first row is shown on the
  * first load, and stays shown while it is in the order. The viewed row
  * leaving the order (deleted, archived) is told apart from a `hash` that
- * never was in it.
+ * never was in it. Story 3.6: where the first row would be shown, the
+ * category's `preferred` row is, when the order holds it.
  */
 export function resolveListViewed({
   order,
   hash,
   previous,
   fallbackFirst,
+  preferred = null,
 }: ListViewedInput): ListViewed {
   if (order === undefined) return { viewed: null, write: undefined }
   if (hash !== null && order.includes(hash)) {
@@ -113,7 +121,7 @@ export function resolveListViewed({
     // Without a hash and none of the old rows left (the order replaced
     // wholesale): the first row, never a blank panel.
     if (next === null && hash === null) {
-      return { viewed: order[0] ?? null, write: undefined }
+      return { viewed: fallbackRow(order, preferred), write: undefined }
     }
     return { viewed: next, write: next ?? close }
   }
@@ -124,5 +132,14 @@ export function resolveListViewed({
   if (lost !== null && order.includes(lost)) {
     return { viewed: lost, write: undefined }
   }
-  return { viewed: order[0] ?? null, write: undefined }
+  return { viewed: fallbackRow(order, preferred), write: undefined }
+}
+
+/** Story 3.6: `preferred` when the order holds it, else the first row. */
+function fallbackRow(
+  order: ReadonlyArray<string>,
+  preferred: string | null,
+): string | null {
+  if (preferred !== null && order.includes(preferred)) return preferred
+  return order[0] ?? null
 }

@@ -45,6 +45,18 @@ function isVisible(
   return statusOf(torrent, stateBeforeMove) !== 'archived'
 }
 
+/**
+ * Story 3.6: `torrent` is a row of `category`'s list: in the category and
+ * not 已整理.
+ */
+export function listsIn(
+  torrent: SlimTorrent,
+  category: string,
+  stateBeforeMove: Maindata['stateBeforeMove'],
+): boolean {
+  return inCategory(torrent, category) && isVisible(torrent, stateBeforeMove)
+}
+
 interface Entry {
   hash: string
   key: number | string | null

@@ -3,11 +3,13 @@ import type { SlimTorrent } from '#/shared/maindata'
 import { SORT_FIELD_IDS, isExtraSortField } from '#/shared/sort-fields'
 import type { SortValue } from '#/shared/sort-keys'
 import { mergeMaindata } from '#/lib/maindata-merge'
+import { ALL } from '#/shared/categories'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import {
   countAll,
   countMatches,
   inCategory,
+  listsIn,
   boardColumnOf,
   selectBoardColumns,
   selectVisibleTorrents,
@@ -723,5 +725,17 @@ describe('the name filter (story 3.5)', () => {
       S1,
       S6,
     ])
+  })
+})
+
+describe('listsIn (story 3.6)', () => {
+  it('a row of the category: in it and not 已整理', () => {
+    const shown = t({ category: 'X' })
+    const archived = t({ category: 'X', state: 'missingFiles', private: false })
+    expect(listsIn(shown, 'X', {})).toBe(true)
+    expect(listsIn(shown, ALL, {})).toBe(true)
+    expect(listsIn(shown, 'mteam-X', {})).toBe(false)
+    expect(listsIn(archived, 'X', {})).toBe(false)
+    expect(listsIn(archived, ALL, {})).toBe(false)
   })
 })
