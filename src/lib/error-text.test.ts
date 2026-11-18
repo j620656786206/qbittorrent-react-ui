@@ -7,7 +7,6 @@ import {
   SETTINGS_WRITE_FAILURE_CODES,
   errorText,
   fileActionFailureText,
-  isOperationFailureCode,
   pauseActionFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
@@ -63,11 +62,6 @@ describe('LIST_LOAD_FAILED (spec 1.8 V2)', () => {
 describe('pause and resume failure text (spec 2.6 F1)', () => {
   it('handles exactly qbit_rejected, timeout and invalid_input', () => {
     expect([...OPERATION_FAILURE_CODES]).toEqual([
-      'qbit_rejected',
-      'timeout',
-      'invalid_input',
-    ])
-    expect(ERROR_CODES.filter(isOperationFailureCode)).toEqual([
       'qbit_rejected',
       'timeout',
       'invalid_input',

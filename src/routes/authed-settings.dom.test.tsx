@@ -57,15 +57,21 @@ vi.mock('#/lib/toast', () => ({
 // dispatchEventForPluginEventSystem looping); e2e/settings-sort.spec.ts
 // picks through the real menu in Chromium.
 const probe = vi.hoisted(
-  (): { pickView: (view: { sort: string; dir: string }) => void } => ({
+  (): {
+    pickView: (view: { sort: string; dir: string }) => void
+    view: unknown
+  } => ({
     pickView: () => {},
+    view: undefined,
   }),
 )
 vi.mock('#/features/header/app-shell', async (importOriginal) => {
   const actual = await importOriginal<typeof AppShellModule>()
   const { useListView } = await import('#/state/list-view')
   function Probe() {
-    probe.pickView = useListView().pickView as never
+    const control = useListView()
+    probe.pickView = control.pickView as never
+    probe.view = control.view
     return null
   }
   return {
@@ -252,6 +258,16 @@ describe('the remembered sort of 全部', () => {
     await answerSettings(remembering('seeding_time'))
     expect(pill()).toBe('排序：做種時間，久的在前，列表')
     expect(search().sort).toBeUndefined()
+  })
+
+  it('URL with sort: a settings answer keeps the same view object', async () => {
+    await mount('/?sort=added_on')
+    await answerSettings(remembering('ratio'))
+    const before = probe.view
+    await refocus()
+    await answerSettings(defaultSettings())
+    expect(client.getQueryData(['settings'])).toEqual(defaultSettings())
+    expect(probe.view).toBe(before)
   })
 
   it('URL with sort: the URL wins', async () => {

@@ -2,6 +2,7 @@ import { z } from '#/shared/zod'
 import {
   categoryKeySchema,
   categoryOrderEntrySchema,
+  hasControlChar,
 } from '#/shared/categories'
 import { savePathSchema } from '#/shared/save-path'
 import { SORT_DIRS, SORT_FIELD_IDS } from '#/shared/sort-fields'
@@ -22,10 +23,21 @@ export const sortChoiceSchema = z.strictObject({
   dir: z.enum(SORT_DIRS),
 })
 
+/**
+ * A common path's name: 1 to 50 characters, no control character (line
+ * breaks included, like category names), not only whitespace.
+ */
+export const commonPathNameSchema = z
+  .string()
+  .min(1)
+  .max(MAX_COMMON_PATH_NAME)
+  .refine((name) => !hasControlChar(name), 'control character')
+  .refine((name) => name.trim() !== '', 'only whitespace')
+
 /** A common path; its normalized `path` is its identity (not its index). */
 export const commonPathSchema = z.strictObject({
   path: savePathSchema,
-  name: z.string().min(1).max(MAX_COMMON_PATH_NAME),
+  name: commonPathNameSchema,
   mediaLibrary: z.boolean(),
 })
 

@@ -123,6 +123,23 @@ describe('commonPathSchema', () => {
   })
 
   it.each([
+    ['a line break', 'media\nX'],
+    ['a tab', 'media\tX'],
+    ['NUL', 'X\u0000'],
+    ['DEL', 'X\u007f'],
+    ['only spaces', '   '],
+    ['only full-width spaces', '\u3000\u3000'],
+  ])('a name with %s is rejected', (_name, name) => {
+    expect(commonPathSchema.safeParse({ ...path(1), name }).success).toBe(false)
+  })
+
+  it('inner spaces are fine', () => {
+    expect(
+      commonPathSchema.safeParse({ ...path(1), name: 'media X 影集' }).success,
+    ).toBe(true)
+  })
+
+  it.each([
     ['a .. path', { path: '/data/../x' }],
     ['mediaLibrary not a boolean', { mediaLibrary: 'yes' }],
     ['no name', { name: undefined }],

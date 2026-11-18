@@ -270,7 +270,7 @@ describe('unreadable file', () => {
       const failed = events('settings_read_failed')
       expect(failed).toHaveLength(1)
       const { time: _time, level: _level, event: _event, ...fields } = failed[0]
-      expect(fields).toEqual({ code: 'EACCES' })
+      expect(fields).toEqual({ file: SETTINGS_FILE, code: 'EACCES' })
       await chmod(file(), 0o600)
       expect(await readFile(file(), 'utf8')).toBe(content)
       expect(logText()).not.toContain('mteam-X')
@@ -459,6 +459,41 @@ describe('writes', () => {
       expect(await readJson()).toEqual(defaultSettings())
     },
   )
+
+  // root ignores folder permissions.
+  it.skipIf(process.getuid?.() === 0)(
+    'a repair write that keeps failing is logged once per start',
+    async () => {
+      await writeRaw({ version: 1, categoryOrder: ['X'] })
+      await chmod(dir, 0o500)
+      const expected = { ...defaultSettings(), categoryOrder: ['X'] }
+      expect(await store.read()).toEqual(expected)
+      expect(await store.read()).toEqual(expected)
+      expect(await store.read()).toEqual(expected)
+      expect(events('settings_write_failed')).toEqual([
+        expect.objectContaining({ reason: 'io', code: 'EACCES', repair: true }),
+      ])
+      // A write Alex asked for still logs each time.
+      expect(await store.update(setSort(ALL, 'ratio', 'desc'))).toEqual({
+        ok: false,
+      })
+      expect(events('settings_write_failed')).toHaveLength(2)
+    },
+  )
+
+  it('update stores and answers what the schema parsed (paths normalized)', async () => {
+    const result = await store.update((current) => ({
+      ...current,
+      commonPaths: [
+        { path: '/data//media/./X/', name: 'X', mediaLibrary: true },
+      ],
+    }))
+    const normalized = [
+      { path: '/data/media/X', name: 'X', mediaLibrary: true },
+    ]
+    expect(result.ok && result.settings.commonPaths).toEqual(normalized)
+    expect(await readJson()).toMatchObject({ commonPaths: normalized })
+  })
 
   it('a later read sees the written settings', async () => {
     await store.update(setSort(ALL, 'name', 'asc'))

@@ -34,12 +34,6 @@ export const OPERATION_FAILURE_CODES = [
 
 export type OperationFailureCode = (typeof OPERATION_FAILURE_CODES)[number]
 
-export function isOperationFailureCode(
-  code: ErrorCode,
-): code is OperationFailureCode {
-  return (OPERATION_FAILURE_CODES as ReadonlyArray<ErrorCode>).includes(code)
-}
-
 /**
  * AD-8, AD-9, story 3.1: the codes a settings write handles itself (the
  * failure toast with 「重試」). Connection codes stay with the global

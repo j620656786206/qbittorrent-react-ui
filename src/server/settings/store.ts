@@ -40,7 +40,8 @@ import type { CommonPath, Settings, SortChoice } from '#/shared/settings'
 //   wrong `SAVE_ROOTS` must not erase it) and is only left out of what is
 //   served.
 // - A file that cannot be read (EACCES): defaults are served, the file is
-//   left alone, every write fails; logged once per start.
+//   left alone, every write fails; logged once per start. A read's repair
+//   write that fails is also logged once per start.
 // AR-36: log lines carry the file name, section names, counts and errno
 // codes only: never content (category names may be private) and never a
 // path beyond the file name.
@@ -110,6 +111,7 @@ export function createSettingsStore(
   const file = join(dir, SETTINGS_FILE)
   let newerLogged = false
   let unreadableLogged = false
+  let repairFailLogged = false
   let tail: Promise<unknown> = Promise.resolve()
 
   /** Runs `task` after every earlier one settled. */
@@ -304,26 +306,46 @@ export function createSettingsStore(
     }
   }
 
-  /** Writes `settings`; `false` (logged) when refused or failed. */
-  async function write(settings: Settings): Promise<boolean> {
+  /**
+   * Writes `settings` as the schema parses it (paths normalized) and
+   * answers what was written; `null` (logged through `fail`) when refused
+   * or failed.
+   */
+  async function write(
+    settings: Settings,
+    fail: typeof writeFailed = writeFailed,
+  ): Promise<Settings | null> {
     const checked = settingsSchema.safeParse(settings)
     if (!checked.success) {
-      writeFailed('invalid')
-      return false
+      fail('invalid')
+      return null
     }
-    const text = serialize(settings)
+    const text = serialize(checked.data)
     const bytes = Buffer.byteLength(text, 'utf8')
     if (bytes > MAX_SETTINGS_BYTES) {
-      writeFailed('too_large', { bytes, maxBytes: MAX_SETTINGS_BYTES })
-      return false
+      fail('too_large', { bytes, maxBytes: MAX_SETTINGS_BYTES })
+      return null
     }
     try {
       await writeFileAtomically(text)
-      return true
+      return checked.data
     } catch (error) {
-      writeFailed('io', { code: errnoCode(error) })
-      return false
+      fail('io', { code: errnoCode(error) })
+      return null
     }
+  }
+
+  /**
+   * A read's repair write that fails (a read-only CONFIG_DIR) would fail
+   * on every focus: logged once per start.
+   */
+  function repairWriteFailed(
+    reason: string,
+    fields: Record<string, unknown> = {},
+  ) {
+    if (repairFailLogged) return
+    repairFailLogged = true
+    writeFailed(reason, { ...fields, repair: true })
   }
 
   /** Keeps the broken file under a new name; `false` (logged) on failure. */
@@ -355,7 +377,7 @@ export function createSettingsStore(
   function noteUnreadable(code: string) {
     if (unreadableLogged) return
     unreadableLogged = true
-    logger.error('settings_read_failed', { code })
+    logger.error('settings_read_failed', { file: SETTINGS_FILE, code })
   }
 
   /** What is served: common paths outside `SAVE_ROOTS` are left out. */
@@ -401,7 +423,7 @@ export function createSettingsStore(
       locked(async () => {
         const state = await current()
         if (state === null) return defaultSettings()
-        if (state.mustWrite) await write(state.settings)
+        if (state.mustWrite) await write(state.settings, repairWriteFailed)
         return served(state.settings)
       }),
     update: (change) =>
@@ -416,9 +438,8 @@ export function createSettingsStore(
         if (unchanged && !state.mustWrite) {
           return { ok: true, settings: served(next) }
         }
-        return (await write(next))
-          ? { ok: true, settings: served(next) }
-          : { ok: false }
+        const written = await write(next)
+        return written ? { ok: true, settings: served(written) } : { ok: false }
       }),
   }
 }

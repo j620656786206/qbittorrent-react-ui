@@ -86,9 +86,12 @@ function AuthedLayout() {
     }
   }, [rawSearch, navigate])
 
+  // Only a URL without `sort` reads the remembered sort, so with `sort` a
+  // settings answer keeps `view` (and the visible list) as it is.
+  const rememberedForView = sort === undefined ? remembered : null
   const view = useMemo(
-    () => sortViewOf({ sort, dir }, remembered),
-    [sort, dir, remembered],
+    () => sortViewOf({ sort, dir }, rememberedForView),
+    [sort, dir, rememberedForView],
   )
   const setView = useCallback(
     (next: SortView) => {

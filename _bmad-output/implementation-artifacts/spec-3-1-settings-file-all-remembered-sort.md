@@ -5,7 +5,7 @@ created: '2026-11-18'
 status: 'done'
 baseline_revision: '00bfa386f06614b0f8bfdb5882ee6faae9917d69'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -149,6 +149,39 @@ deferred: []
   - `[medium]` `[patch]` (verification-gap) The unreadable-file path has no test : store test added (defaults served, bytes kept, update refused, one log line).
   - `[low]` `[patch]` (verification-gap, other) Comment names a missing test file : same as the blind entry; fixed there.
 
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 29 findings, high 0, medium 0, low 20, false 9, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (intent) Follow choices: hold still while saving, write `?sort=` for a bare URL, fall back to 「狀態」 when the value goes : first-pass decisions recorded in the Spec Change Log.
+  - `[false]` `[reject]` (intent) Out-of-root common paths are hidden, not dropped : first-pass decision recorded (a wrong `SAVE_ROOTS` must not erase data).
+  - `[false]` `[reject]` (intent) The `timeout` wording differs from `errorText` : first-pass fix; the settings write never touches qBittorrent.
+  - `[false]` `[reject]` (intent) Category keys narrower (`__proto__`, C1 controls) : safer superset of the contract's rule.
+  - `[false]` `[reject]` (intent) More files count as broken (bad or missing version step) : falls under "the store cannot read it"; the old file is kept either way.
+  - `[false]` `[reject]` (intent) Additions (serial saves, synced writes, `.` segments, viewed row waits) : first-pass fixes.
+  - `[low]` `[reject]` (intent) Client behaviours are tested one layer below the user : carried; the menu, sheet and focus-follow run in Chromium, the rest in the real layout under happy-dom.
+  - `[false]` `[reject]` (blind) The skeleton waits for settings even with `?sort=` : the AC asks for both answers before data shows.
+  - `[low]` `[reject]` (blind) The sort pill shows the default before settings answer : a pick in that window still saves correctly; the skeleton covers the list itself.
+  - `[low]` `[patch]` (blind) A failing repair write logs on every read : logged once per start.
+  - `[low]` `[patch]` (blind) `write()` validates one value and stores another : the checked data is serialized.
+  - `[low]` `[patch]` (blind) Common path names accept control characters and blanks : rejected, like category names (the schema is frozen from here).
+  - `[low]` `[reject]` (blind) A category literally named `__all__` collides with 「全部」 : not a name qBittorrent users choose; documented risk only.
+  - `[low]` `[patch]` (blind) `isOperationFailureCode` is unused outside its test : one source kept.
+  - `[false]` `[reject]` (blind) 重試 on `invalid_input` and the `timeout` wording : the AC lists these codes with 重試.
+  - `[low]` `[patch]` (blind) `docs/deployment.md` says nothing about the settings file : section added (file, broken copies, downgrade, post-deploy check).
+  - `[low]` `[patch]` (blind) `settings_read_failed` lacks the file field : added.
+  - `[low]` `[reject]` (blind) "Not written again" tests rely on mtime : CI runs on Linux with fine timestamps; the tests also check content.
+  - `[low]` `[reject]` (blind) The "never polls" test does not advance time : the query has no `refetchInterval`; the test documents the focus refetch.
+  - `[low]` `[reject]` (blind) Following keeps `hash` untested : `setView` spreads the previous search, covered since Story 2.4.
+  - `[low]` `[reject]` (blind) No e2e for the failure toast : covered in the route DOM test; a fake failure switch adds tooling for one toast.
+  - `[low]` `[reject]` (blind) `save-path.ts` imports the control-character check from `categories.ts` : one shared helper, no duplication.
+  - `[low]` `[reject]` (blind) Two broken copies in the same millisecond : needs two corrupt files within 1 ms.
+  - `[low]` `[patch]` (edge) With `?sort=` every settings answer gives `view` a new identity : the remembered value is used only for a bare URL; `view` stays stable.
+  - `[low]` `[patch]` (edge) A failing repair write is retried and logged on every read : same as the blind entry; fixed there.
+  - `[low]` `[reject]` (edge) A file larger than 256 KB on disk is served and every write fails : only by hand-editing; the refusal and its log say why.
+  - `[low]` `[patch]` (edge) `expectSaved` passes any non-`settings_write_failed` answer : asserts `"ok":true`.
+  - `[low]` `[patch]` (edge) The second e2e page is not watched for CSP and console errors : the same listeners are attached.
+  - `[false]` `[reject]` (edge, claim) After a failed save another device's value replaces the pick : following another device then is intended (carried).
+
 ## Design Notes
 
 Why react only to a change of the remembered value: the URL is "the sort on screen"; the remembered value is "what Alex last chose anywhere". Comparing the new remembered value with the previous one (not with the screen) means a pending write (focus refetch returns the old value, unchanged), a failed write (value unchanged) and this tab's own successful write (new value equals the screen) all leave the screen alone, while another device's write (value changed and differs from the screen) moves it.
@@ -175,3 +208,7 @@ Status: done (first review pass)
 **Review.** 36 findings: patched 6 medium entries (serial saves and stale answers, silent view changes, out-of-root common paths kept in the file, durable writes, in-flight guard test, unreadable-file test) and low ones; rejected 13 (7 false, 6 low) with reasons; nothing deferred.
 
 **Follow-up review: recommended.** Patched by verdict: medium 6. The named risk: the follow rule and the save ordering were reworked after review, so a second pass should re-check them with the store changes.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 29 findings, no high or medium: patched the low ones (repair-write failure logged once, the checked data is what gets stored, common path names reject control characters and blanks, one failure-code source, `settings_read_failed` carries the file, a stable `view` with `?sort=`, e2e checks a real `ok: true` and watches the second page, a settings section in `docs/deployment.md`); rejected the rest with reasons. Follow-up review: not recommended (no high patched on a follow-up pass).

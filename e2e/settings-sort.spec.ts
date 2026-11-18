@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { fromCrossJSON } from 'seroval'
 import {
   DEFAULT_MODES,
   LIST_SCROLL_ID,
@@ -8,6 +9,7 @@ import {
   scrollList,
   setModes,
   test,
+  watchExtraPage,
 } from './fixtures'
 
 // Story 3.1: 「全部」 remembers the sort Alex picks by hand, in settings.json
@@ -49,10 +51,16 @@ const saveAnswered = (page: Page) =>
     )
   })
 
+/** The answer is `{ ok: true, ... }` (Start sends it seroval-encoded). */
 async function expectSaved(saved: ReturnType<typeof saveAnswered>) {
   const response = await saved
   expect(response.ok()).toBe(true)
-  expect(await response.text()).not.toContain('settings_write_failed')
+  const body: unknown = JSON.parse(await response.text())
+  const decoded = response.headers()['x-tss-serialized']
+    ? fromCrossJSON<{ result: unknown }>(body as never, { refs: new Map() })
+        .result
+    : body
+  expect(decoded).toMatchObject({ ok: true })
 }
 
 /** Desktop: the sort menu. */
@@ -115,6 +123,7 @@ test('another page follows a changed sort on focus, at the top', async ({
 
   // The other device is a phone.
   const other = await context.newPage()
+  const otherWatch = await watchExtraPage(other)
   await other.setViewportSize(PHONE)
   await other.goto('/?sort=added_on')
   await expect(other.getByRole('listitem').first()).toBeVisible()
@@ -145,6 +154,7 @@ test('another page follows a changed sort on focus, at the top', async ({
   await expect(sortPill(page)).toHaveAccessibleName(
     '排序：做種時間，久的在前，列表',
   )
+  otherWatch.expectClean()
   await other.close()
 })
 
