@@ -16,6 +16,7 @@ import {
   useMaindata,
 } from '#/state/maindata'
 import { useEmptyEntrance } from '#/state/entrance'
+import { useListView } from '#/state/list-view'
 import { useMaindataFailure } from '#/state/maindata-failure'
 import { useMaindataRetry } from '#/state/maindata-retry'
 import { useDayClock } from '#/state/now'
@@ -74,9 +75,12 @@ export function TorrentBoard() {
   const { retry, retrying } = useMaindataRetry()
   const desktop = useIsDesktop()
   const { today } = useDayClock()
+  const { viewReady } = useListView()
 
+  // Story 3.1 (AD-8): the first load also waits for the settings, which
+  // may turn a URL without `sort` into the list.
   const state = boardView({
-    hasData: columns !== undefined,
+    hasData: columns !== undefined && viewReady,
     total: columns ? totalOf(columns) : 0,
     error: failure,
   })

@@ -28,6 +28,8 @@ import {
   markMaindataFailure,
 } from '#/state/maindata-failure'
 import type { FetchMaindata } from '#/state/maindata'
+import { SETTINGS_KEY, settingsQueryDefaults } from '#/state/settings'
+import type { FetchSettings } from '#/state/settings'
 
 // AR-35, AD-9: one QueryClient per router. The global `onError` is the only
 // place that handles the login-stop codes, the connection codes and
@@ -52,6 +54,11 @@ export interface CreateQueryClientOptions {
    * `['error-reasons']` query options are registered on the client.
    */
   fetchErrorReasons?: FetchErrorReasons
+  /**
+   * The `getSettings` call (bound in src/router.tsx). When given, the
+   * `['settings']` query options are registered on the client.
+   */
+  fetchSettings?: FetchSettings
 }
 
 function locationPath(): string {
@@ -80,6 +87,7 @@ export function createQueryClient({
   currentPath = locationPath,
   fetchMaindata,
   fetchErrorReasons,
+  fetchSettings,
 }: CreateQueryClientOptions = {}): QueryClient {
   // bad_origin repeats on every poll; once per client is enough to see it.
   let badOriginLogged = false
@@ -158,6 +166,10 @@ export function createQueryClient({
       ERROR_REASONS_KEY,
       errorReasonsQueryDefaults(fetchErrorReasons),
     )
+  }
+
+  if (fetchSettings) {
+    client.setQueryDefaults(SETTINGS_KEY, settingsQueryDefaults(fetchSettings))
   }
 
   // The server builds a router (and so a client) for every request, /healthz

@@ -5,8 +5,10 @@ import { routeTree } from './routeTree.gen'
 import { watchLoginRequired } from '#/features/login/watch-login-required'
 import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { getMaindata } from '#/server/functions/get-maindata'
+import { getSettings } from '#/server/functions/get-settings'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { bindFetchMaindata } from '#/state/maindata'
+import { bindFetchSettings } from '#/state/settings'
 import { createQueryClient } from '#/state/query-client'
 
 // AD-10: the request middleware's per-request CSP nonce goes on Start's inline
@@ -22,12 +24,13 @@ function cspNonce(): string | undefined {
 }
 
 export function getRouter() {
-  // src/state may not import server functions, so the maindata and error
-  // reason calls are bound here. This import is also what bundles
+  // src/state may not import server functions, so the maindata, error
+  // reason and settings calls are bound here. This import is also what bundles
   // getMaindata (smoke B9, B10).
   const queryClient = createQueryClient({
     fetchMaindata: bindFetchMaindata(getMaindata),
     fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
+    fetchSettings: bindFetchSettings(getSettings),
   })
   const router = createTanStackRouter({
     routeTree,

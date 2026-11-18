@@ -10,6 +10,7 @@ import { LIST_LOAD_FAILED } from '#/lib/error-text'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
+import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { replayEntrance, resetEntrance } from '#/state/entrance'
@@ -22,6 +23,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
+import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import {
   CARD_GAP,
@@ -129,6 +131,28 @@ function stubPrototype(name: 'clientHeight' | 'clientWidth', value: number) {
   })
 }
 
+/** Story 3.1: the settings answered (the view is final). */
+let viewReady = true
+
+function boardTree() {
+  return (
+    <QueryClientProvider client={client}>
+      <ListViewContext
+        value={{
+          view: DEFAULT_SORT_VIEW,
+          viewReady,
+          setView: () => {},
+          pickView: () => {},
+        }}
+      >
+        <ViewedHashContext value={{ hash: null, setHash }}>
+          <TorrentBoard />
+        </ViewedHashContext>
+      </ListViewContext>
+    </QueryClientProvider>
+  )
+}
+
 async function render(first: MaindataResponse | AppError | 'pending') {
   answers = [first]
   fetchCount = 0
@@ -151,13 +175,7 @@ async function render(first: MaindataResponse | AppError | 'pending') {
   main.append(container)
   root = createRoot(container)
   await act(async () => {
-    root.render(
-      <QueryClientProvider client={client}>
-        <ViewedHashContext value={{ hash: null, setHash }}>
-          <TorrentBoard />
-        </ViewedHashContext>
-      </QueryClientProvider>,
-    )
+    root.render(boardTree())
   })
 }
 
@@ -185,6 +203,7 @@ const button = (label: string) =>
   main.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement
 
 beforeEach(() => {
+  viewReady = true
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
@@ -480,6 +499,20 @@ describe('error reasons (spec 2.10)', () => {
 })
 
 describe('board states', () => {
+  it('story 3.1: maindata first, settings later: the skeleton stays until they answer', async () => {
+    viewReady = false
+    await render(
+      fakeResponse({ changed: [t({ hash: fakeHash(1), name: 'Fake.A' })] }),
+    )
+    expect(
+      main.querySelector('[aria-busy="true"]')?.getAttribute('aria-label'),
+    ).toBe('看板，載入中')
+    expect(main.textContent).not.toContain('Fake.A')
+    viewReady = true
+    await act(async () => root.render(boardTree()))
+    expect(main.querySelector('[aria-busy="true"]')).toBeNull()
+  })
+
   it('K11 first load: card skeletons, busy, no spinner text', async () => {
     await render('pending')
     const busy = main.querySelector('[aria-busy="true"]')

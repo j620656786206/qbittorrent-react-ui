@@ -86,9 +86,13 @@
 // `critical` flags (default true) filter like qBittorrent 5.1.4. Every
 // request (its `last_known_id` and time) is logged:
 //   curl 'http://localhost:3100/__fake/log'
+// Story 3.1: the app's settings.json lives in the temporary CONFIG_DIR; a
+// reset removes it (and any kept broken copy), so the next read writes the
+// defaults (the e2e fixtures reset before every test):
+//   curl -X POST 'http://localhost:3100/__fake/settings?reset=1'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { createServer, request } from 'node:http'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -1015,6 +1019,22 @@ function controlLog(req, res) {
   })
 }
 
+/** Story 3.1: removes the app's settings files (loopback only, POST). */
+function controlSettings(req, res, url) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'POST') return send(res, 405, 'POST\n')
+  if (url.searchParams.get('reset') !== '1' || !configDir) {
+    return send(res, 400, 'reset=1\n')
+  }
+  for (const name of readdirSync(configDir)) {
+    if (name.startsWith('settings.json') || name.startsWith('.settings.json')) {
+      rmSync(join(configDir, name), { force: true })
+    }
+  }
+  send(res, 200, 'ok\n')
+}
+
 function frontHandler(appPort) {
   return (req, res) => {
     const url = new URL(req.url ?? '/', 'http://front')
@@ -1022,6 +1042,9 @@ function frontHandler(appPort) {
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
     if (url.pathname === '/__fake/files') return controlFiles(req, res)
     if (url.pathname === '/__fake/log') return controlLog(req, res)
+    if (url.pathname === '/__fake/settings') {
+      return controlSettings(req, res, url)
+    }
     if (mode.front === 'down' && url.pathname.startsWith(SERVER_FN_PREFIX)) {
       return send(res, 502, '<html><body>Bad gateway</body></html>', {
         'content-type': 'text/html; charset=utf-8',
@@ -1183,6 +1206,7 @@ switch modes:
   files: normal | slow | fail
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'
+reset settings.json: curl -X POST '${origin}/__fake/settings?reset=1'
 Ctrl+C stops everything.`)
 }
 

@@ -61,8 +61,8 @@ development_status:
   2-10-出錯種子的原因: done # PR #29：出錯種子顯示 qBittorrent log 裡整理過的原因
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-設定檔和-全部-記住排序: backlog
+  epic-3: in-progress
+  3-1-設定檔和-全部-記住排序: done # PR #33：排序記憶存在 NAS 的設定檔，「全部」記住手動選的排序
   3-2-電腦分類分頁: backlog
   3-3-設定頁: backlog
   3-4-手機分類清單: backlog

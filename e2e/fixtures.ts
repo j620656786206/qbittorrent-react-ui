@@ -29,7 +29,17 @@ export interface Watch {
   allowForcedStatus: (status: number, pathPrefix: string) => void
 }
 
-export const test = base.extend<{ watch: Watch }>({
+export const test = base.extend<{ watch: Watch; freshSettings: void }>({
+  // Story 3.1: a picked sort is remembered in settings.json on the server,
+  // which every test shares. Each test starts from the defaults (a URL
+  // without `sort` shows the board).
+  freshSettings: [
+    async ({ request }, use) => {
+      await resetSettings(request)
+      await use()
+    },
+    { auto: true },
+  ],
   watch: [
     async ({ page }, use, testInfo) => {
       const violations: Array<string> = []
@@ -104,6 +114,45 @@ export const test = base.extend<{ watch: Watch }>({
 })
 
 export { expect }
+
+/**
+ * Story 3.1: the fixture's watch for a second page of the test (from
+ * `context.newPage()`), which the auto fixture does not see: CSP
+ * violations, console errors, page errors and requests that leave
+ * loopback. Call it before the page loads anything; `expectClean()` at
+ * the end.
+ */
+export async function watchExtraPage(page: Page) {
+  const problems: Array<string> = []
+  await page.exposeFunction('__rtCspViolation', (text: string) => {
+    problems.push(`csp: ${text}`)
+  })
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => {
+      window.__rtCspViolation?.(
+        `${event.effectiveDirective} blocked ${event.blockedURI || '(inline)'}`,
+      )
+    })
+  })
+  page.on('console', (message) => {
+    if (message.type() === 'error') problems.push(`console: ${message.text()}`)
+  })
+  page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`))
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) return
+    if (!LOOPBACK_HOSTS.has(url.hostname)) problems.push(`left: ${url.origin}`)
+  })
+  return {
+    expectClean: () => expect(problems, 'second page problems').toEqual([]),
+  }
+}
+
+/** Story 3.1: removes the app's settings.json (the defaults come back). */
+export async function resetSettings(request: APIRequestContext) {
+  const response = await request.post('/__fake/settings?reset=1')
+  expect(response.ok(), await response.text()).toBe(true)
+}
 
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'

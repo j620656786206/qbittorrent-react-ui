@@ -4,10 +4,11 @@ import {
   FILES_LOAD_FAILED,
   LIST_LOAD_FAILED,
   OPERATION_FAILURE_CODES,
+  SETTINGS_WRITE_FAILURE_CODES,
   errorText,
   fileActionFailureText,
-  isOperationFailureCode,
   pauseActionFailureText,
+  sortSaveFailureText,
 } from '#/lib/error-text'
 import { ERROR_CODES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
@@ -65,11 +66,6 @@ describe('pause and resume failure text (spec 2.6 F1)', () => {
       'timeout',
       'invalid_input',
     ])
-    expect(ERROR_CODES.filter(isOperationFailureCode)).toEqual([
-      'qbit_rejected',
-      'timeout',
-      'invalid_input',
-    ])
   })
 
   it.each([
@@ -95,5 +91,24 @@ describe('pause and resume failure text (spec 2.6 F1)', () => {
 
   it('story 2.7 the files tab load failure reads 讀不到檔案清單', () => {
     expect(FILES_LOAD_FAILED).toBe('讀不到檔案清單')
+  })
+})
+
+describe('sort save failure text (story 3.1)', () => {
+  it('a settings write handles settings_write_failed, timeout and invalid_input', () => {
+    expect([...SETTINGS_WRITE_FAILURE_CODES]).toEqual([
+      'settings_write_failed',
+      'timeout',
+      'invalid_input',
+    ])
+  })
+
+  it.each([
+    ['settings_write_failed', '排序沒記住：設定檔寫不進去'],
+    ['timeout', '排序沒記住：容器沒有回應，請再試一次'],
+    ['invalid_input', '排序沒記住：送出的資料格式不對'],
+  ] as const)('%s', (code, text) => {
+    expect(sortSaveFailureText(code)).toBe(text)
+    expect(text).not.toContain(EM_DASH)
   })
 })

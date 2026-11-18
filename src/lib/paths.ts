@@ -11,3 +11,13 @@ export function locationLabel(savePath: string): string {
   if (segments.length === 0) return '/'
   return segments.slice(-2).join('/')
 }
+
+/**
+ * Story 3.1: `path` is `folder` or inside it, on a folder boundary
+ * (`/data` holds `/data` and `/data/x`, not `/database`). Both are
+ * normalized absolute paths (no trailing slash except the root `/`).
+ */
+export function isInFolder(path: string, folder: string): boolean {
+  if (folder === '/') return path.startsWith('/')
+  return path === folder || path.startsWith(`${folder}/`)
+}

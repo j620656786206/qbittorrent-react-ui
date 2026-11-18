@@ -40,7 +40,7 @@ import { ViewIcon } from '#/features/header/view-icon'
 // sort-sheet.tsx (Story 2.2).
 
 export function DesktopSortMenu() {
-  const { view, setView } = useListView()
+  const { view, pickView } = useListView()
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const selectedRef = useRef<HTMLDivElement>(null)
@@ -73,7 +73,7 @@ export function DesktopSortMenu() {
     // Any sort change, a flip too, goes back to the top of the list (and
     // between the board and the list).
     resetListScroll()
-    setView(next)
+    pickView(next)
   }
 
   const item = (field: SortFieldDef) => {

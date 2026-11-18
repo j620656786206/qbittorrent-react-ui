@@ -97,7 +97,7 @@ export interface TorrentListProps {
 }
 
 export function TorrentList({ panel }: TorrentListProps) {
-  const { view } = useListView()
+  const { view, viewReady } = useListView()
   const extraField = isExtraSortField(view.sort) ? view.sort : null
   const { data: sortKeysData, errorUpdateCount } = useSortKeys(
     extraField,
@@ -120,11 +120,18 @@ export function TorrentList({ panel }: TorrentListProps) {
     holdAddsNew: keysFailed,
   })
   const { retry, retrying } = useMaindataRetry()
-  const viewed = useListViewed(shown, { fallbackFirst: panel !== undefined })
-  usePublishShownList(shown, viewed)
+  // Story 3.1: no row is viewed (nothing published for the detail, no
+  // `hash` written) while the skeleton still waits for the settings, so the
+  // detail's hero mounts after the rows, as on any first load, and joins
+  // their entrance (story 2.9).
+  const order = viewReady ? shown : undefined
+  const viewed = useListViewed(order, { fallbackFirst: panel !== undefined })
+  usePublishShownList(order, viewed)
 
+  // Story 3.1 (AD-8): the first load also waits for the settings, which
+  // may change the sort of a URL without one.
   const state = listView({
-    hasData: shown !== undefined,
+    hasData: shown !== undefined && viewReady,
     visibleCount: shown?.length ?? 0,
     error: failure,
   })

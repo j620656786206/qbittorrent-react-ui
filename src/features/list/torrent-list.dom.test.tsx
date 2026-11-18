@@ -136,6 +136,8 @@ function mountMain() {
 const scroller = () => document.getElementById(LIST_SCROLL_ID) as HTMLElement
 
 let view: SortView = { sort: 'added_on', dir: 'desc' }
+/** Story 3.1: the settings answered (the view is final). */
+let viewReady = true
 /** The URL's `hash` (story 2.4); `setHash` writes it and re-renders. */
 let viewedHash: string | null = null
 let withPanel = false
@@ -156,7 +158,9 @@ async function applyHash(next: string | null) {
 function app() {
   return (
     <QueryClientProvider client={client}>
-      <ListViewContext value={{ view, setView: () => {} }}>
+      <ListViewContext
+        value={{ view, viewReady, setView: () => {}, pickView: () => {} }}
+      >
         <ViewedHashContext value={{ hash: viewedHash, setHash }}>
           <TorrentList
             panel={withPanel ? <aside aria-label="詳情" /> : undefined}
@@ -253,6 +257,7 @@ beforeEach(() => {
   reasonCalls.count = 0
   reasonCalls.reasons = {}
   view = { sort: 'added_on', dir: 'desc' }
+  viewReady = true
   viewedHash = null
   withPanel = false
   deferWrites = false
@@ -274,6 +279,36 @@ afterEach(async () => {
   vi.useRealTimers()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('first load (story 3.1)', () => {
+  it('maindata first, settings later: the skeleton stays until they answer', async () => {
+    viewReady = false
+    await render(fakeResponse({ changed: many(3) }))
+    expect(
+      main.querySelector('[aria-busy="true"]')?.getAttribute('aria-label'),
+    ).toBe('種子列表，載入中')
+    expect(shownNames()).toEqual([])
+    viewReady = true
+    await act(async () => root.render(app()))
+    expect(main.querySelector('section[aria-busy="true"]')).toBeNull()
+    expect(main.querySelector('section')?.getAttribute('aria-label')).toBe(
+      '種子列表，共 3 個',
+    )
+  })
+
+  it('with the desktop panel: no row is viewed and no hash written until the settings answer', async () => {
+    withPanel = true
+    viewReady = false
+    await render(fakeResponse({ changed: many(3) }))
+    expect(shownListStore.state.viewed).toBeNull()
+    expect(setHash).not.toHaveBeenCalled()
+    viewReady = true
+    await act(async () => root.render(app()))
+    // The newest row (T2) is viewed (the first-row fallback leaves the URL).
+    expect(shownListStore.state.viewed).toBe(fakeHash(3))
+    expect(setHash).not.toHaveBeenCalled()
+  })
 })
 
 describe('the virtualizer', () => {
