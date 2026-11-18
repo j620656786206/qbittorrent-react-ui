@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Outlet,
   createFileRoute,
@@ -8,6 +9,9 @@ import {
 import { AppShell } from '#/features/header/app-shell'
 import { requireSession } from '#/features/login/require-session'
 import { sessionQueryOptions } from '#/features/login/session-query'
+import { rememberedSortOf } from '#/lib/remembered-sort'
+import { setCategorySort } from '#/server/functions/set-category-sort'
+import { ALL } from '#/shared/categories'
 import {
   fixListSearch,
   listSearchSchema,
@@ -15,8 +19,13 @@ import {
   sortViewOf,
 } from '#/shared/list-search'
 import type { SortView } from '#/shared/list-search'
+import { resetListScroll } from '#/shared/ui/main-scroll'
+import { callFn } from '#/state/call-fn'
 import { ListViewContext } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
+import { useFollowRememberedSort } from '#/state/remembered-sort'
+import { categorySortOp, useSettings } from '#/state/settings'
+import { sendOp } from '#/state/tracked-op'
 import { ViewedHashContext } from '#/state/viewed-hash'
 
 // Every page that shows data sits under this pathless layout (Start auth
@@ -34,6 +43,13 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // viewed torrent's `hash` too; opening, switching and closing the detail
 // write it with `replace` and `resetScroll: false`, a sort change keeps it.
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
+// Story 3.1 (AD-8, AD-13): 「全部」 remembers its sort in settings.json. A URL
+// without `sort` shows the remembered one (else 「狀態」); a manual pick
+// writes the URL and saves it (`setCategorySort` through `sendOp`); any
+// later settings answer that changes the sort on screen (another device's
+// change on window focus, or the remembered value of a URL without `sort`
+// appearing or going) writes it with `replace` and scrolls to the top. The list and the
+// board keep their skeleton until the settings answered (`viewReady`).
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -46,9 +62,15 @@ export const Route = createFileRoute('/_authed')({
   component: AuthedLayout,
 })
 
+const saveSortOp = categorySortOp((values) => callFn(setCategorySort, values))
+
 function AuthedLayout() {
   const { sort, dir, hash } = Route.useSearch()
   const navigate = useNavigate()
+  const client = useQueryClient()
+  const { settings, ready } = useSettings()
+  // The only category until story 3.2 adds the tabs.
+  const remembered = rememberedSortOf(settings, ALL)
   // The search as typed in the address bar, before validation.
   const rawSearch = useLocation({ select: (location) => location.search })
 
@@ -64,7 +86,10 @@ function AuthedLayout() {
     }
   }, [rawSearch, navigate])
 
-  const view = useMemo(() => sortViewOf({ sort, dir }), [sort, dir])
+  const view = useMemo(
+    () => sortViewOf({ sort, dir }, remembered),
+    [sort, dir, remembered],
+  )
   const setView = useCallback(
     (next: SortView) => {
       void navigate({
@@ -78,7 +103,29 @@ function AuthedLayout() {
     },
     [navigate],
   )
-  const control = useMemo(() => ({ view, setView }), [view, setView])
+  const pickView = useCallback(
+    (next: SortView) => {
+      setView(next)
+      sendOp(saveSortOp, client, {
+        category: ALL,
+        sort: next.sort,
+        dir: next.dir,
+      })
+    },
+    [setView, client],
+  )
+  const follow = useCallback(
+    (next: SortView) => {
+      resetListScroll()
+      setView(next)
+    },
+    [setView],
+  )
+  useFollowRememberedSort(remembered, view, ready, follow)
+  const control = useMemo(
+    () => ({ view, viewReady: ready, setView, pickView }),
+    [view, ready, setView, pickView],
+  )
 
   const setHash = useCallback(
     (next: string | null) => {

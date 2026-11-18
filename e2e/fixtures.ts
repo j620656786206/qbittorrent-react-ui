@@ -29,7 +29,17 @@ export interface Watch {
   allowForcedStatus: (status: number, pathPrefix: string) => void
 }
 
-export const test = base.extend<{ watch: Watch }>({
+export const test = base.extend<{ watch: Watch; freshSettings: void }>({
+  // Story 3.1: a picked sort is remembered in settings.json on the server,
+  // which every test shares. Each test starts from the defaults (a URL
+  // without `sort` shows the board).
+  freshSettings: [
+    async ({ request }, use) => {
+      await resetSettings(request)
+      await use()
+    },
+    { auto: true },
+  ],
   watch: [
     async ({ page }, use, testInfo) => {
       const violations: Array<string> = []
@@ -104,6 +114,12 @@ export const test = base.extend<{ watch: Watch }>({
 })
 
 export { expect }
+
+/** Story 3.1: removes the app's settings.json (the defaults come back). */
+export async function resetSettings(request: APIRequestContext) {
+  const response = await request.post('/__fake/settings?reset=1')
+  expect(response.ok(), await response.text()).toBe(true)
+}
 
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'

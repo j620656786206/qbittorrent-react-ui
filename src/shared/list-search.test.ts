@@ -3,6 +3,7 @@ import {
   DEFAULT_SORT_VIEW,
   fixListSearch,
   listSearchSchema,
+  normalizeSortView,
   searchWithHash,
   sortViewOf,
 } from '#/shared/list-search'
@@ -52,6 +53,56 @@ describe('sortViewOf', () => {
   })
 })
 
+// Story 3.1: a URL without `sort` shows the remembered sort of the category.
+describe('sortViewOf with a remembered sort', () => {
+  const remembered = { sort: 'seeding_time', dir: 'desc' } as const
+
+  it('URL without sort: the remembered sort', () => {
+    expect(sortViewOf({}, remembered)).toEqual(remembered)
+  })
+
+  it('URL with sort: the URL wins', () => {
+    expect(sortViewOf({ sort: 'ratio' }, remembered)).toEqual({
+      sort: 'ratio',
+      dir: 'desc',
+    })
+    expect(sortViewOf({ sort: 'ratio', dir: 'asc' }, remembered)).toEqual({
+      sort: 'ratio',
+      dir: 'asc',
+    })
+  })
+
+  it('nothing remembered (null or undefined): 狀態', () => {
+    expect(sortViewOf({}, null)).toBe(DEFAULT_SORT_VIEW)
+    expect(sortViewOf({}, undefined)).toBe(DEFAULT_SORT_VIEW)
+  })
+
+  it('a dir alone never changes the remembered sort', () => {
+    expect(sortViewOf({ dir: 'asc' }, remembered)).toEqual(remembered)
+  })
+
+  it('a remembered 狀態 takes its default direction', () => {
+    expect(sortViewOf({}, { sort: 'state', dir: 'asc' })).toEqual({
+      sort: 'state',
+      dir: 'desc',
+    })
+  })
+})
+
+describe('normalizeSortView', () => {
+  it('keeps a directional choice as is (same object)', () => {
+    const choice = { sort: 'ratio', dir: 'asc' } as const
+    expect(normalizeSortView(choice)).toBe(choice)
+  })
+
+  it('狀態 always takes its default direction', () => {
+    expect(normalizeSortView({ sort: 'state', dir: 'asc' })).toEqual({
+      sort: 'state',
+      dir: 'desc',
+    })
+  })
+})
+
 describe('fixListSearch (S5)', () => {
   it('nothing to fix: null', () => {
     expect(fixListSearch({})).toBeNull()
@@ -74,7 +125,7 @@ describe('fixListSearch (S5)', () => {
     expect(fixListSearch({ sort: 'state' })).toBeNull()
   })
 
-  it('a dir without a sort goes: the default 狀態 has no direction', () => {
+  it('a dir without a sort goes (story 3.1: the remembered sort decides)', () => {
     expect(fixListSearch({ dir: 'asc', q: 'x' })).toEqual({ q: 'x' })
     expect(fixListSearch({ dir: 'up' })).toEqual({})
   })

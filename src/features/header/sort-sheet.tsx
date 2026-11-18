@@ -94,7 +94,7 @@ export function PhoneSortSheet({
   onExpandedChange,
   returnFocus,
 }: PhoneSortSheetProps) {
-  const { view, setView } = useListView()
+  const { view, pickView } = useListView()
   const selectedRef = useRef<HTMLButtonElement>(null)
   const groupIdPrefix = useId()
   const words = directionWords(view)
@@ -120,7 +120,7 @@ export function PhoneSortSheet({
     if (picked === null) return
     // Any sort change, a flip too, goes back to the top of the list.
     resetListScroll()
-    setView(picked.view)
+    pickView(picked.view)
     if (!picked.keepOpen) onOpenChange(false)
   }
 

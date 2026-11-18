@@ -20,9 +20,9 @@ export interface SortView {
 }
 
 /**
- * No `sort` in the URL: 「狀態」, the board (story 2.3; Epic 3 changes this to
- * the category's remembered sort). 「狀態」 has no direction: `dir` is its
- * default and a `dir` in the URL is ignored and removed.
+ * No `sort` in the URL and nothing remembered: 「狀態」, the board (story
+ * 2.3). Story 3.1: a URL without `sort` shows the category's remembered
+ * sort first. 「狀態」 has no direction: `dir` is its default.
  */
 export const DEFAULT_SORT_VIEW: SortView = Object.freeze({
   sort: 'state',
@@ -38,16 +38,26 @@ export const listSearchSchema = z.object({
 
 export type ListSearch = z.infer<typeof listSearchSchema>
 
+/** `choice` as a view: a field without a direction (狀態) takes its default. */
+export function normalizeSortView(choice: SortView): SortView {
+  const field = sortField(choice.sort)
+  return field.directional || choice.dir === field.defaultDir
+    ? choice
+    : { sort: choice.sort, dir: field.defaultDir }
+}
+
 /**
- * The view a validated search means; `dir` missing, or on a field without
- * a direction, is the field's default.
+ * The view a validated search means (story 3.1): the URL's `sort` when it
+ * has one (`dir` missing, or on a field without a direction, is the field's
+ * default); otherwise `remembered`, the category's remembered sort;
+ * otherwise 「狀態」. A `dir` without a `sort` means nothing.
  */
-export function sortViewOf(search: ListSearch): SortView {
+export function sortViewOf(
+  search: ListSearch,
+  remembered?: SortView | null,
+): SortView {
   if (search.sort === undefined) {
-    return search.dir === undefined ||
-      !sortField(DEFAULT_SORT_VIEW.sort).directional
-      ? DEFAULT_SORT_VIEW
-      : { sort: DEFAULT_SORT_VIEW.sort, dir: search.dir }
+    return remembered ? normalizeSortView(remembered) : DEFAULT_SORT_VIEW
   }
   const field = sortField(search.sort)
   // A field without a direction (狀態) always takes its default.
@@ -67,25 +77,22 @@ const isHash = (value: unknown): value is string =>
 
 /**
  * The raw (unvalidated) search with the bad params removed, or `null` when
- * nothing needs fixing. A bad `sort` falls back to the default, so its `dir`
- * goes too; a bad `dir`, or any `dir` on a field without a direction, goes
- * alone; a `hash` that is not 40 or 64 lowercase hex goes alone. Other
- * params stay.
+ * nothing needs fixing. A bad `sort` falls back to the remembered sort or
+ * 「狀態」, so its `dir` goes too; a `dir` without a `sort` means nothing
+ * (story 3.1: the whole view then comes from the remembered sort) and goes;
+ * a bad `dir`, or any `dir` on a field without a direction, goes alone; a
+ * `hash` that is not 40 or 64 lowercase hex goes alone. Other params stay.
  */
 export function fixListSearch(
   raw: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> | null {
   const badSort = 'sort' in raw && !isSortFieldId(raw.sort)
-  // The field `dir` applies to: the URL's, or the default when it has none.
-  const sortId = isSortFieldId(raw.sort)
-    ? raw.sort
-    : 'sort' in raw
-      ? null
-      : DEFAULT_SORT_VIEW.sort
-  // A field without a direction (狀態) ignores `dir`, so it goes too.
+  // The field `dir` applies to, if any.
+  const sortId = isSortFieldId(raw.sort) ? raw.sort : null
+  // No field, or one without a direction (狀態): `dir` goes too.
   const badDir =
     'dir' in raw &&
-    (!isDir(raw.dir) || (sortId !== null && !sortField(sortId).directional))
+    (!isDir(raw.dir) || sortId === null || !sortField(sortId).directional)
   const badHash = 'hash' in raw && !isHash(raw.hash)
   if (!badSort && !badDir && !badHash) return null
   const { sort: _sort, dir: _dir, hash: _hash, ...rest } = raw

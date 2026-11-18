@@ -24,14 +24,18 @@ let root: Root
 let container: HTMLElement
 let main: HTMLElement
 let view: SortView
-const setView = vi.fn((next: SortView) => {
+/** Story 3.1: a pick from the menu is never an app-driven change. */
+const appSetView = vi.fn()
+const pickView = vi.fn((next: SortView) => {
   view = next
   render()
 })
 
 function render() {
   root.render(
-    <ListViewContext value={{ view, setView }}>
+    <ListViewContext
+      value={{ view, viewReady: true, setView: appSetView, pickView }}
+    >
       <PhoneSortPill />
     </ListViewContext>,
   )
@@ -93,10 +97,12 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
-  setView.mockClear()
+  pickView.mockClear()
+  appSetView.mockClear()
 })
 
 afterEach(async () => {
+  expect(appSetView).not.toHaveBeenCalled()
   await act(async () => root.unmount())
   container.remove()
   main.remove()
@@ -208,7 +214,7 @@ describe('the phone sort sheet', () => {
     main.scrollTop = 500
     await open()
     await click(radio('分享率'))
-    expect(setView).toHaveBeenLastCalledWith({ sort: 'ratio', dir: 'asc' })
+    expect(pickView).toHaveBeenLastCalledWith({ sort: 'ratio', dir: 'asc' })
     expect(sheet()).not.toBeNull()
     expect(radio('分享率').textContent).toBe('分享率　低的在前 ↑')
     expect(main.scrollTop).toBe(0)
@@ -219,7 +225,7 @@ describe('the phone sort sheet', () => {
     main.scrollTop = 500
     await open()
     await click(radio('完成時間'))
-    expect(setView).toHaveBeenLastCalledWith({
+    expect(pickView).toHaveBeenLastCalledWith({
       sort: 'completion_on',
       dir: 'desc',
     })
@@ -255,7 +261,7 @@ describe('the phone sort sheet', () => {
     main.scrollTop = 500
     await open()
     await click(radio('狀態'))
-    expect(setView).toHaveBeenCalledWith({ sort: 'state', dir: 'desc' })
+    expect(pickView).toHaveBeenCalledWith({ sort: 'state', dir: 'desc' })
     expect(sheet()).toBeNull()
     expect(main.scrollTop).toBe(0)
     expect(pill().getAttribute('aria-label')).toBe('排序：狀態，看板')
@@ -265,7 +271,7 @@ describe('the phone sort sheet', () => {
     await mount({ sort: 'state', dir: 'desc' })
     await open()
     await click(radio('狀態'))
-    expect(setView).not.toHaveBeenCalled()
+    expect(pickView).not.toHaveBeenCalled()
     expect(sheet()).not.toBeNull()
   })
 

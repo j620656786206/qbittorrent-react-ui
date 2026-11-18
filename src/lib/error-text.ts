@@ -41,6 +41,20 @@ export function isOperationFailureCode(
 }
 
 /**
+ * AD-8, AD-9, story 3.1: the codes a settings write handles itself (the
+ * failure toast with 「重試」). Connection codes stay with the global
+ * `onError`.
+ */
+export const SETTINGS_WRITE_FAILURE_CODES = [
+  'settings_write_failed',
+  'timeout',
+  'invalid_input',
+] as const satisfies ReadonlyArray<ErrorCode>
+
+export type SettingsWriteFailureCode =
+  (typeof SETTINGS_WRITE_FAILURE_CODES)[number]
+
+/**
  * Story 2.6: the failure toast of 暫停 or 繼續, 「暫停失敗：qBittorrent 拒絕這
  * 個操作」, the reason from the code's fixed text.
  */
@@ -57,4 +71,15 @@ export function pauseActionFailureText(
  */
 export function fileActionFailureText(code: OperationFailureCode): string {
   return `改檔案設定失敗：${errorText(code)}`
+}
+
+/**
+ * Story 3.1 (Claude 代決 wording): saving a picked sort failed,
+ * 「排序沒記住：設定檔寫不進去」. The screen keeps the pick. A settings
+ * write never touches qBittorrent, so its `timeout` names the container.
+ */
+export function sortSaveFailureText(code: SettingsWriteFailureCode): string {
+  const reason =
+    code === 'timeout' ? '容器沒有回應，請再試一次' : errorText(code)
+  return `排序沒記住：${reason}`
 }

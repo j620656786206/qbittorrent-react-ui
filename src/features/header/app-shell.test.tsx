@@ -190,7 +190,14 @@ describe('the shell markup', () => {
     'the phone pill follows a non-default view: %o',
     (view, pillText, label) => {
       const html = renderToStaticMarkup(
-        <ListViewContext value={{ view, setView: () => {} }}>
+        <ListViewContext
+          value={{
+            view,
+            viewReady: true,
+            setView: () => {},
+            pickView: () => {},
+          }}
+        >
           <HeaderContext
             value={{
               model: headerModel({
