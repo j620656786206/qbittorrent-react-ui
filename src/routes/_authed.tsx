@@ -28,6 +28,7 @@ import { setCategorySort } from '#/server/functions/set-category-sort'
 import { ALL } from '#/shared/categories'
 import {
   DEFAULT_SORT_VIEW,
+  PLACE_KEYS,
   categoryOfSearch,
   fixListSearch,
   listSearchSchema,
@@ -46,9 +47,8 @@ import { replayEntrance } from '#/state/entrance'
 import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
-import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
+import { MAINDATA_KEY, useCategoryCounts, useMaindata } from '#/state/maindata'
 import { useMaindataFailure } from '#/state/maindata-failure'
-import { forgetOpeningSearch, openingSearch } from '#/state/opening-search'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { categorySortOp, useSettings } from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
@@ -110,10 +110,11 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // the NAS). On the list route, once maindata has answered, every category
 // on screen is stored as `lastCategory`, and a `hash` in the URL as that
 // category's entry of `lastViewedHash` when it is one of that category's
-// rows (a stale or foreign link never replaces a good entry). The app
-// opening on the list with a bare URL (no `category`, `sort` or `hash` key,
-// valid or not; `q` alone is still bare) goes back to `lastCategory` with
-// its remembered sort (else 「狀態」), written once with `replace` when
+// rows (a stale or foreign link never replaces a good entry), also when
+// that torrent only arrives in a later answer. The app opening with a bare
+// URL (no `category`, `sort` or `hash`; `q` alone is still bare; on the
+// list or the settings page) goes back to `lastCategory` with its
+// remembered sort (else 「狀態」), written once with `replace` when
 // maindata and the settings answered; a category no torrent has any more
 // stays 「全部」 (the bare URL already shows 「全部」 with its remembered
 // sort). The list and the board keep their skeleton until then
@@ -122,7 +123,11 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // page) the restore waits and nothing is recorded; back on the list it
 // runs if the URL is still bare. A place written meanwhile cancels it, and
 // so does a first maindata request that failed (the usual error state
-// shows; a late answer never jumps to another category).
+// shows; a late answer never jumps to another category, and `lastCategory`
+// is kept until Alex leaves the category he opened on or the URL names a
+// place). Claude 代決: a URL whose only place params are invalid counts as
+// bare; Start's server already redirects it to the cleaned URL before the
+// app runs, so the app cannot tell it from a bare one.
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
 export const Route = createFileRoute('/_authed')({
   ssr: false,
@@ -159,43 +164,36 @@ interface Latest {
 }
 
 /**
- * Story 3.6: the open-time restore. `pending`: waiting for maindata and the
- * settings to go to `category`; `navigating`: the URL is being written;
- * `done`: nothing (left) to restore.
+ * Story 3.6: the open-time restore. `pending`: waiting for maindata, the
+ * settings and the list to go to `category`; `navigating`: the URL is being
+ * written; `held`: given up after a failed first maindata request, so
+ * `lastCategory` is kept until the screen leaves `category` (the one at
+ * open) or the URL names a place; `done`: nothing (left) to restore.
  */
 type Restore =
   | { step: 'pending'; category: string }
   | { step: 'navigating'; category: string }
+  | { step: 'held'; category: string }
   | { step: 'done' }
 
 const RESTORED: Restore = { step: 'done' }
 
 /**
- * Story 3.6: the search string names no place: no `category`, `sort` or
- * `hash` key, even an invalid one (`q` alone does not count).
+ * Story 3.6: the (validated) search string names no place: none of
+ * PLACE_KEYS (`q` alone does not count).
  */
 function isBareSearch(searchStr: string): boolean {
   const params = new URLSearchParams(searchStr)
-  return !params.has('category') && !params.has('sort') && !params.has('hash')
+  return PLACE_KEYS.every((key) => !params.has(key))
 }
 
 /**
- * Story 3.6: what the app opening on `searchStr` has to restore. `opening`
- * is the search as typed (src/state/opening-search.ts), before the router
- * dropped invalid params.
+ * Story 3.6: what the app opening on `searchStr` has to restore. Opening on
+ * the settings page with a bare list search counts too: the restore waits
+ * for the list.
  */
-function initialRestore(
-  searchStr: string,
-  opening: string | null,
-  onList: boolean,
-): Restore {
-  if (
-    !onList ||
-    !isBareSearch(searchStr) ||
-    (opening !== null && !isBareSearch(opening))
-  ) {
-    return RESTORED
-  }
+function initialRestore(searchStr: string): Restore {
+  if (!isBareSearch(searchStr)) return RESTORED
   const category = readPref('lastCategory')
   // A bare URL already is 「全部」 with its remembered sort.
   return category === ALL ? RESTORED : { step: 'pending', category }
@@ -230,9 +228,8 @@ function AuthedLayout() {
   const { sort, dir, hash, category: urlCategory } = listSearch
   const query = listSearch.q ?? ''
   const [restore, setRestore] = useState<Restore>(() =>
-    initialRestore(searchStr, openingSearch(), onList),
+    initialRestore(searchStr),
   )
-  useEffect(() => forgetOpeningSearch(), [])
   const restoring =
     restore.step === 'pending' ||
     (restore.step === 'navigating' &&
@@ -287,9 +284,10 @@ function AuthedLayout() {
   const maindataFailure = useMaindataFailure()
   useEffect(() => {
     if (restore.step !== 'pending') return
-    // The first maindata request failed: give up, never jump later.
+    // The first maindata request failed: give up, never jump later, and
+    // keep the remembered category (held) until Alex moves.
     if (counts === undefined && maindataFailure !== null) {
-      setRestore(RESTORED)
+      setRestore({ step: 'held', category })
       return
     }
     // Off the list (the settings page) the restore waits.
@@ -323,6 +321,7 @@ function AuthedLayout() {
     }).then(finish, finish)
   }, [
     restore,
+    category,
     ready,
     counts,
     maindataFailure,
@@ -335,25 +334,30 @@ function AuthedLayout() {
   // Story 3.6: record where Alex is, on the list only, never mid-restore.
   useEffect(() => {
     if (!onList || restoring || !countsKnown) return
-    writePref('lastCategory', category)
-  }, [onList, restoring, countsKnown, category])
-  useEffect(() => {
-    if (!onList || restoring || !countsKnown || hash === undefined) return
-    // Only one of this category's rows: in maindata, in the category, not
-    // 已整理 (a stale or foreign link keeps the entry it has).
-    const data = client.getQueryData<Maindata>(MAINDATA_KEY)
-    if (
-      data === undefined ||
-      !Object.hasOwn(data.torrents, hash) ||
-      !listsIn(data.torrents[hash], category, data.stateBeforeMove)
-    ) {
-      return
+    if (restore.step === 'held') {
+      // Still where the app opened after a failed start: keep the old one.
+      if (category === restore.category && isBareSearch(searchStr)) return
+      setRestore(RESTORED)
     }
-    writePref(
-      'lastViewedHash',
-      withViewedHash(readPref('lastViewedHash'), category, hash),
-    )
-  }, [client, onList, restoring, countsKnown, category, hash])
+    writePref('lastCategory', category)
+  }, [onList, restoring, countsKnown, category, restore, searchStr])
+  // Only one of this category's rows: in maindata, in the category, not
+  // 已整理 (a stale or foreign link keeps the entry it has). Subscribed, so
+  // a torrent that arrives in a later answer is recorded then.
+  const selectHashListed = useCallback(
+    (data: Maindata) =>
+      hash !== undefined &&
+      Object.hasOwn(data.torrents, hash) &&
+      listsIn(data.torrents[hash], category, data.stateBeforeMove),
+    [hash, category],
+  )
+  const { data: hashListed = false } = useMaindata(selectHashListed)
+  useEffect(() => {
+    if (!onList || restoring || hash === undefined || !hashListed) return
+    const current = readPref('lastViewedHash')
+    const next = withViewedHash(current, category, hash)
+    if (next !== current) writePref('lastViewedHash', next)
+  }, [onList, restoring, hashListed, category, hash])
   // Off the list nothing waits on the restore (the settings page's header).
   const viewReady = ready && !(restoring && onList)
 

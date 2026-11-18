@@ -30,7 +30,6 @@ import { clearConnectionErrors } from '#/state/connection'
 import { entranceStore, resetEntrance } from '#/state/entrance'
 import { clearLoginRequired } from '#/state/login-required'
 import { clearMaindataFailure } from '#/state/maindata-failure'
-import { forgetOpeningSearch, noteOpeningSearch } from '#/state/opening-search'
 import { createQueryClient } from '#/state/query-client'
 
 // Story 3.6, the client half of the I/O matrix through the real `_authed`
@@ -90,8 +89,8 @@ const archived = { state: 'missingFiles', private: false } as const
 
 /**
  * mteam-X: A, B, C (newest first; A and C named `keep`) and an archived H;
- * X: D, E (newest first); mteam-tv only an archived G. Added times decide
- * the list order under 加入時間.
+ * X: D, E (newest first); uncategorized: F, I (newest first); mteam-tv
+ * only an archived G. Added times decide the list order under 加入時間.
  */
 function torrents() {
   return [
@@ -124,6 +123,8 @@ function torrents() {
       added_on: 60,
       ...archived,
     }),
+    t({ hash: fakeHash(6), name: 'Fake.F', category: '', added_on: 6 }),
+    t({ hash: fakeHash(9), name: 'Fake.I', category: '', added_on: 4 }),
   ]
 }
 
@@ -133,6 +134,7 @@ const C = fakeHash(3)
 const E = fakeHash(5)
 const G = fakeHash(7)
 const H = fakeHash(8)
+const I = fakeHash(9)
 
 const remembering = (
   entries: Record<string, { sort: SortFieldId; dir: 'asc' | 'desc' }>,
@@ -164,8 +166,6 @@ async function mount(
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     ),
   })
-  // As src/router.tsx does, before the router drops invalid params.
-  noteOpeningSearch(router)
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -277,7 +277,6 @@ beforeEach(() => {
   fetchMaindata = () => Promise.resolve(maindata)
   fetchSettings = () => Promise.resolve(settingsAnswer)
   clearMaindataFailure()
-  forgetOpeningSearch()
   getSessionFn.mockReset()
   getSessionFn.mockResolvedValue({
     ok: true,
@@ -338,6 +337,23 @@ describe('recording', () => {
     expect(readPref('lastViewedHash').get('X')).toBe(E)
   })
 
+  it('a hash whose torrent arrives in a later answer is recorded then', async () => {
+    remember(ALL, { X: E })
+    const later = fakeHash(10)
+    await mount(`/?category=X&sort=added_on&hash=${later}`)
+    expect(readPref('lastViewedHash').get('X')).toBe(E)
+    maindata = fakeResponse({
+      changed: [
+        ...torrents(),
+        t({ hash: later, name: 'Fake.Late', category: 'X', added_on: 70 }),
+      ],
+    })
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['maindata'] })
+    })
+    expect(readPref('lastViewedHash').get('X')).toBe(later)
+  })
+
   it('a stale or foreign hash never replaces the category’s entry', async () => {
     remember(ALL, { X: E, 'mteam-X': B })
     // Another category's torrent.
@@ -378,6 +394,18 @@ describe('opening on a bare URL', () => {
     expect(entranceStore.state.generation).toBe(generation)
     // The list and the board waited: 「全部」 was never shown in between.
     expect(new Set(probe.readyCategories)).toEqual(new Set(['mteam-X']))
+  })
+
+  it('uncategorized: category= in the URL, its tab, its torrent', async () => {
+    settingsAnswer = remembering({ '': { sort: 'added_on', dir: 'desc' } })
+    remember('', { '': I })
+    await mount('/')
+    expect(search()).toEqual({ category: '', sort: 'added_on', dir: 'desc' })
+    expect(router.state.location.href).toMatch(/[?&]category=(&|$)/)
+    expect(selectedTab()).toBe('未分類')
+    // I, not the first row F.
+    expect(panel()).toContain('Fake.I')
+    expect(panel()).not.toContain('Fake.F')
   })
 
   it('no remembered sort: 「狀態」 (the board), no detail opens', async () => {
@@ -503,22 +531,33 @@ describe('a URL with a place wins', () => {
     expect(panel()).toContain('Fake.B')
     expect(panel()).not.toContain('Fake.A')
   })
+})
 
-  it('an invalid sort, hash or category still counts as a place', async () => {
-    for (const url of [
-      '/?sort=bogus',
-      '/?hash=not-a-hash',
-      `/?category=${ALL}`,
-    ]) {
-      await mount(url)
-      expect([url, 'category' in search()]).toEqual([url, false])
-      expect(selectedTab()).toBe('全部')
-      await act(async () => root.unmount())
-      container.remove()
-      client.clear()
-    }
-    await mount('/?sort=ratio')
+describe('a URL whose only place params are invalid', () => {
+  beforeEach(() => {
+    settingsAnswer = remembering({
+      'mteam-X': { sort: 'added_on', dir: 'desc' },
+    })
+    remember('mteam-X', { 'mteam-X': B })
   })
+
+  // Claude 代決: such a URL ends up bare and is restored. Start's server
+  // redirects it to the cleaned URL before the app runs (and the router
+  // cleans it again before any route renders), so the app cannot tell it
+  // from a bare one.
+  it.each(['/?sort=bogus', '/?hash=NOT-A-HASH', '/?category=%01'])(
+    '%s restores the remembered category',
+    async (url) => {
+      await mount(url)
+      expect(search()).toEqual({
+        category: 'mteam-X',
+        sort: 'added_on',
+        dir: 'desc',
+      })
+      expect(selectedTab()).toBe('mteam-X')
+      expect(panel()).toContain('Fake.B')
+    },
+  )
 })
 
 describe('the restore waits, gives way, or gives up', () => {
@@ -557,6 +596,29 @@ describe('the restore waits, gives way, or gives up', () => {
     expect(selectedTab()).toBe('全部')
   })
 
+  it('opening on the settings page: the restore runs once back on the list', async () => {
+    const written = watchLastCategory()
+    await mount('/settings')
+    expect(pathname()).toBe('/settings')
+    expect('category' in search()).toBe(false)
+    expect(readPref('lastCategory')).toBe('mteam-X')
+    await go('/')
+    expect(search()).toEqual({
+      category: 'mteam-X',
+      sort: 'added_on',
+      dir: 'desc',
+    })
+    expect(panel()).toContain('Fake.B')
+    expect(written).not.toContain(JSON.stringify(ALL))
+  })
+
+  it('opening on the settings page, then a list URL with a place: no restore', async () => {
+    await mount('/settings')
+    await go('/', { sort: 'ratio' })
+    expect(search()).toEqual({ sort: 'ratio' })
+    expect(selectedTab()).toBe('全部')
+  })
+
   it('「全部」 is never written while a restore runs', async () => {
     const written = watchLastCategory()
     await mount('/')
@@ -587,6 +649,14 @@ describe('the restore waits, gives way, or gives up', () => {
     })
     expect('category' in search()).toBe(false)
     expect(selectedTab()).toBe('全部')
+    // One blip at open never erases the remembered place.
+    expect(readPref('lastCategory')).toBe('mteam-X')
+    expect(written).toEqual([])
+    // Alex moving is recorded again, back to 「全部」 too.
+    await click(tab('X'))
+    expect(readPref('lastCategory')).toBe('X')
+    await click(tab('全部'))
+    expect(readPref('lastCategory')).toBe(ALL)
   })
 })
 

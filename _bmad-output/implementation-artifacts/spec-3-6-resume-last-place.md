@@ -5,7 +5,7 @@ created: '2026-11-18'
 status: 'done'
 baseline_revision: '51ae818da69ac2618666399462d35a3e53cab5b8'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -83,6 +83,7 @@ deferred: []
 ## Spec Change Log
 
 - 2026-11-18, first review pass: (1) a hash is recorded only when the torrent is in that category's list (not 已整理); (2) off the list the restore stays pending and nothing is recorded; back on the list it runs if the URL is still bare; (3) bareness is decided from the search as typed when the app opened (the router drops invalid params before any route renders, so `src/state/opening-search.ts` keeps the opening search, read once); (4) a failed first maindata request gives the restore up; (5) the restore writes the normalized search once. KEEP: the URL wins over remembered values; the restore keeps the hint off; board and phone never auto-open.
+- 2026-11-18, follow-up pass: the opening-search module is removed. Start's server redirects a URL with invalid search params to the cleaned URL before the app runs, so the app cannot tell `/?sort=bogus` from `/`; such a URL counts as bare and restores (Claude 代決). After a failed first maindata request the restore is `held` and `lastCategory` is not written until Alex switches category or a URL names a place; a bare opening on `/settings` restores once back on the list; the `lastViewedHash` recording re-runs when maindata changes.
 
 ## Review Triage Log
 
@@ -120,6 +121,41 @@ deferred: []
   - `[low]` `[reject]` (intent) The map is validated per entry, not by one schema : each entry goes through zod.
   - `[low]` `[reject]` (intent) The URL does not name the restored torrent : AD-13 gives the remembered torrent to localStorage until clicked.
 
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 31 findings, high 0, medium 3, low 21, false 7, maybe-false 0
+- findings:
+  - `[low]` `[patch]` (verification-gap) The router's opening-search call is untested (the DOM test makes it itself) : the e2e showed Start's server redirects `/?sort=bogus` to `/` before the app runs, so the mechanism could never work in production; it was removed (Claude 代決: a URL whose only place params are invalid counts as bare and restores) and the DOM test now pins that.
+  - `[false]` `[reject]` (intent) The restore is decided once at mount : the AC's "opening the app" is a fresh load.
+  - `[false]` `[reject]` (intent) A followed URL records its category (including 「全部」) : that is the category last viewed; the give-up case is fixed separately.
+  - `[false]` `[reject]` (intent) A hash is recorded only for the category's own rows : first-pass fix recorded.
+  - `[false]` `[reject]` (intent) Bareness checks raw keys : first-pass fix recorded.
+  - `[false]` `[reject]` (intent) A sort change within list mode keeps the shown row : 2.4's rule kept; noted for Alex.
+  - `[false]` `[reject]` (intent) The URL gets no `hash` after a restore : the AC fills category and sort only.
+  - `[false]` `[reject]` (intent) The cap drops the least recently written : the natural reading of "oldest".
+  - `[low]` `[reject]` (intent) Phone resume and PWA are not exercised : the restore is width-independent; the phone branch is DOM-tested.
+  - `[low]` `[reject]` (intent) The login return is not exercised : the login redirect lands on the original URL, which carries its place.
+  - `[low]` `[patch]` (intent) The no-scroll e2e cannot fail on a 3-torrent list : uses long data and settles first.
+  - `[low]` `[reject]` (intent) Gone, archived and filtered are DOM-only : the panel rule is the shared, unit-tested resolver.
+  - `[medium]` `[patch]` (blind) A failed first load erases the remembered category when a refetch succeeds : nothing is recorded after a give-up until Alex switches or a URL names a place.
+  - `[medium]` `[patch]` (blind) Opening on `/settings` never restores and then records 「全部」 : the restore starts pending when the opening search is bare.
+  - `[low]` `[patch]` (blind) `isBareSearch` hardcodes its key list : one shared constant.
+  - `[medium]` `[patch]` (blind) The `lastViewedHash` effect does not subscribe to maindata : it re-runs when maindata changes.
+  - `[low]` `[reject]` (blind) `preferred` depends on effect timing; no `storage` events : carried; two tabs is a noted limit.
+  - `[low]` `[patch]` (blind) e2e negative checks run too early : settles first.
+  - `[low]` `[reject]` (blind) No phone-viewport e2e : same as the intent phone entry.
+  - `[low]` `[patch]` (blind) Restoring the uncategorized category is never tested : DOM test added.
+  - `[low]` `[patch]` (blind) The invalid-param test is hand-rolled : `it.each`.
+  - `[low]` `[reject]` (blind) AD-11 links for each router call are missing : the repo cites the same router guides; the opening-search assumption is pinned by the new e2e.
+  - `[low]` `[patch]` (blind) `listsIn` test uses the raw string : imports `ALL`.
+  - `[low]` `[patch]` (blind) Dead guard and a pointless write in prefs : removed.
+  - `[low]` `[patch]` (blind) A garbled e2e comment : rewritten.
+  - `[low]` `[patch]` (edge) A failed first load then a late answer overwrites `lastCategory` : same as the blind entry; fixed there.
+  - `[low]` `[patch]` (edge) Opening on `/settings` never restores : same as the blind entry; fixed there.
+  - `[low]` `[patch]` (edge) A hash whose torrent arrives in a later poll is never recorded : same as the blind entry; fixed there.
+  - `[low]` `[reject]` (edge, claim) The wiring lives in `list-viewed.ts`, not `torrent-list.tsx` : the hook owns the choice; the list passes its scope as before.
+  - `[low]` `[reject]` (intent) Two devices tested with two in-memory storages : as the spec asks.
+  - `[low]` `[reject]` (intent) No hint and no extra entrance are checked through proxies : the DOM probes and the pill text are the observable signals.
+
 ## Design Notes
 
 Claude 代決 (list in the PR): at most 100 categories kept in the per-category map; `q` alone still counts as a bare URL for the restore; the restore keeps the hint off (not a tab switch).
@@ -146,3 +182,7 @@ Status: done (first review pass)
 **Follow-up review: recommended.** Patched by verdict: medium 3. The named risk: the restore state machine and the new opening-search module changed after review.
 
 **Known limit.** Two tabs on one device can overwrite each other's remembered place.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 31 findings, no high: patched 3 medium (no erase after a failed first load, restore after opening on `/settings`, recording a torrent that arrives later) and the low ones (shared `PLACE_KEYS`, a real no-scroll e2e on long data, uncategorized restore test, `it.each`, small cleanups); the opening-search mechanism was removed after the e2e proved it unreachable (see the change log). Follow-up review: not recommended (no high patched on a follow-up pass).

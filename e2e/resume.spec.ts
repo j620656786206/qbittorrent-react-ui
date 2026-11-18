@@ -5,6 +5,7 @@ import {
   expect,
   expectSaveOf,
   login,
+  scrollList,
   setModes,
   test,
 } from './fixtures'
@@ -14,9 +15,10 @@ import {
 // categories only). The last category and the torrent viewed there are
 // stored per device (this browser context's localStorage); `/` goes back to
 // that category with its remembered sort and, in list mode, shows that
-// torrent in the panel without scrolling to it. A URL with `sort` is
-// followed as is; the board never opens a detail by itself. The fixtures
-// fail the test on any CSP violation or console error.
+// torrent in the panel without scrolling to it (checked on `data=many`, a
+// list long enough to scroll). A URL with `sort` is followed as is; the
+// board never opens a detail by itself. The fixtures fail the test on any
+// CSP violation or console error.
 
 const DESKTOP = { width: 1280, height: 800 }
 
@@ -111,14 +113,76 @@ test('reopening / returns to the category, its sort and the torrent viewed there
   await expect(panel(page)).not.toContainText(X_NEWEST)
   // `goto` adds one entry; the restore replaced it.
   expect(await page.evaluate(() => history.length)).toBe(historyBefore + 1)
-  // The list stays at the top (the preferred row is not scrolled to).
+})
+
+/** The highest `scrollTop` of the list over the next 20 frames. */
+function maxScrollOverFrames(page: Page) {
+  return page.evaluate(
+    (id) =>
+      new Promise<number>((resolve) => {
+        let max = 0
+        let frames = 0
+        const tick = () => {
+          max = Math.max(max, document.getElementById(id)?.scrollTop ?? 0)
+          frames += 1
+          if (frames >= 20) resolve(max)
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }),
+    LIST_SCROLL_ID,
+  )
+}
+
+test('a remembered row far down a long list is shown without scrolling to it, no hint', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { ...DEFAULT_MODES, data: 'many' })
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  await tab(page, 'X').click()
+  await expectSaveOf(page, 'X', () => pickSort(page, '加入時間'))
+  await expect(page.getByRole('listitem').first()).toBeVisible()
+
+  // A row from the middle of X's ~1,400 rows.
+  await scrollList(page, 'middle')
+  const name = await page.evaluate((id) => {
+    const scroller = document.getElementById(id)
+    const box = scroller?.getBoundingClientRect()
+    if (!scroller || !box) return null
+    for (const button of scroller.querySelectorAll<HTMLElement>(
+      '[role="listitem"] > button',
+    )) {
+      const rect = button.getBoundingClientRect()
+      if (rect.top >= box.top + 40 && rect.bottom <= box.bottom - 40) {
+        return (
+          [...button.querySelectorAll('[title]')]
+            .map((element) => element.getAttribute('title') ?? '')
+            .find((title) => title.startsWith('Fake.')) ?? null
+        )
+      }
+    }
+    return null
+  }, LIST_SCROLL_ID)
+  expect(name).not.toBeNull()
+  const viewed = name ?? ''
+  await row(page, viewed).click()
+  await expect(panel(page)).toContainText(viewed)
+
+  await page.goto('/')
+  await expect.poll(() => params(page).category).toBe('X')
+  await expect(panel(page)).toContainText(viewed)
+  // The list can scroll, yet stays at the top while things settle.
   expect(
-    await page.evaluate(
-      (id) => document.getElementById(id)?.scrollTop ?? -1,
-      LIST_SCROLL_ID,
-    ),
-  ).toBe(0)
-  // Not a tab switch: no hint.
+    await page.evaluate((id) => {
+      const scroller = document.getElementById(id)
+      return scroller ? scroller.scrollHeight - scroller.clientHeight : 0
+    }, LIST_SCROLL_ID),
+  ).toBeGreaterThan(1000)
+  expect(await maxScrollOverFrames(page)).toBe(0)
+  await expect(row(page, viewed)).toHaveCount(0)
+  // Not a tab switch: no hint, after settling too.
   await expect(sortPill(page)).not.toContainText('記住的')
 })
 
@@ -131,8 +195,10 @@ test('q alone still returns to the last category, with the keyword applied', asy
   await expect(tab(page, 'mteam-X')).toHaveAttribute('aria-pressed', 'true')
   await expectSaveOf(page, 'mteam-X', () => pickSort(page, '加入時間'))
 
-  // Claude 代決: `q` alone names no place. `S01E01` matches one torrent of
-  // every category; in mteam-X only one.
+  // Claude 代決: `q` alone names no place, so `/?q=…` still restores the
+  // category. Every category holds exactly one torrent named `…S01E01…`,
+  // so a single row (mteam-X's) shows that both the restored category and
+  // the keyword filter the list.
   await page.goto('/?q=S01E01')
   await expect
     .poll(() => {

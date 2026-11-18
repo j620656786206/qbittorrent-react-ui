@@ -102,6 +102,17 @@ export const listSearchSchema = z.object({
 
 export type ListSearch = z.infer<typeof listSearchSchema>
 
+/**
+ * Story 3.6: the params that name a place in the list (a category, a sort,
+ * a viewed torrent). A URL without any of them is bare; `q` alone is not a
+ * place.
+ */
+export const PLACE_KEYS = [
+  'category',
+  'sort',
+  'hash',
+] as const satisfies ReadonlyArray<keyof ListSearch>
+
 /** `choice` as a view: a field without a direction (狀態) takes its default. */
 export function normalizeSortView(choice: SortView): SortView {
   const field = sortField(choice.sort)

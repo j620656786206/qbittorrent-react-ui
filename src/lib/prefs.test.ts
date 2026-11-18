@@ -162,6 +162,10 @@ describe('lastViewedHash (story 3.6)', () => {
     expect(after.get('X')).toBe(B)
     expect(withViewedHash(before, 'X', 'NOT-A-HASH')).toBe(before)
     expect(withViewedHash(before, '__proto__', B)).toBe(before)
+    // Already the newest entry with that hash: nothing changed.
+    expect(withViewedHash(before, 'X', A)).toBe(before)
+    const older = withViewedHash(before, 'mteam-X', B)
+    expect(withViewedHash(older, 'X', A)).not.toBe(older)
   })
 
   it(`keeps at most ${MAX_VIEWED_HASHES} categories, dropping the oldest`, () => {

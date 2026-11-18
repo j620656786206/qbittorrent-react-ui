@@ -86,10 +86,10 @@ function capped(entries: ReadonlyArray<[string, string]>): ViewedHashes {
     map.delete(key)
     map.set(key, hash)
   }
-  while (map.size > MAX_VIEWED_HASHES) {
-    const oldest = map.keys().next()
-    if (oldest.done === true) break
-    map.delete(oldest.value)
+  // Oldest first: deleting while iterating a Map is safe.
+  for (const key of map.keys()) {
+    if (map.size <= MAX_VIEWED_HASHES) break
+    map.delete(key)
   }
   return map
 }
@@ -122,7 +122,8 @@ const CODECS: { [K in PrefName]: Codec<Prefs[K]> } = {
 /**
  * Story 3.6: `hashes` with `hash` as `category`'s last viewed torrent, that
  * entry now the newest, capped at MAX_VIEWED_HASHES. A key or hash the
- * preference would refuse leaves `hashes` as it is.
+ * preference would refuse, or an entry already the newest with that hash,
+ * leaves `hashes` as it is (the same object: nothing to write).
  */
 export function withViewedHash(
   hashes: ViewedHashes,
@@ -135,6 +136,8 @@ export function withViewedHash(
   ) {
     return hashes
   }
+  const newest = [...hashes].at(-1)
+  if (newest?.[0] === category && newest[1] === hash) return hashes
   return capped([...hashes, [category, hash]])
 }
 

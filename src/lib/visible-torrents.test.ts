@@ -3,6 +3,7 @@ import type { SlimTorrent } from '#/shared/maindata'
 import { SORT_FIELD_IDS, isExtraSortField } from '#/shared/sort-fields'
 import type { SortValue } from '#/shared/sort-keys'
 import { mergeMaindata } from '#/lib/maindata-merge'
+import { ALL } from '#/shared/categories'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import {
   countAll,
@@ -732,9 +733,9 @@ describe('listsIn (story 3.6)', () => {
     const shown = t({ category: 'X' })
     const archived = t({ category: 'X', state: 'missingFiles', private: false })
     expect(listsIn(shown, 'X', {})).toBe(true)
-    expect(listsIn(shown, '__all__', {})).toBe(true)
+    expect(listsIn(shown, ALL, {})).toBe(true)
     expect(listsIn(shown, 'mteam-X', {})).toBe(false)
     expect(listsIn(archived, 'X', {})).toBe(false)
-    expect(listsIn(archived, '__all__', {})).toBe(false)
+    expect(listsIn(archived, ALL, {})).toBe(false)
   })
 })
