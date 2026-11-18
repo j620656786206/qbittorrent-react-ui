@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import {
   MORE_SORT_GROUPS,
@@ -8,7 +8,7 @@ import {
 } from '#/shared/sort-fields'
 import type { SortFieldDef, SortFieldId } from '#/shared/sort-fields'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
-import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
+import { useCloseAtDesktop } from '#/shared/ui/close-at-desktop'
 import { cn } from '#/shared/ui/cn'
 import { resetListScroll } from '#/shared/ui/main-scroll'
 import { useListView } from '#/state/list-view'
@@ -101,19 +101,7 @@ export function PhoneSortSheet({
   // The torrent list behind the sheet keeps its order while it is open, and
   // Esc closes it (the shortcut registry).
   useSheetLayer(open, () => onOpenChange(false))
-
-  // The sheet is the phone's container: at desktop width (the pill is
-  // hidden there) it closes, and focus falls back to `main`.
-  useEffect(() => {
-    if (!open || typeof window.matchMedia !== 'function') return
-    const desktop = window.matchMedia(DESKTOP_QUERY)
-    const onChange = () => {
-      if (desktop.matches) onOpenChange(false)
-    }
-    onChange()
-    desktop.addEventListener('change', onChange)
-    return () => desktop.removeEventListener('change', onChange)
-  }, [open, onOpenChange])
+  useCloseAtDesktop(open, onOpenChange)
 
   const onPick = (id: SortFieldId) => {
     const picked = pickSort(view, id)

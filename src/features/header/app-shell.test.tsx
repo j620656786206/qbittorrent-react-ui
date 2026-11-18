@@ -17,6 +17,7 @@ import { AppShell, ShellLayout } from '#/features/header/app-shell'
 import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import { HeaderContext } from '#/features/header/header-context'
 import { headerModel } from '#/features/header/header-model'
+import { REMEMBERED_HINT_LINE_PREFIX } from '#/features/header/sort-model'
 
 // Spec 1.7: the shell's static markup (node, no DOM). Fixed models go in
 // through HeaderContext; the production AppShell is rendered under a seeded
@@ -122,7 +123,7 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label (設定 is not since story 3.3); only the sort pill has a title',
+    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4); only the sort pill has a title',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
@@ -134,7 +135,6 @@ describe('the shell markup', () => {
         '快捷鍵',
         '搜尋',
         '新增種子',
-        '分類：全部',
       ])
       // Only the desktop sort pill has a tooltip (story 2.1).
       expect(html.match(/\stitle="[^"]*"/g)).toEqual([' title="排序：狀態"'])
@@ -522,24 +522,34 @@ describe('AppShell with a seeded query client and connection store', () => {
   })
 })
 
-// Story 3.2: the phone's category button stays inert until 3.4 but names
-// the category on screen, so a `?category=` filter is never silent.
-describe('the phone category button (story 3.2)', () => {
-  function phoneButton(
+// Story 3.2: the phone's category button names the category on screen, so
+// a `?category=` filter is never silent. Story 3.4: it is enabled and opens
+// the category sheet; the hint line sits under the third row.
+describe('the phone category button (stories 3.2 and 3.4)', () => {
+  function renderPhone(
     category: string,
     tabs: Array<{ key: string; label: string; count: number }> | undefined,
-  ) {
-    const html = renderToStaticMarkup(
+    {
+      rememberedHint = false,
+      sort = 'state',
+      settingsOpen = false,
+    }: {
+      rememberedHint?: boolean
+      sort?: 'state' | 'seeding_time'
+      settingsOpen?: boolean
+    } = {},
+  ): string {
+    return renderToStaticMarkup(
       <ListViewContext
         value={{
-          view: { sort: 'state', dir: 'desc', category },
+          view: { sort, dir: 'desc', category },
           viewReady: true,
           setView: () => {},
           pickView: () => {},
           selectCategory: () => {},
-          rememberedHint: false,
+          rememberedHint,
           openSettings: () => {},
-          settingsOpen: false,
+          settingsOpen,
         }}
       >
         <CategoryTabsContext value={tabs}>
@@ -561,6 +571,13 @@ describe('the phone category button (story 3.2)', () => {
         </CategoryTabsContext>
       </ListViewContext>,
     )
+  }
+
+  function phoneButton(
+    category: string,
+    tabs: Array<{ key: string; label: string; count: number }> | undefined,
+  ) {
+    const html = renderPhone(category, tabs)
     const tag =
       openTags(html, 'button').find((open) =>
         open.includes('aria-label="分類：'),
@@ -578,11 +595,16 @@ describe('the phone category button (story 3.2)', () => {
     { key: '', label: '未分類', count: 1 },
   ]
 
-  it('shows the selected category and its count, still disabled', () => {
+  it('shows the selected category and its count, enabled, opens a dialog (story 3.4)', () => {
     const button = phoneButton('mteam-X', TABS)
     expect(attr(button.tag, 'aria-label')).toBe('分類：mteam-X')
     expect(button.text).toMatch(/^mteam-X\s+3$/)
-    expect(button.tag).toMatch(/\sdisabled=""/)
+    expect(button.tag).not.toMatch(/\sdisabled=""/)
+    expect(attr(button.tag, 'aria-haspopup')).toBe('dialog')
+    expect(attr(button.tag, 'aria-expanded')).toBe('false')
+    // 44px pill.
+    expect(attr(button.tag, 'class')).toMatch(/\bh-11\b/)
+    expect(attr(button.tag, 'class')).toMatch(/\brounded-full\b/)
   })
 
   it('uncategorized reads 未分類', () => {
@@ -595,5 +617,68 @@ describe('the phone category button (story 3.2)', () => {
     const button = phoneButton(ALL, undefined)
     expect(attr(button.tag, 'aria-label')).toBe('分類：全部')
     expect(button.text).toMatch(/^全部\s+4$/)
+  })
+
+  const HINT_LINE = `${REMEMBERED_HINT_LINE_PREFIX}做種時間 ↓`
+
+  /** The phone's third row (pills and hint line), up to `main`. */
+  function thirdRow(html: string) {
+    const start = html.lastIndexOf(
+      '<div',
+      html.indexOf('data-testid="phone-third-row"'),
+    )
+    const end = html.indexOf('<main')
+    return {
+      tag: openTags(html.slice(start), 'div')[0] ?? '',
+      html: html.slice(start, end),
+    }
+  }
+
+  /** The status line's opening tag and text. */
+  function statusLine(html: string) {
+    const tag = openTags(html, 'p').find((open) =>
+      open.includes('role="status"'),
+    )
+    if (tag === undefined) return null
+    const start = html.indexOf(tag) + tag.length
+    return { tag, text: html.slice(start, html.indexOf('</p>', start)) }
+  }
+
+  it('story 3.4: the hint line in the phone-only third row, after the pills, muted 12px, in the flow, a live region', () => {
+    const html = renderPhone('mteam-X', TABS, {
+      rememberedHint: true,
+      sort: 'seeding_time',
+    })
+    const row = thirdRow(html)
+    expect(attr(row.tag, 'class')).toMatch(/\blg:hidden\b/)
+    const line = statusLine(row.html)
+    expect(line?.text).toBe(HINT_LINE)
+    const classes = attr(line?.tag ?? '', 'class') ?? ''
+    expect(classes).toMatch(/\btext-meta\b/)
+    expect(classes).toMatch(/\btext-text-muted\b/)
+    // Not absolutely placed: it pushes the content down.
+    expect(classes).not.toMatch(/\b(absolute|fixed)\b/)
+    expect(row.html.indexOf(HINT_LINE)).toBeGreaterThan(
+      row.html.indexOf('aria-label="排序：做種時間，久的在前，列表"'),
+    )
+    // Only once in the page: never on the desktop pill row.
+    expect(html.split(REMEMBERED_HINT_LINE_PREFIX)).toHaveLength(2)
+  })
+
+  it('story 3.4: without the hint the live region stays, empty and without its margin', () => {
+    const html = renderPhone('mteam-X', TABS, { sort: 'seeding_time' })
+    expect(html).not.toContain(REMEMBERED_HINT_LINE_PREFIX)
+    const line = statusLine(thirdRow(html).html)
+    expect(line?.text).toBe('')
+    expect(attr(line?.tag ?? '', 'class')).not.toMatch(/\bmt-/)
+  })
+
+  it('story 3.4: no hint line on the settings page', () => {
+    const html = renderPhone('mteam-X', TABS, {
+      rememberedHint: true,
+      sort: 'seeding_time',
+      settingsOpen: true,
+    })
+    expect(statusLine(thirdRow(html).html)?.text).toBe('')
   })
 })

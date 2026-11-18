@@ -126,7 +126,7 @@ afterEach(async () => {
 })
 
 describe('the phone sort pill', () => {
-  it('story 3.2: never shows 「（這個分類記住的）」 (desktop only until 3.4)', async () => {
+  it('story 3.2: never shows 「（這個分類記住的）」 (the phone has its own line since 3.4)', async () => {
     rememberedHint = true
     await mount({ sort: 'seeding_time', dir: 'desc' })
     expect(pill().textContent).not.toContain('記住的')
