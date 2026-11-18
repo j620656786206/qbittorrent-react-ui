@@ -1,0 +1,281 @@
+{
+  "recordedAt": "2026-11-18T05:07:18.272Z",
+  "data": "fake-qbit many (4165 visible torrents, categories X, mteam-X, mteam-tv)",
+  "browser": "headless Chromium, 1440 x 900",
+  "method": "in-page performance.now() before the tab click(); commit = the tab turns aria-pressed (same commit as the new rows); frame = requestAnimationFrame then a MessageChannel task (after the first frame with the new rows is painted)",
+  "budgetMs": 100,
+  "runs": [
+    {
+      "mode": "list",
+      "switches": [
+        {
+          "label": "X",
+          "commitMs": 5.799999997019768,
+          "frameMs": 7,
+          "shows": "種子列表，共 1387 個"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 5.9000000059604645,
+          "frameMs": 7.100000001490116,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 6,
+          "frameMs": 11.5,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "全部",
+          "commitMs": 6.199999995529652,
+          "frameMs": 15.299999997019768,
+          "shows": "種子列表，共 4165 個"
+        },
+        {
+          "label": "X",
+          "commitMs": 5,
+          "frameMs": 15.200000002980232,
+          "shows": "種子列表，共 1387 個"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 6.5,
+          "frameMs": 12.700000002980232,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 5.9000000059604645,
+          "frameMs": 15.100000001490116,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "全部",
+          "commitMs": 5.699999995529652,
+          "frameMs": 15.899999998509884,
+          "shows": "種子列表，共 4165 個"
+        },
+        {
+          "label": "X",
+          "commitMs": 5.100000001490116,
+          "frameMs": 14.799999997019768,
+          "shows": "種子列表，共 1387 個"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 5.899999998509884,
+          "frameMs": 15.799999997019768,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 5.399999998509884,
+          "frameMs": 12.699999995529652,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "全部",
+          "commitMs": 5.399999998509884,
+          "frameMs": 15.100000001490116,
+          "shows": "種子列表，共 4165 個"
+        },
+        {
+          "label": "X",
+          "commitMs": 5.399999998509884,
+          "frameMs": 15.5,
+          "shows": "種子列表，共 1387 個"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 6,
+          "frameMs": 14.699999995529652,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 5.899999998509884,
+          "frameMs": 15.5,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "全部",
+          "commitMs": 6,
+          "frameMs": 12.800000004470348,
+          "shows": "種子列表，共 4165 個"
+        },
+        {
+          "label": "X",
+          "commitMs": 5.199999995529652,
+          "frameMs": 15.299999997019768,
+          "shows": "種子列表，共 1387 個"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 5.800000004470348,
+          "frameMs": 15.400000005960464,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 5.699999995529652,
+          "frameMs": 13.5,
+          "shows": "種子列表，共 1389 個"
+        },
+        {
+          "label": "全部",
+          "commitMs": 5.100000001490116,
+          "frameMs": 16.600000001490116,
+          "shows": "種子列表，共 4165 個"
+        }
+      ],
+      "frame": {
+        "median": 15.1,
+        "p95": 15.9,
+        "max": 16.6
+      },
+      "commit": {
+        "median": 5.8,
+        "p95": 6.2,
+        "max": 6.5
+      }
+    },
+    {
+      "mode": "board",
+      "switches": [
+        {
+          "label": "X",
+          "commitMs": 10.200000002980232,
+          "frameMs": 12.700000002980232,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 8.5,
+          "frameMs": 10.5,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 8.600000001490116,
+          "frameMs": 10.900000005960464,
+          "shows": "board"
+        },
+        {
+          "label": "全部",
+          "commitMs": 9,
+          "frameMs": 11.5,
+          "shows": "board"
+        },
+        {
+          "label": "X",
+          "commitMs": 7,
+          "frameMs": 9,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 7,
+          "frameMs": 9.100000001490116,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 7.200000002980232,
+          "frameMs": 9.100000001490116,
+          "shows": "board"
+        },
+        {
+          "label": "全部",
+          "commitMs": 7.399999998509884,
+          "frameMs": 9.600000001490116,
+          "shows": "board"
+        },
+        {
+          "label": "X",
+          "commitMs": 6.899999998509884,
+          "frameMs": 8.799999997019768,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 6.600000001490116,
+          "frameMs": 8.5,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 7.799999997019768,
+          "frameMs": 9.899999998509884,
+          "shows": "board"
+        },
+        {
+          "label": "全部",
+          "commitMs": 7.399999998509884,
+          "frameMs": 9.5,
+          "shows": "board"
+        },
+        {
+          "label": "X",
+          "commitMs": 7.299999997019768,
+          "frameMs": 9.399999998509884,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 6.799999997019768,
+          "frameMs": 8.899999998509884,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 6.699999995529652,
+          "frameMs": 8.799999997019768,
+          "shows": "board"
+        },
+        {
+          "label": "全部",
+          "commitMs": 7.399999998509884,
+          "frameMs": 9.5,
+          "shows": "board"
+        },
+        {
+          "label": "X",
+          "commitMs": 7.100000001490116,
+          "frameMs": 9.299999997019768,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-X",
+          "commitMs": 6.9000000059604645,
+          "frameMs": 8.900000005960464,
+          "shows": "board"
+        },
+        {
+          "label": "mteam-tv",
+          "commitMs": 6.600000001490116,
+          "frameMs": 8.600000001490116,
+          "shows": "board"
+        },
+        {
+          "label": "全部",
+          "commitMs": 7.300000004470348,
+          "frameMs": 9.899999998509884,
+          "shows": "board"
+        }
+      ],
+      "frame": {
+        "median": 9.3,
+        "p95": 11.5,
+        "max": 12.7
+      },
+      "commit": {
+        "median": 7.2,
+        "p95": 9,
+        "max": 10.2
+      }
+    }
+  ],
+  "showsExpected": true,
+  "ok": true
+}
