@@ -1,8 +1,7 @@
-import { Link, useRouter } from '@tanstack/react-router'
+import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { listReturnSearch, wasOpenedFromList } from '#/state/settings-return'
 import { AutoCollapseSwitch } from '#/features/settings/auto-collapse-switch'
 import { CategoryOrderList } from '#/features/settings/category-order-list'
 
@@ -12,16 +11,20 @@ import { CategoryOrderList } from '#/features/settings/category-order-list'
 // with a ghost icon back button and the title, then the content centered
 // at the list column's width. Exactly two items: the category tab order
 // and the board's auto-collapse switch. The back button returns to the
-// list URL Alex came from (src/state/settings-return.ts), else `/`. Opened
-// with the 設定 button, the entry before is that list, so it goes back in
-// the history (no second copy of the list); opened directly, it replaces
-// the settings entry. Either way the phone's Back gesture never returns
-// to the settings page.
+// list Alex came from: the 設定 button carries the list's search in this
+// page's URL (else plain `/`). Opened with that button, the history entry
+// says `fromList` (src/router.tsx), so it goes back in the history (no
+// second copy of the list); opened directly, it replaces the settings
+// entry. Either way the phone's Back gesture never returns to the
+// settings page.
 // Old layout: `git show 82551ad^:src/routes/settings.tsx`.
 // https://tanstack.com/router/latest/docs/framework/react/guide/navigation
 
 export function SettingsPage() {
   const router = useRouter()
+  const fromList = useLocation({
+    select: (location) => location.state.fromList === true,
+  })
   const pageTitleId = useId()
   return (
     <section
@@ -31,10 +34,10 @@ export function SettingsPage() {
       <div className="flex items-center gap-2">
         <Link
           to="/"
-          search={listReturnSearch()}
+          search={(previous) => previous}
           replace
           onClick={(event) => {
-            if (!wasOpenedFromList()) return
+            if (!fromList) return
             event.preventDefault()
             router.history.back()
           }}

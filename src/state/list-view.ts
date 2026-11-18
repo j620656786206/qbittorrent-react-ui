@@ -53,8 +53,8 @@ export interface ListViewControl {
    */
   rememberedHint: boolean
   /**
-   * Story 3.3: the desktop header's 設定 button. From the list it records
-   * the list URL (src/state/settings-return.ts) and opens `/settings`; on
+   * Story 3.3: the desktop header's 設定 button. Opens `/settings` with
+   * the list's search in its URL and `fromList` in the history entry; on
    * the settings page it does nothing.
    */
   openSettings: () => void

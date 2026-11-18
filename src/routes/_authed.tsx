@@ -45,11 +45,6 @@ import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { categorySortOp, useSettings } from '#/state/settings'
-import {
-  listReturnSearch,
-  markOpenedFromList,
-  rememberListSearch,
-} from '#/state/settings-return'
 import { sendOp } from '#/state/tracked-op'
 import { ViewedHashContext } from '#/state/viewed-hash'
 
@@ -87,14 +82,15 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // manual pick saves the current category's sort, and the follow rule
 // watches the current category's remembered value.
 // Story 3.3: `/settings` sits under this layout too (header as usual). The
-// list's search is recorded in memory whenever it changes on the list
-// (src/state/settings-return.ts), and on `/settings` the header shows that
-// list: its category tab and its sort. The list setters (sort, category,
-// viewed torrent) always write `/` on top of that list's search, so a tab
-// click (the pressed one too) or a sort pick on the settings page lands on
-// the list, and a pick saves under that list's category. The follow rule
-// and the bad-category fix only run on the list (they would write list
-// params into the settings page's URL).
+// 設定 button opens it with the list's search in its URL and `fromList`
+// in the history entry's state, so on `/settings` the header shows that
+// list (its category tab and its sort) from the same URL, and the page's
+// back button returns to it. The list setters (sort, category, viewed
+// torrent) always write `/` on top of the current search, so a tab click
+// (the pressed one too) or a sort pick on the settings page lands on the
+// list, and a pick saves under that list's category. The follow rule only
+// runs on the list: off it, a change made meanwhile is judged when the
+// list is back.
 // https://tanstack.com/router/latest/docs/framework/react/guide/navigation
 export const Route = createFileRoute('/_authed')({
   ssr: false,
@@ -128,8 +124,6 @@ interface Latest {
   view: ListView
   onList: boolean
   settingsOpen: boolean
-  /** The address bar's search (rememberListSearch validates it). */
-  search: Readonly<Record<string, unknown>>
 }
 
 /** The list route's path. */
@@ -152,21 +146,14 @@ function AuthedLayout() {
   })
   // The search validated from the same location as `onList` (the route's
   // own search can lag one commit behind the path while history moves).
-  // On the settings page the header shows the list Alex came from.
-  const urlSearch = useMemo(
+  // On the settings page it is the list Alex came from.
+  const listSearch = useMemo(
     () => listSearchSchema.parse(rawSearch),
     [rawSearch],
   )
-  const listSearch = onList ? urlSearch : listReturnSearch()
   const { sort, dir, hash, category: urlCategory } = listSearch
 
   useEffect(() => {
-    if (onList) rememberListSearch(rawSearch)
-  }, [onList, rawSearch])
-
-  useEffect(() => {
-    // Only the list's URL carries list params to fix.
-    if (!onList) return
     const fixed = fixListSearch(rawSearch)
     if (fixed) {
       void navigate({
@@ -176,7 +163,7 @@ function AuthedLayout() {
         resetScroll: false,
       })
     }
-  }, [onList, rawSearch, navigate])
+  }, [rawSearch, navigate])
 
   // The category confirmed on screen (it keeps its tab once it empties).
   const confirmedRef = useRef<string | null>(null)
@@ -199,7 +186,7 @@ function AuthedLayout() {
   const replayRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!invalid || !onList) return
+    if (!invalid) return
     // Not a click: no hint, no replay left waiting.
     setSortChange(OPENED)
     replayRef.current = null
@@ -209,7 +196,7 @@ function AuthedLayout() {
       replace: true,
       resetScroll: false,
     })
-  }, [invalid, onList, navigate])
+  }, [invalid, navigate])
 
   const remembered = rememberedSortOf(settings, category)
   // Only a URL without `sort` reads the remembered sort, so with `sort` a
@@ -226,7 +213,6 @@ function AuthedLayout() {
     view,
     onList,
     settingsOpen,
-    search: rawSearch,
   })
   useLayoutEffect(() => {
     latestRef.current = {
@@ -236,16 +222,8 @@ function AuthedLayout() {
       view,
       onList,
       settingsOpen,
-      search: rawSearch,
     }
   })
-
-  /** The search a list setter starts from: the list's own on `/settings`. */
-  const baseSearch = useCallback(
-    (previous: Readonly<Record<string, unknown>>) =>
-      latestRef.current.onList ? previous : listReturnSearch(),
-    [],
-  )
 
   const rememberedHint =
     showsRememberedHint(sortChange) &&
@@ -257,7 +235,7 @@ function AuthedLayout() {
       void navigate({
         to: LIST_PATH,
         search: (previous) => ({
-          ...baseSearch(previous),
+          ...previous,
           sort: next.sort,
           dir: next.dir,
         }),
@@ -267,7 +245,7 @@ function AuthedLayout() {
         resetScroll: false,
       })
     },
-    [navigate, baseSearch],
+    [navigate],
   )
   const pickView = useCallback(
     (next: SortView) => {
@@ -297,8 +275,19 @@ function AuthedLayout() {
   const selectCategory = useCallback(
     (next: string) => {
       const latest = latestRef.current
-      // On the settings page every tab, the pressed one too, goes back.
-      if (next === latest.category && latest.onList) return
+      if (next === latest.category) {
+        // On the settings page the pressed tab goes back to the list as
+        // it was (its sort too); on the list it does nothing.
+        if (!latest.onList) {
+          void navigate({
+            to: LIST_PATH,
+            search: (previous) => previous,
+            replace: true,
+            resetScroll: false,
+          })
+        }
+        return
+      }
       const nextRemembered = rememberedSortOf(latest.settings, next)
       const nextView = nextRemembered
         ? normalizeSortView(nextRemembered)
@@ -322,7 +311,7 @@ function AuthedLayout() {
       void navigate({
         to: LIST_PATH,
         search: (previous) => {
-          const withCategory = searchWithCategory(baseSearch(previous), next)
+          const withCategory = searchWithCategory(previous, next)
           const search = keepHash
             ? withCategory
             : searchWithHash(withCategory, null)
@@ -332,7 +321,7 @@ function AuthedLayout() {
         resetScroll: false,
       })
     },
-    [client, navigate, baseSearch],
+    [client, navigate],
   )
 
   const follow = useCallback(
@@ -350,11 +339,13 @@ function AuthedLayout() {
   const openSettings = useCallback(() => {
     const latest = latestRef.current
     if (latest.settingsOpen) return
-    // The effect above records the list on every change; recording here
-    // too covers a change made in this same commit, before effects ran.
-    if (latest.onList) rememberListSearch(latest.search)
-    markOpenedFromList(latest.onList)
-    void navigate({ to: SETTINGS_PATH })
+    // The list's search rides along; `fromList` says the entry before is
+    // that list (the back button then goes back instead of adding a copy).
+    void navigate({
+      to: SETTINGS_PATH,
+      search: (previous) => previous,
+      state: (previous) => ({ ...previous, fromList: latest.onList }),
+    })
   }, [navigate])
 
   const control = useMemo(
@@ -399,13 +390,13 @@ function AuthedLayout() {
       void navigate({
         to: LIST_PATH,
         search: (previous) =>
-          searchWithHash(baseSearch(previous), next) as never,
+          searchWithHash(previous, next) as never,
         replace: true,
         // The detail never moves the list or the board.
         resetScroll: false,
       })
     },
-    [navigate, baseSearch],
+    [navigate],
   )
   const viewed = useMemo(
     () => ({ hash: hash ?? null, setHash }),

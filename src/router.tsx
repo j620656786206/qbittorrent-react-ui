@@ -55,3 +55,12 @@ declare module '@tanstack/react-router' {
     router: ReturnType<typeof getRouter>
   }
 }
+
+// Story 3.3: the 設定 button marks the settings page's history entry: the
+// entry before it is the list (the page's back button goes back to it).
+// https://tanstack.com/router/latest/docs/framework/react/guide/navigation
+declare module '@tanstack/history' {
+  interface HistoryState {
+    fromList?: boolean
+  }
+}

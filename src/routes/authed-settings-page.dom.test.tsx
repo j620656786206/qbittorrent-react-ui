@@ -29,12 +29,11 @@ import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
 import { createQueryClient } from '#/state/query-client'
-import { clearListReturn } from '#/state/settings-return'
 
 // Story 3.3, the client half of the I/O matrix through the real `_authed`
 // layout in a real router: the desktop header's 設定 button opens
-// `/settings` and the back button returns to the list URL Alex came from
-// (or `/` when opened directly); the category order list (every
+// `/settings` with the list's search in its URL and the back button
+// returns to that list (or `/` when opened directly); the category order list (every
 // qBittorrent category, 「全部」 fixed first, first up and last down
 // disabled), a press sending the whole new order with the pressed row's
 // arrows waiting (every arrow while the settings are read) and nothing
@@ -273,7 +272,6 @@ beforeEach(() => {
   setCategorySortFn.mockImplementation(() => new Promise(() => {}) as never)
   clearLoginRequired()
   clearConnectionErrors()
-  clearListReturn()
   localStorage.clear()
   toasts.length = 0
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -286,7 +284,6 @@ afterEach(async () => {
   focusManager.setFocused(undefined)
   clearLoginRequired()
   clearConnectionErrors()
-  clearListReturn()
   localStorage.clear()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
@@ -301,7 +298,8 @@ describe('open and back', () => {
     expect(settingsButton().disabled).toBe(false)
     await click(settingsButton())
     expect(pathname()).toBe('/settings')
-    expect(search()).toEqual({})
+    // The list's search rides along in the settings page's URL.
+    expect(search()).toEqual({ category: 'mteam-X', sort: 'ratio', hash: HASH })
     expect(page()).not.toBeNull()
     expect(page()?.querySelector('h2')?.textContent).toBe('設定')
     // The header shows as usual.
@@ -341,14 +339,14 @@ describe('open and back', () => {
     expect(router.history.length).toBe(1)
   })
 
-  it('a typed /settings with list params: the list fix never rewrites its URL', async () => {
-    // On the list, `dir` without `sort` is removed (fixListSearch).
+  it('a typed /settings with bad list params is fixed like the list, staying there', async () => {
+    // `dir` without `sort` is removed (fixListSearch).
     await mount('/settings?dir=asc')
     expect(pathname()).toBe('/settings')
-    expect(search()).toEqual({ dir: 'asc' })
+    expect(search()).toEqual({})
   })
 
-  it('the list URL is recorded whenever the list changes, so history keeps it right', async () => {
+  it('back from a settings entry reached through history returns to the list entry before it', async () => {
     await mount('/?sort=ratio')
     await click(settingsButton())
     await act(async () => router.history.back())
@@ -363,8 +361,14 @@ describe('open and back', () => {
     await click(tab)
     await act(async () => router.history.forward())
     expect(pathname()).toBe('/settings')
-    const href = new URL(backLink().href, 'http://x')
-    expect(href.searchParams.get('category')).toBe('mteam-X')
+    // The entry still says it came from the list: back pops to that entry,
+    // which the tab click changed.
+    await click(backLink())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(pathname()).toBe('/')
+    expect(search()).toMatchObject({ category: 'mteam-X' })
   })
 
   it('opened directly: back goes to /', async () => {
@@ -439,7 +443,7 @@ describe('the header on /settings', () => {
     expect(settingsButton().disabled).toBe(false)
   })
 
-  it('the pressed tab goes back to the list on that category', async () => {
+  it('the pressed tab goes back to the list as it was, its sort too', async () => {
     settingsAnswer = remembering
     await mount('/?category=mteam-X&sort=added_on')
     await click(settingsButton())
@@ -447,7 +451,9 @@ describe('the header on /settings', () => {
     if (!tab) throw new Error('no pressed tab')
     await click(tab)
     expect(pathname()).toBe('/')
-    expect(search()).toMatchObject({ category: 'mteam-X', sort: 'ratio' })
+    // Not the remembered 'ratio': the list Alex left, unchanged.
+    expect(search()).toEqual({ category: 'mteam-X', sort: 'added_on' })
+    expect(pill()).not.toContain('這個分類記住的')
   })
 
   it('a sort pick saves under that category and lands on its list', async () => {
@@ -505,7 +511,7 @@ describe('the header on /settings', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
     expect(pathname()).toBe('/settings')
-    expect(search()).toEqual({})
+    expect(search()).toEqual({ category: 'mteam-X' })
     expect(pill()).toBe('排序：做種時間，久的在前，列表')
   })
 })
