@@ -617,6 +617,30 @@ describe('the category order list', () => {
     expect(saves).toEqual([])
   })
 
+  it('the mount refresh failed after an earlier answer: read-only, the saved order kept', async () => {
+    settingsAnswer = ordered('d', 'b')
+    await mount('/')
+    failSettings = true
+    await click(settingsButton())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    // The older answer's order, but no arrow can send an order built on it.
+    expect(rows()).toEqual(['全部', 'd', 'b', 'a', 'c', 'mteam-X'])
+    expect(page()?.querySelectorAll('button[aria-label$="移"]')).toHaveLength(0)
+    expect(page()?.textContent).toContain('讀不到設定，暫時不能排順序')
+    // A later read that answers brings the arrows back.
+    failSettings = false
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(
+      page()?.querySelectorAll('button[aria-label$="移"]').length,
+    ).toBeGreaterThan(0)
+  })
+
   it('loading: a busy skeleton until maindata answers', async () => {
     holdMaindata = true
     await mount('/settings')

@@ -80,6 +80,11 @@ export interface SettingsState {
    * `errorUpdateCount` only grows.
    */
   ready: boolean
+  /**
+   * The latest read failed: `settings` (if any) is an older answer that
+   * may no longer match the file. Clears once a read answers again.
+   */
+  readFailed: boolean
 }
 
 export function useSettings(): SettingsState {
@@ -88,6 +93,7 @@ export function useSettings(): SettingsState {
   return {
     settings: query.data,
     ready: query.data !== undefined || query.errorUpdateCount > 0,
+    readFailed: query.isError,
   }
 }
 
