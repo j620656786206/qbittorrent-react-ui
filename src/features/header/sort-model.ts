@@ -28,10 +28,20 @@ export interface SortPillModel {
   title: string
   /**
    * 「排序：做種時間，久的在前，列表」 or 「排序：狀態，看板」 (the view word
-   * last, as the mockups).
+   * last, as the mockups). Story 3.2: with the hint, it comes before the
+   * view word: 「排序：做種時間，久的在前（這個分類記住的），列表」.
    */
   ariaLabel: string
+  /**
+   * Story 3.2 (EXPERIENCE sort-pill): 「（這個分類記住的）」 after the app
+   * switched to the category's remembered sort, else `null`. Desktop only;
+   * never in the tooltip.
+   */
+  hint: string | null
 }
+
+/** Story 3.2: the desktop pill's muted hint. */
+export const REMEMBERED_HINT = '（這個分類記住的）'
 
 /** The direction in words, or `null` for a field without one. */
 export function directionWords(view: SortView): string | null {
@@ -39,7 +49,10 @@ export function directionWords(view: SortView): string | null {
   return field.directional ? field.words[view.dir] : null
 }
 
-export function sortPillModel(view: SortView): SortPillModel {
+export function sortPillModel(
+  view: SortView,
+  { rememberedHint = false }: { rememberedHint?: boolean } = {},
+): SortPillModel {
   const field = sortField(view.sort)
   const words = directionWords(view)
   const arrow = field.directional ? ` ${dirArrow(view.dir)}` : ''
@@ -52,7 +65,8 @@ export function sortPillModel(view: SortView): SortPillModel {
     text: `排序：${field.label}${arrow}`,
     shortText: `${field.label}${arrow}`,
     title,
-    ariaLabel: `${title}，${viewWord}`,
+    ariaLabel: `${title}${rememberedHint ? REMEMBERED_HINT : ''}，${viewWord}`,
+    hint: rememberedHint ? REMEMBERED_HINT : null,
   }
 }
 

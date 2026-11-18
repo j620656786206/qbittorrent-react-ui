@@ -6,6 +6,7 @@ import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import {
   countAll,
+  inCategory,
   boardColumnOf,
   selectBoardColumns,
   selectVisibleTorrents,
@@ -509,5 +510,90 @@ describe('boardColumnOf (spec 2.4)', () => {
     expect(boardColumnOf(columns, 'c')).toBe('seeding')
     expect(boardColumnOf(columns, 'd')).toBe('archived')
     expect(boardColumnOf(columns, 'z')).toBeNull()
+  })
+})
+
+// Story 3.2 (AR-41): the category filter, only inside the selectors.
+describe('the category filter (story 3.2)', () => {
+  const C1 = fakeHash(0x31)
+  const C2 = fakeHash(0x32)
+  const C3 = fakeHash(0x33)
+  const C4 = fakeHash(0x34)
+  const C5 = fakeHash(0x35)
+  const byCategory = mergeMaindata(
+    undefined,
+    fakeResponse({
+      changed: [
+        t({ hash: C1, added_on: 1_790_000_500, category: 'mteam-X' }),
+        t({
+          hash: C2,
+          added_on: 1_790_000_400,
+          category: 'mteam-X',
+          state: 'stalledUP',
+          progress: 1,
+        }),
+        t({
+          hash: C3,
+          added_on: 1_790_000_300,
+          category: 'mteam-X',
+          state: 'missingFiles',
+          private: false,
+        }),
+        t({ hash: C4, added_on: 1_790_000_200, category: '' }),
+        t({ hash: C5, added_on: 1_790_000_100, category: 'X' }),
+      ],
+    }),
+  )
+
+  it('a category: only its torrents, archived ones still left out of the list', () => {
+    expect(
+      selectVisibleTorrents(byCategory, {
+        ...ADDED_NEWEST,
+        category: 'mteam-X',
+      }),
+    ).toEqual([C1, C2])
+  })
+
+  it("uncategorized matches '' only", () => {
+    expect(
+      selectVisibleTorrents(byCategory, { ...ADDED_NEWEST, category: '' }),
+    ).toEqual([C4])
+  })
+
+  it('「全部」 (ALL, or no category) is every visible torrent', () => {
+    const all = [C1, C2, C4, C5]
+    expect(
+      selectVisibleTorrents(byCategory, {
+        ...ADDED_NEWEST,
+        category: '__all__',
+      }),
+    ).toEqual(all)
+    expect(selectVisibleTorrents(byCategory, ADDED_NEWEST)).toEqual(all)
+  })
+
+  it('a category no torrent has: nothing', () => {
+    expect(
+      selectVisibleTorrents(byCategory, { ...ADDED_NEWEST, category: 'nope' }),
+    ).toEqual([])
+  })
+
+  it('board columns and the 已整理 column count only the category', () => {
+    const columns = selectBoardColumns(byCategory, 'mteam-X')
+    expect(columns.downloading).toEqual([C1])
+    expect([...columns.seeding, ...columns.done]).toEqual([C2])
+    expect(columns.archived).toEqual([C3])
+    expect(columns.attention).toEqual([])
+    const uncategorized = selectBoardColumns(byCategory, '')
+    expect(uncategorized.downloading).toEqual([C4])
+    expect(uncategorized.archived).toEqual([])
+    // No category: every torrent, as before.
+    expect(selectBoardColumns(byCategory).archived).toEqual([C3])
+    expect(selectBoardColumns(byCategory).downloading).toEqual([C1, C4, C5])
+  })
+
+  it('inCategory: ALL holds every torrent, a name only its own', () => {
+    expect(inCategory({ category: '' }, '__all__')).toBe(true)
+    expect(inCategory({ category: 'X' }, 'X')).toBe(true)
+    expect(inCategory({ category: 'X' }, '')).toBe(false)
   })
 })

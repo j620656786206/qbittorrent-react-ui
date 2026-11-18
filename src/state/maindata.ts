@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, QueryFunctionContext } from '@tanstack/react-query'
 import { createStore, useSelector } from '@tanstack/react-store'
+import { selectCategoryCounts } from '#/lib/category-tabs'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import {
   selectBoardColumns,
@@ -13,6 +14,7 @@ import type {
   SortKeys,
   TorrentView,
 } from '#/lib/visible-torrents'
+import { ALL } from '#/shared/categories'
 import type {
   GetMaindataInput,
   MaindataResponse,
@@ -193,14 +195,28 @@ export function useVisibleTorrents(view: TorrentView, sortKeys?: SortKeys) {
   return useMaindata(select)
 }
 
-/** One board computation per maindata snapshot, however many observe it. */
-const boardColumnsBySnapshot = new WeakMap<Maindata, BoardColumns>()
+/**
+ * One board computation per maindata snapshot and category, however many
+ * observe it.
+ */
+const boardColumnsBySnapshot = new WeakMap<
+  Maindata,
+  Map<string, BoardColumns>
+>()
 
-function selectBoardColumnsOnce(data: Maindata): BoardColumns {
-  let columns = boardColumnsBySnapshot.get(data)
+function selectBoardColumnsOnce(
+  data: Maindata,
+  category: string,
+): BoardColumns {
+  let byCategory = boardColumnsBySnapshot.get(data)
+  if (byCategory === undefined) {
+    byCategory = new Map()
+    boardColumnsBySnapshot.set(data, byCategory)
+  }
+  let columns = byCategory.get(category)
   if (columns === undefined) {
-    columns = selectBoardColumns(data)
-    boardColumnsBySnapshot.set(data, columns)
+    columns = selectBoardColumns(data, category)
+    byCategory.set(category, columns)
   }
   return columns
 }
@@ -212,10 +228,24 @@ function selectBoardColumnsOnce(data: Maindata): BoardColumns {
  * so an unchanged column does not re-render. The board and its detail
  * both observe it: Query runs `select` per observer, so the result is
  * cached per snapshot and ~4167 torrents are classified and sorted once a
- * poll, not once per observer.
+ * poll, not once per observer. Story 3.2: only `category`'s torrents
+ * (the selected tab, `useListView().view.category`).
  */
-export function useBoardColumns() {
-  return useMaindata(selectBoardColumnsOnce)
+export function useBoardColumns(category: string = ALL) {
+  const select = useCallback(
+    (data: Maindata) => selectBoardColumnsOnce(data, category),
+    [category],
+  )
+  return useMaindata(select)
+}
+
+/**
+ * Story 3.2: every category some torrent has, with its count without
+ * archived torrents (selectCategoryCounts). Its result keeps its reference
+ * while no count changes.
+ */
+export function useCategoryCounts() {
+  return useMaindata(selectCategoryCounts)
 }
 
 /**

@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL } from '#/shared/categories'
 import { AppError } from '#/lib/app-error'
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
@@ -21,7 +22,11 @@ import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
-import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
+import {
+  freezeStore,
+  holdOrderForAnimation,
+  resetOrderFreeze,
+} from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
@@ -133,16 +138,20 @@ function stubPrototype(name: 'clientHeight' | 'clientWidth', value: number) {
 
 /** Story 3.1: the settings answered (the view is final). */
 let viewReady = true
+/** Story 3.2: the selected category. */
+let category: string = ALL
 
 function boardTree() {
   return (
     <QueryClientProvider client={client}>
       <ListViewContext
         value={{
-          view: DEFAULT_SORT_VIEW,
+          view: { ...DEFAULT_SORT_VIEW, category },
           viewReady,
           setView: () => {},
           pickView: () => {},
+          selectCategory: () => {},
+          rememberedHint: false,
         }}
       >
         <ViewedHashContext value={{ hash: null, setHash }}>
@@ -204,6 +213,7 @@ const button = (label: string) =>
 
 beforeEach(() => {
   viewReady = true
+  category = ALL
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
@@ -829,5 +839,86 @@ describe('the entrance (spec 2.9)', () => {
     await render(fakeResponse({ changed: sample() }))
     expect(stub.calls).toHaveLength(0)
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+// Story 3.2: the board shows only the selected category, the 已整理 column
+// too; another category is a new board and never waits on a held order.
+describe('the category (story 3.2)', () => {
+  const categorized = () =>
+    sample().map((torrent) =>
+      ['Down', 'Arch1', 'Error'].includes(torrent.name)
+        ? { ...torrent, category: 'mteam-X' }
+        : torrent,
+    )
+
+  async function setCategory(next: string) {
+    category = next
+    await act(async () => root.render(boardTree()))
+  }
+
+  it('columns and the 已整理 column count only the category', async () => {
+    category = 'mteam-X'
+    await render(fakeResponse({ changed: categorized() }))
+    expect(sections()).toEqual([
+      '要處理，1 個',
+      '下載中，1 個',
+      '做種中，0 個',
+      '完成，0 個',
+      '已整理欄',
+    ])
+    expect(button('展開已整理欄，1 個')).not.toBeNull()
+  })
+
+  it('only archived torrents: four columns of 沒有, 已整理 as usual', async () => {
+    category = 'only-archived'
+    await render(
+      fakeResponse({
+        changed: sample().map((torrent) =>
+          torrent.name.startsWith('Arch')
+            ? { ...torrent, category: 'only-archived' }
+            : torrent,
+        ),
+      }),
+    )
+    expect(sections()).toEqual([
+      '要處理，0 個',
+      '下載中，0 個',
+      '做種中，0 個',
+      '完成，0 個',
+      '已整理欄',
+    ])
+    for (const label of [
+      '要處理，0 個',
+      '下載中，0 個',
+      '做種中，0 個',
+      '完成，0 個',
+    ]) {
+      expect(section(label).textContent).toContain('沒有')
+    }
+    expect(button('展開已整理欄，2 個')).not.toBeNull()
+  })
+
+  it('another category applies at once while an animation holds the order', async () => {
+    category = 'mteam-X'
+    await render(fakeResponse({ changed: categorized() }))
+    expect(sections()[0]).toBe('要處理，1 個')
+    const release = holdOrderForAnimation()
+    try {
+      // Held, new torrents would wait; another category is not "new".
+      await setCategory(ALL)
+      expect(sections()[0]).toBe('要處理，2 個')
+      expect(names(section('要處理，2 個'))).toEqual(['Stalled', 'Error'])
+    } finally {
+      release()
+    }
+  })
+
+  it('another category is a new board: the 已整理 column closes again', async () => {
+    await render(fakeResponse({ changed: categorized() }))
+    await act(async () => button('展開已整理欄，2 個').click())
+    expect(sections().at(-1)).toBe('已整理，2 個')
+    await setCategory('mteam-X')
+    expect(sections().at(-1)).toBe('已整理欄')
   })
 })

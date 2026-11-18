@@ -270,7 +270,10 @@ test('K6 only archived: 全部 0, the four columns say 沒有, 已整理 works',
   // The container picks up the new mode on its next pull.
   await expect(column(page, '下載中，0 個')).toBeVisible({ timeout: POLL_WAIT })
   await expect(
-    page.getByRole('tab', { name: /^全部/ }).filter({ visible: true }),
+    page
+      .getByRole('group', { name: '分類' })
+      .getByRole('button', { name: /^全部/ })
+      .filter({ visible: true }),
   ).toHaveText(/^全部\s*0$/)
   for (const name of ['要處理', '下載中', '做種中', '完成']) {
     const section = column(page, `${name}，0 個`)

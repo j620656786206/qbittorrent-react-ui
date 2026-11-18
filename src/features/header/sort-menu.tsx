@@ -37,15 +37,18 @@ import { ViewIcon } from '#/features/header/view-icon'
 // under group headers (no submenu). It opens already expanded and scrolled
 // to the current sort when that sort is under 更多. Picking 「狀態」 shows
 // the board (story 2.3). The phone pill and its sort sheet are in
-// sort-sheet.tsx (Story 2.2).
+// sort-sheet.tsx (Story 2.2). Story 3.2 (EXPERIENCE sort-pill): after a
+// category tab switched the sort to that category's remembered one, the
+// pill adds a muted 「（這個分類記住的）」 (`rememberedHint`), also read
+// before the view word; the tooltip stays the sort in words.
 
 export function DesktopSortMenu() {
-  const { view, pickView } = useListView()
+  const { view, pickView, rememberedHint } = useListView()
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const selectedRef = useRef<HTMLDivElement>(null)
   const groupIdPrefix = useId()
-  const pill = sortPillModel(view)
+  const pill = sortPillModel(view, { rememberedHint })
   const words = directionWords(view)
 
   const onOpenChange = (next: boolean) => {
@@ -126,6 +129,9 @@ export function DesktopSortMenu() {
             {pill.viewWord}
           </span>
           <b className="font-bold">{pill.text}</b>
+          {pill.hint !== null && (
+            <span className="-ml-1.5 text-text-muted">{pill.hint}</span>
+          )}
           <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>

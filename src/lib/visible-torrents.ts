@@ -2,6 +2,7 @@ import { slimSortValue, sortKeyOf } from '#/lib/sort-values'
 import { columnOf, statusOf } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
 import type { BoardColumn } from '#/lib/torrent-status'
+import { ALL } from '#/shared/categories'
 import type { SlimTorrent } from '#/shared/maindata'
 import { isExtraSortField, sortField } from '#/shared/sort-fields'
 import type { SortView } from '#/shared/list-search'
@@ -17,8 +18,20 @@ import type { SortValue } from '#/shared/sort-keys'
 // reversed. `desc` puts the field's first direction word first (large, new,
 // long, high, A to Z, yes); see src/shared/sort-fields.ts.
 
-/** What the visible list depends on; category and search join in Epic 3. */
-export type TorrentView = SortView
+/**
+ * What the visible list depends on. Story 3.2: `category`, `ALL` (the
+ * default) for every torrent, `''` for uncategorized ones; search joins in
+ * story 3.5.
+ */
+export type TorrentView = SortView & { category?: string }
+
+/** Story 3.2: the torrent is in `category` (`ALL` holds every torrent). */
+export function inCategory(
+  torrent: Pick<SlimTorrent, 'category'>,
+  category: string,
+): boolean {
+  return category === ALL || torrent.category === category
+}
 
 /** An extra sort's values by hash (getSortKeys, merged). */
 export type SortKeys = Readonly<Record<string, SortValue>>
@@ -84,12 +97,13 @@ export function selectVisibleTorrents(
   sortKeys?: SortKeys,
 ): Array<string> {
   const { torrents, stateBeforeMove } = maindata
-  const { sort, dir } = view
+  const { sort, dir, category = ALL } = view
   const extra = isExtraSortField(sort)
   const plain = sortField(sort).kind === 'hash'
   const sign = dir === 'desc' ? 1 : -1
   const entries: Array<Entry> = []
   for (const torrent of Object.values(torrents)) {
+    if (!inCategory(torrent, category)) continue
     if (!isVisible(torrent, stateBeforeMove)) continue
     const value: SortValue | undefined = extra
       ? sortKeys && Object.hasOwn(sortKeys, torrent.hash)
@@ -132,8 +146,13 @@ function boardKey(value: number): number | null {
  * column's field orders it, newest or longest first, no value last, ties
  * like `selectVisibleTorrents` (`added_on` newest, then `hash`). Archived
  * torrents get their own column here: only the desktop board shows them.
+ * Story 3.2: only `category`'s torrents (`ALL`, the default: every one), in
+ * the 已整理 column too.
  */
-export function selectBoardColumns(maindata: Maindata): BoardColumns {
+export function selectBoardColumns(
+  maindata: Maindata,
+  category: string = ALL,
+): BoardColumns {
   const { torrents, stateBeforeMove } = maindata
   const entries: Record<BoardColumn, Array<Entry>> = {
     attention: [],
@@ -143,6 +162,7 @@ export function selectBoardColumns(maindata: Maindata): BoardColumns {
     archived: [],
   }
   for (const torrent of Object.values(torrents)) {
+    if (!inCategory(torrent, category)) continue
     const column = columnOf(statusOf(torrent, stateBeforeMove))
     entries[column].push({
       hash: torrent.hash,

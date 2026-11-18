@@ -1,6 +1,7 @@
 import { QueryClientProvider, environmentManager } from '@tanstack/react-query'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL } from '#/shared/categories'
 import { pickConnectionAlert } from '#/lib/connection-alert'
 import type { ConnectionAlertInput } from '#/lib/connection-alert'
 import { fakeHash, fakeResponse, fakeServerState, t } from '#/lib/testing'
@@ -13,7 +14,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { createQueryClient } from '#/state/query-client'
 import { AppShell, ShellLayout } from '#/features/header/app-shell'
-import { ListViewContext } from '#/state/list-view'
+import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import { HeaderContext } from '#/features/header/header-context'
 import { headerModel } from '#/features/header/header-model'
 
@@ -192,10 +193,12 @@ describe('the shell markup', () => {
       const html = renderToStaticMarkup(
         <ListViewContext
           value={{
-            view,
+            view: { ...view, category: ALL },
             viewReady: true,
             setView: () => {},
             pickView: () => {},
+            selectCategory: () => {},
+            rememberedHint: false,
           }}
         >
           <HeaderContext
@@ -232,10 +235,10 @@ describe('the shell markup', () => {
   it('the selected 「全部」 tab is not disabled', () => {
     const html = CASES.H1()
     const tabs = openTags(html, 'button').filter((tag) =>
-      tag.includes('role="tab"'),
+      tag.includes('aria-pressed='),
     )
     expect(tabs).toHaveLength(1)
-    expect(tabs[0]).toContain('aria-selected="true"')
+    expect(tabs[0]).toContain('aria-pressed="true"')
     expect(tabs[0]).not.toMatch(/\sdisabled=""/)
     expect(text(html)).toMatch(/全部\s+4/)
   })
@@ -310,7 +313,9 @@ describe('the shell markup', () => {
     expect(html.match(/>上傳 沒有</g)).toHaveLength(2)
     // The 「全部」 tab and the phone category button have no count.
     expect(html).toMatch(/<span>全部<\/span><\/button>/)
-    expect(html).toMatch(/<b class="font-semibold">全部<\/b><svg/)
+    expect(html).toMatch(
+      /<b class="min-w-0 truncate font-semibold">全部<\/b><svg/,
+    )
   })
 
   it('H10: skeleton bars for speeds and count', () => {
@@ -321,7 +326,7 @@ describe('the shell markup', () => {
     // Both pills, the phone line and the 「全部」 tab say they are loading.
     expect(html.match(/aria-busy="true"/g)).toHaveLength(4)
     expect(
-      openTags(html, 'button').find((tag) => tag.includes('role="tab"')),
+      openTags(html, 'button').find((tag) => tag.includes('aria-pressed=')),
     ).toContain('aria-busy="true"')
   })
 
@@ -498,5 +503,79 @@ describe('AppShell with a seeded query client and connection store', () => {
     // Desktop pills keep the last speeds; the count stays.
     expect(html).toContain('>下載 9.95 MB/s，不限速<')
     expect(text(html)).toMatch(/全部\s+4/)
+  })
+})
+
+// Story 3.2: the phone's category button stays inert until 3.4 but names
+// the category on screen, so a `?category=` filter is never silent.
+describe('the phone category button (story 3.2)', () => {
+  function phoneButton(
+    category: string,
+    tabs: Array<{ key: string; label: string; count: number }> | undefined,
+  ) {
+    const html = renderToStaticMarkup(
+      <ListViewContext
+        value={{
+          view: { sort: 'state', dir: 'desc', category },
+          viewReady: true,
+          setView: () => {},
+          pickView: () => {},
+          selectCategory: () => {},
+          rememberedHint: false,
+        }}
+      >
+        <CategoryTabsContext value={tabs}>
+          <HeaderContext
+            value={{
+              model: headerModel({
+                serverState: normal,
+                alert: null,
+                allCount: 4,
+              }),
+              retrying: false,
+              onBarAction: () => {},
+            }}
+          >
+            <ShellLayout>
+              <p>page content</p>
+            </ShellLayout>
+          </HeaderContext>
+        </CategoryTabsContext>
+      </ListViewContext>,
+    )
+    const tag =
+      openTags(html, 'button').find((open) =>
+        open.includes('aria-label="分類：'),
+      ) ?? ''
+    const start = html.indexOf(tag)
+    return {
+      tag,
+      text: text(html.slice(start, html.indexOf('</button>', start))).trim(),
+    }
+  }
+
+  const TABS = [
+    { key: ALL, label: '全部', count: 4 },
+    { key: 'mteam-X', label: 'mteam-X', count: 3 },
+    { key: '', label: '未分類', count: 1 },
+  ]
+
+  it('shows the selected category and its count, still disabled', () => {
+    const button = phoneButton('mteam-X', TABS)
+    expect(attr(button.tag, 'aria-label')).toBe('分類：mteam-X')
+    expect(button.text).toMatch(/^mteam-X\s+3$/)
+    expect(button.tag).toMatch(/\sdisabled=""/)
+  })
+
+  it('uncategorized reads 未分類', () => {
+    const button = phoneButton('', TABS)
+    expect(attr(button.tag, 'aria-label')).toBe('分類：未分類')
+    expect(button.text).toMatch(/^未分類\s+1$/)
+  })
+
+  it('before the tabs are known: 「全部」 with the header count', () => {
+    const button = phoneButton(ALL, undefined)
+    expect(attr(button.tag, 'aria-label')).toBe('分類：全部')
+    expect(button.text).toMatch(/^全部\s+4$/)
   })
 })

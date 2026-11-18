@@ -125,7 +125,10 @@ export function TorrentList({ panel }: TorrentListProps) {
   // detail's hero mounts after the rows, as on any first load, and joins
   // their entrance (story 2.9).
   const order = viewReady ? shown : undefined
-  const viewed = useListViewed(order, { fallbackFirst: panel !== undefined })
+  const viewed = useListViewed(order, {
+    fallbackFirst: panel !== undefined,
+    scope: view.category,
+  })
   usePublishShownList(order, viewed)
 
   // Story 3.1 (AD-8): the first load also waits for the settings, which

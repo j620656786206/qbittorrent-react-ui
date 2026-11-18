@@ -1,4 +1,5 @@
 import { z } from '#/shared/zod'
+import { ALL, categoryOrderEntrySchema } from '#/shared/categories'
 import {
   SORT_DIRS,
   SORT_FIELD_IDS,
@@ -11,7 +12,11 @@ import { TORRENT_HASH_PATTERN } from '#/shared/torrent-hash'
 // AD-13, AR-49: the list's `sort` and `dir` search params, and since story
 // 2.4 `hash`, the torrent the detail shows. The `_authed` layout validates
 // with this schema (a bad value reads as missing), and `fixListSearch` says
-// how to correct the address bar with `replace`.
+// how to correct the address bar with `replace`. Story 3.2: `category`, the
+// selected category tab. Absent is 「全部」 (`ALL` never appears in the URL);
+// uncategorized is `category=` with an empty value (Claude 代決; the
+// router's default serializer keeps an empty string as `category=` and
+// reads it back as `''`).
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
 
 export interface SortView {
@@ -34,6 +39,11 @@ export const listSearchSchema = z.object({
   dir: z.enum(SORT_DIRS).optional().catch(undefined),
   /** The viewed torrent (story 2.4); 40 or 64 lowercase hex. */
   hash: z.string().regex(TORRENT_HASH_PATTERN).optional().catch(undefined),
+  /**
+   * Story 3.2: the selected category, a name or `''` (uncategorized);
+   * absent is 「全部」.
+   */
+  category: categoryOrderEntrySchema.optional().catch(undefined),
 })
 
 export type ListSearch = z.infer<typeof listSearchSchema>
@@ -75,13 +85,18 @@ const isDir = (value: unknown): value is SortDir =>
 const isHash = (value: unknown): value is string =>
   typeof value === 'string' && TORRENT_HASH_PATTERN.test(value)
 
+const isCategory = (value: unknown): value is string =>
+  categoryOrderEntrySchema.safeParse(value).success
+
 /**
  * The raw (unvalidated) search with the bad params removed, or `null` when
  * nothing needs fixing. A bad `sort` falls back to the remembered sort or
  * 「狀態」, so its `dir` goes too; a `dir` without a `sort` means nothing
  * (story 3.1: the whole view then comes from the remembered sort) and goes;
  * a bad `dir`, or any `dir` on a field without a direction, goes alone; a
- * `hash` that is not 40 or 64 lowercase hex goes alone. Other params stay.
+ * `hash` that is not 40 or 64 lowercase hex goes alone; a `category` that
+ * is no category name (story 3.2: a control character, too long, `ALL`'s
+ * key, not a string) goes alone, so the screen is 「全部」. Other params stay.
  */
 export function fixListSearch(
   raw: Readonly<Record<string, unknown>>,
@@ -94,14 +109,33 @@ export function fixListSearch(
     'dir' in raw &&
     (!isDir(raw.dir) || sortId === null || !sortField(sortId).directional)
   const badHash = 'hash' in raw && !isHash(raw.hash)
-  if (!badSort && !badDir && !badHash) return null
-  const { sort: _sort, dir: _dir, hash: _hash, ...rest } = raw
+  const badCategory = 'category' in raw && !isCategory(raw.category)
+  if (!badSort && !badDir && !badHash && !badCategory) return null
+  const { sort: _sort, dir: _dir, hash: _hash, category: _c, ...rest } = raw
   return {
     ...rest,
     ...('sort' in raw && !badSort ? { sort: raw.sort } : {}),
     ...('dir' in raw && !badSort && !badDir ? { dir: raw.dir } : {}),
     ...('hash' in raw && !badHash ? { hash: raw.hash } : {}),
+    ...('category' in raw && !badCategory ? { category: raw.category } : {}),
   }
+}
+
+/** Story 3.2: the selected category of a validated search (`ALL` if none). */
+export function categoryOfSearch(search: Pick<ListSearch, 'category'>): string {
+  return search.category ?? ALL
+}
+
+/**
+ * Story 3.2: the search with `category` set, or removed for 「全部」. Every
+ * other param stays.
+ */
+export function searchWithCategory(
+  previous: Readonly<Record<string, unknown>>,
+  category: string,
+): Record<string, unknown> {
+  const { category: _category, ...rest } = previous
+  return category === ALL ? rest : { ...rest, category }
 }
 
 /**

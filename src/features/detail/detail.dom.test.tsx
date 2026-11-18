@@ -23,6 +23,7 @@ import { createQueryClient } from '#/state/query-client'
 import { clearPending, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
 import { openLayerCount, resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, publishShownList } from '#/state/shown-order'
+import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import { BoardDetailPanel } from '#/features/detail/board-detail-panel'
 import { DetailHeader } from '#/features/detail/detail-header'
@@ -1371,5 +1372,55 @@ describe('the hero entrance (spec 2.9)', () => {
     await render(<ListDetailPanel />)
     await act(async () => publishShownList({ order, viewed: h(2) }))
     expect(stub.calls).toHaveLength(0)
+  })
+})
+
+// Story 3.2: the board detail inside a category counts only that
+// category's torrents of the column, and a torrent of another category
+// closes it.
+describe('the board panel inside a category (story 3.2)', () => {
+  /** 做種中: Seed1 and Seed3 in mteam-X, Seed2 in X. */
+  const split = () =>
+    board().map((torrent) =>
+      torrent.name === 'Seed1' || torrent.name === 'Seed3'
+        ? { ...torrent, category: 'mteam-X' }
+        : torrent,
+    )
+
+  const inCategory = (ui: ReactNode) => (
+    <ListViewContext
+      value={{
+        view: { sort: 'state', dir: 'desc', category: 'mteam-X' },
+        viewReady: true,
+        setView: () => {},
+        pickView: () => {},
+        selectCategory: () => {},
+        rememberedHint: false,
+      }}
+    >
+      {ui}
+    </ListViewContext>
+  )
+
+  it('「第 N 個／共 M 個」 counts only the category; › stops at its last torrent', async () => {
+    await render(inCategory(<BoardDetailPanel />), {
+      hash: h(11),
+      data: split(),
+    })
+    expect(positionLine()).toBe('做種中　第 1 個／共 2 個')
+    await act(async () => byLabel('下一個').click())
+    // Seed2 (category X) is skipped.
+    expect(positionLine()).toBe('做種中　第 2 個／共 2 個')
+    expect(byLabel('下一個').disabled).toBe(true)
+    expect(writes).toEqual([h(13)])
+  })
+
+  it('a hash from another category closes the detail', async () => {
+    await render(inCategory(<BoardDetailPanel />), {
+      hash: h(12),
+      data: split(),
+    })
+    expect(q('aside')).toBeNull()
+    expect(writes).toEqual([null])
   })
 })

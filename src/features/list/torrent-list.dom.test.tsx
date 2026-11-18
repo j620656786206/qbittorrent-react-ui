@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL } from '#/shared/categories'
 import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
@@ -138,6 +139,8 @@ const scroller = () => document.getElementById(LIST_SCROLL_ID) as HTMLElement
 let view: SortView = { sort: 'added_on', dir: 'desc' }
 /** Story 3.1: the settings answered (the view is final). */
 let viewReady = true
+/** Story 3.2: the selected category. */
+let category: string = ALL
 /** The URL's `hash` (story 2.4); `setHash` writes it and re-renders. */
 let viewedHash: string | null = null
 let withPanel = false
@@ -159,7 +162,14 @@ function app() {
   return (
     <QueryClientProvider client={client}>
       <ListViewContext
-        value={{ view, viewReady, setView: () => {}, pickView: () => {} }}
+        value={{
+          view: { ...view, category },
+          viewReady,
+          setView: () => {},
+          pickView: () => {},
+          selectCategory: () => {},
+          rememberedHint: false,
+        }}
       >
         <ViewedHashContext value={{ hash: viewedHash, setHash }}>
           <TorrentList
@@ -258,6 +268,7 @@ beforeEach(() => {
   reasonCalls.reasons = {}
   view = { sort: 'added_on', dir: 'desc' }
   viewReady = true
+  category = ALL
   viewedHash = null
   withPanel = false
   deferWrites = false
@@ -964,5 +975,45 @@ describe('the entrance (spec 2.9)', () => {
     await render(fakeResponse({ changed: many(30) }))
     expect(stub.calls).toHaveLength(0)
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+// Story 3.2: the category filter reaches the list through the view.
+describe('the category (story 3.2)', () => {
+  const mixed = () => [
+    torrent(0, { category: 'mteam-X' }),
+    torrent(1, { category: 'X' }),
+    torrent(2, { category: 'mteam-X' }),
+    torrent(3, { category: '' }),
+  ]
+
+  async function setCategory(next: string) {
+    category = next
+    await act(async () => root.render(app()))
+  }
+
+  it('only the category rows; another category applies at once, even while frozen', async () => {
+    category = 'mteam-X'
+    await render(fakeResponse({ changed: mixed() }))
+    expect(shownNames()).toEqual(['T2', 'T0'])
+    await act(async () => pointer('pointerover', section()))
+    await setCategory('')
+    expect(shownNames()).toEqual(['T3'])
+    await setCategory(ALL)
+    expect(shownNames()).toEqual(['T3', 'T2', 'T1', 'T0'])
+  })
+
+  it('with the panel: another category views its first row, not a successor from the old order', async () => {
+    withPanel = true
+    await render(fakeResponse({ changed: mixed() }))
+    expect(ringed()).toEqual(['T3'])
+    await act(async () => rowButtons()[1].click())
+    expect(ringed()).toEqual(['T2'])
+    setHash.mockClear()
+    // The layout drops `hash` when the new category does not hold it.
+    viewedHash = null
+    await setCategory('X')
+    expect(ringed()).toEqual(['T1'])
+    expect(setHash).not.toHaveBeenCalled()
   })
 })
