@@ -73,7 +73,19 @@ export function fileActionFailureText(code: OperationFailureCode): string {
  * write never touches qBittorrent, so its `timeout` names the container.
  */
 export function sortSaveFailureText(code: SettingsWriteFailureCode): string {
-  const reason =
-    code === 'timeout' ? '容器沒有回應，請再試一次' : errorText(code)
-  return `排序沒記住：${reason}`
+  return `排序沒記住：${settingsWriteReason(code)}`
+}
+
+/**
+ * Story 3.3 (Claude 代決 wording): saving the category order from the
+ * settings page failed, 「順序沒存到：設定檔寫不進去」. The list keeps its
+ * old order.
+ */
+export function orderSaveFailureText(code: SettingsWriteFailureCode): string {
+  return `順序沒存到：${settingsWriteReason(code)}`
+}
+
+/** A settings write's reason; its `timeout` is the container's, not qBittorrent's. */
+function settingsWriteReason(code: SettingsWriteFailureCode): string {
+  return code === 'timeout' ? '容器沒有回應，請再試一次' : errorText(code)
 }

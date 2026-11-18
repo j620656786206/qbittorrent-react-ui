@@ -13,14 +13,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createLogger } from '#/server/log'
 import { migrateSettings } from '#/server/settings/migrations'
 import { isUnderSaveRoot } from '#/server/settings/save-roots'
-import {
-  MAX_SETTINGS_BYTES,
-  SETTINGS_FILE,
-  createSettingsStore,
-} from '#/server/settings/store'
+import { SETTINGS_FILE, createSettingsStore } from '#/server/settings/store'
 import type { SettingsStore } from '#/server/settings/store'
 import { ALL } from '#/shared/categories'
-import { defaultSettings } from '#/shared/settings'
+import { MAX_SETTINGS_BYTES, defaultSettings } from '#/shared/settings'
 import type { Settings } from '#/shared/settings'
 
 // Story 3.1 matrix rows 1 to 7 and the SAVE_ROOTS half of the path schema:

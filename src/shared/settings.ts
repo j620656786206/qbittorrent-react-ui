@@ -14,6 +14,8 @@ import { SORT_DIRS, SORT_FIELD_IDS } from '#/shared/sort-fields'
 // not the section), so these schemas also describe one entry each.
 
 export const SETTINGS_VERSION = 1
+/** The settings file's size bound; the container refuses a bigger file. */
+export const MAX_SETTINGS_BYTES = 262_144
 export const MAX_COMMON_PATHS = 50
 export const MAX_COMMON_PATH_NAME = 50
 
@@ -74,3 +76,22 @@ export const setCategorySortInputSchema = z.strictObject({
 })
 
 export type SetCategorySortInput = z.infer<typeof setCategorySortInputSchema>
+
+/**
+ * Story 3.3: the whole new tab order (`setCategoryOrder`). Each entry is a
+ * `categoryOrder` entry (never `ALL`), no name twice, and the list fits the
+ * settings file's 256 KB bound; anything else is `invalid_input`.
+ */
+export const setCategoryOrderInputSchema = z.strictObject({
+  order: z
+    .array(categoryOrderEntrySchema)
+    .refine((order) => new Set(order).size === order.length, 'duplicate')
+    .refine(
+      (order) =>
+        new TextEncoder().encode(JSON.stringify(order)).length <=
+        MAX_SETTINGS_BYTES,
+      'too large',
+    ),
+})
+
+export type SetCategoryOrderInput = z.infer<typeof setCategoryOrderInputSchema>

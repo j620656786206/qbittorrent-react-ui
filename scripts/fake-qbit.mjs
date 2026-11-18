@@ -882,6 +882,9 @@ const CATEGORIES = {
   X: { name: 'X', savePath: '/data/media/X' },
   'mteam-X': { name: 'mteam-X', savePath: '/data/torrent/mteam-seed' },
   'mteam-tv': { name: 'mteam-tv', savePath: '/data/torrent/mteam-seed' },
+  // Story 3.3: a category no torrent uses (no tab, listed on the settings
+  // page).
+  'X-empty': { name: 'X-empty', savePath: '/data/media/X-empty' },
 }
 
 function serverState() {

@@ -15,6 +15,7 @@ import {
   useBoardColumns,
   useMaindata,
 } from '#/state/maindata'
+import { useAutoCollapse } from '#/state/auto-collapse'
 import { useEmptyEntrance } from '#/state/entrance'
 import { useListView } from '#/state/list-view'
 import { useMaindataFailure } from '#/state/maindata-failure'
@@ -38,10 +39,7 @@ import {
   totalOf,
 } from '#/features/board/board-model'
 import { PhoneBoard, PhoneBoardSkeleton } from '#/features/board/status-tabs'
-import {
-  useAutoCollapsePref,
-  useBoardCollapse,
-} from '#/features/board/use-board-collapse'
+import { useBoardCollapse } from '#/features/board/use-board-collapse'
 
 // Story 2.3, FR-15: the board, what the 「狀態」 sort shows (EXPERIENCE
 // 排序決定長相). Columns and their orders come from `useBoardColumns(category)`
@@ -140,7 +138,7 @@ function DesktopBoard({
   today,
 }: BoardDataProps) {
   const [archivedOpen, setArchivedOpen] = useState(false)
-  const autoCollapse = useAutoCollapsePref()
+  const autoCollapse = useAutoCollapse()
   const { view, controller } = useBoardCollapse(autoCollapse)
   const { focus } = view
   // Collapsed: the wide column takes the rest, every other one is 64px.

@@ -7,6 +7,7 @@ import {
   SETTINGS_WRITE_FAILURE_CODES,
   errorText,
   fileActionFailureText,
+  orderSaveFailureText,
   pauseActionFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
@@ -109,6 +110,17 @@ describe('sort save failure text (story 3.1)', () => {
     ['invalid_input', '排序沒記住：送出的資料格式不對'],
   ] as const)('%s', (code, text) => {
     expect(sortSaveFailureText(code)).toBe(text)
+    expect(text).not.toContain(EM_DASH)
+  })
+})
+
+describe('order save failure text (story 3.3)', () => {
+  it.each([
+    ['settings_write_failed', '順序沒存到：設定檔寫不進去'],
+    ['timeout', '順序沒存到：容器沒有回應，請再試一次'],
+    ['invalid_input', '順序沒存到：送出的資料格式不對'],
+  ] as const)('%s', (code, text) => {
+    expect(orderSaveFailureText(code)).toBe(text)
     expect(text).not.toContain(EM_DASH)
   })
 })

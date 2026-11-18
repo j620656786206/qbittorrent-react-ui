@@ -122,7 +122,7 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label; only the sort pill has a title',
+    '%s: every placeholder is disabled with its label (設定 is not since story 3.3); only the sort pill has a title',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
@@ -132,7 +132,6 @@ describe('the shell markup', () => {
         '搜尋',
         null, // desktop 新增 has its text
         '快捷鍵',
-        '設定',
         '搜尋',
         '新增種子',
         '分類：全部',
@@ -141,6 +140,21 @@ describe('the shell markup', () => {
       expect(html.match(/\stitle="[^"]*"/g)).toEqual([' title="排序：狀態"'])
     },
   )
+
+  it('the desktop 設定 button is enabled and calls openSettings (story 3.3)', () => {
+    const html = CASES.H1()
+    const settings = openTags(html, 'button').find(
+      (tag) => attr(tag, 'aria-label') === '設定',
+    )
+    expect(settings).toBeDefined()
+    expect(settings).not.toMatch(/\sdisabled=""/)
+    // The phone has no 設定 button (story 3.4 adds the sheet's row).
+    expect(
+      openTags(html, 'button').filter(
+        (tag) => attr(tag, 'aria-label') === '設定',
+      ),
+    ).toHaveLength(1)
+  })
 
   it('the desktop sort pill is enabled and opens a menu (story 2.1)', () => {
     const html = CASES.H1()
@@ -199,6 +213,8 @@ describe('the shell markup', () => {
             pickView: () => {},
             selectCategory: () => {},
             rememberedHint: false,
+            openSettings: () => {},
+            settingsOpen: false,
           }}
         >
           <HeaderContext
@@ -522,6 +538,8 @@ describe('the phone category button (story 3.2)', () => {
           pickView: () => {},
           selectCategory: () => {},
           rememberedHint: false,
+          openSettings: () => {},
+          settingsOpen: false,
         }}
       >
         <CategoryTabsContext value={tabs}>

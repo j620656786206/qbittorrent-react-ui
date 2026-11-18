@@ -54,6 +54,8 @@ function render(loaded = true) {
           pickView: () => {},
           selectCategory,
           rememberedHint: false,
+          openSettings: () => {},
+          settingsOpen: false,
         }}
       >
         <CategoryTabsContext value={tabs}>
@@ -154,12 +156,13 @@ describe('the desktop category tabs', () => {
     expect(tabNamed('<b>x</b>').querySelector('b')).toBeNull()
   })
 
-  it('a click switches; the selected tab does nothing', async () => {
+  it('a click switches; the selected tab also reports (the layout decides, story 3.3)', async () => {
     await act(async () => render())
     await act(async () => tabNamed('未分類').click())
     expect(selectCategory).toHaveBeenCalledWith('')
     await act(async () => tabNamed('未分類').click())
-    expect(selectCategory).toHaveBeenCalledTimes(1)
+    expect(selectCategory).toHaveBeenCalledTimes(2)
+    expect(selectCategory).toHaveBeenLastCalledWith('')
   })
 
   it('the selected tab scrolls into view on change, inline nearest', async () => {

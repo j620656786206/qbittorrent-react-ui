@@ -44,6 +44,8 @@ function render() {
         pickView,
         selectCategory: () => {},
         rememberedHint,
+        openSettings: () => {},
+        settingsOpen: false,
       }}
     >
       <PhoneSortPill />

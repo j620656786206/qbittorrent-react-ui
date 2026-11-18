@@ -10,6 +10,7 @@ import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
+import { setAutoCollapse } from '#/state/auto-collapse'
 import { clearConnectionErrors } from '#/state/connection'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
@@ -372,6 +373,30 @@ describe('C2 off or narrow', () => {
     })
     expect(collapsedBoard()).toBe(false)
     expect(sections()[1]).toBe('下載中，2 個')
+  })
+
+  it('story 3.3: the settings switch (same tab) turns it off and on without a reload', async () => {
+    await render(fakeResponse({ changed: data() }))
+    await scroll(body('做種中'), 3000)
+    expect(collapsedBoard()).toBe(true)
+    // No storage event in the same tab: setAutoCollapse tells the board.
+    await act(async () => {
+      setAutoCollapse(false)
+      await vi.advanceTimersByTimeAsync(20)
+    })
+    expect(localStorage.getItem(PREF_KEYS.autoCollapse)).toBe('off')
+    expect(collapsedBoard()).toBe(false)
+    await scroll(body('做種中'), 3200)
+    expect(collapsedBoard()).toBe(false)
+    expect(sections()).toHaveLength(5)
+    // Back on: the next scroll collapses again.
+    await act(async () => {
+      setAutoCollapse(true)
+      await vi.advanceTimersByTimeAsync(20)
+    })
+    await scroll(body('做種中'), 0)
+    await scroll(body('做種中'), 3000)
+    expect(collapsedBoard()).toBe(true)
   })
 
   it('below 1024px: the phone board, nothing collapses', async () => {

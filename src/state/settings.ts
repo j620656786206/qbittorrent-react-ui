@@ -2,17 +2,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   SETTINGS_WRITE_FAILURE_CODES,
+  orderSaveFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
+import { categoryOrderRowsOf, orderAfterMove } from '#/lib/category-order'
+import type { Maindata } from '#/lib/maindata-merge'
 import type {
   GetSettingsInput,
+  SetCategoryOrderInput,
   SetCategorySortInput,
   Settings,
 } from '#/shared/settings'
 import { callFn } from '#/state/call-fn'
 import { isLoginRequired, unlessLoginRequired } from '#/state/login-required'
 import type { TrackedOp } from '#/state/tracked-op'
+import { MAINDATA_KEY } from '#/state/maindata'
 
 // AD-8, story 3.1: `['settings']`, the settings file on the NAS (getSettings).
 // Not polled: read once, then again whenever the window regains focus, so
@@ -101,11 +106,34 @@ export async function applySettings(
 
 export const SORT_SAVE_OP = 'save-category-sort'
 
-/** Send order of each save call (its variables object; 重試 resends it). */
+/**
+ * Story 3.3: one send sequence for every settings write (sort and order
+ * saves together), counted when the call actually goes out (a queued call
+ * counts when its turn comes; 重試 counts again). Each answer holds the
+ * whole file, so an answer is only applied when no answer of a later send
+ * was applied before it: an older answer landing late (a sort save read
+ * before an order write) never reverts the newer order in the cache.
+ */
 let sendCount = 0
 const sendOrder = new WeakMap<object, number>()
-/** Per client and category: the send order of the last answer applied. */
-const appliedOrder = new WeakMap<QueryClient, Map<string, number>>()
+/** Per client: the send order of the last answer applied. */
+const appliedOrder = new WeakMap<QueryClient, number>()
+
+function markSent(variables: object): void {
+  sendCount += 1
+  sendOrder.set(variables, sendCount)
+}
+
+function applyInSendOrder(
+  client: QueryClient,
+  variables: object,
+  settings: Settings,
+): Promise<void> | undefined {
+  const order = sendOrder.get(variables) ?? 0
+  if (order < (appliedOrder.get(client) ?? 0)) return undefined
+  appliedOrder.set(client, order)
+  return applySettings(client, settings)
+}
 
 export type SetCategorySortCall = (
   input: SetCategorySortInput,
@@ -118,33 +146,24 @@ export type SetCategorySortCall = (
  * which sends the same call. A newer pick closes the toast of an older one.
  * The saves of one category run one after another (mutation `scope`), so
  * the file ends on the last pick; and an answer is only applied when no
- * answer of a later save of that category was applied before it.
+ * answer of a later settings write was applied before it (story 3.3: the
+ * shared send sequence above).
  */
 export function categorySortOp(
   call: SetCategorySortCall,
 ): TrackedOp<SetCategorySortInput, SettingsWriteFailureCode, Settings> {
   return {
     name: SORT_SAVE_OP,
-    call,
+    call: (variables) => {
+      markSent(variables)
+      return call(variables)
+    },
     keysOf: ({ category }) => [`settings:sort:${category}`],
     scopeOf: ({ category }) => `${SORT_SAVE_OP}:${category}`,
     failureCodes: SETTINGS_WRITE_FAILURE_CODES,
     failureText: (_variables, code) => sortSaveFailureText(code),
-    onSend: (variables) => {
-      sendCount += 1
-      sendOrder.set(variables, sendCount)
-    },
-    onSuccess: (client, variables, settings) => {
-      const order = sendOrder.get(variables) ?? 0
-      let applied = appliedOrder.get(client)
-      if (applied === undefined) {
-        applied = new Map()
-        appliedOrder.set(client, applied)
-      }
-      if (order < (applied.get(variables.category) ?? 0)) return
-      applied.set(variables.category, order)
-      return applySettings(client, settings)
-    },
+    onSuccess: (client, variables, settings) =>
+      applyInSendOrder(client, variables, settings),
   }
 }
 
@@ -160,4 +179,77 @@ export function isSavingSort(client: QueryClient, category: string): boolean {
       predicate: (mutation) => mutation.options.scope?.id === scope,
     }) > 0
   )
+}
+
+export const ORDER_SAVE_OP = 'save-category-order'
+
+export type SetCategoryOrderCall = (
+  input: SetCategoryOrderInput,
+) => Promise<Settings>
+
+/** One arrow press on the settings page: which category, which way. */
+export interface CategoryOrderSave {
+  /** The category whose arrow was pressed (its row waits for the answer). */
+  key: string
+  /** `-1` up, `1` down. */
+  direction: -1 | 1
+}
+
+/**
+ * Story 3.3: saving a move in the category tab order (`setCategoryOrder`)
+ * through `sendOp`. The op carries the move, not an order: when the call
+ * runs it builds the whole new order from the current `['settings']` and
+ * `['maindata']` (orderAfterMove, which keeps saved entries not listed
+ * now), so a page left open, a press queued behind another or a later
+ * 「重試」 applies the same move to the newest order instead of resending an
+ * old snapshot. The input sent is still the whole order (idempotent on the
+ * container). Nothing is sent when the settings or maindata are unknown
+ * or the category cannot move that way any more (the answer is `null`).
+ * No optimistic move (AD-7): the list and the tabs take the order from the
+ * answer, which `applySettings` writes into `['settings']`. Its failure
+ * codes are a settings write's: the toast 「順序沒存到：…」 with 「重試」; a
+ * newer press closes the toast of an older one. All order saves share one
+ * mutation `scope`, so each runs after the one before has settled, and
+ * every settings write's answer is applied in send order.
+ */
+export function categoryOrderOp(
+  call: SetCategoryOrderCall,
+  client: QueryClient,
+): TrackedOp<CategoryOrderSave, SettingsWriteFailureCode, Settings | null> {
+  return {
+    name: ORDER_SAVE_OP,
+    call: async (variables) => {
+      const { key, direction } = variables
+      const settings = client.getQueryData<Settings>(SETTINGS_KEY)
+      const maindata = client.getQueryData<Maindata>(MAINDATA_KEY)
+      if (settings === undefined || maindata === undefined) return null
+      const stored = settings.categoryOrder
+      const order = orderAfterMove({
+        stored,
+        listed: categoryOrderRowsOf(maindata, stored).map((row) => row.key),
+        key,
+        delta: direction,
+      })
+      if (order === null) return null
+      markSent(variables)
+      return call({ order })
+    },
+    keysOf: () => ['settings:order'],
+    scopeOf: () => ORDER_SAVE_OP,
+    failureCodes: SETTINGS_WRITE_FAILURE_CODES,
+    failureText: (_variables, code) => orderSaveFailureText(code),
+    onSuccess: (queryClient, variables, settings) =>
+      settings === null
+        ? undefined
+        : applyInSendOrder(queryClient, variables, settings),
+  }
+}
+
+/**
+ * Story 3.3: reads `['settings']` again now (the settings page on mount),
+ * so its arrows start from the file as it is, not an old answer.
+ */
+export function refreshSettings(client: QueryClient): Promise<void> {
+  if (isLoginRequired()) return Promise.resolve()
+  return client.refetchQueries({ queryKey: SETTINGS_KEY, exact: true })
 }

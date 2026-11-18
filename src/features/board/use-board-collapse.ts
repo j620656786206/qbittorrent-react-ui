@@ -1,28 +1,15 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { isPrefKey, readPref } from '#/lib/prefs'
 import {
   BoardCollapseController,
   NORMAL_VIEW,
 } from '#/features/board/board-collapse-controller'
 import type { CollapseView } from '#/features/board/board-collapse-controller'
 
-// Story 2.8: the auto-collapse pref (src/lib/prefs.ts, AD-13), read on
-// mount and again on the `storage` event (the settings page in Epic 3, or
-// another tab), and the desktop board's collapse controller.
-
-export function useAutoCollapsePref(): boolean {
-  const [on, setOn] = useState(() => readPref('autoCollapse'))
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (isPrefKey(event.key, 'autoCollapse')) {
-        setOn(readPref('autoCollapse'))
-      }
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
-  return on
-}
+// Story 2.8: the desktop board's collapse controller. Story 3.3: the board
+// reads the auto-collapse pref with useAutoCollapse (src/state/
+// auto-collapse.ts), so the settings page's switch (same tab) and another
+// tab's change (the `storage` event) both reach a mounted board without a
+// reload.
 
 export interface BoardCollapse {
   view: CollapseView
