@@ -100,6 +100,7 @@ deferred: []
 ## Spec Change Log
 
 - 2026-11-18, first review pass: (1) the tabs are plain buttons in a group labelled 「分類」 with `aria-pressed`, not a `tablist` (the contract allowed the existing pattern; a tab widget without arrow keys misleads screen readers). (2) The hint cause tells a remembered sort (`category-switch`) from the 「狀態」 fallback (`category-default`); only the first shows the hint, matching EXPERIENCE's sort-pill row. (3) Category keys the URL cannot carry (`__all__`, `__proto__`, over 255 characters, control characters) get no tab; their torrents stay under 「全部」. (4) The phone's inert category button shows the selected category. KEEP: filtering only in `selectVisibleTorrents`; the URL is the sort on screen; `replayEntrance()` after the new rows commit.
+- 2026-11-18, multi-model review after merge (opus, fable, sonnet, haiku; Alex picked the fixes, PR "fix(epic-3)"): before the tabs are known, the desktop row shows the URL's category alone (like the phone button), not always 「全部」. Sort saves share the one settings write scope (spec 3.1).
 
 ## Review Triage Log
 

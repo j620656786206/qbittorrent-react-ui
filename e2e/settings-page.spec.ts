@@ -98,7 +98,8 @@ test('open from a category list, move a category up, tabs follow the answer, bac
   expect(tabsBefore[0]).toBe('全部')
 
   await settingsButton(page).click()
-  await expect(page).toHaveURL(/\/settings$/)
+  // The list's search rides along in the settings page's URL.
+  await expect(page).toHaveURL(/\/settings\?category=mteam-X&sort=added_on$/)
   await expect(settingsPage(page)).toBeVisible()
   // The header shows as usual.
   await expect(
