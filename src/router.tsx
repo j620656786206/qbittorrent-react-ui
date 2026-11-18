@@ -8,6 +8,7 @@ import { getMaindata } from '#/server/functions/get-maindata'
 import { getSettings } from '#/server/functions/get-settings'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { bindFetchMaindata } from '#/state/maindata'
+import { noteOpeningSearch } from '#/state/opening-search'
 import { bindFetchSettings } from '#/state/settings'
 import { createQueryClient } from '#/state/query-client'
 
@@ -45,7 +46,10 @@ export function getRouter() {
   })
 
   // Browser only, so server renders add no subscription to the module-level store.
-  if (typeof window !== 'undefined') watchLoginRequired(router)
+  if (typeof window !== 'undefined') {
+    watchLoginRequired(router)
+    noteOpeningSearch(router)
+  }
 
   return router
 }

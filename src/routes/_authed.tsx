@@ -21,8 +21,9 @@ import type { Maindata } from '#/lib/maindata-merge'
 import { showsRememberedHint } from '#/lib/remembered-hint'
 import type { SortChange } from '#/lib/remembered-hint'
 import { nameMatches, searchNeedle } from '#/lib/name-search'
+import { readPref, withViewedHash, writePref } from '#/lib/prefs'
 import { rememberedSortOf, sameSort } from '#/lib/remembered-sort'
-import { inCategory } from '#/lib/visible-torrents'
+import { inCategory, listsIn } from '#/lib/visible-torrents'
 import { setCategorySort } from '#/server/functions/set-category-sort'
 import { ALL } from '#/shared/categories'
 import {
@@ -37,6 +38,7 @@ import {
   sortViewOf,
 } from '#/shared/list-search'
 import type { SortView } from '#/shared/list-search'
+import { sortField } from '#/shared/sort-fields'
 import type { Settings } from '#/shared/settings'
 import { resetListScroll } from '#/shared/ui/main-scroll'
 import { callFn } from '#/state/call-fn'
@@ -45,6 +47,8 @@ import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
+import { useMaindataFailure } from '#/state/maindata-failure'
+import { forgetOpeningSearch, openingSearch } from '#/state/opening-search'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { categorySortOp, useSettings } from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
@@ -102,6 +106,24 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // (like the other setters) and puts the list back at the top; a category
 // switch keeps the keyword (and the box), and so does the settings page
 // round trip (the whole list search rides along).
+// Story 3.6: this device remembers where Alex was (src/lib/prefs.ts, never
+// the NAS). On the list route, once maindata has answered, every category
+// on screen is stored as `lastCategory`, and a `hash` in the URL as that
+// category's entry of `lastViewedHash` when it is one of that category's
+// rows (a stale or foreign link never replaces a good entry). The app
+// opening on the list with a bare URL (no `category`, `sort` or `hash` key,
+// valid or not; `q` alone is still bare) goes back to `lastCategory` with
+// its remembered sort (else 「狀態」), written once with `replace` when
+// maindata and the settings answered; a category no torrent has any more
+// stays 「全部」 (the bare URL already shows 「全部」 with its remembered
+// sort). The list and the board keep their skeleton until then
+// (`viewReady`), so the first entrance is the restored category's and no
+// other plays; it is no tab switch, so no hint. Off the list (the settings
+// page) the restore waits and nothing is recorded; back on the list it
+// runs if the URL is still bare. A place written meanwhile cancels it, and
+// so does a first maindata request that failed (the usual error state
+// shows; a late answer never jumps to another category).
+// https://tanstack.com/router/latest/docs/framework/react/guide/search-params
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -136,6 +158,49 @@ interface Latest {
   settingsOpen: boolean
 }
 
+/**
+ * Story 3.6: the open-time restore. `pending`: waiting for maindata and the
+ * settings to go to `category`; `navigating`: the URL is being written;
+ * `done`: nothing (left) to restore.
+ */
+type Restore =
+  | { step: 'pending'; category: string }
+  | { step: 'navigating'; category: string }
+  | { step: 'done' }
+
+const RESTORED: Restore = { step: 'done' }
+
+/**
+ * Story 3.6: the search string names no place: no `category`, `sort` or
+ * `hash` key, even an invalid one (`q` alone does not count).
+ */
+function isBareSearch(searchStr: string): boolean {
+  const params = new URLSearchParams(searchStr)
+  return !params.has('category') && !params.has('sort') && !params.has('hash')
+}
+
+/**
+ * Story 3.6: what the app opening on `searchStr` has to restore. `opening`
+ * is the search as typed (src/state/opening-search.ts), before the router
+ * dropped invalid params.
+ */
+function initialRestore(
+  searchStr: string,
+  opening: string | null,
+  onList: boolean,
+): Restore {
+  if (
+    !onList ||
+    !isBareSearch(searchStr) ||
+    (opening !== null && !isBareSearch(opening))
+  ) {
+    return RESTORED
+  }
+  const category = readPref('lastCategory')
+  // A bare URL already is 「全部」 with its remembered sort.
+  return category === ALL ? RESTORED : { step: 'pending', category }
+}
+
 /** The list route's path. */
 const LIST_PATH = '/'
 /** Story 3.3: the settings page's path. */
@@ -148,6 +213,7 @@ function AuthedLayout() {
   const { data: counts } = useCategoryCounts()
   // The search as typed in the address bar, before validation.
   const rawSearch = useLocation({ select: (location) => location.search })
+  const searchStr = useLocation({ select: (location) => location.searchStr })
   const onList = useLocation({
     select: (location) => location.pathname === LIST_PATH,
   })
@@ -163,6 +229,14 @@ function AuthedLayout() {
   )
   const { sort, dir, hash, category: urlCategory } = listSearch
   const query = listSearch.q ?? ''
+  const [restore, setRestore] = useState<Restore>(() =>
+    initialRestore(searchStr, openingSearch(), onList),
+  )
+  useEffect(() => forgetOpeningSearch(), [])
+  const restoring =
+    restore.step === 'pending' ||
+    (restore.step === 'navigating' &&
+      categoryOfSearch({ category: urlCategory }) !== restore.category)
 
   useEffect(() => {
     const fixed = fixListSearch(rawSearch)
@@ -208,6 +282,80 @@ function AuthedLayout() {
       resetScroll: false,
     })
   }, [invalid, navigate])
+
+  const countsKnown = counts !== undefined
+  const maindataFailure = useMaindataFailure()
+  useEffect(() => {
+    if (restore.step !== 'pending') return
+    // The first maindata request failed: give up, never jump later.
+    if (counts === undefined && maindataFailure !== null) {
+      setRestore(RESTORED)
+      return
+    }
+    // Off the list (the settings page) the restore waits.
+    if (!onList || !ready || counts === undefined) return
+    const target = restore.category
+    // A place written meanwhile wins; a vanished category stays 「全部」.
+    if (
+      !isBareSearch(searchStr) ||
+      resolveCategory({ requested: target, counts, confirmed: null }).invalid
+    ) {
+      setRestore(RESTORED)
+      return
+    }
+    const targetRemembered = rememberedSortOf(settings, target)
+    const targetView = targetRemembered
+      ? normalizeSortView(targetRemembered)
+      : DEFAULT_SORT_VIEW
+    setRestore({ step: 'navigating', category: target })
+    const finish = () => setRestore(RESTORED)
+    void navigate({
+      to: LIST_PATH,
+      // Written as fixListSearch would leave it: no `dir` for 「狀態」.
+      search: (previous) => {
+        const { dir: _dir, ...rest } = searchWithCategory(previous, target)
+        return sortField(targetView.sort).directional
+          ? { ...rest, sort: targetView.sort, dir: targetView.dir }
+          : { ...rest, sort: targetView.sort }
+      },
+      replace: true,
+      resetScroll: false,
+    }).then(finish, finish)
+  }, [
+    restore,
+    ready,
+    counts,
+    maindataFailure,
+    onList,
+    searchStr,
+    settings,
+    navigate,
+  ])
+
+  // Story 3.6: record where Alex is, on the list only, never mid-restore.
+  useEffect(() => {
+    if (!onList || restoring || !countsKnown) return
+    writePref('lastCategory', category)
+  }, [onList, restoring, countsKnown, category])
+  useEffect(() => {
+    if (!onList || restoring || !countsKnown || hash === undefined) return
+    // Only one of this category's rows: in maindata, in the category, not
+    // 已整理 (a stale or foreign link keeps the entry it has).
+    const data = client.getQueryData<Maindata>(MAINDATA_KEY)
+    if (
+      data === undefined ||
+      !Object.hasOwn(data.torrents, hash) ||
+      !listsIn(data.torrents[hash], category, data.stateBeforeMove)
+    ) {
+      return
+    }
+    writePref(
+      'lastViewedHash',
+      withViewedHash(readPref('lastViewedHash'), category, hash),
+    )
+  }, [client, onList, restoring, countsKnown, category, hash])
+  // Off the list nothing waits on the restore (the settings page's header).
+  const viewReady = ready && !(restoring && onList)
 
   const remembered = rememberedSortOf(settings, category)
   // Only a URL without `sort` reads the remembered sort, so with `sort` a
@@ -402,7 +550,7 @@ function AuthedLayout() {
   const control = useMemo(
     () => ({
       view,
-      viewReady: ready,
+      viewReady,
       setView,
       pickView,
       selectCategory,
@@ -416,7 +564,7 @@ function AuthedLayout() {
     }),
     [
       view,
-      ready,
+      viewReady,
       setView,
       pickView,
       selectCategory,
@@ -430,18 +578,18 @@ function AuthedLayout() {
     ],
   )
 
-  // The tab order waits for the settings like the list does.
+  // The tab order waits for the settings (and the restore) like the list.
   const categoryOrder = settings?.categoryOrder
   const tabs = useMemo(
     () =>
-      counts === undefined || !ready
+      counts === undefined || !viewReady
         ? undefined
         : categoryTabs({
             counts,
             categoryOrder: categoryOrder ?? [],
             selected: category,
           }),
-    [counts, ready, categoryOrder, category],
+    [counts, viewReady, categoryOrder, category],
   )
 
   const setHash = useCallback(

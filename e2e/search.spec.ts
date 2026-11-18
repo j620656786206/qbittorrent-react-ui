@@ -384,8 +384,9 @@ for (const scheme of ['light', 'dark'] as const) {
       path: `${SCREENSHOT_DIR}/no-result-category-phone-${scheme}.png`,
     })
 
-    // No result in 全部.
-    await page.goto('/?q=牧神記')
+    // No result in 全部. Story 3.6: `q` alone would go back to the last
+    // category (mteam-X), so the URL names its sort.
+    await page.goto('/?q=牧神記&sort=state')
     await expect(noResult(page)).toHaveText('找不到『牧神記』')
     await settle(page)
     expect(await horizontalOverflow(page)).toBe(0)

@@ -8,6 +8,7 @@ import {
   countAll,
   countMatches,
   inCategory,
+  listsIn,
   boardColumnOf,
   selectBoardColumns,
   selectVisibleTorrents,
@@ -723,5 +724,17 @@ describe('the name filter (story 3.5)', () => {
       S1,
       S6,
     ])
+  })
+})
+
+describe('listsIn (story 3.6)', () => {
+  it('a row of the category: in it and not 已整理', () => {
+    const shown = t({ category: 'X' })
+    const archived = t({ category: 'X', state: 'missingFiles', private: false })
+    expect(listsIn(shown, 'X', {})).toBe(true)
+    expect(listsIn(shown, '__all__', {})).toBe(true)
+    expect(listsIn(shown, 'mteam-X', {})).toBe(false)
+    expect(listsIn(archived, 'X', {})).toBe(false)
+    expect(listsIn(archived, '__all__', {})).toBe(false)
   })
 })

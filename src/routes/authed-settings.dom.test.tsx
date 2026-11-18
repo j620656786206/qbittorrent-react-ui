@@ -200,6 +200,8 @@ async function refocus() {
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  // Story 3.6: the last category and torrent are remembered per device.
+  localStorage.clear()
   notifyManager.setScheduler((callback) => callback())
   settingsReads = []
   saves = []
