@@ -5,6 +5,7 @@ import { createStore, useSelector } from '@tanstack/react-store'
 import { selectCategoryCounts } from '#/lib/category-tabs'
 import { mergeMaindata } from '#/lib/maindata-merge'
 import {
+  countMatches,
   selectBoardColumns,
   selectVisibleTorrents,
 } from '#/lib/visible-torrents'
@@ -196,8 +197,8 @@ export function useVisibleTorrents(view: TorrentView, sortKeys?: SortKeys) {
 }
 
 /**
- * One board computation per maindata snapshot and category, however many
- * observe it.
+ * One board computation per maindata snapshot, category and keyword,
+ * however many observe it.
  */
 const boardColumnsBySnapshot = new WeakMap<
   Maindata,
@@ -207,16 +208,19 @@ const boardColumnsBySnapshot = new WeakMap<
 function selectBoardColumnsOnce(
   data: Maindata,
   category: string,
+  query: string,
 ): BoardColumns {
-  let byCategory = boardColumnsBySnapshot.get(data)
-  if (byCategory === undefined) {
-    byCategory = new Map()
-    boardColumnsBySnapshot.set(data, byCategory)
+  let byFilter = boardColumnsBySnapshot.get(data)
+  if (byFilter === undefined) {
+    byFilter = new Map()
+    boardColumnsBySnapshot.set(data, byFilter)
   }
-  let columns = byCategory.get(category)
+  // Any text can be a category or a keyword: a JSON pair never collides.
+  const key = JSON.stringify([category, query])
+  let columns = byFilter.get(key)
   if (columns === undefined) {
-    columns = selectBoardColumns(data, category)
-    byCategory.set(category, columns)
+    columns = selectBoardColumns(data, category, query)
+    byFilter.set(key, columns)
   }
   return columns
 }
@@ -229,12 +233,30 @@ function selectBoardColumnsOnce(
  * both observe it: Query runs `select` per observer, so the result is
  * cached per snapshot and ~4167 torrents are classified and sorted once a
  * poll, not once per observer. Story 3.2: only `category`'s torrents
- * (the selected tab, `useListView().view.category`).
+ * (the selected tab, `useListView().view.category`). Story 3.5: only names
+ * holding `query` (`view.query`; empty is every name).
  */
-export function useBoardColumns(category: string = ALL) {
+export function useBoardColumns(category: string = ALL, query = '') {
   const select = useCallback(
-    (data: Maindata) => selectBoardColumnsOnce(data, category),
-    [category],
+    (data: Maindata) => selectBoardColumnsOnce(data, category, query),
+    [category, query],
+  )
+  return useMaindata(select)
+}
+
+/**
+ * Story 3.5: how many of `category`'s torrents hold `query` (empty: all),
+ * archived ones only with `withArchived` (countMatches). A number, so
+ * re-renders only when it changes.
+ */
+export function useMatchCount(
+  category: string,
+  query: string,
+  withArchived: boolean,
+) {
+  const select = useCallback(
+    (data: Maindata) => countMatches(data, category, query, withArchived),
+    [category, query, withArchived],
   )
   return useMaindata(select)
 }

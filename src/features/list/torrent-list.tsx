@@ -7,7 +7,9 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { noResultText } from '#/lib/name-search'
 import type { SortKeys } from '#/lib/visible-torrents'
+import { ALL } from '#/shared/categories'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
@@ -20,6 +22,7 @@ import {
   selectStateBeforeMove,
   selectTorrents,
   useMaindata,
+  useMatchCount,
   useVisibleTorrents,
 } from '#/state/maindata'
 import { useMaindataFailure } from '#/state/maindata-failure'
@@ -49,6 +52,7 @@ import {
   LIST_SCROLL_CLASS,
   ListEmpty,
   ListLoadError,
+  ListNoResult,
   ListSkeleton,
 } from '#/features/list/list-states'
 import { TorrentRow } from '#/features/list/torrent-row'
@@ -70,7 +74,11 @@ import { TorrentRow } from '#/features/list/torrent-row'
 // order (`useListViewed`); the order shown and that row are published for
 // the detail (`usePublishShownList`), which never runs a second freeze.
 // Desktop list mode passes the detail panel as `panel`: it sits right of
-// the rows; the empty, error and loading blocks replace both.
+// the rows; the empty, error and loading blocks replace both. Story 3.5:
+// with a keyword the order is already filtered by name (the view's
+// `query`); no match shows the no-result block, with 「在全部裡找」 outside
+// 「全部」, unless the category has no torrent at all (then still
+// 「這個分類沒有種子」).
 
 const estimateSize = () => ROW_HEIGHT
 
@@ -97,7 +105,7 @@ export interface TorrentListProps {
 }
 
 export function TorrentList({ panel }: TorrentListProps) {
-  const { view, viewReady } = useListView()
+  const { view, viewReady, selectCategory } = useListView()
   const extraField = isExtraSortField(view.sort) ? view.sort : null
   const { data: sortKeysData, errorUpdateCount } = useSortKeys(
     extraField,
@@ -112,10 +120,14 @@ export function TorrentList({ panel }: TorrentListProps) {
   const keysFailed =
     extraField !== null && sortKeys === undefined && errorUpdateCount > 0
   const { data: live } = useVisibleTorrents(view, sortKeys)
+  // Story 3.5: the category's own size, keyword aside.
+  const { data: categorySize = 0 } = useMatchCount(view.category, '', false)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()
   const shown = useFrozenOrder(live, {
     viewKey: viewKeyOf(view),
+    // Story 3.5: another category or keyword applies even while holding.
+    filterKey: JSON.stringify([view.category, view.query]),
     hold: extraField !== null && sortKeys === undefined,
     holdAddsNew: keysFailed,
   })
@@ -143,7 +155,17 @@ export function TorrentList({ panel }: TorrentListProps) {
   if (state === 'skeleton') return <ListSkeleton />
   if (state === 'error')
     return <ListLoadError onRetry={retry} busy={retrying} />
-  if (state === 'empty' || !shown) return <ListEmpty />
+  if (state === 'empty' || !shown) {
+    if (view.query === '' || categorySize === 0) return <ListEmpty />
+    return (
+      <ListNoResult
+        text={noResultText(view.query, view.category)}
+        onSearchAll={
+          view.category === ALL ? undefined : () => selectCategory(ALL)
+        }
+      />
+    )
+  }
   const rows = (
     <TorrentRows
       shown={shown}

@@ -140,20 +140,28 @@ function stubPrototype(name: 'clientHeight' | 'clientWidth', value: number) {
 let viewReady = true
 /** Story 3.2: the selected category. */
 let category: string = ALL
+/** Story 3.5: the search keyword. */
+let searchQuery = ''
+/** Story 3.5: 「在全部裡找」 calls this with `ALL`. */
+const selectCategory = vi.fn()
 
 function boardTree() {
   return (
     <QueryClientProvider client={client}>
       <ListViewContext
         value={{
-          view: { ...DEFAULT_SORT_VIEW, category },
+          view: { ...DEFAULT_SORT_VIEW, category, query: searchQuery },
           viewReady,
           setView: () => {},
           pickView: () => {},
-          selectCategory: () => {},
+          selectCategory,
           rememberedHint: false,
           openSettings: () => {},
           settingsOpen: false,
+          searchOpen: false,
+          openSearch: () => {},
+          setQuery: () => {},
+          closeSearch: () => {},
         }}
       >
         <ViewedHashContext value={{ hash: null, setHash }}>
@@ -216,6 +224,8 @@ const button = (label: string) =>
 beforeEach(() => {
   viewReady = true
   category = ALL
+  searchQuery = ''
+  selectCategory.mockReset()
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   notifyManager.setScheduler((callback) => callback())
   modelCalls.clear()
@@ -922,5 +932,158 @@ describe('the category (story 3.2)', () => {
     expect(sections().at(-1)).toBe('已整理，2 個')
     await setCategory('mteam-X')
     expect(sections().at(-1)).toBe('已整理欄')
+  })
+})
+
+// Story 3.5: the keyword filters the columns (已整理 too); a partly empty
+// board keeps its columns with 「沒有」; only an all-empty board turns into
+// the no-result block, with 「在全部裡找」 outside 「全部」.
+describe('the search keyword (story 3.5)', () => {
+  async function setQuery(next: string) {
+    searchQuery = next
+    await act(async () => root.render(boardTree()))
+  }
+
+  it('columns, counts and the collapsed 已整理 count follow the keyword', async () => {
+    searchQuery = 'ARCH'
+    await render(fakeResponse({ changed: sample() }))
+    expect(sections()).toEqual([
+      '要處理，0 個',
+      '下載中，0 個',
+      '做種中，0 個',
+      '完成，0 個',
+      '已整理欄',
+    ])
+    expect(button('展開已整理欄，2 個')).not.toBeNull()
+    // While searching, an empty 要處理 says 「沒有」, not 「都沒問題」.
+    expect(section('要處理，0 個').textContent).toContain('沒有')
+    expect(section('要處理，0 個').textContent).not.toContain('都沒問題')
+    await setQuery('arch1')
+    expect(button('展開已整理欄，1 個')).not.toBeNull()
+  })
+
+  it('a partly empty board keeps four columns, each empty one 「沒有」', async () => {
+    searchQuery = 'e'
+    await render(fakeResponse({ changed: sample() }))
+    // Seed, Stalled, Error match; Down does not.
+    expect(sections()).toEqual([
+      '要處理，2 個',
+      '下載中，0 個',
+      '做種中，1 個',
+      '完成，0 個',
+      '已整理欄',
+    ])
+    expect(section('下載中，0 個').textContent).toContain('沒有')
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).toBeNull()
+  })
+
+  it('typing keeps the board mounted (the open 已整理 column stays)', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await act(async () => button('展開已整理欄，2 個').click())
+    await setQuery('arch')
+    expect(sections().at(-1)).toBe('已整理，2 個')
+  })
+
+  it('nothing anywhere in a category: the no-result block with 「在全部裡找」', async () => {
+    category = 'mteam-tv'
+    searchQuery = '牧神記'
+    await render(
+      fakeResponse({
+        changed: sample().map((torrent) => ({
+          ...torrent,
+          category: 'mteam-tv',
+        })),
+      }),
+    )
+    const block = main.querySelector(
+      'section[aria-label="搜尋結果"]',
+    ) as HTMLElement
+    expect(block.textContent).toContain('『牧神記』在 mteam-tv 找不到')
+    // The board stays mounted, hidden under the block.
+    const board = main.querySelector('[role="region"][aria-label="看板"]')
+    expect(board?.closest('.invisible')).not.toBeNull()
+    const searchAll = [...block.querySelectorAll('button')].find(
+      (element) => element.textContent === '在全部裡找',
+    )
+    if (!searchAll) throw new Error('no 在全部裡找')
+    await act(async () => searchAll.click())
+    expect(selectCategory).toHaveBeenCalledWith(ALL)
+  })
+
+  it('nothing in 「全部」: only 「找不到『…』」, no button; markup is text', async () => {
+    searchQuery = '<script>'
+    await render(fakeResponse({ changed: sample() }))
+    const block = main.querySelector(
+      'section[aria-label="搜尋結果"]',
+    ) as HTMLElement
+    expect(block.textContent).toBe('找不到『<script>』')
+    expect(block.querySelector('button')).toBeNull()
+    expect(block.querySelector('script')).toBeNull()
+  })
+
+  it('desktop: 要處理 empty, another column not: 要處理 says 「沒有」', async () => {
+    searchQuery = 'Seed'
+    await render(fakeResponse({ changed: sample() }))
+    expect(sections().slice(0, 3)).toEqual([
+      '要處理，0 個',
+      '下載中，0 個',
+      '做種中，1 個',
+    ])
+    expect(section('要處理，0 個').textContent).toContain('沒有')
+    expect(section('要處理，0 個').textContent).not.toContain('都沒問題')
+  })
+
+  it('a no-result moment keeps the open 已整理 column', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await act(async () => button('展開已整理欄，2 個').click())
+    await setQuery('牧神記')
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).not.toBeNull()
+    await setQuery('arch')
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).toBeNull()
+    expect(sections().at(-1)).toBe('已整理，2 個')
+    expect(
+      main
+        .querySelector('[role="region"][aria-label="看板"]')
+        ?.closest('.invisible'),
+    ).toBeNull()
+  })
+
+  it('a category with no torrent at all: 「這個分類沒有種子」, not no-result', async () => {
+    category = 'emptied'
+    searchQuery = 'show'
+    await render(fakeResponse({ changed: sample() }))
+    expect(main.textContent).toContain('這個分類沒有種子')
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).toBeNull()
+  })
+
+  it('a keyword cleared while an animation holds the order shows the matches at once', async () => {
+    searchQuery = 'Seed'
+    await render(fakeResponse({ changed: sample() }))
+    expect(sections()[0]).toBe('要處理，0 個')
+    const release = holdOrderForAnimation()
+    try {
+      await setQuery('')
+      expect(sections()[0]).toBe('要處理，2 個')
+      expect(names(section('要處理，2 個'))).toEqual(['Stalled', 'Error'])
+      await setQuery('Stalled')
+      expect(sections()[0]).toBe('要處理，1 個')
+    } finally {
+      release()
+    }
+  })
+
+  it('only an archived match keeps the board (已整理 is not empty)', async () => {
+    searchQuery = 'Arch2'
+    await render(fakeResponse({ changed: sample() }))
+    expect(main.querySelector('section[aria-label="搜尋結果"]')).toBeNull()
+    expect(button('展開已整理欄，1 個')).not.toBeNull()
+  })
+
+  it('the phone board: every empty tab says 「沒有」 while searching', async () => {
+    desktop = false
+    searchQuery = 'Seed'
+    await render(fakeResponse({ changed: sample() }))
+    expect(main.textContent).not.toContain('都沒問題')
+    expect(main.textContent).toContain('沒有')
   })
 })

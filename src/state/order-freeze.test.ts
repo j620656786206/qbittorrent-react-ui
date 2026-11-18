@@ -129,6 +129,34 @@ describe('shownOrderReducer (the hook update)', () => {
   })
 })
 
+describe('a filter change (story 3.5)', () => {
+  it('applies the live order at once, even while holding or frozen', () => {
+    const shown = ['c', 'b']
+    const live = ['a', 'c', 'b', 'd']
+    expect(
+      shownOrderReducer(shown, {
+        live,
+        frozen: true,
+        hold: true,
+        filterChanged: true,
+      }),
+    ).toBe(live)
+    expect(
+      shownOrderReducer(shown, {
+        live,
+        frozen: false,
+        hold: true,
+        holdAddsNew: true,
+        filterChanged: true,
+      }),
+    ).toBe(live)
+    // Without a filter change the hold keeps new matches hidden.
+    expect(
+      shownOrderReducer(shown, { live, frozen: false, hold: true }),
+    ).toEqual(['c', 'b'])
+  })
+})
+
 describe('F6 freeze reasons', () => {
   beforeEach(() => {
     // The settle check reads performance.now().

@@ -1,5 +1,9 @@
 import { z } from '#/shared/zod'
-import { ALL, categoryOrderEntrySchema } from '#/shared/categories'
+import {
+  ALL,
+  categoryOrderEntrySchema,
+  hasControlChar,
+} from '#/shared/categories'
 import {
   SORT_DIRS,
   SORT_FIELD_IDS,
@@ -20,8 +24,12 @@ import { TORRENT_HASH_PATTERN } from '#/shared/torrent-hash'
 // or shared `?category=2024` (or `true`, `null`) arrives as a number,
 // boolean or null: `category` turns those back into the text typed (the
 // router writes such a name quoted, `category=%222024%22`, which reads back
-// as text). Absent is the key missing, never `null`.
+// as text). Absent is the key missing, never `null`. Story 3.5: `q`, the
+// in-list search keyword, read back to text the same way and trimmed; a
+// keyword that trims to nothing is no keyword (the URL drops it). It is
+// matched as plain text, never as a pattern (src/lib/name-search.ts).
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
+// https://zod.dev/api
 
 export interface SortView {
   sort: SortFieldId
@@ -53,6 +61,28 @@ export function categoryText(value: unknown): unknown {
 
 const categorySchema = z.preprocess(categoryText, categoryOrderEntrySchema)
 
+/** A `q` value as the router parsed it, back to text and trimmed. */
+function queryText(value: unknown): unknown {
+  const text = categoryText(value)
+  return typeof text === 'string' ? text.trim() : text
+}
+
+/** Story 3.5: the longest keyword the URL keeps (the field stops there too). */
+export const MAX_QUERY_LENGTH = 200
+
+/**
+ * Story 3.5: the keyword, trimmed; empty (or only spaces), longer than
+ * MAX_QUERY_LENGTH or holding a control character is invalid.
+ */
+const querySchema = z.preprocess(
+  queryText,
+  z
+    .string()
+    .min(1)
+    .max(MAX_QUERY_LENGTH)
+    .refine((text) => !hasControlChar(text), 'control character'),
+)
+
 export const listSearchSchema = z.object({
   sort: z.enum(SORT_FIELD_IDS).optional().catch(undefined),
   dir: z.enum(SORT_DIRS).optional().catch(undefined),
@@ -63,6 +93,11 @@ export const listSearchSchema = z.object({
    * absent is 「全部」.
    */
   category: categorySchema.optional().catch(undefined),
+  /**
+   * Story 3.5: the search keyword, trimmed; absent (or only spaces) is no
+   * search.
+   */
+  q: querySchema.optional().catch(undefined),
 })
 
 export type ListSearch = z.infer<typeof listSearchSchema>
@@ -107,6 +142,12 @@ const isHash = (value: unknown): value is string =>
 const isCategory = (value: unknown): boolean =>
   categorySchema.safeParse(value).success
 
+/** The keyword already reads as itself: text, trimmed, not empty. */
+const isCleanQuery = (value: unknown): boolean => {
+  const parsed = querySchema.safeParse(value)
+  return parsed.success && parsed.data === categoryText(value)
+}
+
 /**
  * The raw (unvalidated) search with the bad params removed, or `null` when
  * nothing needs fixing. A bad `sort` falls back to the remembered sort or
@@ -115,7 +156,9 @@ const isCategory = (value: unknown): boolean =>
  * a bad `dir`, or any `dir` on a field without a direction, goes alone; a
  * `hash` that is not 40 or 64 lowercase hex goes alone; a `category` that
  * is no category name (story 3.2: a control character, too long, `ALL`'s
- * key, not a string) goes alone, so the screen is 「全部」. Other params stay.
+ * key, not a string) goes alone, so the screen is 「全部」; a `q` with
+ * spaces around it is trimmed, one that is only spaces, too long, holds a
+ * control character or is not text goes (story 3.5). Other params stay.
  */
 export function fixListSearch(
   raw: Readonly<Record<string, unknown>>,
@@ -129,14 +172,28 @@ export function fixListSearch(
     (!isDir(raw.dir) || sortId === null || !sortField(sortId).directional)
   const badHash = 'hash' in raw && !isHash(raw.hash)
   const badCategory = 'category' in raw && !isCategory(raw.category)
-  if (!badSort && !badDir && !badHash && !badCategory) return null
-  const { sort: _sort, dir: _dir, hash: _hash, category: _c, ...rest } = raw
+  const badQuery = 'q' in raw && !isCleanQuery(raw.q)
+  if (!badSort && !badDir && !badHash && !badCategory && !badQuery) {
+    return null
+  }
+  const {
+    sort: _sort,
+    dir: _dir,
+    hash: _hash,
+    category: _c,
+    q: _q,
+    ...rest
+  } = raw
+  const query = querySchema.safeParse(raw.q)
   return {
     ...rest,
     ...('sort' in raw && !badSort ? { sort: raw.sort } : {}),
     ...('dir' in raw && !badSort && !badDir ? { dir: raw.dir } : {}),
     ...('hash' in raw && !badHash ? { hash: raw.hash } : {}),
     ...('category' in raw && !badCategory ? { category: raw.category } : {}),
+    ...('q' in raw && query.success
+      ? { q: badQuery ? query.data : raw.q }
+      : {}),
   }
 }
 
@@ -168,4 +225,17 @@ export function searchWithHash(
 ): Record<string, unknown> {
   const { hash: _hash, ...rest } = previous
   return hash === null ? rest : { ...rest, hash }
+}
+
+/**
+ * Story 3.5: the search with `q` set to `text` trimmed, or removed when
+ * that is empty. Every other param stays.
+ */
+export function searchWithQuery(
+  previous: Readonly<Record<string, unknown>>,
+  text: string,
+): Record<string, unknown> {
+  const { q: _q, ...rest } = previous
+  const query = text.trim()
+  return query === '' ? rest : { ...rest, q: query }
 }

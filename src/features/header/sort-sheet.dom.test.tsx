@@ -38,7 +38,7 @@ function render() {
   root.render(
     <ListViewContext
       value={{
-        view: { ...view, category: ALL },
+        view: { ...view, category: ALL, query: '' },
         viewReady: true,
         setView: appSetView,
         pickView,
@@ -46,6 +46,10 @@ function render() {
         rememberedHint,
         openSettings: () => {},
         settingsOpen: false,
+        searchOpen: false,
+        openSearch: () => {},
+        setQuery: () => {},
+        closeSearch: () => {},
       }}
     >
       <PhoneSortPill />

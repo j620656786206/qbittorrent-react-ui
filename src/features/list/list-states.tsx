@@ -74,7 +74,7 @@ export function ListSkeleton() {
   )
 }
 
-export { ListEmpty } from '#/shared/ui/list-blocks'
+export { ListEmpty, ListNoResult } from '#/shared/ui/list-blocks'
 
 /** The first-load error block with the list's text. */
 export function ListLoadError(props: { onRetry: () => void; busy: boolean }) {

@@ -1390,7 +1390,7 @@ describe('the board panel inside a category (story 3.2)', () => {
   const inCategory = (ui: ReactNode) => (
     <ListViewContext
       value={{
-        view: { sort: 'state', dir: 'desc', category: 'mteam-X' },
+        view: { sort: 'state', dir: 'desc', category: 'mteam-X', query: '' },
         viewReady: true,
         setView: () => {},
         pickView: () => {},
@@ -1398,6 +1398,10 @@ describe('the board panel inside a category (story 3.2)', () => {
         rememberedHint: false,
         openSettings: () => {},
         settingsOpen: false,
+        searchOpen: false,
+        openSearch: () => {},
+        setQuery: () => {},
+        closeSearch: () => {},
       }}
     >
       {ui}

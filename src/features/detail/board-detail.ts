@@ -23,8 +23,10 @@ export function useBoardDetailTarget({
   phone: boolean
 }): DetailTarget | null {
   const { hash, setHash } = useViewedHash()
-  // Story 3.2: the selected category's columns, like the board.
-  const { data: columns } = useBoardColumns(useListView().view.category)
+  // Story 3.2: the selected category's columns, like the board; story 3.5:
+  // with the keyword's filter too, so a torrent it filters out closes it.
+  const { view } = useListView()
+  const { data: columns } = useBoardColumns(view.category, view.query)
   const { data: torrents } = useMaindata(selectTorrents)
 
   const found = hash !== null && columns ? boardColumnOf(columns, hash) : null

@@ -6,6 +6,7 @@ import { mergeMaindata } from '#/lib/maindata-merge'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import {
   countAll,
+  countMatches,
   inCategory,
   boardColumnOf,
   selectBoardColumns,
@@ -595,5 +596,132 @@ describe('the category filter (story 3.2)', () => {
     expect(inCategory({ category: '' }, '__all__')).toBe(true)
     expect(inCategory({ category: 'X' }, 'X')).toBe(true)
     expect(inCategory({ category: 'X' }, '')).toBe(false)
+  })
+})
+
+// Story 3.5 (AR-41): the name filter, only inside the selectors.
+describe('the name filter (story 3.5)', () => {
+  const S1 = fakeHash(41)
+  const S2 = fakeHash(42)
+  const S3 = fakeHash(43)
+  const S4 = fakeHash(44)
+  const S5 = fakeHash(45)
+  const S6 = fakeHash(46)
+  const searchable = mergeMaindata(
+    undefined,
+    fakeResponse({
+      changed: [
+        t({
+          hash: S1,
+          name: 'Fake.Show.S01E01.1080p',
+          added_on: 1_790_000_600,
+          category: 'mteam-tv',
+        }),
+        t({
+          hash: S2,
+          name: 'fake.show.s01e02.1080p',
+          added_on: 1_790_000_500,
+          category: 'mteam-tv',
+          state: 'stalledUP',
+          progress: 1,
+        }),
+        t({
+          hash: S3,
+          name: 'FAKE.SHOW.S01E03.ARCHIVED',
+          added_on: 1_790_000_400,
+          category: 'mteam-tv',
+          state: 'missingFiles',
+          private: false,
+        }),
+        t({
+          hash: S4,
+          name: 'Fake.Show.S01E04.1080p',
+          added_on: 1_790_000_300,
+          category: 'X',
+        }),
+        t({
+          hash: S5,
+          name: '<script>alert(1)</script> (2024)',
+          added_on: 1_790_000_200,
+          category: 'X',
+        }),
+        t({
+          hash: S6,
+          name: 'Fake.Other.S02E01',
+          added_on: 1_790_000_100,
+          category: 'mteam-tv',
+        }),
+      ],
+    }),
+  )
+  const view = (category: string, query: string) => ({
+    ...ADDED_NEWEST,
+    category,
+    query,
+  })
+
+  it('only the category, name only, any case, trimmed; archived left out of the list', () => {
+    expect(
+      selectVisibleTorrents(searchable, view('mteam-tv', '  Show.S01 ')),
+    ).toEqual([S1, S2])
+    expect(
+      selectVisibleTorrents(searchable, view('__all__', 'show.s01')),
+    ).toEqual([S1, S2, S4])
+  })
+
+  it('empty or only spaces is no filter', () => {
+    const all = selectVisibleTorrents(searchable, view('__all__', ''))
+    expect(all).toHaveLength(5)
+    expect(selectVisibleTorrents(searchable, view('__all__', '   '))).toEqual(
+      all,
+    )
+    expect(selectVisibleTorrents(searchable, ADDED_NEWEST)).toEqual(all)
+  })
+
+  it.each([
+    ['(', [S5]],
+    ['.*', []],
+    ['<script>', [S5]],
+    ['.', [S1, S2, S4, S6]],
+  ])('%j matches literally', (query, expected) => {
+    expect(selectVisibleTorrents(searchable, view('__all__', query))).toEqual(
+      expected,
+    )
+  })
+
+  it('the order stays the sort order', () => {
+    expect(
+      selectVisibleTorrents(searchable, {
+        sort: 'added_on',
+        dir: 'asc',
+        category: '__all__',
+        query: 'show',
+      }),
+    ).toEqual([S4, S2, S1])
+  })
+
+  it('countMatches: the category, the keyword, archived ones on request', () => {
+    expect(countMatches(searchable, 'mteam-tv', 'S01', false)).toBe(2)
+    expect(countMatches(searchable, 'mteam-tv', 'S01', true)).toBe(3)
+    expect(countMatches(searchable, 'mteam-tv', '', false)).toBe(3)
+    expect(countMatches(searchable, '__all__', '牧神記', true)).toBe(0)
+    expect(countMatches(searchable, 'nope', '', true)).toBe(0)
+  })
+
+  it('board columns, 已整理 included, hold only matching names of the category', () => {
+    const columns = selectBoardColumns(searchable, 'mteam-tv', 'S01')
+    expect(columns.downloading).toEqual([S1])
+    expect([...columns.seeding, ...columns.done]).toEqual([S2])
+    expect(columns.archived).toEqual([S3])
+    expect(columns.attention).toEqual([])
+    const none = selectBoardColumns(searchable, 'X', '牧神記')
+    expect(Object.values(none).every((hashes) => hashes.length === 0)).toBe(
+      true,
+    )
+    // No keyword: the category, as before.
+    expect(selectBoardColumns(searchable, 'mteam-tv').downloading).toEqual([
+      S1,
+      S6,
+    ])
   })
 })
