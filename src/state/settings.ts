@@ -2,17 +2,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   SETTINGS_WRITE_FAILURE_CODES,
+  orderSaveFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
+import { categoryOrderRowsOf, orderAfterMove } from '#/lib/category-order'
+import type { Maindata } from '#/lib/maindata-merge'
 import type {
   GetSettingsInput,
+  SetCategoryOrderInput,
   SetCategorySortInput,
   Settings,
 } from '#/shared/settings'
 import { callFn } from '#/state/call-fn'
 import { isLoginRequired, unlessLoginRequired } from '#/state/login-required'
 import type { TrackedOp } from '#/state/tracked-op'
+import { MAINDATA_KEY } from '#/state/maindata'
 
 // AD-8, story 3.1: `['settings']`, the settings file on the NAS (getSettings).
 // Not polled: read once, then again whenever the window regains focus, so
@@ -160,4 +165,71 @@ export function isSavingSort(client: QueryClient, category: string): boolean {
       predicate: (mutation) => mutation.options.scope?.id === scope,
     }) > 0
   )
+}
+
+export const ORDER_SAVE_OP = 'save-category-order'
+
+export type SetCategoryOrderCall = (
+  input: SetCategoryOrderInput,
+) => Promise<Settings>
+
+/** One arrow press on the settings page: which category, which way. */
+export interface CategoryOrderSave {
+  /** The category whose arrow was pressed (its row waits for the answer). */
+  key: string
+  /** `-1` up, `1` down. */
+  direction: -1 | 1
+}
+
+/**
+ * Story 3.3: saving a move in the category tab order (`setCategoryOrder`)
+ * through `sendOp`. The op carries the move, not an order: when the call
+ * runs it builds the whole new order from the current `['settings']` and
+ * `['maindata']` (orderAfterMove, which keeps saved entries not listed
+ * now), so a page left open, a press queued behind another or a later
+ * 「重試」 applies the same move to the newest order instead of resending an
+ * old snapshot. The input sent is still the whole order (idempotent on the
+ * container). Nothing is sent when the settings or maindata are unknown
+ * or the category cannot move that way any more (the answer is `null`).
+ * No optimistic move (AD-7): the list and the tabs take the order from the
+ * answer, which `applySettings` writes into `['settings']`. Its failure
+ * codes are a settings write's: the toast 「順序沒存到：…」 with 「重試」; a
+ * newer press closes the toast of an older one. All order saves share one
+ * mutation `scope`, so each runs after the one before has settled.
+ */
+export function categoryOrderOp(
+  call: SetCategoryOrderCall,
+  client: QueryClient,
+): TrackedOp<CategoryOrderSave, SettingsWriteFailureCode, Settings | null> {
+  return {
+    name: ORDER_SAVE_OP,
+    call: async ({ key, direction }) => {
+      const settings = client.getQueryData<Settings>(SETTINGS_KEY)
+      const maindata = client.getQueryData<Maindata>(MAINDATA_KEY)
+      if (settings === undefined || maindata === undefined) return null
+      const stored = settings.categoryOrder
+      const order = orderAfterMove({
+        stored,
+        listed: categoryOrderRowsOf(maindata, stored).map((row) => row.key),
+        key,
+        delta: direction,
+      })
+      return order === null ? null : call({ order })
+    },
+    keysOf: () => ['settings:order'],
+    scopeOf: () => ORDER_SAVE_OP,
+    failureCodes: SETTINGS_WRITE_FAILURE_CODES,
+    failureText: (_variables, code) => orderSaveFailureText(code),
+    onSuccess: (queryClient, _variables, settings) =>
+      settings === null ? undefined : applySettings(queryClient, settings),
+  }
+}
+
+/**
+ * Story 3.3: reads `['settings']` again now (the settings page on mount),
+ * so its arrows start from the file as it is, not an old answer.
+ */
+export function refreshSettings(client: QueryClient): Promise<void> {
+  if (isLoginRequired()) return Promise.resolve()
+  return client.refetchQueries({ queryKey: SETTINGS_KEY, exact: true })
 }

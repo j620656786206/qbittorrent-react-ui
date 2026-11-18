@@ -84,6 +84,35 @@ export interface CategoryTab {
 const collator = new Intl.Collator('zh-Hant')
 
 /**
+ * `keys` (no `ALL`) in tab order: those in `categoryOrder` first, in its
+ * order, then the rest by the name shown (「未分類」 for uncategorized;
+ * zh-Hant collation, then code units). Entries of `categoryOrder` not in
+ * `keys` are skipped. Story 3.3's settings list orders the same way.
+ */
+export function orderCategoryKeys(
+  keys: Iterable<string>,
+  categoryOrder: ReadonlyArray<string>,
+): Array<string> {
+  const present = new Set(keys)
+  const ordered: Array<string> = []
+  const placed = new Set<string>()
+  for (const key of categoryOrder) {
+    if (present.has(key) && !placed.has(key)) {
+      ordered.push(key)
+      placed.add(key)
+    }
+  }
+  const rest = [...present]
+    .filter((key) => !placed.has(key))
+    .sort(
+      (a, b) =>
+        collator.compare(categoryLabel(a), categoryLabel(b)) ||
+        (a < b ? -1 : a > b ? 1 : 0),
+    )
+  return [...ordered, ...rest]
+}
+
+/**
  * The tabs in order: 「全部」 first (`counts.all`), then the categories in
  * `categoryOrder` (settings), then the rest by the name shown (「未分類」
  * for uncategorized; `localeCompare` in zh-Hant). A category without any
@@ -106,24 +135,9 @@ export function categoryTabs({
   if (selected !== ALL && isTabCategory(selected) && !byKey.has(selected)) {
     byKey.set(selected, 0)
   }
-  const ordered: Array<string> = []
-  const placed = new Set<string>()
-  for (const key of categoryOrder) {
-    if (byKey.has(key) && !placed.has(key)) {
-      ordered.push(key)
-      placed.add(key)
-    }
-  }
-  const rest = [...byKey.keys()]
-    .filter((key) => !placed.has(key))
-    .sort(
-      (a, b) =>
-        collator.compare(categoryLabel(a), categoryLabel(b)) ||
-        (a < b ? -1 : a > b ? 1 : 0),
-    )
   return [
     { key: ALL, label: categoryLabel(ALL), count: counts.all },
-    ...[...ordered, ...rest].map((key) => ({
+    ...orderCategoryKeys(byKey.keys(), categoryOrder).map((key) => ({
       key,
       label: categoryLabel(key),
       count: byKey.get(key) ?? 0,

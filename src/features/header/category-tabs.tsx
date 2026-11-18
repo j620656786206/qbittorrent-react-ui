@@ -22,7 +22,9 @@ import { useHeader } from '#/features/header/header-context'
 // `aria-pressed`: they filter the list in place and have no arrow keys or
 // tab panel, so they are not announced as a WAI-ARIA tabs widget. Each
 // button is in the Tab order with the global focus ring. Clicking a tab
-// switches the category (`selectCategory`); the selected one does nothing.
+// switches the category (`selectCategory`); the layout ignores a click on
+// the selected one, except on the settings page (story 3.3: back to that
+// list).
 // Before the first maindata answer only 「全部」 shows, its count a
 // skeleton; after a failed first load its count is left out (spec 1.8).
 // Shortcut tooltips come in story 3.7.
@@ -104,9 +106,7 @@ function Tab({
       type="button"
       aria-pressed={selected}
       data-category={tab.key === ALL ? undefined : tab.key}
-      onClick={() => {
-        if (!selected) onSelect(tab.key)
-      }}
+      onClick={() => onSelect(tab.key)}
       className={cn(TAB_CLASS, selected ? SELECTED_CLASS : UNSELECTED_CLASS)}
     >
       <span>{tab.label}</span>

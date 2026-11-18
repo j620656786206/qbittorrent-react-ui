@@ -12,6 +12,7 @@ import {
 } from '#/shared/categories'
 import {
   MAX_COMMON_PATHS,
+  MAX_SETTINGS_BYTES,
   SETTINGS_VERSION,
   commonPathSchema,
   defaultSettings,
@@ -49,7 +50,6 @@ import type { CommonPath, Settings, SortChoice } from '#/shared/settings'
 // https://nodejs.org/docs/latest-v26.x/api/fs.html
 
 export const SETTINGS_FILE = 'settings.json'
-export const MAX_SETTINGS_BYTES = 262_144
 const MODE = 0o600
 
 export interface SettingsStoreOptions {

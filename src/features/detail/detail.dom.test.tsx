@@ -1396,6 +1396,8 @@ describe('the board panel inside a category (story 3.2)', () => {
         pickView: () => {},
         selectCategory: () => {},
         rememberedHint: false,
+        openSettings: () => {},
+        settingsOpen: false,
       }}
     >
       {ui}

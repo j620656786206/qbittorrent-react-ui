@@ -169,6 +169,8 @@ function app() {
           pickView: () => {},
           selectCategory: () => {},
           rememberedHint: false,
+          openSettings: () => {},
+          settingsOpen: false,
         }}
       >
         <ViewedHashContext value={{ hash: viewedHash, setHash }}>

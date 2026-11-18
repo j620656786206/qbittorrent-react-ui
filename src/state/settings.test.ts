@@ -6,18 +6,27 @@ import {
 import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '#/lib/app-error'
+import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import { ALL } from '#/shared/categories'
 import { defaultSettings } from '#/shared/settings'
-import type { SetCategorySortInput, Settings } from '#/shared/settings'
+import type {
+  SetCategoryOrderInput,
+  SetCategorySortInput,
+  Settings,
+} from '#/shared/settings'
 import { clearConnectionErrors, getConnectionErrors } from '#/state/connection'
 import { clearLoginRequired, markLoginRequired } from '#/state/login-required'
+import { MAINDATA_KEY } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
 import {
   SETTINGS_KEY,
   applySettings,
+  ORDER_SAVE_OP,
   bindFetchSettings,
+  categoryOrderOp,
   categorySortOp,
   isSavingSort,
+  refreshSettings,
 } from '#/state/settings'
 import type { FetchSettings, GetSettingsFn } from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
@@ -323,4 +332,195 @@ describe('categorySortOp', () => {
       expect(toastCalls.failures).toEqual([])
     },
   )
+})
+
+describe('categoryOrderOp (story 3.3)', () => {
+  const withOrder = (...order: Array<string>): Settings => ({
+    ...withSort('ratio'),
+    categoryOrder: order,
+  })
+
+  /** Categories a, b, c (torrents) and d (none), like the matrix. */
+  const maindata = fakeResponse({
+    changed: ['a', 'b', 'c'].map((category, i) =>
+      t({ hash: fakeHash(i + 1), category }),
+    ),
+    categories: Object.fromEntries(
+      ['a', 'b', 'c', 'd'].map((name) => [name, { name, savePath: '/data' }]),
+    ),
+  })
+
+  /** A client whose settings say `categoryOrder: ['b']`, maindata loaded. */
+  async function orderClient(settings = withOrder('b')): Promise<QueryClient> {
+    const client = createQueryClient({
+      currentPath: () => '/',
+      fetchSettings: async () => settings,
+      fetchMaindata: async () => maindata,
+    })
+    client.mount()
+    cleanups.push(() => {
+      client.unmount()
+      client.clear()
+    })
+    await client.fetchQuery({ queryKey: SETTINGS_KEY })
+    await client.fetchQuery({ queryKey: MAINDATA_KEY })
+    return client
+  }
+
+  function deferredCall() {
+    const answers: Array<(value: Settings) => void> = []
+    const call = vi.fn(
+      (_values: SetCategoryOrderInput) =>
+        new Promise<Settings>((resolve) => {
+          answers.push(resolve)
+        }),
+    )
+    return { call, answers }
+  }
+
+  const pending = (client: QueryClient) =>
+    client.isMutating({ mutationKey: [ORDER_SAVE_OP] })
+
+  it('carries the move and sends the whole order built from the current settings', async () => {
+    const client = await orderClient()
+    const { call, answers } = deferredCall()
+    sendOp(categoryOrderOp(call, client), client, { key: 'c', direction: -1 })
+    await flush()
+    // Matrix "Move up": b, a, c, d with c up.
+    expect(call.mock.calls[0][0]).toEqual({ order: ['b', 'c', 'a', 'd'] })
+    expect(pending(client)).toBe(1)
+    // No optimistic move: the settings stay until the answer.
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(withOrder('b'))
+    expect(toastCalls.dismissed).toEqual(['settings:order'])
+    answers[0](withOrder('b', 'c', 'a', 'd'))
+    await flush()
+    await flush()
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(
+      withOrder('b', 'c', 'a', 'd'),
+    )
+    expect(pending(client)).toBe(0)
+    expect(toastCalls.failures).toEqual([])
+  })
+
+  it('keeps saved entries that are not listed now', async () => {
+    // 未分類 is saved but no torrent is uncategorized; 'gone' is missing.
+    const client = await orderClient(withOrder('b', '', 'gone'))
+    const { call } = deferredCall()
+    sendOp(categoryOrderOp(call, client), client, { key: 'd', direction: -1 })
+    await flush()
+    expect(call.mock.calls[0][0]).toEqual({
+      order: ['b', '', 'gone', 'a', 'd', 'c'],
+    })
+  })
+
+  it('a queued press applies its move to the order the first answer saved', async () => {
+    const client = await orderClient()
+    const { call, answers } = deferredCall()
+    const op = categoryOrderOp(call, client)
+    sendOp(op, client, { key: 'c', direction: -1 })
+    sendOp(op, client, { key: 'd', direction: -1 })
+    await flush()
+    // The second waits for the first to settle.
+    expect(call).toHaveBeenCalledTimes(1)
+    answers[0](withOrder('b', 'c', 'a', 'd'))
+    await flush()
+    await flush()
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(call.mock.calls[1][0]).toEqual({ order: ['b', 'c', 'd', 'a'] })
+  })
+
+  it('nothing is sent when the category cannot move that way (any more)', async () => {
+    const client = await orderClient()
+    const { call } = deferredCall()
+    sendOp(categoryOrderOp(call, client), client, { key: 'b', direction: -1 })
+    await flush()
+    await flush()
+    expect(call).not.toHaveBeenCalled()
+    expect(pending(client)).toBe(0)
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(withOrder('b'))
+  })
+
+  it.each([
+    ['settings_write_failed', '順序沒存到：設定檔寫不進去'],
+    ['timeout', '順序沒存到：容器沒有回應，請再試一次'],
+    ['invalid_input', '順序沒存到：送出的資料格式不對'],
+  ] as const)(
+    '%s: the failure toast with 重試, the order unchanged',
+    async (code, text) => {
+      const client = await orderClient()
+      const call = vi
+        .fn<(values: SetCategoryOrderInput) => Promise<Settings>>()
+        .mockRejectedValueOnce(new AppError(code))
+        .mockResolvedValue(withOrder('b', 'c', 'a', 'd'))
+      sendOp(categoryOrderOp(call, client), client, {
+        key: 'c',
+        direction: -1,
+      })
+      await flush()
+      await flush()
+      expect(toastCalls.failures).toHaveLength(1)
+      expect(toastCalls.failures[0].text).toBe(text)
+      expect(toastCalls.failures[0].keys).toEqual(['settings:order'])
+      expect(client.getQueryData(SETTINGS_KEY)).toEqual(withOrder('b'))
+      toastCalls.failures[0].onRetry()
+      await flush()
+      await flush()
+      expect(call).toHaveBeenCalledTimes(2)
+      expect(call.mock.calls[1][0]).toEqual({ order: ['b', 'c', 'a', 'd'] })
+      expect(client.getQueryData(SETTINGS_KEY)).toEqual(
+        withOrder('b', 'c', 'a', 'd'),
+      )
+    },
+  )
+
+  it('重試 after the settings changed elsewhere reapplies the move to the new order', async () => {
+    const client = await orderClient()
+    const call = vi
+      .fn<(values: SetCategoryOrderInput) => Promise<Settings>>()
+      .mockRejectedValueOnce(new AppError('settings_write_failed'))
+      .mockImplementation(async ({ order }) => withOrder(...order))
+    sendOp(categoryOrderOp(call, client), client, { key: 'c', direction: -1 })
+    await flush()
+    await flush()
+    expect(call.mock.calls[0][0]).toEqual({ order: ['b', 'c', 'a', 'd'] })
+    // Another device saved a new order; this page read it (focus, mount).
+    await applySettings(client, withOrder('d', 'a', 'c', 'b'))
+    toastCalls.failures[0].onRetry()
+    await flush()
+    await flush()
+    // c up in d, a, c, b, not the old snapshot.
+    expect(call.mock.calls[1][0]).toEqual({ order: ['d', 'c', 'a', 'b'] })
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(
+      withOrder('d', 'c', 'a', 'b'),
+    )
+  })
+
+  it.each([
+    ['home_unreachable'],
+    ['not_logged_in'],
+    ['qbit_rejected'],
+  ] as const)(
+    '%s: no toast (the global handler, or not a settings write failure)',
+    async (code) => {
+      const client = await orderClient()
+      const call = vi.fn(() => Promise.reject(new AppError(code)))
+      sendOp(categoryOrderOp(call, client), client, {
+        key: 'c',
+        direction: -1,
+      })
+      await flush()
+      await flush()
+      expect(toastCalls.failures).toEqual([])
+      expect(client.getQueryData(SETTINGS_KEY)).toEqual(withOrder('b'))
+    },
+  )
+
+  it('refreshSettings reads the settings again', async () => {
+    const fetchSettings = vi.fn<FetchSettings>(async () => withOrder('b'))
+    const { client } = setup(fetchSettings)
+    await flush()
+    expect(fetchSettings).toHaveBeenCalledTimes(1)
+    await refreshSettings(client)
+    expect(fetchSettings).toHaveBeenCalledTimes(2)
+  })
 })

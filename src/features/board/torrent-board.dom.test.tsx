@@ -152,6 +152,8 @@ function boardTree() {
           pickView: () => {},
           selectCategory: () => {},
           rememberedHint: false,
+          openSettings: () => {},
+          settingsOpen: false,
         }}
       >
         <ViewedHashContext value={{ hash: null, setHash }}>

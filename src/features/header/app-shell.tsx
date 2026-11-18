@@ -27,9 +27,11 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // sort pill, which stays at the right and never shrinks; the phone's
 // category button stays inert until story 3.4 but names the category on
 // screen and its count.
-// Epic 1 placeholders (search, 新增, shortcuts, settings, phone category)
-// carry the native `disabled`: 50% and not-allowed from the base rule,
-// no hover, not focusable, and no `title` (their shortcuts do not exist yet).
+// Story 3.3: the desktop 設定 button opens `/settings`; there it stays
+// focusable with `aria-current="page"`. Epic 1 placeholders (search, 新增,
+// shortcuts, phone category) carry the native `disabled`: 50% and
+// not-allowed from the base rule, no hover, not focusable, and no `title`
+// (their shortcuts do not exist yet).
 //
 // The header model is computed once per tick in HeaderProvider; the layout
 // and the page (`children`) keep their identity, so only the small leaves
@@ -66,9 +68,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
           <IconButton label="快捷鍵">
             <Keyboard size={20} strokeWidth={2} aria-hidden="true" />
           </IconButton>
-          <IconButton label="設定">
-            <Settings size={20} strokeWidth={2} aria-hidden="true" />
-          </IconButton>
+          <SettingsButton />
         </header>
         <DesktopBar />
 
@@ -108,20 +108,38 @@ export function ShellLayout({ children }: { children: ReactNode }) {
   )
 }
 
+/** Story 3.3: the desktop header's 設定 button opens the settings page. */
+function SettingsButton() {
+  const { openSettings, settingsOpen } = useListView()
+  return (
+    <IconButton label="設定" onClick={openSettings} current={settingsOpen}>
+      <Settings size={20} strokeWidth={2} aria-hidden="true" />
+    </IconButton>
+  )
+}
+
+/** A header icon button; without `onClick` an inert Epic 1 placeholder. */
 function IconButton({
   label,
   phone = false,
+  onClick,
+  current = false,
   children,
 }: {
   label: string
   phone?: boolean
+  onClick?: () => void
+  /** The page this button opens is on screen. */
+  current?: boolean
   children: ReactNode
 }) {
   return (
     <button
       type="button"
-      disabled
+      disabled={onClick === undefined}
+      onClick={onClick}
       aria-label={label}
+      aria-current={current ? 'page' : undefined}
       className={cn(
         'inline-flex flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline',
         phone ? 'size-11' : 'size-9',
