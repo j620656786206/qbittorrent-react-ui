@@ -16,7 +16,11 @@ import { TORRENT_HASH_PATTERN } from '#/shared/torrent-hash'
 // selected category tab. Absent is 「全部」 (`ALL` never appears in the URL);
 // uncategorized is `category=` with an empty value (Claude 代決; the
 // router's default serializer keeps an empty string as `category=` and
-// reads it back as `''`).
+// reads it back as `''`). The router also JSON-parses values, so a typed
+// or shared `?category=2024` (or `true`, `null`) arrives as a number,
+// boolean or null: `category` turns those back into the text typed (the
+// router writes such a name quoted, `category=%222024%22`, which reads back
+// as text). Absent is the key missing, never `null`.
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
 
 export interface SortView {
@@ -34,6 +38,21 @@ export const DEFAULT_SORT_VIEW: SortView = Object.freeze({
   dir: sortField('state').defaultDir,
 })
 
+/**
+ * A `category` value as the router parsed it, back to the text in the
+ * address bar: a number, boolean or `null` from JSON parsing becomes its
+ * text; anything else stays as is.
+ */
+export function categoryText(value: unknown): unknown {
+  if (value === null) return 'null'
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return value
+}
+
+const categorySchema = z.preprocess(categoryText, categoryOrderEntrySchema)
+
 export const listSearchSchema = z.object({
   sort: z.enum(SORT_FIELD_IDS).optional().catch(undefined),
   dir: z.enum(SORT_DIRS).optional().catch(undefined),
@@ -43,7 +62,7 @@ export const listSearchSchema = z.object({
    * Story 3.2: the selected category, a name or `''` (uncategorized);
    * absent is 「全部」.
    */
-  category: categoryOrderEntrySchema.optional().catch(undefined),
+  category: categorySchema.optional().catch(undefined),
 })
 
 export type ListSearch = z.infer<typeof listSearchSchema>
@@ -85,8 +104,8 @@ const isDir = (value: unknown): value is SortDir =>
 const isHash = (value: unknown): value is string =>
   typeof value === 'string' && TORRENT_HASH_PATTERN.test(value)
 
-const isCategory = (value: unknown): value is string =>
-  categoryOrderEntrySchema.safeParse(value).success
+const isCategory = (value: unknown): boolean =>
+  categorySchema.safeParse(value).success
 
 /**
  * The raw (unvalidated) search with the bad params removed, or `null` when

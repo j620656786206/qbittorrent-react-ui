@@ -5,7 +5,7 @@ created: '2026-11-18'
 status: 'done'
 baseline_revision: '42beea66e8a2965a2562adb5e8109c73ca927a07'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -140,6 +140,41 @@ deferred: []
   - `[low]` `[patch]` (edge) The trace script can hang : throws if already selected, rejects after 5 s.
   - `[low]` `[patch]` (edge, claim) Some real categories get a tab that never filters : refused names have no tab.
 
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 31 findings, high 0, medium 0, low 25, false 6, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (intent) The hint skips the 「狀態」 fallback (four causes) : first-pass decision recorded in the Spec Change Log, matching EXPERIENCE.
+  - `[false]` `[reject]` (intent) The tabs use a group with `aria-pressed` : first-pass decision recorded.
+  - `[false]` `[reject]` (intent) The phone button shows the category : first-pass fix recorded.
+  - `[low]` `[reject]` (intent) A schema-invalid `category` is dropped before maindata answers : such a value can never become a tab; only a well-formed missing one needs to wait.
+  - `[low]` `[reject]` (intent) The entrance order against the rows committing is not tested : the replay runs from a layout effect keyed on the committed category (2.9's contract); the generation test pins once per click.
+  - `[low]` `[patch]` (intent) The Auto Run Result prose says `aria-selected` while the script watches `aria-pressed` : prose corrected.
+  - `[low]` `[reject]` (intent) No test checks a board column's scroll after a switch : the board remounts per category, so columns start at the top.
+  - `[false]` `[reject]` (intent) Additions beyond the contract : first-pass fixes and logged Claude 代決.
+  - `[low]` `[patch]` (verification-gap) A reload on a far-right category is not tested to scroll into view : test added (tabs arrive after mount).
+  - `[low]` `[patch]` (verification-gap, other) `categoryOfSearch` is unused : resolved (one source).
+  - `[false]` `[reject]` (verification-gap, other) The spec text says `tablist` : the deviation is recorded in the Spec Change Log; the contract block is not edited.
+  - `[low]` `[reject]` (blind) The phone has no way back to 「全部」 : only a shared desktop URL or a narrowed window leads there; Story 3.4 adds the phone category list next.
+  - `[low]` `[patch]` (blind) The hint can show after a category change no click made : the fallback resets the cause and the replay target; the hint also checks the switched category.
+  - `[low]` `[patch]` (blind) A misnamed test : renamed; the real `confirmed: null` case added.
+  - `[low]` `[patch]` (blind) The out-of-category `hash` on load is half covered : URL asserted for the list; phone list case added.
+  - `[low]` `[patch]` (blind) The scroller-to-top test passes without a scroller : asserts the same node.
+  - `[low]` `[patch]` (blind) The pill-keeps-its-place e2e covers only a switch without the hint : non-null boxes asserted; the hint case checked too.
+  - `[low]` `[patch]` (blind) The trace script never checks which mode it timed : fails unless each mode shows its view.
+  - `[low]` `[patch]` (blind) `rememberAddedOn` waits on any matching POST : decodes the save and matches the category.
+  - `[low]` `[patch]` (blind) JSON-looking category names (`2024`) fall back from a typed URL : numbers and booleans coerced back to strings; round-trip test with a `2024` category.
+  - `[low]` `[reject]` (blind) No left fade once the row is scrolled right : DESIGN names a right fade only; the selected tab is always in view.
+  - `[low]` `[reject]` (blind) A poll that reorders tabs can push the selected one out of view : the next switch scrolls it back; order changes are rare (settings page in 3.3).
+  - `[low]` `[patch]` (blind) The tab-order test checks the collation against itself : literal expected order.
+  - `[low]` `[patch]` (blind) The "still saving" check ignores categories : scoped to the current category; test added.
+  - `[low]` `[reject]` (blind) The phone button's loading and failure states are untested : they reuse the 「全部」 button's tested branches.
+  - `[low]` `[reject]` (edge) A tab click while that category's save is in flight shows the previous sort : needs a switch away and back within one save round trip.
+  - `[low]` `[patch]` (edge) The fallback leaves the hint and a stale replay target : same as the blind hint entry; fixed there.
+  - `[low]` `[patch]` (edge) A fake-qbit child that exits is not noticed : the script rejects when the child exits early.
+  - `[low]` `[patch]` (edge) `boundingBox()` null passes the pill check : same as the blind e2e entry; fixed there.
+  - `[low]` `[reject]` (edge, claim) The remembered sort right after a pick is not in the cache yet : same as the in-flight entry above.
+  - `[false]` `[reject]` (edge, claim) No hint when the app falls back to 「狀態」 : deliberate, recorded.
+
 ## Design Notes
 
 Who changed the sort is state the layout owns: set `category-switch` when a tab click applies a remembered sort, `manual` on `pickView`, `open` on first load and reload. The hint function stays pure; the layout passes it the sort before the switch, the sort after and the cause.
@@ -165,10 +200,14 @@ Status: implemented, review not run yet.
 
 **Claude 代決 (for the PR).** `category=` (empty) for uncategorized, label 「未分類」; names outside `categoryOrder` sorted by the label shown with `Intl.Collator('zh-Hant')`; category keys the URL cannot carry (`__all__`, `__proto__`, over 255 characters, control characters) get no tab, their torrents count under 「全部」; the existing disabled 「新增種子」 empty block reused; the phone category button stays inert until 3.4 but shows the selected category and its count; another category remounts the board (columns back at the top, auto-collapse and the open 已整理 column reset); the list's viewed row resets per category (first row, no "successor" from the old order); the hint is also read in the pill's `aria-label` and shows only when a remembered sort was applied (the 「狀態」 fallback of a category that remembers none is cause `category-default`, no hint; following another device clears it); the tabs are plain buttons in a group labelled 「分類」 with `aria-pressed` (review: no arrow keys or tab panel, so not a `tablist`); the tab order waits for the settings like the list.
 
-**Performance (100 ms budget).** `node scripts/trace-category-switch.mjs` on the built app with fake-qbit `many` (4165 visible torrents; X 1387, mteam-X 1389, mteam-tv 1389), headless Chromium 1440 x 900, dev Mac, 2026-11-18. Method: in the page, `performance.now()` before the tab's `click()`; commit when the tab turns `aria-selected` (same commit as the new rows); frame after a `requestAnimationFrame` plus a `MessageChannel` task (the first painted frame with the new rows). 20 switches per mode (X, mteam-X, mteam-tv, 全部, five rounds):
+**Performance (100 ms budget).** `node scripts/trace-category-switch.mjs` on the built app with fake-qbit `many` (4165 visible torrents; X 1387, mteam-X 1389, mteam-tv 1389), headless Chromium 1440 x 900, dev Mac, 2026-11-18. Method: in the page, `performance.now()` before the tab's `click()`; commit when the tab turns `aria-pressed` (same commit as the new rows); frame after a `requestAnimationFrame` plus a `MessageChannel` task (the first painted frame with the new rows). 20 switches per mode (X, mteam-X, mteam-tv, 全部, five rounds):
 - list (every category remembers 加入時間): frame median 14.4 ms, p95 17.0 ms, max 17.8 ms; commit median 5.6 ms, max 7.2 ms.
 - board (nothing remembered): frame median 9.3 ms, p95 11.7 ms, max 13.1 ms; commit median 7.2 ms, max 10.5 ms.
 (Second run after the review fixes; the first run was list max 19.0 ms, board max 11.7 ms.)
 Summary JSON: `e2e-output/screenshots/3-2/switch-timing.json` (gitignored).
 
 **Screenshots.** `e2e-output/screenshots/3-2/` from `e2e/category-tabs.spec.ts`, desktop 1280 x 800, light and dark: `tabs-overflow-*`, `tabs-selected-far-right-*`, `remembered-hint-*`, `emptied-category-*`. Fake data `data=categories` (21 code-name categories plus `only-archived`) and `data=categories-emptied` added to `scripts/fake-qbit.mjs`.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 31 findings, no high or medium: patched the low ones (the hint is tied to the switched category and reset by a fallback, the saving check is per category, JSON-looking category names round-trip, more tests for reload scroll, phone hash and pill layout with the hint, a stricter timing script); rejected the rest with reasons. Follow-up review: not recommended. Timing rerun after the patches: list max 16.6 ms, board max 12.7 ms on 4,165 fake torrents.

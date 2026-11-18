@@ -46,7 +46,7 @@ export function useFollowRememberedSort(
       after: remembered,
       shown: last.view,
       next: view,
-      saving: isSavingSort(client),
+      saving: isSavingSort(client, category),
     })
     if (next !== null) follow(next)
   }, [client, remembered, view, ready, follow, category])

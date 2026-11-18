@@ -1,3 +1,7 @@
+import {
+  defaultParseSearch,
+  defaultStringifySearch,
+} from '@tanstack/react-router'
 import { describe, expect, it } from 'vitest'
 import { ALL } from '#/shared/categories'
 import {
@@ -211,8 +215,8 @@ describe('category in the search', () => {
   })
 
   it.each([
-    [123],
-    [true],
+    [{ name: 'x' }],
+    [['a']],
     [ALL],
     ['bad\u0001name'],
     ['x'.repeat(256)],
@@ -230,7 +234,9 @@ describe('category in the search', () => {
   it('fixListSearch drops a bad category alone and keeps a good one', () => {
     expect(fixListSearch({ category: 'mteam-X', sort: 'ratio' })).toBeNull()
     expect(fixListSearch({ category: '' })).toBeNull()
-    expect(fixListSearch({ category: 7, sort: 'ratio', dir: 'asc' })).toEqual({
+    expect(
+      fixListSearch({ category: { x: 1 }, sort: 'ratio', dir: 'asc' }),
+    ).toEqual({
       sort: 'ratio',
       dir: 'asc',
     })
@@ -253,5 +259,37 @@ describe('category in the search', () => {
       sort: 'ratio',
       dir: 'asc',
     })
+  })
+})
+
+// Review: the router JSON-parses search values, so a name like `2024`
+// arrives as a number from a typed URL and must still be that category.
+describe('category names the router parses as JSON', () => {
+  it.each([
+    [2024, '2024'],
+    [-5, '-5'],
+    [true, 'true'],
+    [false, 'false'],
+    [null, 'null'],
+  ])('%j reads as the text %j', (raw, text) => {
+    expect(listSearchSchema.parse({ category: raw }).category).toBe(text)
+    expect(fixListSearch({ category: raw })).toBeNull()
+  })
+
+  it('round-trips through the router serializer, written and typed', () => {
+    for (const name of ['2024', 'true', 'null', 'mteam-X', '']) {
+      const url = defaultStringifySearch({ category: name })
+      const parsed = defaultParseSearch(url) as Record<string, unknown>
+      expect(listSearchSchema.parse(parsed).category).toBe(name)
+    }
+    // Typed by hand, unquoted.
+    for (const [url, name] of [
+      ['?category=2024', '2024'],
+      ['?category=true', 'true'],
+      ['?category=null', 'null'],
+    ] as const) {
+      const parsed = defaultParseSearch(url) as Record<string, unknown>
+      expect(listSearchSchema.parse(parsed).category).toBe(name)
+    }
   })
 })

@@ -26,6 +26,7 @@ import { setCategorySort } from '#/server/functions/set-category-sort'
 import { ALL } from '#/shared/categories'
 import {
   DEFAULT_SORT_VIEW,
+  categoryOfSearch,
   fixListSearch,
   listSearchSchema,
   normalizeSortView,
@@ -94,6 +95,16 @@ export const Route = createFileRoute('/_authed')({
 
 const saveSortOp = categorySortOp((values) => callFn(setCategorySort, values))
 
+/** A sort change and the category it happened on (`null`: none). */
+type SortChangeOn = SortChange & { category: string | null }
+
+const OPENED: SortChangeOn = {
+  before: null,
+  after: null,
+  cause: 'open',
+  category: null,
+}
+
 /** The layout's latest values, for callbacks that stay stable. */
 interface Latest {
   category: string
@@ -126,7 +137,7 @@ function AuthedLayout() {
   // The category confirmed on screen (it keeps its tab once it empties).
   const confirmedRef = useRef<string | null>(null)
   const resolved = resolveCategory({
-    requested: urlCategory ?? ALL,
+    requested: categoryOfSearch({ category: urlCategory }),
     counts,
     confirmed: confirmedRef.current,
   })
@@ -134,8 +145,20 @@ function AuthedLayout() {
   useLayoutEffect(() => {
     confirmedRef.current = resolved.confirmed
   })
+  // Who changed the sort last, and for which category (the hint shows only
+  // on the category a tab click switched to).
+  const [sortChange, setSortChange] = useState<SortChangeOn>(OPENED)
+  // The category a tab click switched to; the layout effect below replays
+  // the entrance once that category's rows have committed
+  // (src/state/entrance.ts). Any other category change (a fallback to
+  // 「全部」) only drops it.
+  const replayRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!invalid) return
+    // Not a click: no hint, no replay left waiting.
+    setSortChange(OPENED)
+    replayRef.current = null
     void navigate({
       to: '.',
       search: (previous) => searchWithCategory(previous, ALL) as never,
@@ -157,13 +180,10 @@ function AuthedLayout() {
     latestRef.current = { category, settings, hash, view }
   })
 
-  const [sortChange, setSortChange] = useState<SortChange>({
-    before: null,
-    after: null,
-    cause: 'open',
-  })
   const rememberedHint =
-    showsRememberedHint(sortChange) && sameSort(view, sortChange.after)
+    showsRememberedHint(sortChange) &&
+    sortChange.category === category &&
+    sameSort(view, sortChange.after)
 
   const setView = useCallback(
     (next: SortView) => {
@@ -181,9 +201,15 @@ function AuthedLayout() {
   const pickView = useCallback(
     (next: SortView) => {
       setView(next)
-      setSortChange({ before: null, after: null, cause: 'manual' })
+      const { category: current } = latestRef.current
+      setSortChange({
+        before: null,
+        after: null,
+        cause: 'manual',
+        category: current,
+      })
       sendOp(saveSortOp, client, {
-        category: latestRef.current.category,
+        category: current,
         sort: next.sort,
         dir: next.dir,
       })
@@ -191,11 +217,6 @@ function AuthedLayout() {
     [setView, client],
   )
 
-  // The category a tab click switched to; the layout effect below replays
-  // the entrance once that category's rows have committed
-  // (src/state/entrance.ts). Any other category change (a fallback to
-  // 「全部」) only drops it.
-  const replayRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const target = replayRef.current
     replayRef.current = null
@@ -222,6 +243,7 @@ function AuthedLayout() {
         before: { sort: latest.view.sort, dir: latest.view.dir },
         after: nextView,
         cause: nextRemembered ? 'category-switch' : 'category-default',
+        category: next,
       })
       replayRef.current = next
       resetListScroll()
@@ -246,7 +268,7 @@ function AuthedLayout() {
       resetListScroll()
       setView(next)
       // Another device's sort is not this category's switch: no hint.
-      setSortChange({ before: null, after: null, cause: 'open' })
+      setSortChange(OPENED)
     },
     [setView],
   )

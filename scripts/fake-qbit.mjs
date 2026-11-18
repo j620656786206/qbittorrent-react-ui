@@ -44,8 +44,9 @@
 //          已整理); the first has a long save path with Chinese in it;
 //          story 2.10 adds a 13th (0x300d), another 錯誤 whose log reason
 //          has a fake path and a 203.0.113.x address (never shown)
-//          categories (story 3.2): 21 code-name categories (mteam-X,
-//          mteam-tv, X, cat-01 to cat-16, uncategorized, a markup name)
+//          categories (story 3.2): 22 code-name categories (mteam-X,
+//          mteam-tv, X, cat-01 to cat-16, uncategorized, a markup name,
+//          2024)
 //          of 1 to 4 torrents each, plus `only-archived` with one archived
 //          torrent, so the desktop tab row overflows; categories-emptied:
 //          the same without mteam-X
@@ -570,7 +571,8 @@ const STATES = Object.fromEntries(
 
 // Story 3.2 `data=categories`: enough categories to overflow the desktop
 // tab row. Code names only: mteam-X, mteam-tv, X, cat-01 to cat-16, the
-// uncategorized key '', a markup name (shown as plain text) and
+// uncategorized key '', a markup name (shown as plain text), `2024` (a
+// name the router reads as a number when typed in a URL) and
 // `only-archived`, which holds archived torrents only (its tab reads 0).
 // Each category holds 1 to 4 torrents, alternately downloading and
 // seeding. `categories-emptied` is the same set without mteam-X (the
@@ -585,6 +587,8 @@ const CATEGORY_NAMES = [
   ),
   '',
   '<script>alert(1)</script>',
+  // A name the router parses as a number from a typed URL.
+  '2024',
 ]
 const CATEGORY_SET = CATEGORY_NAMES.flatMap((category, c) =>
   Array.from({ length: (c % 4) + 1 }, (_, i) => {

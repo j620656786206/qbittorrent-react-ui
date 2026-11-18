@@ -10,7 +10,8 @@
 // `aria-pressed`, in the same commit as the new rows), then the first
 // frame after it: a `requestAnimationFrame` callback, then a message-channel
 // task, which runs after that frame was painted. Reports every switch and
-// the median, p95 and max per mode, and writes a JSON summary to
+// the median, p95 and max per mode, fails unless every list switch shows
+// the list and every board switch the board, and writes a JSON summary to
 // e2e-output/screenshots/3-2/switch-timing.json.
 //
 // Usage: npm run build && node scripts/trace-category-switch.mjs
@@ -18,6 +19,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
+import { fromJSON } from 'seroval'
 
 const PORT = 3293
 const BASE = `http://localhost:${PORT}`
@@ -66,13 +68,32 @@ const tab = (page, label) =>
       }),
     })
 
-/** Picks 加入時間 in the desktop sort menu and waits for the save. */
-async function rememberAddedOn(page) {
+/**
+ * The `category` of a setCategorySort call's input, decoded (Start sends
+ * it with seroval's `toJSONAsync`), or `undefined` for any other call.
+ */
+function savedCategory(body) {
+  if (body === null) return undefined
+  let payload
+  try {
+    payload = fromJSON(JSON.parse(body))
+  } catch {
+    return undefined
+  }
+  const data = payload?.data
+  return data && typeof data === 'object' && 'sort' in data
+    ? data.category
+    : undefined
+}
+
+/** Picks 加入時間 for the tab `label` and waits for exactly its save. */
+async function rememberAddedOn(page, label) {
+  const category = label === '全部' ? '__all__' : label
   const saved = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
       response.url().includes('/_serverFn/') &&
-      (response.request().postData() ?? '').includes('category'),
+      savedCategory(response.request().postData()) === category,
   )
   await page.getByRole('button', { name: /^排序：.*，(列表|看板)$/ }).click()
   await page
@@ -172,9 +193,27 @@ const server = spawn(
 )
 // fake-qbit's and the app's errors show up in this script's output.
 server.stderr.pipe(process.stderr)
+// fake-qbit exiting early (the port taken, a crash) fails the run.
+let finished = false
+const serverExited = new Promise((_, reject) => {
+  server.on('exit', (code, signal) => {
+    if (!finished) {
+      reject(new Error(`fake-qbit exited early (${signal ?? code})`))
+    }
+  })
+})
+serverExited.catch(() => {})
 
 let browser
 try {
+  await Promise.race([measure(), serverExited])
+} finally {
+  finished = true
+  await browser?.close()
+  server.kill('SIGTERM')
+}
+
+async function measure() {
   await waitForHealth()
   await post('/__fake/mode?data=many')
   await post('/__fake/settings?reset=1')
@@ -196,7 +235,7 @@ try {
   // List: every category remembers 加入時間.
   for (const label of CYCLE) {
     await tab(page, label).click()
-    await rememberAddedOn(page)
+    await rememberAddedOn(page, label)
   }
   await sleep(1500)
   const list = await runMode(page, 'list')
@@ -210,8 +249,14 @@ try {
       'in-page performance.now() before the tab click(); commit = the tab turns aria-pressed (same commit as the new rows); frame = requestAnimationFrame then a MessageChannel task (after the first frame with the new rows is painted)',
     budgetMs: BUDGET_MS,
     runs,
-    ok: runs.every((run) => run.frame.max <= BUDGET_MS),
+    // Each mode really showed what it measures: a list run that fell back
+    // to the board (a failed setup) never counts as list timings.
+    showsExpected:
+      list.switches.every((entry) => entry.shows.startsWith('種子列表')) &&
+      board.switches.every((entry) => entry.shows === 'board'),
   }
+  result.ok =
+    result.showsExpected && runs.every((run) => run.frame.max <= BUDGET_MS)
   writeFileSync(
     `${OUT_DIR}/switch-timing.json`,
     `${JSON.stringify(result, null, 2)}\n`,
@@ -226,9 +271,9 @@ try {
       )
     }
   }
-  console.log(result.ok ? 'ok: within budget' : 'OVER BUDGET')
+  if (!result.showsExpected) {
+    console.log('FAILED: a run did not show its mode (list or board)')
+  }
+  console.log(result.ok ? 'ok: within budget' : 'NOT OK')
   if (!result.ok) process.exitCode = 1
-} finally {
-  await browser?.close()
-  server.kill('SIGTERM')
 }

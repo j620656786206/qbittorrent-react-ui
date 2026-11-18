@@ -238,9 +238,15 @@ describe('resolveCategory', () => {
     ).toEqual({ category: 'gone', invalid: false, confirmed: 'gone' })
   })
 
-  it('a reload on a vanished category (nothing confirmed) falls back', () => {
+  it('a vanished category while another one was confirmed falls back', () => {
     expect(
       resolveCategory({ requested: 'gone', counts, confirmed: 'mteam-X' }),
+    ).toEqual({ category: ALL, invalid: true, confirmed: null })
+  })
+
+  it('a reload on a vanished category (nothing confirmed) falls back', () => {
+    expect(
+      resolveCategory({ requested: 'gone', counts, confirmed: null }),
     ).toEqual({ category: ALL, invalid: true, confirmed: null })
   })
 })

@@ -226,6 +226,29 @@ test('a category no torrent has falls back to 全部 with the URL fixed', async 
   await expect(page.getByRole('listitem')).toHaveCount(4)
 })
 
+test('a category the router reads as a number (2024) round-trips', async ({
+  page,
+  request,
+}) => {
+  await setModes(request, { data: 'categories' })
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  await tab(page, '2024').click()
+  await expect(tab(page, '2024')).toHaveAttribute('aria-pressed', 'true')
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('category'))
+    .toBe('"2024"')
+  // Reload what the app wrote, then the name typed by hand.
+  await page.reload()
+  await expect(tab(page, '2024')).toHaveAttribute('aria-pressed', 'true')
+  await page.goto('/?category=2024')
+  await expect(tab(page, '2024')).toHaveAttribute('aria-pressed', 'true')
+  // The router rewrites the typed number in its own quoted form.
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('category'))
+    .toBe('"2024"')
+})
+
 for (const scheme of ['light', 'dark'] as const) {
   test(`screenshots for the PR (${scheme})`, async ({ page, request }) => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true })
@@ -263,8 +286,11 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(last).toHaveAttribute('aria-pressed', 'true')
     await expect(fade).toHaveCount(0)
     const pillAfter = await sortPill(page).boundingBox()
-    expect(pillAfter?.x).toBe(pillBefore?.x)
-    expect(pillAfter?.width).toBe(pillBefore?.width)
+    if (pillBefore === null || pillAfter === null) {
+      throw new Error('the sort pill has no box')
+    }
+    expect(pillAfter.x).toBe(pillBefore.x)
+    expect(pillAfter.width).toBe(pillBefore.width)
     const inView = await last.evaluate((element) => {
       const box = element.getBoundingClientRect()
       const scroller = element.parentElement?.getBoundingClientRect()
@@ -287,6 +313,22 @@ for (const scheme of ['light', 'dark'] as const) {
     await tab(page, 'cat-03').click()
     await expect(sortPill(page)).toContainText(HINT)
     await expect(page.getByRole('listitem').first()).toBeVisible()
+    // With the hint the pill is wider: it stays whole at the right of the
+    // row, and the tab row still does not wrap.
+    const withHint = await sortPill(page).boundingBox()
+    const filterRow = await tablist(page).locator('xpath=../..').boundingBox()
+    if (withHint === null || filterRow === null) {
+      throw new Error('the sort pill or the filter row has no box')
+    }
+    expect(withHint.x + withHint.width).toBeLessThanOrEqual(
+      filterRow.x + filterRow.width + 0.5,
+    )
+    expect(withHint.x).toBeGreaterThan(filterRow.x)
+    expect(withHint.height).toBeLessThan(50)
+    const rowHeight = await tablist(page).evaluate(
+      (element) => element.getBoundingClientRect().height,
+    )
+    expect(rowHeight).toBeLessThan(50)
     await settle(page)
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/remembered-hint-desktop-${scheme}.png`,

@@ -174,6 +174,21 @@ describe('the desktop category tabs', () => {
     expect(scrollIntoView.mock.contexts[0]).toBe(tabNamed('mteam-tv'))
   })
 
+  it('a reload on a far-right category scrolls it into view once the tabs arrive', async () => {
+    selected = 'mteam-tv'
+    tabs = undefined
+    await act(async () => render())
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    tabs = TABS
+    await act(async () => render())
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      block: 'nearest',
+      inline: 'nearest',
+    })
+    expect(scrollIntoView.mock.contexts[0]).toBe(tabNamed('mteam-tv'))
+  })
+
   it('the scroller hides its scrollbar, never wraps, keeps the selected clear of the fade', async () => {
     await act(async () => render())
     const className = tablist().className

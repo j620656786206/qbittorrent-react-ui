@@ -243,16 +243,15 @@ describe('the tab row', () => {
   it('「全部」 first, then categoryOrder, then the rest by name; counts without archived', async () => {
     settingsAnswer = remembering({}, ['X'])
     await mount('/')
-    const restLabels = [
-      'mteam-X',
-      '未分類',
-      'mteam-tv',
-      '<script>alert(1)</script>',
-    ].sort((a, b) => a.localeCompare(b, 'zh-Hant'))
+    // Pinned: zh-Hant puts the markup name, then 未分類 (by its label),
+    // then the Latin names.
     expect(tabs().map((text) => text.replace(/\d+$/, ''))).toEqual([
       '全部',
       'X',
-      ...restLabels,
+      '<script>alert(1)</script>',
+      '未分類',
+      'mteam-tv',
+      'mteam-X',
     ])
     expect(tab('全部').textContent).toBe('全部7')
     expect(tab('mteam-X').textContent).toBe('mteam-X3')
@@ -313,10 +312,12 @@ describe('a tab click', () => {
     })
     await mount('/')
     const scroller = document.getElementById(LIST_SCROLL_ID)
-    expect(scroller).not.toBeNull()
-    if (scroller) scroller.scrollTop = 300
+    if (scroller === null) throw new Error('no list scroller')
+    scroller.scrollTop = 300
     await click(tab('X'))
-    expect(document.getElementById(LIST_SCROLL_ID)?.scrollTop ?? 0).toBe(0)
+    // The same scroller (the list stayed mounted), back at the top.
+    expect(document.getElementById(LIST_SCROLL_ID)).toBe(scroller)
+    expect(scroller.scrollTop).toBe(0)
   })
 
   it('no remembered sort: 狀態; no hint when the sort before was 狀態 too', async () => {
@@ -405,6 +406,48 @@ describe('a tab click', () => {
     })
     expect(selectedTab()).toBe('全部')
     expect(entranceStore.state.generation).toBe(generation + 1)
+  })
+})
+
+describe('the hint after a change no click made', () => {
+  it('a fallback to 「全部」 with the same sort shows no hint', async () => {
+    settingsAnswer = remembering({
+      'mteam-X': { sort: 'seeding_time', dir: 'desc' },
+    })
+    await mount('/')
+    await click(tab('mteam-X'))
+    expect(pillText()).toContain('記住的')
+    await act(async () => {
+      await router.navigate({
+        to: '/',
+        search: {
+          category: 'nope',
+          sort: 'seeding_time',
+          dir: 'desc',
+        } as never,
+        replace: true,
+      })
+    })
+    expect(selectedTab()).toBe('全部')
+    expect(search()).toMatchObject({ sort: 'seeding_time' })
+    expect(pillText()).not.toContain('記住的')
+  })
+
+  it('another category reached without a click shows no hint', async () => {
+    settingsAnswer = remembering({
+      'mteam-X': { sort: 'seeding_time', dir: 'desc' },
+    })
+    await mount('/')
+    await click(tab('mteam-X'))
+    await act(async () => {
+      await router.navigate({
+        to: '/',
+        search: { category: 'X', sort: 'seeding_time', dir: 'desc' } as never,
+        replace: true,
+      })
+    })
+    expect(selectedTab()).toBe('X')
+    expect(pillText()).not.toContain('記住的')
   })
 })
 
@@ -550,6 +593,19 @@ describe('another device (story 3.1 follow rule, per category)', () => {
     expect(pillText()).not.toContain('記住的')
   })
 
+  it('a save in flight for another category never holds this one', async () => {
+    settingsAnswer = remembering({ X: { sort: 'seeding_time', dir: 'desc' } })
+    await mount('/?category=mteam-X&sort=added_on')
+    // mteam-X's save never answers (the mock keeps it pending).
+    await pick('ratio')
+    expect(saves).toEqual([{ category: 'mteam-X', sort: 'ratio', dir: 'desc' }])
+    await click(tab('X'))
+    expect(search()).toMatchObject({ category: 'X', sort: 'seeding_time' })
+    settingsAnswer = remembering({ X: { sort: 'name', dir: 'desc' } })
+    await refocus()
+    expect(search()).toMatchObject({ category: 'X', sort: 'name' })
+  })
+
   it('another category changing leaves the screen alone', async () => {
     settingsAnswer = remembering({
       'mteam-X': { sort: 'seeding_time', dir: 'desc' },
@@ -574,6 +630,25 @@ describe('a viewed torrent outside the category on load', () => {
     const body = document.body.textContent
     expect(body.includes('Fake.D') || body.includes('Fake.E')).toBe(true)
     expect(body).not.toContain('Fake.A')
+    // Story 2.4 row D3: a hash the list does not hold is left in the URL.
+    expect(search().hash).toBe(fakeHash(1))
+  })
+
+  it('list (phone): a detail from another category never opens', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    await mount(`/?category=X&sort=added_on&hash=${fakeHash(1)}`)
+    expect(selectedTab()).toBe('X')
+    expect('hash' in search()).toBe(false)
+    expect(document.body.textContent).not.toContain('Fake.A')
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('board: the detail closes', async () => {
