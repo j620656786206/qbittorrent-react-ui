@@ -170,10 +170,32 @@ describe('missing section (row 2)', () => {
     ).toEqual(['categorySort', 'commonPaths'])
   })
 
-  it('an unknown top-level key is dropped', async () => {
-    await writeRaw({ ...defaultSettings(), extra: { secret: 1 } })
+  it('an unknown top-level key is kept through reads and writes, never served', async () => {
+    // A section a newer image added without a new version (spine AD-8).
+    const file = { ...defaultSettings(), later: { kept: [1] } }
+    await writeRaw(file)
     expect(await store.read()).toEqual(defaultSettings())
-    expect(await readJson()).toEqual(defaultSettings())
+    // Not a repair: the file is not rewritten.
+    expect(await readJson()).toEqual(file)
+    const written = await store.update((current) => ({
+      ...current,
+      categoryOrder: ['mteam-X'],
+    }))
+    expect(written).toEqual({
+      ok: true,
+      settings: { ...defaultSettings(), categoryOrder: ['mteam-X'] },
+    })
+    expect(await readJson()).toEqual({ ...file, categoryOrder: ['mteam-X'] })
+  })
+
+  it('an unknown top-level key survives a repair write too', async () => {
+    await writeRaw({ version: 1, categoryOrder: ['mteam-X'], later: 'x' })
+    await store.read()
+    expect(await readJson()).toEqual({
+      ...defaultSettings(),
+      categoryOrder: ['mteam-X'],
+      later: 'x',
+    })
   })
 })
 
