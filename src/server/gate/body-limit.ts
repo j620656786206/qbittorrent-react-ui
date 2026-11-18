@@ -13,12 +13,15 @@ import { failureResponse } from '#/server/gate/respond'
 export const DEFAULT_BODY_LIMIT = 65_536
 /**
  * AD-12: a request that carries a hash list (story 2.6: stop, start; later
- * delete, move) may be 384 KB. Server functions that take one give it as
- * their own `bodyLimit`. Measured as Start serializes the body (story 2.6,
- * torrent-ops.test.ts): 5000 40-char hashes fit; 64-char lists fit only up
- * to 4975. Raising the limit is a spine AD-12 decision left to Alex.
+ * delete, move) may be 400 KB (409 600 bytes). Server functions that take
+ * one give it as their own `bodyLimit`. Measured as Start serializes the
+ * body (torrent-ops.test.ts): 5000 64-char hashes are 395 140 bytes, so
+ * the largest list (1 to 5000 hashes, AD-12) fits with about 14 KB left
+ * for the other fields of the call (a 1024-character path at most).
+ * Alex raised it from 384 KB on 2026-11-18, when 5000 64-char hashes were
+ * found not to fit (spec 2.6).
  */
-export const HASH_LIST_BODY_LIMIT = 393_216
+export const HASH_LIST_BODY_LIMIT = 409_600
 /** Request-level ceiling: the largest per-function limit (uploads raise it). */
 export const MAX_REQUEST_BODY = HASH_LIST_BODY_LIMIT
 /** Ceiling without a valid session. Stays 64 KB when MAX_REQUEST_BODY grows. */

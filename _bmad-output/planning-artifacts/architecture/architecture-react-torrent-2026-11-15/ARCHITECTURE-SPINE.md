@@ -179,7 +179,7 @@ flowchart TD
 - **Rule:**
   - `src/start.ts` 必須明確掛 Start 的 `createCsrfMiddleware`（有了 `src/start.ts`，Start 就不再自動掛），`failureResponse` 回 JSON 的 `bad_origin`，不准回純文字。再加一個全域 request middleware：`Host` 和 `Origin` 必須在環境變數 `APP_ORIGINS` 清單裡（在家的 IP 加 port、Tunnel 網域），而且要有 `X-Requested-With`；`/healthz` 例外。
   - `createCsrfMiddleware` 開 `allowRequestsWithoutOriginCheck: true`：在家走 http 加 IP 時，瀏覽器不送 `Sec-Fetch-Site`，同源 GET 不送 `Origin`，`no-referrer` 又拿掉 `Referer`，不開的話家裡所有讀取都會被擋。防護改靠：`Host` 白名單、server function 一律要 `X-Requested-With: XMLHttpRequest`（別的網站送不出來，容器又不回 CORS）、POST 一定要帶 `Origin`、cookie 是 SameSite=Strict。（2026-11-16 Alex 同意）
-  - 先檢查來源和 cookie，再讀 body。`.torrent` 每個上限 10 MB、一次 20 個、整個請求 50 MB；收 hash 陣列的請求上限 384 KB（刪除 5000 個也送得出去），其他 body 上限 64 KB。先看 `Content-Length`，讀的時候也邊讀邊算。
+  - 先檢查來源和 cookie，再讀 body。`.torrent` 每個上限 10 MB、一次 20 個、整個請求 50 MB；收 hash 陣列的請求上限 400 KB（409,600 bytes），其他 body 上限 64 KB。算法：TanStack Start 送出時每個 hash 會包成 `{"t":1,"s":"..."}`，5000 個 64 位 hash 實測 395,140 bytes，剩約 14 KB 給同一個請求的其他欄位（例如最長 1024 字的路徑）。原本是 384 KB，Story 2.6 實測發現 5000 個 64 位 hash 超過 1,924 bytes，2026-11-18 Alex 同意提高。先看 `Content-Length`，讀的時候也邊讀邊算。
   - hash 只接受 40 或 64 位小寫 hex，陣列 1 到 5000 個；永遠不把 `all` 或含 `|` 的值送給 qBittorrent。
   - 路徑：環境變數 `SAVE_ROOTS`（qBittorrent 容器裡看到的下載根目錄）。所有路徑參數和常用路徑共用 `src/shared` 一個 schema：絕對路徑、不含 NUL、反斜線、控制字元，任何一段是 `..` 就拒絕，正規化後必須在某個根目錄底下，長度上限 1024。改名的新路徑相對於種子自己的資料夾，可以有好幾段（例如 `<劇名>/season<n>/檔名`），每一段各自檢查：不含 `\`、NUL、控制字元，不是 `.` 或 `..`，每段 1 到 255 bytes，不能以 `/` 開頭，舊路徑必須在這個種子目前的檔案清單裡（容器向 qBittorrent 查，不信前端）。
   - `addTorrents` 只收 `magnet:` 連結和 `.torrent` 檔，不收 http 網址，不收 `savepath`（路徑照分類）。檔案開頭必須是 bencode 字典。容器永遠不去抓使用者給的網址。

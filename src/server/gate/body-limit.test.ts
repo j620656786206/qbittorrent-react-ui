@@ -39,10 +39,10 @@ async function expectTooLarge(response: Response) {
 }
 
 describe('body limit (AR-27)', () => {
-  it('uses 64 KB as default and anonymous ceiling, 384 KB as request ceiling', () => {
+  it('uses 64 KB as default and anonymous ceiling, 400 KB as request ceiling', () => {
     expect(DEFAULT_BODY_LIMIT).toBe(65_536)
-    // Story 2.6, AD-12: the hash-list limit is the ceiling.
-    expect(HASH_LIST_BODY_LIMIT).toBe(393_216)
+    // AD-12 (raised 2026-11-18): the hash-list limit is the ceiling.
+    expect(HASH_LIST_BODY_LIMIT).toBe(409_600)
     expect(MAX_REQUEST_BODY).toBe(HASH_LIST_BODY_LIMIT)
     // Never raise this with MAX_REQUEST_BODY: it is what a caller without a
     // session can make the container read and parse.

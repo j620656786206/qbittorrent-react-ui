@@ -169,17 +169,14 @@ describe.each(FUNCTIONS)('%s server function', (name, fn, path) => {
   })
 })
 
-describe('S5 the 384 KB limit against 64-char hashes (finding, see spec 2.6)', () => {
+describe('S5 the 400 KB limit against the largest hash list (AD-12)', () => {
   // Start's client wraps every string as {"t":1,"s":"..."}: 5000 v2
-  // (64-char) hashes come to 395 140 bytes, 1 924 over 393 216. Pinned so a
-  // change in Start's encoding or the limit is noticed. No caller sends a
-  // list this long before Epic 4's batch actions.
-  it('5000 64-char hashes measure over the limit; 4975 still fit', async () => {
-    expect(await startBody(hashes(64, 5000))).toBeGreaterThan(
-      HASH_LIST_BODY_LIMIT,
-    )
-    expect(await startBody(hashes(64, 4975))).toBeLessThanOrEqual(
-      HASH_LIST_BODY_LIMIT,
-    )
+  // (64-char) hashes come to 395 140 bytes. The limit was raised from
+  // 384 KB to 400 KB on 2026-11-18 so they fit (spec 2.6 finding). Pinned
+  // so a change in Start's encoding or the limit is noticed.
+  it('5000 64-char hashes fit, with room for a 1024-character path', async () => {
+    const size = await startBody(hashes(64, 5000))
+    expect(size).toBeLessThanOrEqual(HASH_LIST_BODY_LIMIT)
+    expect(HASH_LIST_BODY_LIMIT - size).toBeGreaterThan(4 * 1024)
   })
 })
