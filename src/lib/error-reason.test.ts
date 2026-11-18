@@ -9,8 +9,8 @@ import {
 import { fakeHash, t } from '#/lib/testing'
 import type { SlimTorrent } from '#/shared/maindata'
 
-// Spec 2.10: parse qBittorrent 5.1.4 log lines, clean and translate the
-// reason. Fake lines only: code-name paths (X, mteam-X) and documentation
+// Spec 2.10: parse qBittorrent 5.1.4 log lines, pass the reason through
+// the allow-list and translate it. Fake lines only: code-name paths (X, mteam-X) and documentation
 // addresses (RFC 5737 IPv4, RFC 3849 IPv6).
 
 const fileError = (name: string, file: string, reason: string) =>
@@ -39,12 +39,23 @@ describe('parseErrorLine', () => {
     ).toEqual({ name: 'N', reason: '磁碟空間不足' })
   })
 
-  it('a torrent errored line with another error keeps it whole, cleaned', () => {
+  it('a torrent errored line with plain English keeps it whole', () => {
+    expect(
+      parseErrorLine(
+        errored('N', 'torrent file collides with file from another torrent'),
+      ),
+    ).toEqual({
+      name: 'N',
+      reason: 'torrent file collides with file from another torrent',
+    })
+  })
+
+  it('a torrent errored line with a path is recognised with no reason', () => {
     expect(
       parseErrorLine(
         errored('N', 'fake tracker said no to /data/torrent/mteam-X'),
       ),
-    ).toEqual({ name: 'N', reason: 'fake tracker said no to （路徑）' })
+    ).toEqual({ name: 'N', reason: null })
   })
 
   it('a file error without 「error: 」 is recognised but shows nothing', () => {
@@ -59,7 +70,7 @@ describe('parseErrorLine', () => {
     ).toEqual({ name: 'N', reason: null })
   })
 
-  it('a reason that cleans to nothing is recognised with no reason', () => {
+  it('an empty reason is recognised with no reason', () => {
     expect(parseErrorLine(errored('N', '   '))).toEqual({
       name: 'N',
       reason: null,
@@ -143,10 +154,8 @@ describe('parseErrorLine in a Chinese qBittorrent', () => {
 })
 
 describe('errorReasonText', () => {
-  it('matrix 3: an unknown reason with an IP address and a path', () => {
-    expect(errorReasonText('tracker 203.0.113.5 refused /srv/x/y')).toBe(
-      'tracker （位址） refused （路徑）',
-    )
+  it('matrix 3: an unknown reason with an IP address and a path shows nothing', () => {
+    expect(errorReasonText('tracker 203.0.113.5 refused /srv/x/y')).toBeNull()
   })
 
   it.each([
@@ -170,155 +179,60 @@ describe('errorReasonText', () => {
     expect(errorReasonText(raw)).toBe(text)
   })
 
-  it('translates only the whole reason', () => {
-    expect(errorReasonText('Permission denied for X')).toBe(
-      'Permission denied for X',
-    )
-  })
-
   it.each([
     [
-      'a Windows path',
-      'cannot open C:\\Downloads\\X\\a.mkv now',
-      'cannot open （路徑） now',
+      'a libtorrent error',
+      'torrent file collides with file from another torrent',
     ],
-    ['a Windows path with slashes', 'at D:/media/mteam-X/b.mkv', 'at （路徑）'],
-    ['a UNC path', 'at \\\\nas\\share\\X\\a.mkv', 'at （路徑）'],
-    [
-      'a path in brackets',
-      'file_open (/data/media/X/a.mkv)',
-      'file_open (（路徑）)',
-    ],
-    ['a quoted path', 'open "/data/media/X/a b.mkv"', 'open （路徑）'],
-    [
-      'a single-quoted path',
-      "open '/data/X/fake secret.mkv' now",
-      'open （路徑） now',
-    ],
-    ['a 「」 quoted path', 'open 「/data/X/假 檔名.mkv」', 'open （路徑）'],
-    [
-      'a path with spaces',
-      'cannot open /data/X/My Show/ep 1.mkv now',
-      'cannot open （路徑） now',
-    ],
-    ['a bare file name', 'cannot open fake-secret.mkv', 'cannot open （路徑）'],
-    [
-      'a file name with punctuation around it',
-      'open (Fake.Show.S01E05.1080p.mkv), again',
-      'open (（路徑）), again',
-    ],
-    ['a path after a colon', 'failed:/data/X/a.mkv', 'failed:（路徑）'],
-    ['a path after a comma', 'a,/data/X/a.mkv,b', 'a,（路徑）,b'],
-    ['a Windows path with spaces', 'at C:\\My Docs\\X\\a.mkv', 'at （路徑）'],
-    ['a slash inside a word', 'fake/thing failed', '（路徑） failed'],
-    [
-      'a host name with a port',
-      'cannot reach tracker.example.com:443 now',
-      'cannot reach （位址） now',
-    ],
-    ['a .lan host with a port', 'nas.lan:8080 refused', '（位址） refused'],
-    [
-      'a host name without a port',
-      'tracker.example.com said no',
-      '（位址） said no',
-    ],
-    [
-      'an IPv4 address with a port',
-      'peer 198.51.100.7:6881 hung up',
-      'peer （位址） hung up',
-    ],
-    ['an IPv6 address', 'peer 2001:db8::1 hung up', 'peer （位址） hung up'],
-    ['a full IPv6 address', 'from 2001:db8:0:0:0:0:0:1', 'from （位址）'],
-    [
-      'a bracketed IPv6 address with a port',
-      'peer [2001:db8::2]:6881 gone',
-      'peer （位址） gone',
-    ],
-    [
-      'an IPv4-mapped IPv6 address',
-      'peer ::ffff:192.0.2.9 gone',
-      'peer （位址） gone',
-    ],
-    [
-      'an account',
-      'login fake-user@nas.example failed',
-      'login （位址） failed',
-    ],
-    [
-      'a URL',
-      'GET https://tracker.example/announce?passkey=fake failed',
-      'GET （位址） failed',
-    ],
-  ])('removes %s', (_name, raw, text) => {
-    const cleaned = errorReasonText(raw)
-    expect(cleaned).toBe(text)
-    // No piece of a file name, path or host is left.
-    for (const piece of [
-      'mkv',
-      'data',
-      'Show',
-      'secret',
-      'Docs',
-      'example',
-      'nas.lan',
-      '檔名',
-      'ep 1',
-      'thing',
-    ]) {
-      expect(cleaned).not.toContain(piece)
-    }
+    ['a reason with , and -', "can't open the file, it is in use - try later"],
+    ['an OS text with words around it', 'Permission denied for X'],
+  ])('shows %s as written', (_name, raw) => {
+    expect(errorReasonText(raw)).toBe(raw)
   })
 
+  it('collapses whitespace in a reason shown as written', () => {
+    expect(errorReasonText('  mismatching\n file   size ')).toBe(
+      'mismatching file size',
+    )
+  })
+
+  // Shapes seen in qBittorrent 5.1.4 logs, with fake names: anything that
+  // is not plain English words never leaves the container.
   it.each([
-    ['a time', 'stopped at 12:30:45', 'stopped at 12:30:45'],
+    ['a POSIX path', 'cannot open /data/X/a.mkv now'],
+    ['a path with spaces', 'cannot open /data/X/My Show/ep 1.mkv now'],
+    ['a path word with no slash', 'cannot open /data/X/Fake Secret/Show now'],
+    ['a Windows path', 'cannot open C:\\Downloads\\X\\a.mkv now'],
+    ['a UNC path', 'at \\\\nas\\share\\X\\a.mkv'],
+    ['a quoted path', 'open "/data/media/X/a b.mkv"'],
+    ['a 「」 quoted path', 'open 「/data/X/假 檔名.mkv」'],
+    ['a bare file name', 'cannot open fake-secret.mkv'],
+    ['a host with a port and no dot', 'tracker nas:8080 refused'],
+    ['a host name', 'tracker.example.com said no'],
+    ['an IPv4 address', 'peer 198.51.100.7 hung up'],
+    ['an IPv6 address', 'peer 2001:db8::1 hung up'],
+    ['an account', 'login fake-user@nas.example failed'],
+    ['a URL', 'GET https://tracker.example/announce?passkey=fake failed'],
     [
-      'I/O inside a sentence',
-      'an I/O error, (Input/output) again',
-      'an I/O error, (Input/output) again',
+      'a fast resume line',
+      'mteam-X.Fake fast resume rejected. file_stat(/data/media/X/incompleted/fake@a b.mp4): mismatching file size',
     ],
     [
-      'a C++ scope',
-      'libtorrent::file_open failed',
-      'libtorrent::file_open failed',
+      'a bdecode error',
+      'expected value (list, dict, int or string) in bencoded string [bdecode:4]',
     ],
-    ['a version', 'libtorrent 2.0.11 said no', 'libtorrent 2.0.11 said no'],
-    ['a version with v', 'v5.1.4 said no', 'v5.1.4 said no'],
-    [
-      'read/write as a word',
-      'Read/write failed, read/write again',
-      'Read/write failed, read/write again',
-    ],
-    ['a sentence end', 'it failed. Try again.', 'it failed. Try again.'],
-  ])('keeps %s', (_name, raw, text) => {
-    expect(errorReasonText(raw)).toBe(text)
+    ['Chinese text', '找不到 X 的檔案'],
+    ['a version', 'libtorrent 2.0.11 said no'],
+    ['an empty reason', '   '],
+    ['markup', '<img src=x onerror=alert(1)>'],
+  ])('never shows %s', (_name, raw) => {
+    expect(errorReasonText(raw)).toBeNull()
   })
 
-  it('caps a long reason at 120 characters with 「…」', () => {
-    const text = errorReasonText(`${'磁'.repeat(80)} ${'x'.repeat(80)}`)
-    expect(Array.from(text)).toHaveLength(ERROR_REASON_MAX_CHARS)
-    expect(text.endsWith('…')).toBe(true)
-  })
-
-  it('the cap never cuts inside a placeholder', () => {
-    // 117 characters, then a path: the cut at 119 lands inside 「（路徑）」.
-    const text = errorReasonText(`${'y'.repeat(117)} /data/X/a.mkv tail`)
-    expect(text).toBe(`${'y'.repeat(117)}…`)
-    const address = errorReasonText(`${'y'.repeat(116)} 203.0.113.9 more`)
-    expect(address).toBe(`${'y'.repeat(116)}…`)
-  })
-
-  it('adjacent placeholders collapse into one', () => {
-    expect(errorReasonText('at /data/X/a.mkv /data/X/b.mkv')).toBe(
-      'at （路徑）',
-    )
-    expect(errorReasonText('peers 203.0.113.1 203.0.113.2')).toBe(
-      'peers （位址）',
-    )
-  })
-
-  it('a reason of exactly 120 characters stays whole', () => {
+  it('a plain reason of exactly 120 characters stays; 121 shows nothing', () => {
     const raw = 'y'.repeat(ERROR_REASON_MAX_CHARS)
     expect(errorReasonText(raw)).toBe(raw)
+    expect(errorReasonText(`${raw}y`)).toBeNull()
   })
 })
 

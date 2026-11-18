@@ -1,4 +1,6 @@
+import { isErroredTorrent } from '#/lib/error-reason'
 import { isTorrentHash } from '#/lib/is-torrent-hash'
+import { isMovingTorrent } from '#/lib/torrent-status'
 import { BadMaindata, issuePaths } from '#/server/qbit/bad-maindata'
 import type { RawMaindata } from '#/server/qbit/maindata-schema'
 import {
@@ -53,14 +55,13 @@ export interface TorrentTable {
    */
   forEach: (visit: (torrent: Readonly<SlimTorrent>) => void) => void
   /**
-   * Story 2.10: the state each moving torrent had before its move, by hash,
-   * kept the way the browser's maindata-merge keeps it (a torrent first
-   * seen moving has none). A copy.
+   * Story 2.10: Unix seconds after which this torrent's current error
+   * started: the time of the last answer that still showed it outside
+   * `error` (a move keeps it). 0 when it was errored the first time this
+   * table saw it, or is not errored.
    */
-  readonly stateBeforeMove: Record<string, string>
+  errorStartedAfter: (hash: string) => number
 }
-
-const MOVING = 'moving'
 
 interface Row {
   torrent: SlimTorrent
@@ -79,7 +80,10 @@ function sameSlimFields(a: SlimTorrent, b: SlimTorrent): boolean {
 
 export function createTorrentTable(now: () => number = Date.now): TorrentTable {
   const rows = new Map<string, Row>()
-  const beforeMove = new Map<string, string>()
+  /** Story 2.10: hash to `errorStartedAfter`, while errored or moving. */
+  const errorStarts = new Map<string, number>()
+  /** `now()` in ms of the last applied answer. */
+  let appliedAt: number | null = null
   const tombstones = new Map<string, Tombstone>()
   let categories = new Map<string, Category>()
   let serverState: ServerState | null = null
@@ -169,10 +173,13 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     }
     for (const { hash, torrent, changed } of updates) {
       const existing = rows.get(hash)
-      if (torrent.state !== MOVING) beforeMove.delete(hash)
-      else if (existing && existing.torrent.state !== MOVING) {
-        beforeMove.set(hash, existing.torrent.state)
-      }
+      if (isErroredTorrent(torrent, {})) {
+        if (!errorStarts.has(hash)) {
+          const before =
+            existing && appliedAt !== null ? Math.floor(appliedAt / 1000) : 0
+          errorStarts.set(hash, before)
+        }
+      } else if (!isMovingTorrent(torrent)) errorStarts.delete(hash)
       rows.set(hash, {
         torrent,
         changedAt: changed || !existing ? version : existing.changedAt,
@@ -183,7 +190,7 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     const at = now()
     for (const hash of removed) {
       rows.delete(hash)
-      beforeMove.delete(hash)
+      errorStarts.delete(hash)
       tombstones.set(hash, { removedAt: version, at })
     }
     for (const [hash, tombstone] of tombstones) {
@@ -195,6 +202,7 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
 
     categories = nextCategories
     serverState = nextState.data
+    appliedAt = at
   }
 
   function changesSince(counter: number | null): TableChanges {
@@ -224,9 +232,7 @@ export function createTorrentTable(now: () => number = Date.now): TorrentTable {
     apply,
     changesSince,
     forEach,
-    get stateBeforeMove() {
-      return Object.fromEntries(beforeMove)
-    },
+    errorStartedAfter: (hash) => errorStarts.get(hash) ?? 0,
     get serverState() {
       if (serverState === null) {
         throw new Error('torrent table: read before the first answer')

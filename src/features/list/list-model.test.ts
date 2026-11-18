@@ -120,12 +120,14 @@ describe('R6 error rows', () => {
       }),
     )
     const reasons = { [fakeHash(1)]: '磁碟空間不足' }
-    const args = [NOW, 'added_on', undefined, false, reasons] as const
-    expect(rowProps(data, fakeHash(1), ...args)?.errorReason).toBe(
+    const options = { today: NOW, errorReasons: reasons }
+    expect(rowProps(data, fakeHash(1), options)?.errorReason).toBe(
       '磁碟空間不足',
     )
-    expect(rowProps(data, fakeHash(2), ...args)?.errorReason).toBeUndefined()
-    expect(rowProps(data, fakeHash(1), NOW)?.errorReason).toBeUndefined()
+    expect(rowProps(data, fakeHash(2), options)?.errorReason).toBeUndefined()
+    expect(
+      rowProps(data, fakeHash(1), { today: NOW })?.errorReason,
+    ).toBeUndefined()
   })
 
   it('a move from an error kind says 搬移中 once, no reason', () => {
@@ -296,21 +298,21 @@ describe('M1 memo', () => {
       )
     expect(
       shallowEqual(
-        rowProps(first, fakeHash(1), today),
-        rowProps(second, fakeHash(1), today),
+        rowProps(first, fakeHash(1), { today }),
+        rowProps(second, fakeHash(1), { today }),
       ),
     ).toBe(true)
     expect(
       shallowEqual(
-        rowProps(first, fakeHash(2), today),
-        rowProps(second, fakeHash(2), today),
+        rowProps(first, fakeHash(2), { today }),
+        rowProps(second, fakeHash(2), { today }),
       ),
     ).toBe(false)
   })
 
   it('a hash without data has no props', () => {
     const data = mergeMaindata(undefined, fakeResponse())
-    expect(rowProps(data, fakeHash(9), NOW)).toBeNull()
+    expect(rowProps(data, fakeHash(9), { today: NOW })).toBeNull()
   })
 })
 
@@ -419,27 +421,42 @@ describe('the big number by sort', () => {
       undefined,
       fakeResponse({ changed: [t({ hash: fakeHash(1) })] }),
     )
-    expect(rowProps(data, fakeHash(1), NOW, 'seeding_time')?.sortValue).toBe(
-      undefined,
-    )
-    expect(rowProps(data, fakeHash(1), NOW, 'num_seeds')?.sortValue).toBe(
-      undefined,
-    )
     expect(
-      rowProps(data, fakeHash(1), NOW, 'num_seeds', { [fakeHash(1)]: 4 })
+      rowProps(data, fakeHash(1), { today: NOW, sort: 'seeding_time' })
         ?.sortValue,
+    ).toBe(undefined)
+    expect(
+      rowProps(data, fakeHash(1), { today: NOW, sort: 'num_seeds' })?.sortValue,
+    ).toBe(undefined)
+    expect(
+      rowProps(data, fakeHash(1), {
+        today: NOW,
+        sort: 'num_seeds',
+        sortKeys: { [fakeHash(1)]: 4 },
+      })?.sortValue,
     ).toBe(4)
     expect(
-      rowProps(data, fakeHash(1), NOW, 'num_seeds', { [fakeHash(1)]: null })
-        ?.sortValue,
+      rowProps(data, fakeHash(1), {
+        today: NOW,
+        sort: 'num_seeds',
+        sortKeys: { [fakeHash(1)]: null },
+      })?.sortValue,
     ).toBeNull()
     // Added since the last sort-keys poll: loading, not 「沒有」.
     expect(
-      rowProps(data, fakeHash(1), NOW, 'num_seeds', {})?.sortValue,
+      rowProps(data, fakeHash(1), {
+        today: NOW,
+        sort: 'num_seeds',
+        sortKeys: {},
+      })?.sortValue,
     ).toBeUndefined()
     // The first keys failed: no value.
     expect(
-      rowProps(data, fakeHash(1), NOW, 'num_seeds', undefined, true)?.sortValue,
+      rowProps(data, fakeHash(1), {
+        today: NOW,
+        sort: 'num_seeds',
+        keysFailed: true,
+      })?.sortValue,
     ).toBeNull()
   })
 })

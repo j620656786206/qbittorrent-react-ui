@@ -3,11 +3,18 @@ import { StrictMode, act, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { JOIN_MS, RING_MS, RISE_MS, STAGGER_MS } from '#/lib/entrance'
+import {
+  HOLD_SLACK_MS,
+  JOIN_MS,
+  RING_MS,
+  RISE_MS,
+  STAGGER_MS,
+} from '#/lib/entrance'
 import {
   entranceStore,
   replayEntrance,
   resetEntrance,
+  useEmptyEntrance,
   useEntrance,
 } from '#/state/entrance'
 import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
@@ -361,6 +368,21 @@ describe('the order hold', () => {
     expect(freezeStore.state.animation).toBe(false)
   })
 
+  it('a finished that never settles: released HOLD_SLACK_MS after the last should have ended', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      // Rows 0, 1, 2: the last starts at 2 * STAGGER_MS and turns RING_MS.
+      await mount()
+      const end = 2 * STAGGER_MS + Math.max(RING_MS, RISE_MS) + HOLD_SLACK_MS
+      await act(async () => vi.advanceTimersByTime(end - 1))
+      expect(freezeStore.state.animation).toBe(true)
+      await act(async () => vi.advanceTimersByTime(1))
+      expect(freezeStore.state.animation).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a surface that animates nothing holds nothing', async () => {
     await mount({ tops: [700] })
     expect(stub.calls).toHaveLength(0)
@@ -387,5 +409,36 @@ describe('no motion', () => {
     })
     await expect(mount()).resolves.toBeDefined()
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+describe('useEmptyEntrance', () => {
+  function List({ empty }: { empty: boolean }) {
+    useEmptyEntrance(empty)
+    return empty ? null : <Surface />
+  }
+
+  async function mountList(empty: boolean) {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    roots.push(root)
+    await act(async () => root.render(<List empty={empty} />))
+    return (next: boolean) =>
+      act(async () => root.render(<List empty={next} />))
+  }
+
+  it('first data empty: the rows of a later poll draw as they are', async () => {
+    const rerender = await mountList(true)
+    expect(entranceStore.state.startedAt).toBe(now)
+    now += 5000
+    await rerender(false)
+    expect(stub.calls).toHaveLength(0)
+    expect(freezeStore.state.animation).toBe(false)
+  })
+
+  it('rows at once: the empty hook waits and the rows play', async () => {
+    await mountList(false)
+    expect(rises()).toHaveLength(3)
   })
 })

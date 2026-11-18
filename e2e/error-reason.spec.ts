@@ -18,7 +18,7 @@ const ERRORED_NAME = '<img src=x onerror=alert(1)>'
 const STATES_ERROR_HASH = (0x300a).toString(16).padStart(40, '0')
 const UNKNOWN_HASH = (0x300d).toString(16).padStart(40, '0')
 const UNKNOWN_NAME = 'Fake.State.13.ErrorUnknown.1080p'
-const CLEANED = 'fake tracker （位址） refused （路徑）'
+const FIXED_TEXT = 'qBittorrent 回報錯誤'
 /** The container's window (src/server/sync/error-reasons.ts). */
 const ERROR_REASON_REFRESH_MS = 55_000
 
@@ -119,7 +119,7 @@ test('states: the upload-only error reads 磁碟空間不足 in the detail', asy
   await expectRateLimited(request)
 })
 
-test('states: an unknown reason is cleaned on the card and in the detail; the answer carries no path or address', async ({
+test('states: an unknown reason with a path shows the fixed text; the answer carries no reason, path or address for it', async ({
   page,
   request,
 }) => {
@@ -136,15 +136,17 @@ test('states: an unknown reason is cleaned on the card and in the detail; the an
     .getByRole('listitem')
     .locator(':scope > button')
     .filter({ has: page.getByTitle(UNKNOWN_NAME, { exact: true }) })
-  await expect(card).toContainText(CLEANED)
+  await expect(card).toContainText(FIXED_TEXT)
   await page.goto(`/?hash=${UNKNOWN_HASH}`)
-  await expect(heroSummary(panel(page))).toHaveText(CLEANED)
+  await expect(heroSummary(panel(page))).toHaveText(FIXED_TEXT)
   const reasonBodies = (await Promise.all(bodies)).filter((body) =>
     body.includes('reasons'),
   )
   expect(reasonBodies.length).toBeGreaterThan(0)
   for (const body of reasonBodies) {
-    expect(body).toContain('（路徑）')
+    // The other errored torrent's reason is there; this one has none.
+    expect(body).toContain('磁碟空間不足')
+    expect(body).not.toContain(UNKNOWN_HASH)
     expect(body).not.toContain('/data/')
     expect(body).not.toContain('203.0.113')
   }

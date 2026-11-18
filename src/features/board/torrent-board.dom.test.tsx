@@ -16,6 +16,8 @@ import { replayEntrance, resetEntrance } from '#/state/entrance'
 import { stubElementAnimate } from '#/state/entrance-testing'
 import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
+import { getErrorReasons } from '#/server/functions/get-error-reasons'
+import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
@@ -49,16 +51,18 @@ vi.mock('#/features/board/board-model', async (importOriginal) => {
 })
 
 // Story 2.10: getErrorReasons never reaches a server here; each test sets
-// the map it answers.
+// the map it answers (`hang`: the call never answers).
 const reasonCalls = vi.hoisted(
-  (): { count: number; reasons: Record<string, string> } => ({
+  (): { count: number; reasons: Record<string, string>; hang: boolean } => ({
     count: 0,
     reasons: {},
+    hang: false,
   }),
 )
 vi.mock('#/server/functions/get-error-reasons', () => ({
   getErrorReasons: () => {
     reasonCalls.count += 1
+    if (reasonCalls.hang) return new Promise(() => {})
     return Promise.resolve({ ok: true, data: { reasons: reasonCalls.reasons } })
   },
 }))
@@ -129,6 +133,7 @@ async function render(first: MaindataResponse | AppError | 'pending') {
   answers = [first]
   fetchCount = 0
   client = createQueryClient({
+    fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
       const answer = answers[Math.min(fetchCount - 1, answers.length - 1)]
@@ -185,6 +190,7 @@ beforeEach(() => {
   modelCalls.clear()
   reasonCalls.count = 0
   reasonCalls.reasons = {}
+  reasonCalls.hang = false
   desktop = true
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
@@ -437,6 +443,26 @@ describe('error reasons (spec 2.10)', () => {
   it('matrix 8: no errored torrent, no getErrorReasons call', async () => {
     await render(fakeResponse({ changed: sample() }))
     expect(reasonCalls.count).toBe(0)
+  })
+
+  it('a torrent that errors again never shows the reason of its earlier error', async () => {
+    reasonCalls.reasons = { [h(7)]: '磁碟空間不足' }
+    await render(fakeResponse({ changed: errored() }))
+    expect(cardText('Broken')).toContain('磁碟空間不足')
+    const fine = (state: string) =>
+      errored().map((torrent) =>
+        torrent.hash === h(7) || torrent.hash === h(8)
+          ? { ...torrent, state }
+          : torrent,
+      )
+    // No errored torrent: the map is dropped.
+    await poll(delta(fine('stalledDL')))
+    expect(client.getQueryData(['error-reasons'])).toBeUndefined()
+    // Errored again; the new answer has not come: the fixed text.
+    reasonCalls.hang = true
+    await poll(delta(errored()))
+    expect(cardText('Broken')).toContain('qBittorrent 回報錯誤')
+    expect(cardText('Broken')).not.toContain('磁碟空間不足')
   })
 
   it('a new reason re-renders only that card', async () => {

@@ -2,11 +2,11 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, HTMLAttributes, ReactElement, Ref } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import type { Range } from '@tanstack/react-virtual'
-import { getErrorReasons } from '#/server/functions/get-error-reasons'
+import { reasonOf } from '#/lib/error-reason'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { useEntrance } from '#/state/entrance'
-import { bindFetchErrorReasons, useErrorReasons } from '#/state/error-reasons'
+import { useErrorReasons } from '#/state/error-reasons'
 import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
 import {
@@ -71,8 +71,6 @@ export interface CardPin {
 
 const SINGLE: CardLayout = { kind: 'single' }
 
-const fetchErrorReasons = bindFetchErrorReasons(getErrorReasons)
-
 function sameNumbers(
   a: ReadonlyArray<number>,
   b: ReadonlyArray<number>,
@@ -129,7 +127,7 @@ export function CardList({
   const { setHash } = useViewedHash()
   // Story 2.10: polled only while maindata has an errored torrent; every
   // column observes the same `['error-reasons']` query.
-  const errorReasons = useErrorReasons(fetchErrorReasons)
+  const errorReasons = useErrorReasons()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -329,11 +327,7 @@ export function CardList({
                           : undefined
                       }
                       today={today}
-                      errorReason={
-                        errorReasons && Object.hasOwn(errorReasons, hash)
-                          ? errorReasons[hash]
-                          : undefined
-                      }
+                      errorReason={reasonOf(errorReasons, hash)}
                       onOpen={setHash}
                     />
                   )}
