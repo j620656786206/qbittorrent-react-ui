@@ -107,33 +107,14 @@ export async function applySettings(
 export const SORT_SAVE_OP = 'save-category-sort'
 
 /**
- * Story 3.3: one send sequence for every settings write (sort and order
- * saves together), counted when the call actually goes out (a queued call
- * counts when its turn comes; 重試 counts again). Each answer holds the
- * whole file, so an answer is only applied when no answer of a later send
- * was applied before it: an older answer landing late (a sort save read
- * before an order write) never reverts the newer order in the cache.
+ * Every settings write (sort and order saves) shares this mutation `scope`,
+ * so a write is sent only once the one before it settled, its awaited
+ * `onSuccess` (applySettings) included. The container then writes them in
+ * send order and every answer, the whole file, is newer than the one
+ * applied before it: no answer can revert another write in the cache.
+ * https://tanstack.com/query/v5/docs/framework/react/guides/mutations#mutation-scopes
  */
-let sendCount = 0
-const sendOrder = new WeakMap<object, number>()
-/** Per client: the send order of the last answer applied. */
-const appliedOrder = new WeakMap<QueryClient, number>()
-
-function markSent(variables: object): void {
-  sendCount += 1
-  sendOrder.set(variables, sendCount)
-}
-
-function applyInSendOrder(
-  client: QueryClient,
-  variables: object,
-  settings: Settings,
-): Promise<void> | undefined {
-  const order = sendOrder.get(variables) ?? 0
-  if (order < (appliedOrder.get(client) ?? 0)) return undefined
-  appliedOrder.set(client, order)
-  return applySettings(client, settings)
-}
+export const SETTINGS_WRITE_SCOPE = 'settings-write'
 
 export type SetCategorySortCall = (
   input: SetCategorySortInput,
@@ -144,26 +125,21 @@ export type SetCategorySortCall = (
  * Its failure codes are a settings write's (`settings_write_failed`,
  * `timeout`, `invalid_input`): the toast 「排序沒記住：…」 with 「重試」,
  * which sends the same call. A newer pick closes the toast of an older one.
- * The saves of one category run one after another (mutation `scope`), so
- * the file ends on the last pick; and an answer is only applied when no
- * answer of a later settings write was applied before it (story 3.3: the
- * shared send sequence above).
+ * It runs in the settings write queue (SETTINGS_WRITE_SCOPE), so the file
+ * ends on the last pick.
  */
 export function categorySortOp(
   call: SetCategorySortCall,
 ): TrackedOp<SetCategorySortInput, SettingsWriteFailureCode, Settings> {
   return {
     name: SORT_SAVE_OP,
-    call: (variables) => {
-      markSent(variables)
-      return call(variables)
-    },
+    call,
     keysOf: ({ category }) => [`settings:sort:${category}`],
-    scopeOf: ({ category }) => `${SORT_SAVE_OP}:${category}`,
+    scopeOf: () => SETTINGS_WRITE_SCOPE,
     failureCodes: SETTINGS_WRITE_FAILURE_CODES,
     failureText: (_variables, code) => sortSaveFailureText(code),
-    onSuccess: (client, variables, settings) =>
-      applyInSendOrder(client, variables, settings),
+    onSuccess: (client, _variables, settings) =>
+      applySettings(client, settings),
   }
 }
 
@@ -172,11 +148,12 @@ export function categorySortOp(
  * 3.2: a save of another category never holds this one's follow rule).
  */
 export function isSavingSort(client: QueryClient, category: string): boolean {
-  const scope = `${SORT_SAVE_OP}:${category}`
   return (
     client.isMutating({
       mutationKey: [SORT_SAVE_OP],
-      predicate: (mutation) => mutation.options.scope?.id === scope,
+      predicate: (mutation) =>
+        (mutation.state.variables as SetCategorySortInput | undefined)
+          ?.category === category,
     }) > 0
   )
 }
@@ -208,9 +185,9 @@ export interface CategoryOrderSave {
  * No optimistic move (AD-7): the list and the tabs take the order from the
  * answer, which `applySettings` writes into `['settings']`. Its failure
  * codes are a settings write's: the toast 「順序沒存到：…」 with 「重試」; a
- * newer press closes the toast of an older one. All order saves share one
- * mutation `scope`, so each runs after the one before has settled, and
- * every settings write's answer is applied in send order.
+ * newer press closes the toast of an older one. Like every settings write
+ * it runs in the write queue (SETTINGS_WRITE_SCOPE), so it starts after the
+ * write before it has settled and its answer was applied.
  */
 export function categoryOrderOp(
   call: SetCategoryOrderCall,
@@ -231,17 +208,14 @@ export function categoryOrderOp(
         delta: direction,
       })
       if (order === null) return null
-      markSent(variables)
       return call({ order })
     },
     keysOf: () => ['settings:order'],
-    scopeOf: () => ORDER_SAVE_OP,
+    scopeOf: () => SETTINGS_WRITE_SCOPE,
     failureCodes: SETTINGS_WRITE_FAILURE_CODES,
     failureText: (_variables, code) => orderSaveFailureText(code),
-    onSuccess: (queryClient, variables, settings) =>
-      settings === null
-        ? undefined
-        : applyInSendOrder(queryClient, variables, settings),
+    onSuccess: (queryClient, _variables, settings) =>
+      settings === null ? undefined : applySettings(queryClient, settings),
   }
 }
 
