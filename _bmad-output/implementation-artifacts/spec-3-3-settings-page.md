@@ -5,7 +5,7 @@ created: '2026-11-18'
 status: 'done'
 baseline_revision: '2a41259b40ba0a3c196b422408426279a2426e48'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
@@ -137,6 +137,43 @@ deferred: []
   - `[low]` `[reject]` (edge, claim) A `qbit_rejected` answer to an order save shows no toast : the settings functions never return that code; an unexpected answer is a bug the global handler surfaces.
   - `[low]` `[patch]` (edge, claim) Back can open an older list URL after a history return : same as the edge stale-URL entry; fixed there.
 
+### 2026-11-18: Review pass (follow-up)
+- verdicts: 33 findings, high 0, medium 5, low 21, false 7, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (intent) The payload keeps stored entries not listed : first-pass fix recorded (an erased position is data loss).
+  - `[false]` `[reject]` (intent) 重試 reapplies the move instead of resending the same order : first-pass fix recorded; the container write stays idempotent.
+  - `[false]` `[reject]` (intent) The header on `/settings` works as the list's header : first-pass fix recorded (it must match the list it returns to).
+  - `[false]` `[reject]` (intent) Pending arrows use `aria-disabled` : keeps focus on the pressed button; presses are no-ops.
+  - `[false]` `[reject]` (intent) The return search is recorded continuously : first-pass fix recorded.
+  - `[medium]` `[patch]` (intent) Blocked storage shows a note although the AC says 「不報錯」 : the note is removed; storage failure reads as on, silently.
+  - `[false]` `[reject]` (intent) A labelled section instead of an `h1` on `main` : the contract allows either; now `aria-labelledby` on the section.
+  - `[low]` `[reject]` (intent) Reaching back by Tab and the outline on back and the arrows are not asserted : the shared focus style is tested; the e2e Tabs through arrows and the switch.
+  - `[low]` `[reject]` (intent) The failure toast is not exercised end to end : covered in the route DOM test with the real op.
+  - `[low]` `[patch]` (blind) The back link leaves two copies of the list in history : history back when opened from the list; `replace` for a directly opened page.
+  - `[low]` `[patch]` (blind) The URL fix-up still runs on `/settings` : guarded with `onList`.
+  - `[medium]` `[patch]` (blind) Arrows are active before the settings re-read finishes : they wait while `['settings']` is fetching.
+  - `[low]` `[reject]` (blind) A second press loses the first press's announcement and focus : the moves themselves are correct; only the announcement of the earlier one is skipped.
+  - `[low]` `[patch]` (blind) The announced position does not count 「全部」 : it counts it now.
+  - `[low]` `[patch]` (blind) `settingsOpen = !onList` is too broad : compares `/settings` explicitly.
+  - `[low]` `[patch]` (blind) The `settings-return.ts` comment is stale : corrected.
+  - `[low]` `[patch]` (blind) The DOM test header contradicts its assertions : corrected.
+  - `[low]` `[patch]` (blind) The blocked-storage test checks too little : asserts on, no throw and no note.
+  - `[low]` `[patch]` (blind) `settle()` can hang on infinite animations : skips them.
+  - `[low]` `[patch]` (blind) The switch card skips the card padding token : uses the shared padding.
+  - `[low]` `[patch]` (blind) The page region's label duplicates its heading : `aria-labelledby`.
+  - `[low]` `[reject]` (blind) Saved orders grow forever : bounded by the 256 KB file; pruning needs a decision on deleted categories that may come back.
+  - `[low]` `[patch]` (blind) Two comments not rewrapped : rewrapped.
+  - `[low]` `[patch]` (edge) Typed `/settings` with bad list params gets them rewritten into its URL : same as the blind fix-up entry; fixed there.
+  - `[medium]` `[patch]` (edge) Another device's sort change while on `/settings` is never followed : the follow rule's last value no longer advances off the list.
+  - `[medium]` `[patch]` (edge) A press before the mount refetch answers uses stale settings : same as the blind entry; fixed there.
+  - `[low]` `[reject]` (edge) A second row's press drops the first announcement : same as the blind announcement entry.
+  - `[low]` `[reject]` (edge) A re-render between press and the in-flight notice loses the announcement : announcement only; the move is correct.
+  - `[medium]` `[patch]` (edge) An older sort-save answer can revert `categoryOrder` in the cache : answers are applied by one send sequence across settings ops.
+  - `[false]` `[reject]` (blind, diff scope) Additions beyond the contract : logged Claude 代決 and first-pass fixes.
+  - `[low]` `[patch]` (intent) The `fixListSearch` effect is not guarded although the comment says list-only effects are skipped : same as the blind fix-up entry; fixed there.
+  - `[low]` `[reject]` (intent) The phone line sits under the label, not next to the switch : the matrix says under; both placements fit.
+  - `[low]` `[reject]` (intent) 「No session」 tested through `guard.run`, not HTTP : the discover list also checks every function.
+
 ## Design Notes
 
 Claude 代決 (list in the PR): the return URL kept in memory (not localStorage); 「未分類」 listed when used; the failure text 「順序沒存到：…」; a hand-made switch (`role="switch"`) instead of adding Radix Switch; the old page's layout rebuilt with current tokens.
@@ -161,3 +198,7 @@ Status: done (first review pass)
 **Review.** 34 findings: patched 10 medium entries (stored order kept, read-only while settings are unknown, moves computed at send time with refetch on mount, header follows the list on `/settings`, tests for the follow guard and a sort pick on `/settings`) and low ones; rejected 7 (5 false, 2 low) with reasons; nothing deferred.
 
 **Follow-up review: recommended.** Patched by verdict: medium 10. The named risk: the order op and the `/settings` header logic were reworked after review, so a second pass should re-check them.
+
+### Follow-up pass (2026-11-18)
+
+Status: done. 33 findings, no high: patched 5 medium (the storage-failure note removed per the AC's 「不報錯」, arrows wait while settings refetch, one send sequence across settings writes, the follow rule waits off the list, the URL fix-up only on the list) and the low ones (history back from the settings page, the announced position counts 「全部」, `aria-labelledby`, card padding token, infinite animations skipped in e2e waits, comments); rejected the rest with reasons. Follow-up review: not recommended (no high patched on a follow-up pass). Known trade-off: sort saves of different categories now share one answer order, so an older answer for one category can be dropped after a newer one for another; the next focus refetch corrects the cache.

@@ -7,8 +7,7 @@ import { PREF_DEFAULTS, isPrefKey, readPref, writePref } from '#/lib/prefs'
 // `storage` event only reaches other tabs); a change in another tab
 // arrives through that event. What it reads is what the storage holds: a
 // storage that throws reads as on (the default) and a write it refused
-// leaves the value as it was (the switch then says so), so nothing ever
-// errors.
+// leaves the value as it was, so nothing ever errors.
 // https://react.dev/reference/react/useSyncExternalStore
 
 const listeners = new Set<() => void>()
@@ -34,11 +33,10 @@ export function useAutoCollapse(): boolean {
 }
 
 /**
- * Stores the pref on this device and updates every reader in this tab;
- * `false` when the storage refused it (the value stays as it was).
+ * Stores the pref on this device and updates every reader in this tab.
+ * Never throws: a write the storage refused leaves the value as it was.
  */
-export function setAutoCollapse(on: boolean): boolean {
-  const stored = writePref('autoCollapse', on)
+export function setAutoCollapse(on: boolean): void {
+  writePref('autoCollapse', on)
   for (const listener of [...listeners]) listener()
-  return stored
 }

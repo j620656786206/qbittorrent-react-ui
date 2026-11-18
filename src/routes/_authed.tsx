@@ -45,7 +45,11 @@ import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { categorySortOp, useSettings } from '#/state/settings'
-import { listReturnSearch, rememberListSearch } from '#/state/settings-return'
+import {
+  listReturnSearch,
+  markOpenedFromList,
+  rememberListSearch,
+} from '#/state/settings-return'
 import { sendOp } from '#/state/tracked-op'
 import { ViewedHashContext } from '#/state/viewed-hash'
 
@@ -123,15 +127,17 @@ interface Latest {
   hash: string | undefined
   view: ListView
   onList: boolean
+  settingsOpen: boolean
   /** The address bar's search (rememberListSearch validates it). */
   search: Readonly<Record<string, unknown>>
 }
 
-/** The list route's path; every other page under the layout is not the list. */
+/** The list route's path. */
 const LIST_PATH = '/'
+/** Story 3.3: the settings page's path. */
+const SETTINGS_PATH = '/settings'
 
 function AuthedLayout() {
-  const urlSearch = Route.useSearch()
   const navigate = useNavigate()
   const client = useQueryClient()
   const { settings, ready } = useSettings()
@@ -141,7 +147,16 @@ function AuthedLayout() {
   const onList = useLocation({
     select: (location) => location.pathname === LIST_PATH,
   })
+  const settingsOpen = useLocation({
+    select: (location) => location.pathname === SETTINGS_PATH,
+  })
+  // The search validated from the same location as `onList` (the route's
+  // own search can lag one commit behind the path while history moves).
   // On the settings page the header shows the list Alex came from.
+  const urlSearch = useMemo(
+    () => listSearchSchema.parse(rawSearch),
+    [rawSearch],
+  )
   const listSearch = onList ? urlSearch : listReturnSearch()
   const { sort, dir, hash, category: urlCategory } = listSearch
 
@@ -150,6 +165,8 @@ function AuthedLayout() {
   }, [onList, rawSearch])
 
   useEffect(() => {
+    // Only the list's URL carries list params to fix.
+    if (!onList) return
     const fixed = fixListSearch(rawSearch)
     if (fixed) {
       void navigate({
@@ -159,7 +176,7 @@ function AuthedLayout() {
         resetScroll: false,
       })
     }
-  }, [rawSearch, navigate])
+  }, [onList, rawSearch, navigate])
 
   // The category confirmed on screen (it keeps its tab once it empties).
   const confirmedRef = useRef<string | null>(null)
@@ -208,6 +225,7 @@ function AuthedLayout() {
     hash,
     view,
     onList,
+    settingsOpen,
     search: rawSearch,
   })
   useLayoutEffect(() => {
@@ -217,6 +235,7 @@ function AuthedLayout() {
       hash,
       view,
       onList,
+      settingsOpen,
       search: rawSearch,
     }
   })
@@ -326,13 +345,16 @@ function AuthedLayout() {
     },
     [setView],
   )
-  useFollowRememberedSort(remembered, view, ready, follow, category)
+  useFollowRememberedSort(remembered, view, ready, follow, category, onList)
 
-  const settingsOpen = !onList
   const openSettings = useCallback(() => {
-    if (!latestRef.current.onList) return
-    rememberListSearch(latestRef.current.search)
-    void navigate({ to: '/settings' })
+    const latest = latestRef.current
+    if (latest.settingsOpen) return
+    // The effect above records the list on every change; recording here
+    // too covers a change made in this same commit, before effects ran.
+    if (latest.onList) rememberListSearch(latest.search)
+    markOpenedFromList(latest.onList)
+    void navigate({ to: SETTINGS_PATH })
   }, [navigate])
 
   const control = useMemo(

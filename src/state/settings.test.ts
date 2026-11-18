@@ -268,8 +268,8 @@ describe('categorySortOp', () => {
       sort: 'seeding_time',
       dir: 'desc',
     }
-    op.onSend?.(older)
-    op.onSend?.(newer)
+    await op.call(older)
+    await op.call(newer)
     await op.onSuccess?.(client, newer, withSort('seeding_time'))
     await op.onSuccess?.(client, older, withSort('ratio'))
     expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('seeding_time'))
@@ -279,7 +279,7 @@ describe('categorySortOp', () => {
       sort: 'ratio',
       dir: 'asc',
     }
-    op.onSend?.(other)
+    await op.call(other)
     await op.onSuccess?.(client, other, withSort('ratio'))
     expect(client.getQueryData(SETTINGS_KEY)).toEqual(withSort('ratio'))
   })
@@ -514,6 +514,48 @@ describe('categoryOrderOp (story 3.3)', () => {
       expect(client.getQueryData(SETTINGS_KEY)).toEqual(withOrder('b'))
     },
   )
+
+  it('an older sort-save answer landing after the order answer never reverts the order', async () => {
+    const client = await orderClient()
+    let answerSort: (value: Settings) => void = () => {}
+    const sortOp = categorySortOp(
+      () =>
+        new Promise<Settings>((resolve) => {
+          answerSort = resolve
+        }),
+    )
+    const { call, answers } = deferredCall()
+    // The sort save goes out first and is written before the order...
+    sendOp(sortOp, client, { category: 'a', sort: 'ratio', dir: 'asc' })
+    await flush()
+    sendOp(categoryOrderOp(call, client), client, { key: 'c', direction: -1 })
+    await flush()
+    const sortWritten: Settings = {
+      ...withOrder('b'),
+      categorySort: {
+        ...withOrder('b').categorySort,
+        a: { sort: 'ratio', dir: 'asc' },
+      },
+    }
+    const orderWritten: Settings = {
+      ...sortWritten,
+      categoryOrder: ['b', 'c', 'a', 'd'],
+    }
+    // ...but the order's answer arrives first, the sort's after it.
+    answers[0](orderWritten)
+    await flush()
+    await flush()
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(orderWritten)
+    answerSort(sortWritten)
+    await flush()
+    await flush()
+    expect(client.getQueryData<Settings>(SETTINGS_KEY)?.categoryOrder).toEqual([
+      'b',
+      'c',
+      'a',
+      'd',
+    ])
+  })
 
   it('refreshSettings reads the settings again', async () => {
     const fetchSettings = vi.fn<FetchSettings>(async () => withOrder('b'))

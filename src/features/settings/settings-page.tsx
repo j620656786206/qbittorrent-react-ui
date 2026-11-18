@@ -1,8 +1,8 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { listReturnSearch } from '#/state/settings-return'
+import { listReturnSearch, wasOpenedFromList } from '#/state/settings-return'
 import { AutoCollapseSwitch } from '#/features/settings/auto-collapse-switch'
 import { CategoryOrderList } from '#/features/settings/category-order-list'
 
@@ -12,27 +12,40 @@ import { CategoryOrderList } from '#/features/settings/category-order-list'
 // with a ghost icon back button and the title, then the content centered
 // at the list column's width. Exactly two items: the category tab order
 // and the board's auto-collapse switch. The back button returns to the
-// list URL Alex came from (src/state/settings-return.ts), else `/`, in
-// place of the settings page's history entry.
+// list URL Alex came from (src/state/settings-return.ts), else `/`. Opened
+// with the 設定 button, the entry before is that list, so it goes back in
+// the history (no second copy of the list); opened directly, it replaces
+// the settings entry. Either way the phone's Back gesture never returns
+// to the settings page.
 // Old layout: `git show 82551ad^:src/routes/settings.tsx`.
 // https://tanstack.com/router/latest/docs/framework/react/guide/navigation
 
 export function SettingsPage() {
+  const router = useRouter()
+  const pageTitleId = useId()
   return (
-    <section aria-label="設定" className="flex flex-col gap-4 pb-6 lg:gap-5">
+    <section
+      aria-labelledby={pageTitleId}
+      className="flex flex-col gap-4 pb-6 lg:gap-5"
+    >
       <div className="flex items-center gap-2">
         <Link
           to="/"
           search={listReturnSearch()}
-          // Replaces the settings entry, so the phone's Back gesture does
-          // not return to the settings page.
           replace
+          onClick={(event) => {
+            if (!wasOpenedFromList()) return
+            event.preventDefault()
+            router.history.back()
+          }}
           aria-label="回到列表"
           className="inline-flex size-11 flex-none items-center justify-center rounded-full text-text hover-row lg:size-9"
         >
           <ArrowLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
-        <h2 className="text-stat-value">設定</h2>
+        <h2 id={pageTitleId} className="text-stat-value">
+          設定
+        </h2>
       </div>
       <div className="mx-auto flex w-full max-w-list-column-max flex-col gap-4">
         <SettingsCard

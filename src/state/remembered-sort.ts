@@ -28,6 +28,12 @@ export function useFollowRememberedSort(
    * switch itself puts the new category's sort on screen).
    */
   category = ALL,
+  /**
+   * Story 3.3: the list is on screen. Off the list (the settings page) the
+   * rule neither follows nor moves its last-seen value, so a change made
+   * meanwhile is judged when the list is back.
+   */
+  active = true,
 ): void {
   const client = useQueryClient()
   const lastRef = useRef<{
@@ -38,6 +44,7 @@ export function useFollowRememberedSort(
   } | null>(null)
 
   useEffect(() => {
+    if (!active) return
     const last = lastRef.current
     lastRef.current = { remembered, view, ready, category }
     if (last === null || !last.ready || last.category !== category) return
@@ -49,5 +56,5 @@ export function useFollowRememberedSort(
       saving: isSavingSort(client, category),
     })
     if (next !== null) follow(next)
-  }, [client, remembered, view, ready, follow, category])
+  }, [client, remembered, view, ready, follow, category, active])
 }

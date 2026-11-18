@@ -17,8 +17,9 @@ import type { SortView } from '#/shared/list-search'
 // apart from the view, so a count changing re-renders only the tab row.
 // Story 3.3: the settings page sits under the same layout (header as
 // usual) and shows the list Alex came from, so the setters always write
-// the list's URL (`/`): a tab click or a sort pick there goes back to it. Without a provider (node tests)
-// it is the default view in 「全部」, ready, and setting does nothing.
+// the list's URL (`/`): a tab click or a sort pick there goes back to it.
+// Without a provider (node tests) it is the default view in 「全部」,
+// ready, and setting does nothing.
 
 /** The view on screen: the sort, and the category (`ALL` for 「全部」). */
 export interface ListView extends SortView {

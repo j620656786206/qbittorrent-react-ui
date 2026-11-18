@@ -74,9 +74,13 @@ function sentOrder(body: string | null): unknown {
 async function settle(page: Page) {
   await page.evaluate(async () => {
     await new Promise((resolve) => requestAnimationFrame(resolve))
+    // An endless one (the skeleton pulse) would never finish.
     await Promise.all(
       document
         .getAnimations()
+        .filter(
+          (animation) => animation.effect?.getTiming().iterations !== Infinity,
+        )
         .map((animation) => animation.finished.catch(() => null)),
     )
   })
@@ -190,10 +194,15 @@ test('keyboard: back, every arrow and the switch by Tab; Space turns collapse of
   await expect(seeding).toBeVisible({ timeout: 30_000 })
   await scrollPastOneHeight(seeding)
   await expect(strips.first()).toBeVisible()
+  // Endless animations (the skeleton pulse) never stop running.
   await page.waitForFunction(() =>
     document
       .getAnimations()
-      .every((animation) => animation.playState !== 'running'),
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getTiming().iterations === Infinity,
+      ),
   )
 
   await settingsButton(page).click()

@@ -36,10 +36,12 @@ import { clearListReturn } from '#/state/settings-return'
 // `/settings` and the back button returns to the list URL Alex came from
 // (or `/` when opened directly); the category order list (every
 // qBittorrent category, 「全部」 fixed first, first up and last down
-// disabled), a press sending the whole new order with every arrow waiting
-// and nothing moving until the answer, the tabs following the answer, a
-// failure toast keeping the order; the auto-collapse switch (default on,
-// written at once, storage that throws reads on) and the phone line. Only
+// disabled), a press sending the whole new order with the pressed row's
+// arrows waiting (every arrow while the settings are read) and nothing
+// moving until the answer, the tabs following the answer, a failure toast
+// keeping the order; the header on `/settings` showing the list Alex came
+// from; the auto-collapse switch (default on, written at once, storage
+// that fails reads on and reports nothing) and the phone line. Only
 // the session and the settings writes are replaced; maindata and settings
 // come from fakes. Fake data only (code names).
 // https://tanstack.com/router/latest/docs/framework/react/guide/navigation
@@ -130,6 +132,8 @@ let saves: Array<{
 }>
 let desktop: boolean
 let failSettings: boolean
+/** Set: the next settings reads wait until the test releases them. */
+let holdSettings: ((release: () => void) => void) | null
 let holdMaindata: boolean
 let failMaindata: boolean
 let emptyData: boolean
@@ -147,10 +151,14 @@ async function mount(initial: string) {
                 ? fakeResponse({ changed: [], categories: {} })
                 : data(),
             ),
-    fetchSettings: () =>
-      failSettings
-        ? Promise.reject(new AppError('qbit_rejected'))
-        : Promise.resolve(settingsAnswer),
+    fetchSettings: () => {
+      if (failSettings) return Promise.reject(new AppError('qbit_rejected'))
+      const hold = holdSettings
+      if (hold === null) return Promise.resolve(settingsAnswer)
+      return new Promise<Settings>((resolve) => {
+        hold(() => resolve(settingsAnswer))
+      })
+    },
   })
   router = createRouter({
     routeTree,
@@ -184,8 +192,13 @@ async function answer(settings: Settings, index = saves.length - 1) {
 
 const pathname = () => router.state.location.pathname
 const search = () => router.state.location.search as Record<string, unknown>
+/** The settings page: the region named by its 「設定」 heading. */
 const page = () =>
-  document.querySelector<HTMLElement>('section[aria-label="設定"]')
+  [...document.querySelectorAll<HTMLElement>('section[aria-labelledby]')].find(
+    (section) =>
+      document.getElementById(section.getAttribute('aria-labelledby') ?? '')
+        ?.textContent === '設定',
+  ) ?? null
 const settingsButton = () =>
   [...document.querySelectorAll('header button')].find(
     (button) => button.getAttribute('aria-label') === '設定',
@@ -239,6 +252,7 @@ beforeEach(() => {
   saves = []
   desktop = true
   failSettings = false
+  holdSettings = null
   holdMaindata = false
   failMaindata = false
   emptyData = false
@@ -306,13 +320,32 @@ describe('open and back', () => {
     expect(search()).toEqual({ category: 'mteam-X', sort: 'ratio', hash: HASH })
   })
 
-  it('back replaces the settings entry (the phone Back gesture skips it)', async () => {
+  it('opened with 設定: back goes back in the history (no second list entry)', async () => {
     await mount('/?sort=ratio')
     await click(settingsButton())
     expect(router.history.length).toBe(2)
     await click(backLink())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     expect(pathname()).toBe('/')
+    expect(search()).toEqual({ sort: 'ratio' })
     expect(router.history.length).toBe(2)
+    expect(router.history.canGoBack()).toBe(false)
+  })
+
+  it('opened directly: back replaces the settings entry', async () => {
+    await mount('/settings')
+    await click(backLink())
+    expect(pathname()).toBe('/')
+    expect(router.history.length).toBe(1)
+  })
+
+  it('a typed /settings with list params: the list fix never rewrites its URL', async () => {
+    // On the list, `dir` without `sort` is removed (fixListSearch).
+    await mount('/settings?dir=asc')
+    expect(pathname()).toBe('/settings')
+    expect(search()).toEqual({ dir: 'asc' })
   })
 
   it('the list URL is recorded whenever the list changes, so history keeps it right', async () => {
@@ -432,6 +465,32 @@ describe('the header on /settings', () => {
     ])
   })
 
+  it('a change made while on /settings is followed once the list is back', async () => {
+    settingsAnswer = remembering
+    await mount('/?category=mteam-X&sort=ratio&dir=desc')
+    await click(settingsButton())
+    settingsAnswer = {
+      ...remembering,
+      categorySort: { 'mteam-X': { sort: 'seeding_time', dir: 'desc' } },
+    }
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(pathname()).toBe('/settings')
+    await click(backLink())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(pathname()).toBe('/')
+    expect(search()).toMatchObject({
+      category: 'mteam-X',
+      sort: 'seeding_time',
+      dir: 'desc',
+    })
+  })
+
   it('another device changing the remembered sort never navigates away from /settings', async () => {
     settingsAnswer = remembering
     await mount('/?category=mteam-X')
@@ -507,7 +566,7 @@ describe('the category order list', () => {
     await click(arrow('把 c 往上移'))
     expect(status?.textContent).toBe('')
     await answer(ordered('b', 'c', 'a', 'd', 'mteam-X'))
-    expect(status?.textContent).toBe('c 移到第 2 個')
+    expect(status?.textContent).toBe('c 移到第 3 個')
   })
 
   it('reads the settings again on mount (a newer order saved elsewhere)', async () => {
@@ -519,6 +578,25 @@ describe('the category order list', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
     expect(rows()).toEqual(['全部', 'c', 'a', 'b', 'd', 'mteam-X'])
+  })
+
+  it('every arrow waits while the settings are read again (the mount refresh)', async () => {
+    await mount('/?sort=ratio')
+    const releases: Array<() => void> = []
+    holdSettings = (release) => releases.push(release)
+    await click(settingsButton())
+    expect(releases).toHaveLength(1)
+    expect(waiting(arrow('把 c 往上移'))).toBe(true)
+    expect(waiting(arrow('把 b 往下移'))).toBe(true)
+    await click(arrow('把 c 往上移'))
+    expect(saves).toEqual([])
+    await act(async () => {
+      releases[0]()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(waiting(arrow('把 c 往上移'))).toBe(false)
+    await click(arrow('把 c 往上移'))
+    expect(saves).toHaveLength(1)
   })
 
   it('settings unknown (the read failed): read-only with a note, no press', async () => {
@@ -654,27 +732,23 @@ describe('the auto-collapse switch', () => {
     await mount('/settings')
     expect(switchButton().getAttribute('aria-checked')).toBe('true')
     await click(switchButton())
-    // Nothing was stored, so it still reads on.
+    // Nothing was stored, so it still reads on; nothing is reported.
     expect(switchButton().getAttribute('aria-checked')).toBe('true')
+    expect(page()?.textContent).not.toContain('存不了')
     blocked.mockRestore()
   })
 
-  it('storage refuses the write: the switch stays and says so', async () => {
+  it('storage refuses the write (getItem works): shows on, no throw, no note', async () => {
     const refuse = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new Error('quota')
     })
     await mount('/settings')
-    const refusedText = () =>
-      [...(page()?.querySelectorAll('p') ?? [])].find(
-        (element) => element.textContent === '這台裝置存不了這個設定',
-      )
-    expect(refusedText()).toBeUndefined()
-    await click(switchButton())
     expect(switchButton().getAttribute('aria-checked')).toBe('true')
-    expect(refusedText()?.className).toContain('text-text-muted')
-    expect(switchButton().getAttribute('aria-describedby')).toBe(
-      refusedText()?.id,
-    )
+    await click(switchButton())
+    // Nothing was stored, so it still reads on; nothing is reported.
+    expect(switchButton().getAttribute('aria-checked')).toBe('true')
+    expect(page()?.textContent).not.toContain('存不了')
+    expect(switchButton().hasAttribute('aria-describedby')).toBe(false)
     refuse.mockRestore()
   })
 

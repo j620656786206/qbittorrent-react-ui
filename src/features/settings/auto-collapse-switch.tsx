@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { cn } from '#/shared/ui/cn'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { setAutoCollapse, useAutoCollapse } from '#/state/auto-collapse'
@@ -9,8 +9,9 @@ import { setAutoCollapse, useAutoCollapse } from '#/state/auto-collapse'
 // pattern, no new dependency): a click or Space (a button's own key)
 // toggles it, and the change reaches the board at once. The phone shows it
 // too, with the muted line 「只在電腦版有用」 (the board only collapses on
-// desktop). A write the storage refused leaves the switch as it was, with
-// the muted line 「這台裝置存不了這個設定」. The thumb moves with `transform` only, still for reduced motion.
+// desktop). Storage that fails reads as on and never errors; a refused
+// write leaves the switch on. The thumb moves with `transform` only,
+// still for reduced motion.
 // https://www.w3.org/WAI/ARIA/apg/patterns/switch/
 
 export function AutoCollapseSwitch() {
@@ -18,12 +19,10 @@ export function AutoCollapseSwitch() {
   const desktop = useIsDesktop()
   const labelId = useId()
   const noteId = useId()
-  const refusedId = useId()
-  const [refused, setRefused] = useState(false)
   return (
     <section
       aria-labelledby={labelId}
-      className="flex items-center justify-between gap-4 rounded-panel bg-surface px-4 py-3 shadow-card lg:px-[22px] lg:py-3.5"
+      className="flex items-center justify-between gap-4 rounded-panel bg-surface px-4 py-3 shadow-card lg:p-panel-padding"
     >
       <div className="min-w-0">
         <h3 id={labelId} className="text-column-title">
@@ -34,23 +33,14 @@ export function AutoCollapseSwitch() {
             只在電腦版有用
           </p>
         )}
-        {refused && (
-          <p id={refusedId} className="mt-1 text-meta text-text-muted">
-            這台裝置存不了這個設定
-          </p>
-        )}
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={on}
         aria-labelledby={labelId}
-        aria-describedby={
-          [desktop ? null : noteId, refused ? refusedId : null]
-            .filter((id) => id !== null)
-            .join(' ') || undefined
-        }
-        onClick={() => setRefused(!setAutoCollapse(!on))}
+        aria-describedby={desktop ? undefined : noteId}
+        onClick={() => setAutoCollapse(!on)}
         // 44px tall on the phone (touch target), the visible track inside.
         className="group/switch inline-flex h-11 w-[52px] flex-none items-center justify-center rounded-full lg:h-9"
       >
