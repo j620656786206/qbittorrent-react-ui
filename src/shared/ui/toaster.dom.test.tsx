@@ -3,8 +3,16 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetToasts, showFailureToast } from '#/shared/toast-store'
-import { TOAST_REGION_ATTR, Toaster } from '#/shared/ui/toaster'
+import {
+  resetToasts,
+  setToastLift,
+  showFailureToast,
+} from '#/shared/toast-store'
+import {
+  TOAST_LIFT_CLASS,
+  TOAST_REGION_ATTR,
+  Toaster,
+} from '#/shared/ui/toaster'
 
 // Spec 2.6: the renderer. An always-mounted alert region, the looks from
 // DESIGN toast, the 重試 pill and ✕, and a replacement replaying the
@@ -112,5 +120,20 @@ describe('the toaster', () => {
     expect(document.querySelectorAll('[data-slot="toast"]')).toHaveLength(1)
     expect(card()?.textContent).toContain('two')
     expect(card()).not.toBe(first)
+  })
+
+  it('4.1 lifted: 68px up on desktop with a transform transition, none under reduced motion, no style attribute', async () => {
+    const classes = () => region().className.split(' ')
+    expect(classes()).not.toContain(TOAST_LIFT_CLASS)
+    expect(classes()).toContain('lg:transition-transform')
+    expect(classes()).toContain('lg:duration-300')
+    expect(classes()).toContain('lg:ease-[cubic-bezier(0.2,0.8,0.2,1)]')
+    expect(classes()).toContain('lg:motion-reduce:transition-none')
+    await act(async () => setToastLift(true))
+    expect(TOAST_LIFT_CLASS).toBe('lg:-translate-y-[68px]')
+    expect(classes()).toContain(TOAST_LIFT_CLASS)
+    expect(region().getAttribute('style')).toBeNull()
+    await act(async () => setToastLift(false))
+    expect(classes()).not.toContain(TOAST_LIFT_CLASS)
   })
 })

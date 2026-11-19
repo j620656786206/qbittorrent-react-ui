@@ -61,7 +61,7 @@ development_status:
   2-10-出錯種子的原因: done # PR #29：出錯種子顯示 qBittorrent log 裡整理過的原因
   epic-2-retrospective: optional
 
-  epic-3: in-progress
+  epic-3: done
   3-1-設定檔和-全部-記住排序: done # PR #33：排序記憶存在 NAS 的設定檔，「全部」記住手動選的排序
   3-2-電腦分類分頁: done # PR #34：電腦分類分頁，換分類換成那個分類記住的排序
   3-3-設定頁: done # PR #35：設定頁，分類分頁順序和自動收合開關
@@ -71,8 +71,8 @@ development_status:
   3-7-快捷鍵和說明視窗: done # PR #41：電腦快捷鍵和快捷鍵說明視窗
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-電腦勾選和選取列: backlog
+  epic-4: in-progress
+  4-1-電腦勾選和選取列: done # PR #44：電腦勾選和選取列
   4-2-手機選取模式: backlog
   4-3-刪除確認和刪除: backlog
   4-4-刪除淡出: backlog

@@ -38,10 +38,11 @@ export function ListDetailPanel() {
             onNavigate={setHash}
             tabs={tabs}
           />
+          {/* Story 4.1: 110px at the bottom, clear of the selection bar. */}
           <DetailPanelBody
             torrent={torrent}
             tabs={tabs}
-            className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-[22px] [scrollbar-width:thin]"
+            className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-page-desktop-bottom [scrollbar-width:thin]"
           />
         </>
       )}

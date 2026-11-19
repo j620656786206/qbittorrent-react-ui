@@ -18,11 +18,17 @@ import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 // column (screen readers keep it); the second line wraps inside a one-line
 // box, so the speed drops first, then the size; the location tag always
 // stays (at most half the line).
+// Story 4.1: a selected row has the `selection-row` background, which hover
+// never changes. The desktop checkbox is not in here (no control inside the
+// row's button): torrent-list.tsx draws it in the row's `group/item`
+// wrapper, over the 20px slot, so hovering it still shows the row's hover.
 // Names and details are JSX text, never HTML or links.
 
 export interface RowActionProps {
   /** The detail shows this row (the ring, `aria-current`). */
   viewing: boolean
+  /** Story 4.1: the row is ticked (the `selection-row` background). */
+  selected: boolean
   /** Stable: opens this row's torrent in the detail. */
   onOpen: (hash: string) => void
 }
@@ -36,6 +42,7 @@ export const TorrentRow = memo(function Row({
   sortValue,
   errorReason,
   viewing,
+  selected,
   onOpen,
 }: RowProps & RowActionProps) {
   const model = rowModel(torrent, {
@@ -49,6 +56,7 @@ export const TorrentRow = memo(function Row({
     <RowContent
       model={model}
       viewing={viewing}
+      selected={selected}
       onOpen={() => onOpen(torrent.hash)}
     />
   )
@@ -58,10 +66,12 @@ export const TorrentRow = memo(function Row({
 export function RowContent({
   model,
   viewing = false,
+  selected = false,
   onOpen,
 }: {
   model: RowModel
   viewing?: boolean
+  selected?: boolean
   onOpen?: () => void
 }) {
   return (
@@ -73,7 +83,10 @@ export function RowContent({
       onClick={onOpen}
       style={{ height: ROW_HEIGHT }}
       className={cn(
-        'box-border flex w-full items-center gap-2 rounded-row px-2.5 py-[9px] text-left text-text hover-row lg:gap-2.5 lg:px-3',
+        'box-border flex w-full items-center gap-2 rounded-row px-2.5 py-[9px] text-left text-text lg:gap-2.5 lg:px-3',
+        selected
+          ? 'bg-selection-row'
+          : 'hover-row lg:group-hover/item:bg-surface-muted',
         viewing && 'viewing-ring',
       )}
     >

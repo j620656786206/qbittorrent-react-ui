@@ -305,9 +305,10 @@ describe('C1 R1 collapse (reduced motion: at once)', () => {
       '回到看板，已整理，0 個',
     )
     expect(button(/^展開已整理欄/)).toBeUndefined()
-    // The anchor: at scrollTop 601 the first fully visible card is s7
-    // (each card 89px + 10px gap, the list starts 4px down).
-    expect(framed()).toEqual(['s7'])
+    // The anchor: at scrollTop 601 the first fully visible card is s6
+    // (each card 89px + 10px gap, the list starts 10px down since story
+    // 4.1: s6 starts at 10 + 6 * 99 = 604).
+    expect(framed()).toEqual(['s6'])
     expect(animate).not.toHaveBeenCalled()
     expect(freezeStore.state.animation).toBe(false)
   })
@@ -315,7 +316,7 @@ describe('C1 R1 collapse (reduced motion: at once)', () => {
   it('the anchor nearest the pointer inside the column', async () => {
     await render(fakeResponse({ changed: data() }))
     // y 100 + 500 = 600 is inside s11 at scrollTop 601 (s11 spans
-    // 4 + 11 * 99 = 1093 to 1182, so 592 to 681 on screen).
+    // 10 + 11 * 99 = 1099 to 1188, so 598 to 687 on screen).
     document.dispatchEvent(
       new PointerEvent('pointermove', { clientX: 150, clientY: 600 }),
     )

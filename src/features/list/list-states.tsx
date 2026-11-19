@@ -24,8 +24,12 @@ export const LIST_SECTION_CLASS =
 export const LIST_ROWS_SECTION_CLASS =
   'flex h-full min-h-0 flex-col overflow-hidden rounded-panel bg-surface max-lg:-mx-1 max-lg:rounded-b-none'
 
+/**
+ * Story 4.1: 110px under the last row on desktop (`page-desktop-bottom`),
+ * always, so the selection bar never covers it.
+ */
 export const LIST_SCROLL_CLASS =
-  'min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin] lg:p-2'
+  'min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin] lg:p-2 lg:pb-page-desktop-bottom'
 
 /**
  * DESIGN 列表加詳情 (mockup S01-list-mode-desktop): the list at most 560px on

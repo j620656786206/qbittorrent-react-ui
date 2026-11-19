@@ -168,6 +168,7 @@ describe('TorrentRow (the memoized row)', () => {
         sortValue={undefined}
         errorReason={undefined}
         viewing={false}
+        selected={false}
         onOpen={() => {}}
       />,
     )
@@ -191,6 +192,7 @@ describe('TorrentRow (the memoized row)', () => {
           sortValue={undefined}
           errorReason={errorReason}
           viewing={false}
+          selected={false}
           onOpen={() => {}}
         />,
       )
@@ -209,6 +211,7 @@ describe('TorrentRow (the memoized row)', () => {
         sortValue={undefined}
         errorReason="<b>x</b>"
         viewing={false}
+        selected={false}
         onOpen={() => {}}
       />,
     )

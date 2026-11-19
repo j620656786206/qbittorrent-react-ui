@@ -14,7 +14,8 @@ import { ALL } from '#/shared/categories'
 // last scroll once the finger lifted, so momentum scrolling counts). Story
 // 2.2: an open bottom sheet (EXPERIENCE 「底部面板開著」). Story 2.8: a
 // running board animation (AD-7 「動畫進行中」; the auto-collapse FLIP holds
-// it from its first measure to its end). The selection joins later.
+// it from its first measure to its end). Story 4.1: a selection (any hash
+// ticked, src/state/selection.ts) holds the list, never the board.
 
 /** Quiet time after the last scroll before a touch scroll counts as over. */
 export const TOUCH_SETTLE_MS = 300
@@ -28,6 +29,8 @@ export interface FreezeReasons {
   sheetOpen: boolean
   /** A board animation runs (story 2.8, auto-collapse). */
   animation: boolean
+  /** At least one torrent is selected (story 4.1); the list only. */
+  selection: boolean
 }
 
 export function isOrderFrozen(reasons: FreezeReasons): boolean {
@@ -35,13 +38,15 @@ export function isOrderFrozen(reasons: FreezeReasons): boolean {
     reasons.pointerInList ||
     reasons.touchScroll ||
     reasons.sheetOpen ||
-    reasons.animation
+    reasons.animation ||
+    reasons.selection
   )
 }
 
 /**
- * The board's own freeze (story 2.8): only a running animation. Hover, touch
- * and sheets never freeze the board (EXPERIENCE 「看板不受影響」, story 2.3).
+ * The board's own freeze (story 2.8): only a running animation. Hover,
+ * touch, sheets and a selection never freeze the board (EXPERIENCE
+ * 「看板不受影響」, story 2.3).
  */
 export function isBoardFrozen(reasons: FreezeReasons): boolean {
   return reasons.animation
@@ -154,6 +159,7 @@ export const freezeStore = createStore<FreezeReasons>({
   touchScroll: false,
   sheetOpen: false,
   animation: false,
+  selection: false,
 })
 
 function setReason(name: keyof FreezeReasons, value: boolean): void {
@@ -163,6 +169,14 @@ function setReason(name: keyof FreezeReasons, value: boolean): void {
 
 export function setPointerInList(inside: boolean): void {
   setReason('pointerInList', inside)
+}
+
+/**
+ * Story 4.1: the selection store's reason (written only by
+ * src/state/selection.ts). Clearing the last selection reorders once.
+ */
+export function setSelectionFreeze(selecting: boolean): void {
+  setReason('selection', selecting)
 }
 
 /** Open sheets; a count so two at once (a later story) end the reason last. */
@@ -261,8 +275,8 @@ export function noteScroll(): void {
 }
 
 /**
- * Clears the list's own reasons (the list unmounts); an open sheet and a
- * running animation stay.
+ * Clears the list's own reasons (the list unmounts); an open sheet, a
+ * running animation and the selection stay.
  */
 export function resetListFreeze(): void {
   clearSettleTimer()
@@ -282,6 +296,7 @@ export function resetOrderFreeze(): void {
   setReason('sheetOpen', false)
   runningAnimations = 0
   setReason('animation', false)
+  setReason('selection', false)
 }
 
 export function useOrderFrozen(): boolean {

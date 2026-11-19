@@ -18,9 +18,17 @@ export interface ShownToast {
 
 interface ToastState {
   toast: ShownToast | null
+  /**
+   * Story 4.1: the desktop selection bar shows, so the toast sits 16px
+   * above it instead of 24px from the bottom.
+   */
+  lifted: boolean
 }
 
-export const toastStore = createStore<ToastState>({ toast: null })
+export const toastStore = createStore<ToastState>({
+  toast: null,
+  lifted: false,
+})
 
 let nextId = 1
 
@@ -33,7 +41,10 @@ export function showFailureToast(
   if (typeof window === 'undefined') return
   const id = nextId
   nextId += 1
-  toastStore.setState(() => ({ toast: { id, text, retry, keys } }))
+  toastStore.setState((state) => ({
+    ...state,
+    toast: { id, text, retry, keys },
+  }))
 }
 
 /** Closes the toast; with `id`, only if that one still shows. */
@@ -41,7 +52,7 @@ export function dismissToast(id?: number): void {
   const shown = toastStore.state.toast
   if (shown === null) return
   if (id !== undefined && shown.id !== id) return
-  toastStore.setState(() => ({ toast: null }))
+  toastStore.setState((state) => ({ ...state, toast: null }))
 }
 
 /** Closes the toast showing if it is about `key`. */
@@ -50,7 +61,13 @@ export function dismissToastFor(key: string): void {
   if (shown?.keys.includes(key)) dismissToast(shown.id)
 }
 
-/** Tests: nothing shown. */
+/** Story 4.1: lifts the toast above the selection bar, or puts it back. */
+export function setToastLift(lifted: boolean): void {
+  if (toastStore.state.lifted === lifted) return
+  toastStore.setState((state) => ({ ...state, lifted }))
+}
+
+/** Tests: nothing shown, not lifted. */
 export function resetToasts(): void {
-  toastStore.setState(() => ({ toast: null }))
+  toastStore.setState(() => ({ toast: null, lifted: false }))
 }

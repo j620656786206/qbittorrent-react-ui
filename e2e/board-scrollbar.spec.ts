@@ -50,7 +50,11 @@ test('a click on a board column scrollbar keeps the board panel', async ({
   const seeding = board
     .getByRole('region', { name: /^做種中/ })
     .getByRole('group', { name: '做種中' })
-  await seeding.getByRole('listitem').first().locator(':scope > button').click()
+  await seeding
+    .getByRole('listitem')
+    .first()
+    .locator(':scope > button[data-entrance]')
+    .click()
   await expect(panel).toBeVisible()
 
   const bar = await seeding.evaluate((element) => {

@@ -128,8 +128,10 @@ export function useArrowStepping({
       focusNextRef.current = null
       return
     }
+    // The row's own button (`aria-current`), not story 4.1's checkbox
+    // before it in the same wrapper.
     const button = listRef.current?.querySelector<HTMLButtonElement>(
-      `[data-hash="${pending.hash}"] button`,
+      `[data-hash="${pending.hash}"] button[aria-current]`,
     )
     if (!button) return
     focusNextRef.current = null

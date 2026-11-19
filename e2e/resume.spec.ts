@@ -56,13 +56,13 @@ const panel = (page: Page) => page.getByRole('complementary', { name: '詳情' }
 const row = (page: Page, name: string) =>
   page
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({ has: page.getByTitle(name, { exact: true }) })
 const card = (page: Page, name: string) =>
   page
     .getByRole('region', { name: '看板' })
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({ has: page.getByTitle(name, { exact: true }) })
 
 const params = (page: Page) => {
@@ -152,7 +152,7 @@ test('a remembered row far down a long list is shown without scrolling to it, no
     const box = scroller?.getBoundingClientRect()
     if (!scroller || !box) return null
     for (const button of scroller.querySelectorAll<HTMLElement>(
-      '[role="listitem"] > button',
+      '[role="listitem"] > button[data-entrance]',
     )) {
       const rect = button.getBoundingClientRect()
       if (rect.top >= box.top + 40 && rect.bottom <= box.bottom - 40) {

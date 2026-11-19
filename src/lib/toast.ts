@@ -1,4 +1,8 @@
-import { dismissToastFor, showFailureToast } from '#/shared/toast-store'
+import {
+  dismissToastFor,
+  setToastLift,
+  showFailureToast,
+} from '#/shared/toast-store'
 
 // AD-13, story 2.6: the only toast API. The spine allows three kinds: plain
 // text (4 s), with a button (8 s) and a failure with 「重試」. Only the
@@ -22,4 +26,12 @@ function dismissFor(key: string): void {
   dismissToastFor(key)
 }
 
-export const toast = Object.freeze({ failure, dismissFor })
+/**
+ * Story 4.1: while the desktop selection bar shows (`on`), toasts sit 16px
+ * above it; `false` puts them back at the bottom.
+ */
+function setLift(on: boolean): void {
+  setToastLift(on)
+}
+
+export const toast = Object.freeze({ failure, dismissFor, setLift })
