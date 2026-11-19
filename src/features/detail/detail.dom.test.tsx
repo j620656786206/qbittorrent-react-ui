@@ -367,6 +367,8 @@ describe('the list panel (desktop list mode)', () => {
     ).toEqual(['分類', '大小', '加入時間', '完成時間', '已下載', '已上傳'])
     // The header and tabs stay; only the panel scrolls.
     expect(panel.className).toContain('overflow-y-auto')
+    // Story 4.1: 110px at the bottom, clear of the selection bar.
+    expect(panel.className).toContain('pb-page-desktop-bottom')
   })
 
   it('‹ › write the neighbours in the shown order', async () => {
@@ -487,6 +489,13 @@ describe('focus at the ends', () => {
     await act(async () => byLabel('上一個').click())
     expect(byLabel('上一個').disabled).toBe(true)
     expect(document.activeElement).toBe(byLabel('下一個'))
+  })
+
+  it('story 4.1: the board panel body keeps 110px clear of the selection bar', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    const body = document.querySelector('[role="tabpanel"]') as HTMLElement
+    expect(body.className).toContain('overflow-y-auto')
+    expect(body.className).toContain('pb-page-desktop-bottom')
   })
 
   it('a press that does not reach an end keeps focus where it is', async () => {

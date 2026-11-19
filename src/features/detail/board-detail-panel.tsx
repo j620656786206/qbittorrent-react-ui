@@ -90,6 +90,7 @@ export function BoardDetailPanel() {
         tabs={tabs}
         arrowKeys={desktop}
       />
+      {/* Story 4.1: 110px at the bottom, clear of the selection bar. */}
       <DetailPanelBody
         torrent={target.torrent}
         tabs={tabs}

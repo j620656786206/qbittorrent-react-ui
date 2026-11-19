@@ -5,7 +5,7 @@ created: '2026-11-19'
 status: 'done'
 baseline_revision: '51038f5c6defec15f0cf251dda63713606845064'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
 warnings: ['oversized']
@@ -190,6 +190,30 @@ deferred:
   - `[low]` `[reject]` (edge) A long selection hides new torrents. Same as the blind new-torrents finding.
   - `[low]` `[patch]` (edge) On a touch screen at 1024px or wider, the invisible checkbox takes taps. Action: `pointer-events-none` while hidden, restored together with the opacity.
 
+### 2026-11-19: Review pass (follow-up)
+- verdicts: 20 findings. high 0, medium 1, low 19, false 0, maybe-false 0
+- findings:
+  - `[low]` `[patch]` (intent) The clearing rule is tested end to end only for the digit shortcut. Restore, back/forward, 「在全部裡找」 and the keyword are covered by construction, through the scope key. Grouped with the keyword route test below.
+  - `[low]` `[patch]` (verification-gap) The detail panels' 110px bottom has no test. Action: assert `pb-page-desktop-bottom` on both panel bodies, and add a comment.
+  - `[low]` `[patch]` (verification-gap) A keyword change clearing the selection is tested only at the hook. Action: a route-level case that changes the query.
+  - `[low]` `[reject]` (blind) The first tick may not be announced, because the status region is inside the bar that was `aria-hidden`. Alex does not use a screen reader. The fix needs the region moved out of the bar.
+  - `[low]` `[patch]` (blind) The status reads 「已選 1 個共 100 GB」 with no break between the two texts. Action: a screen-reader-only 「，」 between them.
+  - `[low]` `[reject]` (blind) After 取消, focus falls to the body. carried: same as the first pass's edge finding, still rejected.
+  - `[low]` `[reject]` (blind) There are two Tab stops per row. That is the spec's 代決 tab order. Global shortcuts still work.
+  - `[low]` `[reject]` (blind) The bar can show 已選 0 個. It lasts only until the prune effect runs (one render), or while maindata is in error.
+  - `[low]` `[reject]` (blind) `toast.setLift` is a boolean with no owner count. There is one caller today, and 4.2 extends the same bar component.
+  - `[low]` `[reject]` (blind) Crossing below 1024px drops the selection with no way back. This is the first pass's chosen fix. Note for 4.2: replace the clear with phone selection mode.
+  - `[low]` `[reject]` (blind) The list/board switch keeping the selection is untested. The scope key ignores the sort, and the bar sits outside the sort branch.
+  - `[low]` `[reject]` (blind) The e2e order test compares only the count. The unit test compares the names in order.
+  - `[low]` `[reject]` (blind) The keyboard e2e focuses the checkbox directly instead of pressing Tab. `e2e/shortcuts.spec.ts` covers the Tab order.
+  - `[low]` `[reject]` (blind) The padding test only checks `>= 6`. carried: same as the first pass's board padding finding.
+  - `[low]` `[patch]` (blind) The detail panel padding has no comment and no test. Grouped with the verification-gap panel row.
+  - `[low]` `[reject]` (blind) A selected row loses the `:active` press background. This is cosmetic, and the click still opens the detail.
+  - `[low]` `[reject]` (blind) `useIsSelected` is unused. carried: same as the first pass.
+  - `[low]` `[reject]` (blind) A temporary empty `full_update` would prune the whole selection. qBittorrent's full update lists every torrent it has, and no such snapshot has been observed.
+  - `[low]` `[reject]` (edge) Focus is lost after 取消. carried: same as the first pass.
+  - `[medium]` `[patch]` (edge) With a selection, `↓` stepping aligns the target row to the scroller's bottom, under the bar. Action: virtualizer `scrollPaddingEnd` while anything is selected on desktop, for the list and the selectable card lists, with a test.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -259,3 +283,24 @@ Status: done (first pass)
 - The screenshot test rewrites the tracked 4-1 PNGs on every local e2e run.
 - Board columns now start 6px lower and have 110px of room at the end, which is visible in every board screenshot.
 - After this patch there was no single clean full Playwright run. The failed tests and the selection spec were rerun separately.
+
+### Follow-up pass (2026-11-19)
+
+Status: done.
+
+**Review findings.** 20 in total.
+- Patched: 4 entries. 1 is medium: `scrollPaddingEnd` 92, so a row reached with an arrow key while anything is selected stays above the bar. 3 are low:
+  - a panel padding comment and test
+  - a route-level test that a keyword change clears the selection
+  - a screen-reader-only 「，」 in the status text
+- Deferred: none.
+- Rejected: 16, each with its reason in the triage log. 4 of them were carried over from the first pass.
+
+**Follow-up review: not recommended (false).** No high finding was patched on this follow-up pass.
+
+**Verification**
+- lint and typecheck are clean.
+- vitest: 130 files and 3176 tests pass.
+- The build passes.
+- Playwright: a full run with `caffeinate` passed 124 tests in 14.0 min.
+- check.sh: every line ok.

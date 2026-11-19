@@ -38,6 +38,7 @@ export function ListDetailPanel() {
             onNavigate={setHash}
             tabs={tabs}
           />
+          {/* Story 4.1: 110px at the bottom, clear of the selection bar. */}
           <DetailPanelBody
             torrent={torrent}
             tabs={tabs}

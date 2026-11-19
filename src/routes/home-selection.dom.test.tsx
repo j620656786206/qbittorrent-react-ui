@@ -7,7 +7,10 @@ import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
+import { ALL } from '#/shared/categories'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
+import { ListViewContext } from '#/state/list-view'
+import type { ListViewControl } from '#/state/list-view'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
@@ -47,6 +50,36 @@ let desktop = true
 const listeners = new Set<() => void>()
 let root: Root
 let client: QueryClient
+/** The view Home reads; `query` is the URL's `q`. */
+let query = ''
+
+const control = (): ListViewControl => ({
+  view: { sort: 'added_on', dir: 'desc', category: ALL, query },
+  viewReady: true,
+  setView: () => {},
+  pickView: () => {},
+  selectCategory: () => {},
+  rememberedHint: false,
+  openSettings: () => {},
+  settingsOpen: false,
+  searchOpen: query !== '',
+  openSearch: () => {},
+  setQuery: () => {},
+  closeSearch: () => {},
+})
+
+function renderHome() {
+  const Home = Route.options.component as ComponentType
+  return act(async () =>
+    root.render(
+      <QueryClientProvider client={client}>
+        <ListViewContext value={control()}>
+          <Home />
+        </ListViewContext>
+      </QueryClientProvider>,
+    ),
+  )
+}
 
 beforeEach(async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -54,13 +87,14 @@ beforeEach(async () => {
   resetSelection()
   resetOrderFreeze()
   desktop = true
+  query = ''
   vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query: string) =>
+    (media: string) =>
       ({
         get matches() {
-          return query === DESKTOP_QUERY ? desktop : false
+          return media === DESKTOP_QUERY ? desktop : false
         },
-        media: query,
+        media,
         addEventListener: (_: string, listener: () => void) =>
           listeners.add(listener),
         removeEventListener: (_: string, listener: () => void) =>
@@ -73,15 +107,8 @@ beforeEach(async () => {
     currentPath: () => '/',
   })
   await client.prefetchQuery({ queryKey: MAINDATA_KEY })
-  const Home = Route.options.component as ComponentType
   root = createRoot(document.createElement('div'))
-  await act(async () =>
-    root.render(
-      <QueryClientProvider client={client}>
-        <Home />
-      </QueryClientProvider>,
-    ),
-  )
+  await renderHome()
 })
 
 afterEach(async () => {
@@ -108,6 +135,16 @@ describe('the home route and the width', () => {
     await act(async () => {
       for (const listener of listeners) listener()
     })
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(freezeStore.state.selection).toBe(false)
+  })
+
+  it('a new search keyword (the view Home reads) clears it', async () => {
+    await act(async () => toggleSelected(A))
+    await renderHome()
+    expect(selectionStore.state.hashes).toEqual([A])
+    query = 'show'
+    await renderHome()
     expect(selectionStore.state.hashes).toEqual([])
     expect(freezeStore.state.selection).toBe(false)
   })

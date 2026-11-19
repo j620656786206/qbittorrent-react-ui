@@ -65,6 +65,12 @@ import {
 export const CARD_CHECKBOX_CLASS =
   'pointer-events-none absolute -top-1.5 -left-1.5 z-[1] bg-surface opacity-0 ring-2 ring-surface group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100 group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-data-[selecting]/list:pointer-events-auto group-data-[selecting]/list:opacity-100'
 
+/**
+ * Story 4.1: while anything is selected, a card scrolled to stops 92px
+ * above the column's bottom, above the floating selection bar.
+ */
+const SELECTION_SCROLL_PADDING_END = 92
+
 /** Cards drawn beyond the visible ones, above and below. */
 const OVERSCAN = 4
 /** The pinned window's margin, about `OVERSCAN` cards. */
@@ -257,6 +263,8 @@ export function CardList({
     gap: CARD_GAP,
     paddingStart,
     paddingEnd,
+    scrollPaddingEnd:
+      selectable && selected.size > 0 ? SELECTION_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })

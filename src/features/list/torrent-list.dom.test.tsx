@@ -32,6 +32,7 @@ import {
   clearSelection,
   resetSelection,
   selectionStore,
+  toggleSelected,
 } from '#/state/selection'
 import { OWN_ARROWS, pushEscapeLayer, resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, shownListStore } from '#/state/shown-order'
@@ -40,7 +41,10 @@ import type { SortView } from '#/shared/list-search'
 import type * as ListModel from '#/features/list/list-model'
 import { HASH_WRITE_GAP_MS } from '#/features/list/use-arrow-stepping'
 import { LIST_SCROLL_CLASS } from '#/features/list/list-states'
-import { TorrentList } from '#/features/list/torrent-list'
+import {
+  SELECTION_SCROLL_PADDING_END,
+  TorrentList,
+} from '#/features/list/torrent-list'
 
 // Review of 1.7 to 1.9: the list's wiring in a DOM (happy-dom), which the
 // node tests in torrent-list.test.tsx cannot reach: the virtualizer window,
@@ -1256,6 +1260,25 @@ describe('↑ ↓ (story 3.7)', () => {
     // Index 30 brought to the bottom edge (`align: 'auto'`).
     expect(lastTop()).toBeCloseTo(
       30 * (ROW_HEIGHT_PX + 2) + ROW_HEIGHT_PX - 600,
+      -1,
+    )
+  })
+
+  it('4.1 with a selection, a row scrolled to stops 92px above the bottom (above the bar)', async () => {
+    await render(fakeResponse({ changed: many(40) }))
+    const scrollTo = vi.spyOn(scroller(), 'scrollTo')
+    Object.defineProperty(scroller(), 'scrollHeight', { value: 40 * 61 + 200 })
+    const lastTop = () =>
+      (scrollTo.mock.lastCall?.[0] as ScrollToOptions | undefined)?.top
+    await act(async () => toggleSelected(fakeHash(40)))
+    viewedHash = fakeHash(11)
+    await act(async () => root.render(app()))
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(10))
+    expect(SELECTION_SCROLL_PADDING_END).toBe(92)
+    // Index 30's bottom lands 92px above the scroller's bottom edge.
+    expect(lastTop()).toBeCloseTo(
+      30 * (ROW_HEIGHT_PX + 2) + ROW_HEIGHT_PX - 600 + 92,
       -1,
     )
   })

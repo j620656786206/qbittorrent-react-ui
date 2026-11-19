@@ -140,10 +140,13 @@ describe('the selection bar', () => {
     expect(status().parentElement).toBe(bar())
     expect([...status().children].map((child) => child.textContent)).toEqual([
       '已選 3 個',
+      '，',
       '共 100 GB',
     ])
+    // The separator is for screen readers only.
+    expect(status().children[1].className).toBe('sr-only')
     expect([...bar().children].map((child) => child.textContent)).toEqual([
-      '已選 3 個共 100 GB',
+      '已選 3 個，共 100 GB',
       '取消',
       '改路徑',
       '刪除（含檔案）',
@@ -157,9 +160,9 @@ describe('the selection bar', () => {
   it('the count and size changing are announced (a polite status region)', async () => {
     await render()
     await act(async () => toggleSelected(A))
-    expect(status().textContent).toBe('已選 1 個共 100 GB')
+    expect(status().textContent).toBe('已選 1 個，共 100 GB')
     await act(async () => toggleSelected(C))
-    expect(status().textContent).toBe('已選 2 個共 100 GB')
+    expect(status().textContent).toBe('已選 2 個，共 100 GB')
   })
 
   it('a selected hash maindata lacks (before the prune) keeps the bar shown, like the freeze', async () => {
@@ -201,7 +204,7 @@ describe('the selection bar', () => {
       expect(classes).toContain(token)
     }
     expect(bar().getAttribute('style')).toBeNull()
-    const [count, size] = [...status().children]
+    const [count, , size] = [...status().children]
     expect(count.className).toContain('font-bold')
     expect(size.className).toContain('text-[12px]')
     expect(size.className).toContain('opacity-70')

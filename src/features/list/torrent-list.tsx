@@ -100,6 +100,13 @@ import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 const estimateSize = () => ROW_HEIGHT
 
 /**
+ * Story 4.1: while anything is selected on desktop, a row scrolled to
+ * (`↑` `↓`) stops 92px above the scroller's bottom, so it lands above the
+ * floating selection bar (24px up, 52px tall, 16px clear).
+ */
+export const SELECTION_SCROLL_PADDING_END = 92
+
+/**
  * Story 4.1: over the row's 20px slot (12px in, centred), above the row's
  * button; hidden until the row is hovered or focused, or anything is
  * selected. Still focusable while hidden, so Tab reaches it; taps pass
@@ -288,6 +295,7 @@ function TorrentRows({
     }
   }, [])
 
+  const desktop = useIsDesktop()
   // A new `getItemKey` makes the virtualizer re-measure every row: keep it
   // stable (`shown` keeps its reference across polls and while frozen).
   const getItemKey = useCallback((index: number) => shown[index], [shown])
@@ -299,11 +307,12 @@ function TorrentRows({
     overscan: 10,
     gap: ROW_GAP,
     scrollMargin,
+    scrollPaddingEnd:
+      desktop && selected.size > 0 ? SELECTION_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
   // Story 3.7: `↑` `↓` on desktop (use-arrow-stepping.ts).
-  const desktop = useIsDesktop()
   useArrowStepping({
     enabled: desktop,
     shown,

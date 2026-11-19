@@ -68,6 +68,7 @@ export function SelectionBar() {
       {/* Announced when the count or size changes. */}
       <span role="status" className="contents">
         <b className="font-bold">{text.count}</b>
+        <span className="sr-only">，</span>
         <span className="text-[12px] opacity-70">{text.size}</span>
       </span>
       <button
