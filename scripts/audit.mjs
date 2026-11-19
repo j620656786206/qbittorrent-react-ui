@@ -3,10 +3,11 @@
 // the day it expires; after that day the audit fails again until someone
 // looks at it. Any other high or critical advisory fails as before.
 //
-// Alex chose this on 2026-11-18 (option A): GHSA-fc5q-39xc-vjpf has no fixed
-// picomatch release yet and blocked every PR. Remove the entry as soon as a
-// fixed version exists (the script prints a note when the advisory no
-// longer shows up).
+// Alex chose this on 2026-11-18 (option A) for GHSA-fc5q-39xc-vjpf
+// (picomatch), which had no fixed release and blocked every PR. GitHub
+// withdrew that advisory on 2026-11-18, so its entry was removed on
+// 2026-11-19. Remove an entry once its advisory no longer shows up (the
+// script prints a note).
 //
 // Usage: node scripts/audit.mjs
 // npm audit JSON (report version 2):
@@ -14,13 +15,8 @@
 
 import { execFileSync } from 'node:child_process'
 
-const SKIPPED = [
-  {
-    id: 'GHSA-fc5q-39xc-vjpf',
-    expires: '2026-12-31',
-    why: 'picomatch ReDoS (<= 4.0.7, no fixed release on 2026-11-18); only build tooling uses it (vite, the TanStack router plugin), and the built .output that runs in the container does not contain it.',
-  },
-]
+/** @type {Array<{ id: string, expires: string, why: string }>} */
+const SKIPPED = []
 
 const FAILING = new Set(['high', 'critical'])
 
