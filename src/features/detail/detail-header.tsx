@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import type { DetailPosition } from '#/lib/detail-position'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
+import { useShortcutAction } from '#/state/shortcuts'
 import { positionText } from '#/features/detail/detail-model'
 import { MoreMenu } from '#/features/detail/more-menu'
 
@@ -19,6 +20,10 @@ import { MoreMenu } from '#/features/detail/more-menu'
 //   several lines (the header grows and pushes the content down), tapping
 //   again or ‹ › collapses it (EXPERIENCE detail-header).
 // Desktop names stay one line with 「…」 and the full name as `title`.
+// Story 3.7: with `arrowKeys` (the desktop board panel) `↑` `↓` (the
+// shortcut registry) do what ‹ › do, inside the same column; at its end
+// nothing moves and the key is still taken. List mode's arrows are the
+// list's own (they move focus to the row).
 
 export type DetailHeaderLayout = 'row' | 'stacked' | 'phone'
 
@@ -71,6 +76,8 @@ export interface DetailHeaderProps {
   onClose?: () => void
   /** The ✕ itself (the phone sheet focuses it when it opens). */
   closeRef?: Ref<HTMLButtonElement>
+  /** Story 3.7: `↑` `↓` press ‹ › (the desktop board panel). */
+  arrowKeys?: boolean
 }
 
 export function DetailHeader({
@@ -82,6 +89,7 @@ export function DetailHeader({
   onNavigate,
   onClose,
   closeRef,
+  arrowKeys = false,
 }: DetailHeaderProps) {
   const phone = layout === 'phone'
   const { hash, name } = torrent
@@ -94,12 +102,38 @@ export function DetailHeader({
   /** The nav button just pressed and where it went, until it gets there. */
   const pressedRef = useRef<{ which: 'prev' | 'next'; to: string } | null>(null)
 
-  const go = (target: string | null, which: 'prev' | 'next') => {
+  const go = (
+    target: string | null,
+    which: 'prev' | 'next',
+    { fromKey = false } = {},
+  ) => {
     if (target === null) return
     setExpandedFor(null)
-    pressedRef.current = { which, to: target }
+    const button = which === 'prev' ? prevRef.current : nextRef.current
+    // A key moves focus only off a nav button it disables, never off a card.
+    if (!fromKey || document.activeElement === button) {
+      pressedRef.current = { which, to: target }
+    }
     onNavigate(target)
   }
+  useShortcutAction(
+    'prevItem',
+    arrowKeys
+      ? () => {
+          go(position.prev, 'prev', { fromKey: true })
+          return true
+        }
+      : null,
+  )
+  useShortcutAction(
+    'nextItem',
+    arrowKeys
+      ? () => {
+          go(position.next, 'next', { fromKey: true })
+          return true
+        }
+      : null,
+  )
 
   // Reaching the first or last disables the button just pressed, which
   // would drop focus to `body`: move it to the other one.

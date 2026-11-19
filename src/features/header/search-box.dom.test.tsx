@@ -152,6 +152,12 @@ describe('closed', () => {
     }
     expect(tree('phone').querySelector('h1')?.textContent).toBe('種子')
   })
+
+  it('story 3.7: the desktop magnifier names / in its tooltip; the phone one has none', async () => {
+    await mount()
+    expect(magnifier('desktop').title).toBe('搜尋（/）')
+    expect(magnifier('phone').hasAttribute('title')).toBe(false)
+  })
 })
 
 describe('opening', () => {

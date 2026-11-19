@@ -69,6 +69,8 @@ export function stubReducedMotion(reduced: () => boolean): void {
       ({
         matches: query.includes('prefers-reduced-motion') && reduced(),
         media: query,
-      }) as MediaQueryList,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
   )
 }

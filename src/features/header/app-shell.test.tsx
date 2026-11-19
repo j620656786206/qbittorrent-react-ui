@@ -123,7 +123,7 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4, search since 3.5); only the sort pill has a title',
+    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4, search since 3.5, 快捷鍵 since 3.7); tooltips only on the sort pill and the shortcut keys',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
@@ -132,11 +132,15 @@ describe('the shell markup', () => {
       // Story 3.5: both magnifiers open the search box.
       expect(disabled.map((tag) => attr(tag, 'aria-label') ?? null)).toEqual([
         null, // desktop 新增 has its text
-        '快捷鍵',
         '新增種子',
       ])
-      // Only the desktop sort pill has a tooltip (story 2.1).
-      expect(html.match(/\stitle="[^"]*"/g)).toEqual([' title="排序：狀態"'])
+      // The desktop sort pill (story 2.1); story 3.7: the desktop
+      // magnifier and 快捷鍵 name their key (the phone magnifier does not).
+      expect(html.match(/\stitle="[^"]*"/g)).toEqual([
+        ' title="搜尋（/）"',
+        ' title="快捷鍵（?）"',
+        ' title="排序：狀態"',
+      ])
     },
   )
 
@@ -153,6 +157,17 @@ describe('the shell markup', () => {
         (tag) => attr(tag, 'aria-label') === '設定',
       ),
     ).toHaveLength(1)
+  })
+
+  it('story 3.7: one 快捷鍵 button, in the desktop header, enabled; the phone has none', () => {
+    const html = CASES.H1()
+    const buttons = openTags(html, 'button').filter(
+      (tag) => attr(tag, 'aria-label') === '快捷鍵',
+    )
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0]).not.toMatch(/\sdisabled=""/)
+    expect(attr(buttons[0], 'title')).toBe('快捷鍵（?）')
+    expect(desktopHeader(html)).toContain('aria-label="快捷鍵"')
   })
 
   it('the desktop sort pill is enabled and opens a menu (story 2.1)', () => {

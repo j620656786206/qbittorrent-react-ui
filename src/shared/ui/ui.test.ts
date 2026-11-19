@@ -28,8 +28,9 @@ describe('shadcn components (row 21)', () => {
     expect(content).toContain('rounded-panel')
     expect(content).toContain('shadow-float')
     expect(content).not.toMatch(/\brounded-lg\b|\bshadow-lg\b/)
+    // Story 3.7: DialogContent draws its own scrim (non-modal Radix).
     const overlay = source.slice(
-      source.indexOf('function DialogOverlay('),
+      source.indexOf('const SCRIM_CLASS'),
       source.indexOf('function DialogContent('),
     )
     expect(overlay).toContain('bg-scrim-dialog')

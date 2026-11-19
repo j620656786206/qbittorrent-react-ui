@@ -1,10 +1,21 @@
 import { useLayoutEffect, useRef } from 'react'
 
 // AR-52, AD-13: the one shortcut registry. Every key the app answers is in
-// SHORTCUTS below (Epic 3 adds `↑` `↓`, `1` to `9` and the help window,
-// which lists this table); no component listens to the keyboard on its own
-// for a shortcut. Story 2.4 registered `Esc`; story 3.5 adds `/` (open the
-// search box, desktop only: only the desktop search box registers it).
+// SHORTCUTS below; no component listens to the keyboard on its own for a
+// shortcut. Story 2.4 registered `Esc`, story 3.5 `/`; story 3.7 completes
+// the table (EXPERIENCE Interaction Primitives 快捷鍵): `↑` `↓`, `1` to `9`,
+// `[` `]`, `S` then `1` to `5`, `?`. Each entry has its keys, how the help
+// shows them, a description and a group: the help window, the tab and
+// header button tooltips and the sort menu's digits all read their text
+// from this table (`helpGroups`, `shortcutKeysText`, `titleWithShortcut`,
+// `tabShortcutTitle`, `sortMenuDigit`), never their own copy.
+//
+// Keys other than `Esc` only run an action a mounted component provides
+// (`useShortcutAction`), and only the desktop components provide them
+// (1024px and up), so the phone answers none. While a `dialog`-rank layer
+// is open (the help window, a bottom sheet) no action runs. While the sort
+// menu is open it provides `pickTopSort`, and the digits go to it instead
+// of the tabs.
 //
 // `Esc` closes one open layer: the highest-ranked one (story 3.5, AD-13:
 // a dialog or bottom sheet first, then the search box, then the detail,
@@ -12,14 +23,25 @@ import { useLayoutEffect, useRef } from 'react'
 // focus is in an `input`, `textarea`, `select` or contenteditable, only
 // shortcuts marked `inInputs` (only `Esc`) are handled. A key another
 // handler already took (`defaultPrevented`, e.g. a Radix menu closing on
-// Esc), a key pressed while an IME is composing (`isComposing`, or Safari's
-// `keyCode` 229 for the key that ends a composition), an auto-repeat, and
-// a combination with Cmd, Ctrl or Alt are left alone (except AltGr, which
-// some layouts report as Ctrl and Alt and need to type `/`).
+// Esc or moving on an arrow), a key pressed while an IME is composing
+// (`isComposing`, or Safari's `keyCode` 229 for the key that ends a
+// composition), an auto-repeat (except `↑` `↓`: holding one keeps
+// stepping, so the list does not scroll on its own instead), and a
+// combination with Cmd, Ctrl or Alt are left alone (except AltGr, which
+// some layouts report as Ctrl and Alt and need to type `/` or `[`). Shift
+// is allowed with every printable key (`event.key` already says what it
+// typed: `?`, `S`, a German `/`, AZERTY digits); only Shift+`↑` `↓` are
+// left alone. While the sort menu is open, only its digits act: `/`,
+// `[` `]` and `?` are refused (the menu's close would pull focus back, or
+// the category would change behind it). `↑` `↓` are left to
+// whatever has focus inside an element marked `OWN_ARROWS` (the detail's
+// tab list and its scrolling body with the file list; not its header, so
+// they still step from ‹ › and ✕).
+// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key
 // https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/isComposing
 //
 // One `keydown` listener on `document`, there whenever a registered key can
-// act: while a layer is open or an action (`/`) is registered.
+// act: while a layer is open or an action is provided.
 
 export interface ShortcutEvent {
   key: string
@@ -33,20 +55,49 @@ export interface ShortcutEvent {
   ctrlKey?: boolean
   metaKey?: boolean
   altKey?: boolean
+  shiftKey?: boolean
   /** `KeyboardEvent.getModifierState`, for AltGr. */
   getModifierState?: (key: string) => boolean
   preventDefault: () => void
 }
 
+/** The help window's groups, in the order it lists them. */
+export const SHORTCUT_GROUPS = [
+  '換種子',
+  '換分類',
+  '排序',
+  '搜尋和關閉',
+  '說明',
+] as const
+export type ShortcutGroup = (typeof SHORTCUT_GROUPS)[number]
+
+/** One piece of how the help shows a shortcut: a key, or a word between. */
+export type ShortcutKeyPart = { key: string } | { word: string }
+
+export type ShortcutId =
+  'item' | 'tabDigit' | 'tabStep' | 'sort' | 'search' | 'escape' | 'help'
+
 export interface Shortcut {
-  /** `KeyboardEvent.key`. */
-  key: string
+  id: ShortcutId
+  /** The `KeyboardEvent.key` values it answers. */
+  keys: ReadonlyArray<string>
+  /** How the help window and tooltips show it: keys in `<kbd>`, words as text. */
+  display: ReadonlyArray<ShortcutKeyPart>
   /** Also handled while focus is in a text field. */
   inInputs: boolean
-  /** What it does, for the help window (story 3.7). */
+  /** A Shift combination is left alone (`↑` `↓`; printable keys allow it). */
+  noShift?: boolean
+  /** A held key keeps acting (`↑` `↓`). */
+  repeats?: boolean
+  /** Left alone while focus is inside this selector. */
+  notInside?: string
+  /** What it does, for the help window. */
   description: string
-  /** What it does; `false` when there was nothing to do. */
-  run: () => boolean
+  /** A muted line under the description, or none. */
+  note?: string
+  group: ShortcutGroup
+  /** Does it for the key pressed; `false` when there was nothing to do. */
+  run: (key: string) => boolean
 }
 
 /**
@@ -65,11 +116,25 @@ interface Layer {
 const layers: Array<Layer> = []
 let nextLayerId = 1
 
-/** Keys whose action a mounted component provides. */
-export type ShortcutAction = 'openSearch'
+/**
+ * Keys whose action a mounted component provides. `selectTab` and
+ * `pickTopSort` get the digit's position (`0` for `1`); the others ignore it.
+ */
+export type ShortcutAction =
+  | 'openSearch'
+  | 'prevItem'
+  | 'nextItem'
+  | 'selectTab'
+  | 'prevTab'
+  | 'nextTab'
+  | 'openSortMenu'
+  | 'pickTopSort'
+  | 'openHelp'
+
+type ActionRun = (index: number) => boolean
 
 /** Each action's providers in mount order; the newest one runs. */
-const actions = new Map<ShortcutAction, Array<{ run: () => boolean }>>()
+const actions = new Map<ShortcutAction, Array<{ run: ActionRun }>>()
 
 /** The layer `Esc` closes: highest rank, then the most recent. */
 function topLayer(): Layer | undefined {
@@ -91,26 +156,173 @@ function closeTopLayer(): boolean {
 const DIALOG_RANK = ESCAPE_RANKS.indexOf('dialog')
 
 /** Runs a registered action; `false` when none is, or a dialog is open. */
-function runAction(name: ShortcutAction): boolean {
+function runAction(name: ShortcutAction, index = 0): boolean {
   if (layers.some((layer) => layer.rank >= DIALOG_RANK)) return false
   const provider = actions.get(name)?.at(-1)
-  return provider ? provider.run() : false
+  return provider ? provider.run(index) : false
+}
+
+/**
+ * Spread on an element whose own keyboard keeps `↑` `↓` (the detail's tab
+ * list and body): focus inside it, the arrows do not change the torrent.
+ */
+export const OWN_ARROWS = { 'data-own-arrows': '' } as const
+
+/** What has focus, or `null` for nothing (`body`). */
+export function focusedElement(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  const active = document.activeElement
+  return active instanceof HTMLElement && active !== document.body
+    ? active
+    : null
+}
+
+/** `1` to `9`: the tabs in order, `1` is 「全部」. */
+const TAB_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
+/** After `S`: `1` to `5`, the sort menu's top five. */
+const SORT_DIGITS = TAB_DIGITS.slice(0, 5)
+
+const key = (name: string): ShortcutKeyPart => ({ key: name })
+const word = (text: string): ShortcutKeyPart => ({ word: text })
+
+/** The sort menu is open: it provides the digits. */
+function sortMenuOpen(): boolean {
+  return actions.has('pickTopSort')
+}
+
+/** A digit: the open sort menu's top five, else the tab at that position. */
+function runDigit(pressed: string): boolean {
+  const index = TAB_DIGITS.indexOf(pressed as (typeof TAB_DIGITS)[number])
+  if (sortMenuOpen()) {
+    return index < SORT_DIGITS.length && runAction('pickTopSort', index)
+  }
+  return runAction('selectTab', index)
 }
 
 export const SHORTCUTS: ReadonlyArray<Shortcut> = [
   {
-    key: 'Escape',
+    id: 'item',
+    keys: ['ArrowUp', 'ArrowDown'],
+    display: [key('↑'), key('↓')],
+    inInputs: false,
+    repeats: true,
+    noShift: true,
+    notInside: '[data-own-arrows]',
+    description: '上一個、下一個',
+    note: '看板打開詳情時換同一欄',
+    group: '換種子',
+    run: (pressed) =>
+      runAction(pressed === 'ArrowUp' ? 'prevItem' : 'nextItem'),
+  },
+  {
+    id: 'tabDigit',
+    keys: TAB_DIGITS,
+    display: [key(TAB_DIGITS[0]), word('到'), key(TAB_DIGITS.at(-1) ?? '')],
+    inInputs: false,
+    description: `跳到分類，照分頁順序，${TAB_DIGITS[0]} 是「全部」`,
+    group: '換分類',
+    run: runDigit,
+  },
+  {
+    id: 'tabStep',
+    keys: ['[', ']'],
+    display: [key('['), key(']')],
+    inInputs: false,
+    description: '上一個、下一個分類',
+    group: '換分類',
+    run: (pressed) =>
+      !sortMenuOpen() && runAction(pressed === '[' ? 'prevTab' : 'nextTab'),
+  },
+  {
+    id: 'sort',
+    keys: ['s', 'S'],
+    display: [
+      key('S'),
+      word('再按'),
+      key(SORT_DIGITS[0]),
+      word('到'),
+      key(SORT_DIGITS.at(-1) ?? ''),
+    ],
+    inInputs: false,
+    description: `打開排序選單，再按 ${SORT_DIGITS[0]} 到 ${SORT_DIGITS.at(-1) ?? ''} 選常用排序`,
+    group: '排序',
+    run: () => runAction('openSortMenu'),
+  },
+  {
+    id: 'search',
+    keys: ['/'],
+    display: [key('/')],
+    inInputs: false,
+    description: '打開搜尋框找名字',
+    group: '搜尋和關閉',
+    run: () => !sortMenuOpen() && runAction('openSearch'),
+  },
+  {
+    id: 'escape',
+    keys: ['Escape'],
+    display: [key('Esc')],
     inInputs: true,
     description: '清除搜尋、關掉視窗或詳情',
+    group: '搜尋和關閉',
     run: closeTopLayer,
   },
   {
-    key: '/',
+    id: 'help',
+    keys: ['?'],
+    display: [key('?')],
     inInputs: false,
-    description: '打開搜尋框找名字',
-    run: () => runAction('openSearch'),
+    description: '打開快捷鍵說明',
+    group: '說明',
+    // Not over the open sort menu: its close would pull focus out of the
+    // help window, which closes it again.
+    run: () => !sortMenuOpen() && runAction('openHelp'),
   },
 ]
+
+function shortcutById(id: ShortcutId): Shortcut {
+  const found = SHORTCUTS.find((entry) => entry.id === id)
+  if (!found) throw new Error(`no shortcut ${id}`)
+  return found
+}
+
+/** The shortcut's keys as plain text: 「/」, 「S 再按 1 到 5」. */
+export function shortcutKeysText(id: ShortcutId): string {
+  return shortcutById(id)
+    .display.map((part) => ('key' in part ? part.key : part.word))
+    .join(' ')
+}
+
+/** A header button's tooltip: 「搜尋（/）」, 「快捷鍵（?）」. */
+export function titleWithShortcut(label: string, id: ShortcutId): string {
+  return `${label}（${shortcutKeysText(id)}）`
+}
+
+/**
+ * The tooltip of the tab at `index` (0 is 「全部」): 「快捷鍵 2」, or
+ * `undefined` from the 10th tab on (no digit left).
+ */
+export function tabShortcutTitle(index: number): string | undefined {
+  const digit = shortcutById('tabDigit').keys[index] as string | undefined
+  return digit === undefined ? undefined : `快捷鍵 ${digit}`
+}
+
+/** The digit the sort menu shows next to its `top`-th item (1 to 5). */
+export function sortMenuDigit(top: number): string | undefined {
+  return SORT_DIGITS[top - 1]
+}
+
+export interface HelpGroup {
+  group: ShortcutGroup
+  rows: ReadonlyArray<Shortcut>
+}
+
+/** The help window's content: every entry, by group in table order. */
+export function helpGroups(): ReadonlyArray<HelpGroup> {
+  return SHORTCUT_GROUPS.map((group) => ({
+    group,
+    rows: SHORTCUTS.filter((entry) => entry.group === group),
+  })).filter((entry) => entry.rows.length > 0)
+}
 
 /** Focus is somewhere text is typed. */
 export function isTypingTarget(target: EventTarget | null): boolean {
@@ -131,16 +343,27 @@ function composing(event: ShortcutEvent): boolean {
  * (and then the default is prevented).
  */
 export function handleShortcut(event: ShortcutEvent): boolean {
-  // A held Esc repeats: one press closes one layer, not the ones below.
-  if (event.defaultPrevented || composing(event) || event.repeat) return false
+  if (event.defaultPrevented || composing(event)) return false
   // AltGr (Ctrl and Alt on Windows) types characters; Cmd never does.
   const altGraph = event.getModifierState?.('AltGraph') === true
   if (event.metaKey) return false
   if (!altGraph && (event.ctrlKey || event.altKey)) return false
-  const shortcut = SHORTCUTS.find((entry) => entry.key === event.key)
+  const shortcut = SHORTCUTS.find((entry) => entry.keys.includes(event.key))
   if (!shortcut) return false
+  // A held Esc repeats: one press closes one layer, not the ones below.
+  if (event.repeat && shortcut.repeats !== true) return false
+  if (event.shiftKey && shortcut.noShift === true) return false
   if (!shortcut.inInputs && isTypingTarget(event.target)) return false
-  if (!shortcut.run()) return false
+  const target = event.target
+  if (
+    shortcut.notInside !== undefined &&
+    typeof Element !== 'undefined' &&
+    target instanceof Element &&
+    target.closest(shortcut.notInside)
+  ) {
+    return false
+  }
+  if (!shortcut.run(event.key)) return false
   event.preventDefault()
   return true
 }
@@ -183,12 +406,13 @@ export function pushEscapeLayer(
 
 /**
  * Provides the action behind a key (`openSearch` for `/`). The newest
- * provider runs; removing it gives the key back to the one before. Returns
- * its removal (once; later calls do nothing).
+ * provider runs; removing it gives the key back to the one before. `run`
+ * gets the digit's position for `selectTab` and `pickTopSort`. Returns its
+ * removal (once; later calls do nothing).
  */
 export function setShortcutAction(
   name: ShortcutAction,
-  run: () => boolean,
+  run: ActionRun,
 ): () => void {
   const provider = { run }
   const stack = actions.get(name) ?? []
@@ -244,7 +468,7 @@ export function useEscapeLayer(
  */
 export function useShortcutAction(
   name: ShortcutAction,
-  run: (() => boolean) | null,
+  run: ActionRun | null,
 ): void {
   const runRef = useRef(run)
   useLayoutEffect(() => {
@@ -254,7 +478,7 @@ export function useShortcutAction(
   useLayoutEffect(
     () =>
       enabled
-        ? setShortcutAction(name, () => runRef.current?.() ?? false)
+        ? setShortcutAction(name, (index) => runRef.current?.(index) ?? false)
         : undefined,
     [name, enabled],
   )

@@ -4,9 +4,11 @@ import { formatCount } from '#/lib/format'
 import { categoryLabel } from '#/lib/category-tabs'
 import type { CategoryTab } from '#/lib/category-tabs'
 import { ALL } from '#/shared/categories'
+import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { useCategoryTabs, useListView } from '#/state/list-view'
+import { tabShortcutTitle, useShortcutAction } from '#/state/shortcuts'
 import { useHeader } from '#/features/header/header-context'
 
 // Story 3.2, UX-DR18 (DESIGN category-tabs, EXPERIENCE category-tabs): the
@@ -30,7 +32,12 @@ import { useHeader } from '#/features/header/header-context'
 // like the phone's category button): 「全部」 with its count a skeleton
 // until maindata answers, another category by name only; after a failed
 // first load the count is left out (spec 1.8).
-// Shortcut tooltips come in story 3.7.
+// Story 3.7 (EXPERIENCE category-tabs): on desktop `1` to `9` press the
+// first nine tabs (`1` is 「全部」) and `[` `]` the one before or after the
+// selected tab, through the same `selectCategory` as a click; no wrap at
+// either end, nothing before the tabs are known. The first nine tabs'
+// native tooltips name their digit (「快捷鍵 2」, from the shortcut
+// registry); from the 10th on there is no digit and no tooltip.
 // https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
 // https://www.w3.org/WAI/ARIA/apg/patterns/button/
 
@@ -47,6 +54,23 @@ export function DesktopCategoryTabs() {
   const selectedRef = useRef<HTMLButtonElement>(null)
   const fade = useCutRight(scrollerRef, tabs)
   const loaded = tabs !== undefined
+  const desktop = useIsDesktop()
+
+  const pressAt = (index: number) => {
+    const tab = tabs?.[index]
+    if (tab === undefined) return false
+    selectCategory(tab.key)
+    return true
+  }
+  const step = (by: -1 | 1) => {
+    if (tabs === undefined) return false
+    const at = tabs.findIndex((tab) => tab.key === selected)
+    if (at === -1) return false
+    return pressAt(at + by)
+  }
+  useShortcutAction('selectTab', desktop ? pressAt : null)
+  useShortcutAction('prevTab', desktop ? () => step(-1) : null)
+  useShortcutAction('nextTab', desktop ? () => step(1) : null)
 
   // The selected tab into view on change (a reload far right too).
   useEffect(() => {
@@ -70,10 +94,11 @@ export function DesktopCategoryTabs() {
         {tabs === undefined ? (
           <LoadingTab category={selected} />
         ) : (
-          tabs.map((tab) => (
+          tabs.map((tab, index) => (
             <Tab
               key={tab.key}
               tab={tab}
+              title={tabShortcutTitle(index)}
               selected={tab.key === selected}
               buttonRef={tab.key === selected ? selectedRef : undefined}
               onSelect={selectCategory}
@@ -94,11 +119,14 @@ export function DesktopCategoryTabs() {
 
 function Tab({
   tab,
+  title,
   selected,
   buttonRef,
   onSelect,
 }: {
   tab: CategoryTab
+  /** 「快捷鍵 2」 for the first nine tabs. */
+  title: string | undefined
   selected: boolean
   buttonRef: RefObject<HTMLButtonElement | null> | undefined
   onSelect: (category: string) => void
@@ -108,6 +136,7 @@ function Tab({
       ref={buttonRef}
       type="button"
       aria-pressed={selected}
+      title={title}
       data-category={tab.key === ALL ? undefined : tab.key}
       onClick={() => onSelect(tab.key)}
       className={cn(TAB_CLASS, selected ? SELECTED_CLASS : UNSELECTED_CLASS)}

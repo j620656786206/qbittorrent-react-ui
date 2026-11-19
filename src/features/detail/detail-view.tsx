@@ -3,6 +3,7 @@ import type { KeyboardEvent, Ref } from 'react'
 import type { DetailPosition } from '#/lib/detail-position'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
+import { OWN_ARROWS } from '#/state/shortcuts'
 import { DetailHeader } from '#/features/detail/detail-header'
 import type { DetailHeaderLayout } from '#/features/detail/detail-header'
 import { FilesTab } from '#/features/detail/files-tab'
@@ -97,6 +98,8 @@ export function DetailTabs({ phone, tabs, className }: DetailTabsProps) {
     <div
       role="tablist"
       aria-label="詳情分頁"
+      // Story 3.7: focus here, `↑` `↓` are the tabs' own, not the torrent.
+      {...OWN_ARROWS}
       onKeyDown={onKeyDown}
       className={cn('flex flex-none gap-1.5', className)}
     >
@@ -149,7 +152,8 @@ export function DetailTop({
   closeRef,
   titleId,
   tabs,
-}: DetailParts & { tabs: DetailTabState }) {
+  arrowKeys,
+}: DetailParts & { tabs: DetailTabState; arrowKeys?: boolean }) {
   const phone = layout === 'phone'
   return (
     <>
@@ -162,6 +166,7 @@ export function DetailTop({
         onNavigate={onNavigate}
         onClose={onClose}
         closeRef={closeRef}
+        arrowKeys={arrowKeys}
       />
       <DetailTabs
         phone={phone}
@@ -207,6 +212,9 @@ export function DetailPanelBody({
       // tiles) takes no focus, so the panel itself is a tab stop
       // (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
       tabIndex={0}
+      // Story 3.7: focus in the body (its scroll, the file list), `↑` `↓`
+      // scroll it instead of changing the torrent.
+      {...OWN_ARROWS}
       className={className}
     >
       {tab === 'files' ? (

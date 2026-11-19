@@ -6,7 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CategoryTab } from '#/lib/category-tabs'
 import { ALL } from '#/shared/categories'
 import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
+import {
+  pushEscapeLayer,
+  resetShortcuts,
+  setShortcutAction,
+} from '#/state/shortcuts'
 import { DesktopCategoryTabs } from '#/features/header/category-tabs'
 import { HeaderContext } from '#/features/header/header-context'
 import { headerModel } from '#/features/header/header-model'
@@ -242,5 +248,120 @@ describe('the desktop category tabs', () => {
     expect(tabButtons()).toHaveLength(1)
     expect(tabButtons()[0].textContent).toBe('mteam-X')
     expect(tabButtons()[0].getAttribute('aria-pressed')).toBe('true')
+  })
+})
+
+describe('shortcuts and tooltips (story 3.7)', () => {
+  let desktop = true
+
+  beforeEach(() => {
+    desktop = true
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === DESKTOP_QUERY ? desktop : false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+  })
+
+  afterEach(() => resetShortcuts())
+
+  const press = (key: string) =>
+    act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      )
+    })
+
+  const TEN: ReadonlyArray<CategoryTab> = [
+    { key: ALL, label: '全部', count: 20 },
+    ...Array.from({ length: 9 }, (_, i) => ({
+      key: `c${i + 2}`,
+      label: `c${i + 2}`,
+      count: 2,
+    })),
+  ]
+
+  it('the first nine tabs name their digit; the 10th has no tooltip', async () => {
+    tabs = TEN
+    await act(async () => render())
+    expect(tabButtons().map((button) => button.getAttribute('title'))).toEqual([
+      '快捷鍵 1',
+      '快捷鍵 2',
+      '快捷鍵 3',
+      '快捷鍵 4',
+      '快捷鍵 5',
+      '快捷鍵 6',
+      '快捷鍵 7',
+      '快捷鍵 8',
+      '快捷鍵 9',
+      null,
+    ])
+  })
+
+  it('a digit switches like a click; past the last tab nothing', async () => {
+    await act(async () => render())
+    await press('3')
+    expect(selectCategory).toHaveBeenLastCalledWith('')
+    await press('1')
+    expect(selectCategory).toHaveBeenLastCalledWith(ALL)
+    selectCategory.mockClear()
+    await press('6')
+    expect(selectCategory).not.toHaveBeenCalled()
+  })
+
+  it('before the tabs are known a digit does nothing', async () => {
+    tabs = undefined
+    await act(async () => render())
+    await press('1')
+    await press(']')
+    expect(selectCategory).not.toHaveBeenCalled()
+  })
+
+  it('[ ] step from the selected tab, without wrapping at either end', async () => {
+    await act(async () => render())
+    await press('[')
+    expect(selectCategory).not.toHaveBeenCalled()
+    await press(']')
+    expect(selectCategory).toHaveBeenLastCalledWith('mteam-X')
+    await press(']')
+    expect(selectCategory).toHaveBeenLastCalledWith('')
+    await press('[')
+    expect(selectCategory).toHaveBeenLastCalledWith('mteam-X')
+    selected = 'mteam-tv'
+    await act(async () => render())
+    selectCategory.mockClear()
+    await press(']')
+    expect(selectCategory).not.toHaveBeenCalled()
+  })
+
+  it('while the sort menu takes digits, a digit is not a tab', async () => {
+    await act(async () => render())
+    const pick = vi.fn(() => true)
+    const off = setShortcutAction('pickTopSort', pick)
+    await press('2')
+    expect(pick).toHaveBeenCalledWith(1)
+    expect(selectCategory).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('while a dialog is open nothing switches', async () => {
+    await act(async () => render())
+    const off = pushEscapeLayer(() => {}, 'dialog')
+    await press('2')
+    await press(']')
+    expect(selectCategory).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('phone width: no key switches', async () => {
+    desktop = false
+    await act(async () => render())
+    await press('2')
+    await press(']')
+    expect(selectCategory).not.toHaveBeenCalled()
   })
 })

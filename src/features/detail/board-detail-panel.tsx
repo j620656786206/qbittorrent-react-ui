@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { getMain } from '#/shared/ui/main-scroll'
 import { useEscapeLayer } from '#/state/shortcuts'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -20,10 +21,14 @@ import {
 // does not replay it. The board stays clickable behind it. `Esc` (the
 // shortcut registry), the ✕ and a click on empty board space (the route)
 // close it and remove `hash`. A covered 完成 card is left as is.
+// Story 3.7: while it is open on desktop, `↑` `↓` do what ‹ › do (the
+// same column, never the next one), also with focus on ‹ › or ✕; with it
+// closed, or with focus in its tabs or body, they are not taken.
 
 export function BoardDetailPanel() {
   const target = useBoardDetailTarget({ phone: false })
   const { setHash } = useViewedHash()
+  const desktop = useIsDesktop()
   const open = target !== null
   const tabs = useDetailTabs(open)
   const asideRef = useRef<HTMLElement>(null)
@@ -83,6 +88,7 @@ export function BoardDetailPanel() {
         onNavigate={setHash}
         onClose={close}
         tabs={tabs}
+        arrowKeys={desktop}
       />
       <DetailPanelBody
         torrent={target.torrent}
