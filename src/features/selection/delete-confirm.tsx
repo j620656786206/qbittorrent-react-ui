@@ -54,11 +54,14 @@ import type { TrackedOp } from '#/state/tracked-op'
 // toast with 重試 resends the same hashes and `deleteFiles`): the hashes go
 // into `pendingOps` on send. On success the sent hashes leave the
 // selection (a late 重試 never touches a newer selection), so the dialog
-// closes once its delete ended and the bar slides out; a plain 4 s toast says what went
-// (no undo) and maindata refreshes; local data is never edited. On a
-// failure the dialog stays open as it was; connection codes go only to the
-// global handler and the button can be pressed again. No partial failure:
-// qBittorrent answers for the whole batch.
+// closes once its delete ended and the bar slides out; a plain 4 s toast
+// says what went (no undo) and maindata refreshes; local data is never
+// edited. On a failure the dialog stays open as it was and maindata
+// refreshes (a timeout may still have deleted them); connection codes go
+// only to the global handler and the button can be pressed again.
+// Changing 「連檔案一起刪」 closes the failure toast, so its 重試 can never
+// send the old choice. No partial failure: qBittorrent answers for the
+// whole batch.
 
 /** A row's fixed height: 8px padding around the 13px/1.4 line. */
 const ROW_HEIGHT = 34
@@ -148,6 +151,7 @@ function ExpandedList({ rows }: { rows: ReadonlyArray<DeleteRow> }) {
       style={{ maxHeight: EXPANDED_MAX }}
     >
       <ul
+        role="list"
         aria-label="要刪的種子"
         className="relative m-0 list-none p-0"
         style={{ height: virtualizer.getTotalSize() }}
@@ -239,21 +243,25 @@ export function DeleteConfirm({
     }
   }
 
+  // Set on press, before the in-flight state shows (the same tick): blocks
+  // a second send and every close path; cleared when that call settles.
+  const pressedRef = useRef(false)
+  const [pressed, setPressed] = useState(false)
+
   const inFlight = useOpsInFlight(deleteOp)
   const sending = useMemo(() => {
+    if (pressed) return true
     if (inFlight.length === 0) return false
     const mine = new Set([...sentHashes, ...hashes])
     return inFlight.some((variables) =>
       variables.hashes.some((hash) => mine.has(hash)),
     )
-  }, [inFlight, sentHashes, hashes])
-  useEscapeLayer(
-    open,
-    () => {
-      if (!sending) onClose()
-    },
-    'dialog',
-  )
+  }, [pressed, inFlight, sentHashes, hashes])
+  /** Every close path; never while this dialog's delete is out. */
+  const cancel = () => {
+    if (!sending && !pressedRef.current) onClose()
+  }
+  useEscapeLayer(open, cancel, 'dialog')
 
   // Nothing left selected (another device, or this delete went through):
   // close, but only once this dialog's own delete has ended.
@@ -262,14 +270,13 @@ export function DeleteConfirm({
     if (open && empty && !sending) onClose()
   }, [open, empty, sending, onClose])
 
-  // Blocks a second press before the in-flight state shows (a double click
-  // or a key repeat in the same tick); cleared when that call settles.
-  const pressedRef = useRef(false)
   const send = () => {
     if (pressedRef.current || sendable.length === 0) return
     pressedRef.current = true
+    setPressed(true)
     const settle = () => {
       pressedRef.current = false
+      setPressed(false)
     }
     const variables = {
       hashes: sendable.map((row) => row.hash),
@@ -287,6 +294,8 @@ export function DeleteConfirm({
         onFailure: (sent) => {
           settle()
           deleteOp.onFailure?.(sent)
+          // A timeout may still have deleted them: show what qBittorrent has.
+          void refreshMaindata(client)
         },
       },
       client,
@@ -328,7 +337,7 @@ export function DeleteConfirm({
       onPrimary={send}
       primaryDisabled={sendable.length === 0}
       sending={sending}
-      onCancel={onClose}
+      onCancel={cancel}
       returnFocus={returnFocus}
       desktopWidthClass="w-[512px]"
     >
@@ -337,6 +346,7 @@ export function DeleteConfirm({
       ) : (
         <ul
           ref={previewRef}
+          role="list"
           tabIndex={-1}
           aria-label="要刪的種子"
           className={cn('flex-none', LIST_BOX_CLASS)}
@@ -350,7 +360,6 @@ export function DeleteConfirm({
             <li>
               <button
                 type="button"
-                aria-expanded={false}
                 onClick={() => setExpanded(true)}
                 className="inline-flex h-9 items-center gap-1 rounded-full px-3 font-semibold text-text hover-row"
               >
@@ -375,7 +384,16 @@ export function DeleteConfirm({
         <Checkbox
           checked={deleteFiles}
           disabled={sending}
-          onCheckedChange={(next) => setDeleteFiles(next === true)}
+          onCheckedChange={(next) => {
+            setDeleteFiles(next === true)
+            // A failure toast's 重試 would resend the old choice: close it.
+            for (const hash of new Set([
+              ...sentHashes,
+              ...sendable.map((row) => row.hash),
+            ])) {
+              toast.dismissFor(hash)
+            }
+          }}
         />
         連檔案一起刪
       </label>

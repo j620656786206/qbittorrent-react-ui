@@ -251,6 +251,25 @@ deferred:
   - `[low]` `[patch]` (edge) The selection emptying mid-send closes the locked dialog. Action: no auto-close while this dialog's delete is in flight.
   - `[low]` `[reject]` (edge) The plain toast replaces a failure toast. Showing one toast at a time, the newest winning, is the 2.6 design.
 
+### 2026-11-20: Review pass (follow-up)
+- verdicts: 15 findings. high 1, medium 0, low 14, false 0, maybe-false 0
+- findings:
+  - `[low]` `[reject]` (intent) Readings chosen beyond the contract: the added all-gone toast text, motion on every dialog, `pendingOps` marked at send, only the sent hashes pruned. carried: each one is logged as Claude 代決 or a first-pass decision.
+  - `[low]` `[reject]` (edge) More than 5,000 selected returns `invalid_input` every time. This cannot happen today: Alex's qBittorrent holds about 4,165 torrents, and the 5,000 cap is AD-12 / AR-28.
+  - `[low]` `[patch]` (edge) `Esc` or 取消 in the same tick after the primary closes the dialog during the send. Action: the close paths respect the pressed-ref guard.
+  - `[high]` `[patch]` (edge) After a failure, ticking or unticking 「連檔案一起刪」 and then pressing the toast 重試 resends the old `deleteFiles`, so files can be deleted against what the screen shows. Action: changing the checkbox dismisses the dialog's failure toast.
+  - `[low]` `[reject]` (edge) The plain toast replaces a failure toast. carried: same as the first pass.
+  - `[low]` `[patch]` (blind) After a `timeout` the delete may have happened, but nothing refreshes. Action: `refreshMaindata` on failure.
+  - `[low]` `[patch]` (blind) A one-way reveal hard-codes `aria-expanded={false}`. Action: drop `aria-expanded`.
+  - `[low]` `[reject]` (blind) The `aria-describedby` body is long. It is verbose but complete, and it describes the consequence (first-pass patch).
+  - `[low]` `[reject]` (blind) The summary walks the selection three times. This happens only while the dialog is open, about 3,626 iterations per 2 s poll.
+  - `[low]` `[reject]` (blind) On phone, the expanded list is a 320 px scroller inside the sheet. The 320 px cap is the spec's expanded rule, and the fit sheet grows up to 90%.
+  - `[low]` `[reject]` (blind) `Esc` is handled twice on desktop. Both paths run the same guarded close and are idempotent (first-pass note).
+  - `[low]` `[reject]` (blind) The zero-count state reads 0 B. It lasts only until maindata has the hashes, and the primary does nothing meanwhile.
+  - `[low]` `[patch]` (blind) `list-none` drops the list role in WebKit. Action: `role="list"` on both lists.
+  - `[low]` `[reject]` (blind) The plain toast variant carries an empty `keys` field. Type tidiness only, with no behaviour difference.
+  - `[low]` `[reject]` (blind) Some comment lines were not re-wrapped. Cosmetic.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -316,4 +335,26 @@ Status: done (first pass)
 - vitest: 136 files and 3314 tests pass.
 - The build passes.
 - Playwright: a full run with `caffeinate` passed 143 in 18.1 min.
+- check.sh: every line ok.
+
+### Follow-up pass 1 (2026-11-20)
+
+Status: done.
+
+**Review findings: 15.**
+- Patched: 5 entries, 1 high and 4 low.
+  - High: after a failure, toggling 「連檔案一起刪」 left a stale 重試 that would resend the old `deleteFiles`. The toggle now dismisses the dialog's failure toast.
+  - `Esc` and 取消 in the same tick as the primary are blocked.
+  - Maindata is refreshed after a failure.
+  - `aria-expanded` is dropped from the one-way reveal.
+  - Both lists get `role="list"`.
+- Rejected: 10, each with its reason in the triage log.
+
+**Follow-up review: recommended (true).** A high finding was patched on this pass. The risk still to review is that the pressed state and ref now gate both the send and every close path.
+
+**Verification.**
+- lint and typecheck are clean.
+- vitest: 136 files and 3318 tests pass.
+- The build passes.
+- Playwright: 143 passed in 18.1 min. The 4-3 screenshots were regenerated from this tree.
 - check.sh: every line ok.

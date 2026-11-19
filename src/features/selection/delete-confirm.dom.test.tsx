@@ -527,6 +527,90 @@ describe('the delete', () => {
 })
 
 describe('review fixes', () => {
+  it('toggling 「連檔案一起刪」 after a failure closes its 重試 toast, so the old choice is never resent', async () => {
+    deleteCalls.answer = () =>
+      Promise.resolve({
+        ok: false,
+        error: { code: 'qbit_rejected', message: 'x' },
+      })
+    await render()
+    await select(A, B)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(lastFailure()?.[1].keys).toEqual([A, B])
+    toastCalls.dismissFor.mockClear()
+    await act(async () => checkbox().click())
+    // Every key of that toast is dismissed (the store closes it on the first).
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(A)
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(B)
+    expect(deleteCalls.sent).toEqual([{ hashes: [A, B], deleteFiles: true }])
+    // The next send carries what the screen shows.
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent.at(-1)).toEqual({
+      hashes: [A, B],
+      deleteFiles: false,
+    })
+  })
+
+  it('Esc or 取消 in the same tick as the press never closes the dialog', async () => {
+    let finish: (value: unknown) => void = () => {}
+    deleteCalls.answer = () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+    await render()
+    await select(A)
+    await openConfirm()
+    const cancel = buttonNamed('取消')
+    await act(async () => {
+      primary().click()
+      cancel.click()
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    await settle()
+    expect(dialog()).not.toBeNull()
+    expect(primary().textContent).toBe('刪除中…')
+    await act(async () => finish({ ok: true, data: { items: [] } }))
+    await settle()
+    expect(dialog()).toBeNull()
+  })
+
+  it('a failure refreshes maindata (a timeout may still have deleted them)', async () => {
+    deleteCalls.answer = () =>
+      Promise.resolve({ ok: false, error: { code: 'timeout', message: 'x' } })
+    await render()
+    await select(A)
+    await openConfirm()
+    const before = fetches
+    await act(async () => primary().click())
+    await settle()
+    expect(fetches).toBe(before + 1)
+    expect(lastFailure()?.[0]).toMatch(/^刪除失敗：/)
+  })
+
+  it('both lists keep the list role (list-none drops it in WebKit); 「還有」 is a one-way reveal', async () => {
+    torrents = Array.from({ length: 7 }, (_, index) =>
+      t({ hash: fakeHash(0x90 + index), name: `L${index}` }),
+    )
+    await render()
+    await select(...torrents.map((torrent) => torrent.hash))
+    await openConfirm()
+    expect(rows()[0].parentElement?.getAttribute('role')).toBe('list')
+    const more = buttonNamed('還有 2 個')
+    expect(more.hasAttribute('aria-expanded')).toBe(false)
+    await act(async () => more.click())
+    await settle()
+    expect(rows()[0].parentElement?.getAttribute('role')).toBe('list')
+  })
+
   it('a double press in the same tick sends one delete', async () => {
     await render()
     await select(A)
