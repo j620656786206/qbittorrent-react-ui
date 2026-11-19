@@ -4,11 +4,49 @@ import { XIcon } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 
 import { Button } from '#/shared/ui/button.tsx'
+import { useModalSession } from '#/shared/ui/sheet-session'
+
+// shadcn Dialog (https://ui.shadcn.com/docs/components/dialog). Story 3.7:
+// non-modal Radix underneath, like dropdown-menu.tsx: a modal Radix dialog
+// locks scrolling through react-remove-scroll, which injects a `<style>`
+// element the CSP blocks (AD-10, no 'unsafe-inline'). The modal behaviour
+// comes from the bottom sheet's session instead (sheet-session.ts: scroll
+// locked through the CSSOM, the rest of the page `inert`, Tab wrapping
+// inside, focus back to the opener), and the scrim is drawn here, since
+// Radix draws its overlay only for a modal dialog. A press on the scrim
+// closes it (Radix: an outside press dismisses a non-modal dialog); Esc is
+// Radix's. The session runs from the content's mount until the dialog
+// closes (the root's open state, which Radix keeps private, is passed
+// down here), so the exit animation already has the page back; focus goes
+// back through the session only (`returnFocus`, else what had focus when
+// it opened), never through Radix's close autofocus as well.
+// Radix docs: https://www.radix-ui.com/primitives/docs/components/dialog
+
+/** The root's open state, for the content's session. */
+const DialogOpenContext = React.createContext(false)
 
 function Dialog({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}: Omit<React.ComponentProps<typeof DialogPrimitive.Root>, 'modal'>) {
+  const [ownOpen, setOwnOpen] = React.useState(defaultOpen)
+  const open = openProp ?? ownOpen
+  return (
+    <DialogOpenContext value={open}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        modal={false}
+        open={open}
+        onOpenChange={(next) => {
+          if (openProp === undefined) setOwnOpen(next)
+          onOpenChange?.(next)
+        }}
+        {...props}
+      />
+    </DialogOpenContext>
+  )
 }
 
 function DialogTrigger({
@@ -29,41 +67,79 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        'fixed inset-0 z-50 bg-scrim-dialog data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
-      )}
-      {...props}
-    />
-  )
+/** DialogContent's own scrim (Radix draws its overlay only when modal). */
+const SCRIM_CLASS =
+  'fixed inset-0 z-50 bg-scrim-dialog data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0'
+
+/**
+ * Rendered inside the content, so it mounts only with it (Radix Presence);
+ * a passive effect, so the content's and the scrim's refs are attached.
+ * The session ends when the dialog closes, or the content unmounts first.
+ */
+function ModalSessionWhileOpen({
+  begin,
+  end,
+}: {
+  begin: () => void
+  end: (restoreFocus: boolean) => void
+}) {
+  const open = React.useContext(DialogOpenContext)
+  React.useEffect(() => {
+    if (!open) return
+    begin()
+    return () => end(true)
+  }, [open, begin, end])
+  return null
 }
 
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  returnFocus,
+  onKeyDown,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Focused on close; by default what had focus when it opened. */
+  returnFocus?: () => HTMLElement | null
 }) {
+  const scrimRef = React.useRef<HTMLDivElement>(null)
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  const session = useModalSession({
+    sheetRef: contentRef,
+    scrimRef,
+    returnFocus,
+  })
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <div
+        ref={scrimRef}
+        aria-hidden="true"
+        data-slot="dialog-overlay"
+        className={SCRIM_CLASS}
+      />
       <DialogPrimitive.Content
+        ref={contentRef}
         data-slot="dialog-content"
+        aria-modal="true"
+        onKeyDown={(event) => {
+          onKeyDown?.(event)
+          session.onKeyDown(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          // The session already gave focus back.
+          event.preventDefault()
+        }}
         className={cn(
           'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-panel border bg-surface p-6 shadow-float duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
         )}
         {...props}
       >
+        <ModalSessionWhileOpen begin={session.begin} end={session.end} />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -149,7 +225,6 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogOverlay,
   DialogPortal,
   DialogTitle,
   DialogTrigger,

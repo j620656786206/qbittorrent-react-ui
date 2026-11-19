@@ -14,7 +14,11 @@ import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { useListView } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { useMatchCount } from '#/state/maindata'
-import { useEscapeLayer, useShortcutAction } from '#/state/shortcuts'
+import {
+  titleWithShortcut,
+  useEscapeLayer,
+  useShortcutAction,
+} from '#/state/shortcuts'
 import { IconButton } from '#/features/header/icon-button'
 
 // Story 3.5 (DESIGN search-box, EXPERIENCE search-box; mockups
@@ -30,7 +34,8 @@ import { IconButton } from '#/features/header/icon-button'
 // the keyword and close it, and focus goes back to the magnifier when it
 // was inside the box. Both the desktop and the phone trees are rendered
 // (the shell hides one with CSS): only the one for the current width takes
-// focus, `Esc` and `/`.
+// focus, `Esc` and `/`. Story 3.7: the desktop magnifier's tooltip names
+// `/` (「搜尋（/）」, from the registry); the phone's has none.
 //
 // The field keeps what Alex typed (spaces included); the URL's `q` gets it
 // trimmed (`setQuery`). A keystroke inside an IME composition is not
@@ -191,6 +196,7 @@ function Magnifier({
     <IconButton
       label="搜尋"
       phone={phone}
+      title={phone ? undefined : titleWithShortcut('搜尋', 'search')}
       onClick={control.start}
       buttonRef={control.magnifierRef}
     >

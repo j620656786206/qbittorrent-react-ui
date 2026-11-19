@@ -8,6 +8,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { replayEntrance, resetEntrance } from '#/state/entrance'
@@ -21,7 +22,11 @@ import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { clearPending, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
-import { openLayerCount, resetShortcuts } from '#/state/shortcuts'
+import {
+  openLayerCount,
+  pushEscapeLayer,
+  resetShortcuts,
+} from '#/state/shortcuts'
 import { clearShownList, publishShownList } from '#/state/shown-order'
 import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
@@ -1430,5 +1435,124 @@ describe('the board panel inside a category (story 3.2)', () => {
     })
     expect(q('aside')).toBeNull()
     expect(writes).toEqual([null])
+  })
+})
+
+// Story 3.7: on desktop, while the board panel is open, `↑` `↓` do what
+// ‹ › do inside the same column; at its end nothing moves and the key is
+// still taken; with the panel closed (and on the phone) they are not taken.
+describe('↑ ↓ on the board panel (story 3.7)', () => {
+  let desktop = true
+
+  beforeEach(() => {
+    desktop = true
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches:
+            query.includes('reduce') || (query === DESKTOP_QUERY && desktop),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+  })
+
+  async function press(key: string, target?: Element) {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      ;(target ?? document.activeElement ?? document.body).dispatchEvent(event)
+    })
+    return event
+  }
+
+  it('↓ ↑ move like › ‹ in the same column', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    expect((await press('ArrowDown')).defaultPrevented).toBe(true)
+    expect(positionLine()).toBe('做種中　第 2 個／共 3 個')
+    await press('ArrowDown')
+    expect(positionLine()).toBe('做種中　第 3 個／共 3 個')
+    await press('ArrowUp')
+    expect(positionLine()).toBe('做種中　第 2 個／共 3 個')
+    expect(writes).toEqual([h(12), h(13), h(12)])
+  })
+
+  it('at the column end nothing moves (never the next column); the key is taken', async () => {
+    await render(<BoardDetailPanel />, { hash: h(2) })
+    expect(positionLine()).toBe('下載中　第 2 個／共 2 個')
+    expect((await press('ArrowDown')).defaultPrevented).toBe(true)
+    expect(writes).toEqual([])
+    expect(positionLine()).toBe('下載中　第 2 個／共 2 個')
+  })
+
+  it('reaching the end from a card keeps focus on the card', async () => {
+    const card = document.createElement('button')
+    main.append(card)
+    await render(<BoardDetailPanel />, { hash: h(12) })
+    card.focus()
+    await press('ArrowDown')
+    expect(byLabel('下一個').disabled).toBe(true)
+    expect(document.activeElement).toBe(card)
+  })
+
+  it('focus on › still steps; at the column end focus goes to ‹ as with a click', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    expect(q('aside')?.hasAttribute('data-own-arrows')).toBe(false)
+    byLabel('下一個').focus()
+    expect((await press('ArrowDown')).defaultPrevented).toBe(true)
+    expect(positionLine()).toBe('做種中　第 2 個／共 3 個')
+    await press('ArrowDown')
+    expect(byLabel('下一個').disabled).toBe(true)
+    expect(document.activeElement).toBe(byLabel('上一個'))
+    expect(writes).toEqual([h(12), h(13)])
+  })
+
+  it('focus in the body or on a tab keeps the arrows (they scroll it)', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    const body = q('[role="tabpanel"]') as HTMLElement
+    const tab = q('[role="tab"]') as HTMLElement
+    expect(body.hasAttribute('data-own-arrows')).toBe(true)
+    body.focus()
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    tab.focus()
+    expect((await press('ArrowUp')).defaultPrevented).toBe(false)
+    expect(writes).toEqual([])
+    expect(positionLine()).toBe('做種中　第 1 個／共 3 個')
+  })
+
+  it('closed: the arrows are not taken', async () => {
+    await render(<BoardDetailPanel />)
+    expect(q('aside')).toBeNull()
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    expect((await press('ArrowUp')).defaultPrevented).toBe(false)
+    expect(writes).toEqual([])
+  })
+
+  it('while a dialog is open the arrows do nothing', async () => {
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    pushEscapeLayer(() => {}, 'dialog')
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    expect(writes).toEqual([])
+  })
+
+  it('phone width: the arrows are not taken', async () => {
+    desktop = false
+    await render(<BoardDetailPanel />, { hash: h(11) })
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    expect(writes).toEqual([])
+  })
+
+  it('the list panel leaves the arrows to the list; only its tabs and body keep them', async () => {
+    publishShownList({ order: [h(1), h(2)], viewed: h(1) })
+    await render(<ListDetailPanel />, { hash: h(1) })
+    expect(q('aside')?.hasAttribute('data-own-arrows')).toBe(false)
+    expect(q('[role="tablist"]')?.hasAttribute('data-own-arrows')).toBe(true)
+    expect(q('[role="tabpanel"]')?.hasAttribute('data-own-arrows')).toBe(true)
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    expect(writes).toEqual([])
   })
 })

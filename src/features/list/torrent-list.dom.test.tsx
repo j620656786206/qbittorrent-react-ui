@@ -9,6 +9,7 @@ import { ALL } from '#/shared/categories'
 import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { ringOffset } from '#/shared/ui/status-circle'
 import { clearConnectionErrors } from '#/state/connection'
@@ -27,6 +28,7 @@ import {
 } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
+import { OWN_ARROWS, pushEscapeLayer, resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, shownListStore } from '#/state/shown-order'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import type { SortView } from '#/shared/list-search'
@@ -258,7 +260,13 @@ function stubHover({
   hovered: boolean
 }) {
   vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query: string) => ({ matches: fineMouse, media: query }) as MediaQueryList,
+    (query: string) =>
+      ({
+        matches: fineMouse,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
   )
   const matches = Element.prototype.matches
   vi.spyOn(Element.prototype, 'matches').mockImplementation(function (
@@ -1134,5 +1142,198 @@ describe('the search keyword (story 3.5)', () => {
       }),
     )
     expect(main.querySelector('section[aria-label="搜尋結果"]')).not.toBeNull()
+  })
+})
+
+// Story 3.7: `↑` `↓` on desktop list mode view the row before or after in
+// the order shown (Alex's own pick: `setHash`), focus follows the viewed
+// row, an off-screen row is scrolled to; at the ends the key is still
+// taken; the phone answers neither.
+describe('↑ ↓ (story 3.7)', () => {
+  const ROW_HEIGHT_PX = 59
+  let desktop = true
+
+  beforeEach(() => {
+    desktop = true
+    withPanel = true
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === DESKTOP_QUERY ? desktop : false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+  })
+
+  afterEach(() => resetShortcuts())
+
+  async function press(key: string) {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      ;(document.activeElement ?? document.body).dispatchEvent(event)
+    })
+    return event
+  }
+  const focusedName = () =>
+    document.activeElement?.querySelector('[title]')?.getAttribute('title')
+
+  it('↓ views the next row: setHash, the ring and focus move to it', async () => {
+    await render(fakeResponse({ changed: many(5) }))
+    expect(ringed()).toEqual(['T4'])
+    const event = await press('ArrowDown')
+    expect(event.defaultPrevented).toBe(true)
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(4))
+    expect(ringed()).toEqual(['T3'])
+    expect(focusedName()).toBe('T3')
+    await press('ArrowUp')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(5))
+    expect(focusedName()).toBe('T4')
+  })
+
+  it('↑ at the first row and ↓ at the last: nothing changes, the key is still taken', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    const up = await press('ArrowUp')
+    expect(up.defaultPrevented).toBe(true)
+    expect(setHash).not.toHaveBeenCalled()
+    viewedHash = fakeHash(1)
+    await act(async () => root.render(app()))
+    expect(ringed()).toEqual(['T0'])
+    const down = await press('ArrowDown')
+    expect(down.defaultPrevented).toBe(true)
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('the frozen order is the one stepped through', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    stubHover({ fineMouse: true, hovered: true })
+    // The matchMedia stub above answers the desktop query too.
+    pointer('pointerover', section())
+    await poll(delta([torrent(9)]))
+    // Frozen: the new torrent is not on top yet.
+    expect(shownNames()).toEqual(['T2', 'T1', 'T0'])
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+  })
+
+  it('an off-screen row is scrolled to and focused; a row in view does not scroll', async () => {
+    await render(fakeResponse({ changed: many(40) }))
+    // The virtualizer scrolls its element with `scrollTo` (happy-dom lays
+    // nothing out, so the position itself stays 0).
+    const scrollTo = vi.spyOn(scroller(), 'scrollTo')
+    // Room to scroll: 40 rows of 61px.
+    Object.defineProperty(scroller(), 'scrollHeight', { value: 40 * 61 })
+    const lastTop = () =>
+      (scrollTo.mock.lastCall?.[0] as ScrollToOptions | undefined)?.top
+    await press('ArrowDown')
+    // In view: the position it already has.
+    expect(lastTop() ?? 0).toBe(0)
+    expect(focusedName()).toBe('T38')
+    // The viewed row far below the window (a reload on it, story 3.6).
+    viewedHash = fakeHash(11)
+    await act(async () => root.render(app()))
+    expect(
+      rowButtons().some((button) => button.textContent.includes('T9')),
+    ).toBe(false)
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(10))
+    // Index 30 brought to the bottom edge (`align: 'auto'`).
+    expect(lastTop()).toBeCloseTo(
+      30 * (ROW_HEIGHT_PX + 2) + ROW_HEIGHT_PX - 600,
+      -1,
+    )
+  })
+
+  it('a row that renders late takes focus only if focus did not move since the press', async () => {
+    await render(fakeResponse({ changed: many(40) }))
+    Object.defineProperty(scroller(), 'scrollHeight', { value: 40 * 61 })
+    // The scroll does not happen yet: the target row is not rendered.
+    vi.spyOn(scroller(), 'scrollTo').mockImplementation(() => {})
+    const scrollTo = async (top: number) => {
+      scroller().scrollTop = top
+      await act(async () => {
+        scroller().dispatchEvent(new Event('scroll'))
+      })
+    }
+    const rendered = (name: string) =>
+      rowButtons().some((button) => button.textContent.includes(name))
+
+    // Focus stayed on body: the row takes it once it renders.
+    viewedHash = fakeHash(11)
+    await act(async () => root.render(app()))
+    await press('ArrowDown')
+    expect(rendered('T9')).toBe(false)
+    await scrollTo(1300)
+    expect(rendered('T9')).toBe(true)
+    expect(focusedName()).toBe('T9')
+
+    // Focus moved (`/` into the search box) before the row rendered.
+    await scrollTo(0)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    viewedHash = fakeHash(21)
+    await act(async () => root.render(app()))
+    await press('ArrowDown')
+    expect(rendered('T19')).toBe(false)
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    await scrollTo(600)
+    expect(rendered('T19')).toBe(true)
+    expect(document.activeElement).toBe(field)
+    field.remove()
+  })
+
+  it('Tab onto another row: it gets focus, the viewed row keeps its ring', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    rowButtons()[2].focus()
+    expect(document.activeElement).toBe(rowButtons()[2])
+    expect(rowButtons()[0].className).toContain('viewing-ring')
+    expect(rowButtons()[2].className).not.toContain('viewing-ring')
+  })
+
+  it('from the detail’s › the arrows step; from its body they do not', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    // The panel's header (no marker) and body (marked), as the detail has.
+    const aside = document.createElement('aside')
+    const next = document.createElement('button')
+    const body = document.createElement('div')
+    body.tabIndex = 0
+    for (const [name, value] of Object.entries(OWN_ARROWS)) {
+      body.setAttribute(name, value)
+    }
+    aside.append(next, body)
+    document.body.append(aside)
+    body.focus()
+    expect((await press('ArrowDown')).defaultPrevented).toBe(false)
+    expect(setHash).not.toHaveBeenCalled()
+    next.focus()
+    expect((await press('ArrowDown')).defaultPrevented).toBe(true)
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+    expect(focusedName()).toBe('T1')
+    aside.remove()
+  })
+
+  it('while a dialog is open the arrows do nothing', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    const off = pushEscapeLayer(() => {}, 'dialog')
+    const event = await press('ArrowDown')
+    expect(event.defaultPrevented).toBe(false)
+    expect(setHash).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('phone width: the arrows are not taken', async () => {
+    desktop = false
+    withPanel = false
+    viewedHash = fakeHash(3)
+    await render(fakeResponse({ changed: many(3) }))
+    const event = await press('ArrowDown')
+    expect(event.defaultPrevented).toBe(false)
+    expect(setHash).not.toHaveBeenCalled()
   })
 })

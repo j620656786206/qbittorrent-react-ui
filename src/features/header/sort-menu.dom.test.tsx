@@ -5,8 +5,10 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ALL } from '#/shared/categories'
 import type { SortView } from '#/shared/list-search'
+import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { ListViewContext } from '#/state/list-view'
+import { SHORTCUTS, resetShortcuts, setShortcutAction } from '#/state/shortcuts'
 import { DesktopSortMenu } from '#/features/header/sort-menu'
 
 // Spec 2.1 rows S6 to S8: the desktop sort menu's wiring in a DOM.
@@ -246,5 +248,160 @@ describe('the remembered hint (story 3.2)', () => {
     expect(trigger().getAttribute('aria-label')).toBe(
       '排序：做種時間，久的在前，列表',
     )
+  })
+})
+
+// Story 3.7: `S` opens the menu on desktop; while it is open `1` to `5`
+// pick the top five through the same path as a click.
+describe('S then 1 to 5 (story 3.7)', () => {
+  let desktop = true
+
+  beforeEach(() => {
+    desktop = true
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === DESKTOP_QUERY ? desktop : false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+  })
+
+  afterEach(() => {
+    resetShortcuts()
+    vi.restoreAllMocks()
+  })
+
+  /** A key where focus is (a menu item once the menu is open). */
+  const press = (key: string, init: KeyboardEventInit = {}) =>
+    act(async () => {
+      const target = document.activeElement ?? document.body
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key,
+          bubbles: true,
+          cancelable: true,
+          ...init,
+        }),
+      )
+    })
+
+  it('the menu digits are the registry’s keys after S', async () => {
+    await mount({ sort: 'seeding_time', dir: 'desc' })
+    await open()
+    const digits = radios().map(
+      (item) => item.querySelector(':scope > span:last-child')?.textContent,
+    )
+    const sort = SHORTCUTS.find((entry) => entry.id === 'sort')
+    expect(digits).toEqual(['1', '2', '3', '4', '5'])
+    expect(sort?.display).toContainEqual({ key: '1' })
+    expect(sort?.display).toContainEqual({ key: '5' })
+  })
+
+  it.each(['s', 'S'])(
+    '%s opens the menu, 3 picks 加入時間 like a click and closes it',
+    async (key) => {
+      const selectTab = vi.fn(() => true)
+      setShortcutAction('selectTab', selectTab)
+      await mount({ sort: 'ratio', dir: 'asc' })
+      main.scrollTop = 500
+      await press(key, { shiftKey: key === 'S' })
+      expect(menu()).not.toBeNull()
+      await press('3')
+      expect(pickView).toHaveBeenLastCalledWith({
+        sort: 'added_on',
+        dir: 'desc',
+      })
+      expect(menu()).toBeNull()
+      expect(main.scrollTop).toBe(0)
+      expect(selectTab).not.toHaveBeenCalled()
+      // Closed: digits are the tabs' again.
+      await press('3')
+      expect(selectTab).toHaveBeenCalledWith(2)
+    },
+  )
+
+  it("the selected sort's digit flips the direction and keeps the menu open", async () => {
+    await mount({ sort: 'ratio', dir: 'desc' })
+    await press('s')
+    await press('4')
+    expect(pickView).toHaveBeenLastCalledWith({ sort: 'ratio', dir: 'asc' })
+    expect(menu()).not.toBeNull()
+    expect(radio('分享率').textContent).toBe('分享率　低的在前 ↑4')
+  })
+
+  it('狀態 selected, 1 does nothing; the menu stays', async () => {
+    await mount({ sort: 'state', dir: 'desc' })
+    await press('s')
+    await press('1')
+    expect(pickView).not.toHaveBeenCalled()
+    expect(menu()).not.toBeNull()
+  })
+
+  it('6 to 9 with the menu open pick nothing and switch no tab', async () => {
+    const selectTab = vi.fn(() => true)
+    setShortcutAction('selectTab', selectTab)
+    await mount({ sort: 'ratio', dir: 'desc' })
+    await press('s')
+    await press('7')
+    expect(pickView).not.toHaveBeenCalled()
+    expect(selectTab).not.toHaveBeenCalled()
+    expect(menu()).not.toBeNull()
+  })
+
+  it('a menu S opened gives focus back where it was, not to the pill', async () => {
+    const row = document.createElement('button')
+    document.body.append(row)
+    await mount({ sort: 'ratio', dir: 'asc' })
+    row.focus()
+    await press('s')
+    await press('3')
+    expect(menu()).toBeNull()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(document.activeElement).toBe(row)
+    row.remove()
+  })
+
+  it('a menu S opened, closed by a press on the pill, keeps focus on the pill', async () => {
+    const row = document.createElement('button')
+    document.body.append(row)
+    await mount({ sort: 'ratio', dir: 'asc' })
+    row.focus()
+    await press('s')
+    expect(menu()).not.toBeNull()
+    await act(async () => {
+      trigger().dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+      )
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(menu()).toBeNull()
+    expect(document.activeElement).toBe(trigger())
+    row.remove()
+  })
+
+  it('a menu the pill opened still gives focus back to the pill', async () => {
+    await mount({ sort: 'ratio', dir: 'asc' })
+    trigger().focus()
+    await open()
+    await press('Escape')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(menu()).toBeNull()
+    expect(document.activeElement).toBe(trigger())
+  })
+
+  it('phone width: S opens nothing', async () => {
+    desktop = false
+    await mount({ sort: 'ratio', dir: 'desc' })
+    await press('s')
+    expect(menu()).toBeNull()
   })
 })

@@ -11,6 +11,7 @@ export function IconButton({
   phone = false,
   onClick,
   current = false,
+  title,
   buttonRef,
   children,
 }: {
@@ -19,6 +20,8 @@ export function IconButton({
   onClick?: () => void
   /** The page this button opens is on screen. */
   current?: boolean
+  /** Native tooltip, e.g. 「搜尋（/）」 (story 3.7). */
+  title?: string
   buttonRef?: Ref<HTMLButtonElement>
   children: ReactNode
 }) {
@@ -29,6 +32,7 @@ export function IconButton({
       disabled={onClick === undefined}
       onClick={onClick}
       aria-label={label}
+      title={title}
       aria-current={current ? 'page' : undefined}
       className={cn(
         'inline-flex flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline',

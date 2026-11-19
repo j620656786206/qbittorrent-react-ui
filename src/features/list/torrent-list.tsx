@@ -7,12 +7,14 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { detailPosition } from '#/lib/detail-position'
 import { noResultText } from '#/lib/name-search'
 import type { SortKeys } from '#/lib/visible-torrents'
 import { ALL } from '#/shared/categories'
 import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
+import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useEmptyEntrance, useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
@@ -36,6 +38,7 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
+import { focusedElement, useShortcutAction } from '#/state/shortcuts'
 import { usePublishShownList } from '#/state/shown-order'
 import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -79,6 +82,18 @@ import { TorrentRow } from '#/features/list/torrent-row'
 // `query`); no match shows the no-result block, with 「在全部裡找」 outside
 // 「全部」, unless the category has no torrent at all (then still
 // 「這個分類沒有種子」).
+//
+// Story 3.7: on desktop `↑` `↓` (the shortcut registry) view the row before
+// or after the viewed one in the order shown, as Alex's own pick
+// (`setHash`, remembered as last viewed). The row is brought into view
+// only when it is off screen (`scrollToIndex`, `align: 'auto'`) and its
+// button takes focus, so focus follows the viewed row. At the first or
+// last row nothing changes and the key is still taken, so the list does
+// not scroll instead. The restored row on open is never scrolled to
+// (story 3.6); only these keys scroll. Focus in the detail's tabs or body
+// keeps the arrows for them (the registry's `OWN_ARROWS`); from its ‹ ›
+// they still step.
+// https://tanstack.com/virtual/v3/docs/api/virtualizer#scrolltoindex
 
 const estimateSize = () => ROW_HEIGHT
 
@@ -274,6 +289,46 @@ function TorrentRows({
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
+  // Story 3.7: `↑` `↓` on desktop. The row to focus once it is rendered
+  // (it may only appear after the scroll), and what had focus at the press:
+  // focus moved anywhere else since (`/` into the search box) cancels it.
+  const desktop = useIsDesktop()
+  const focusNextRef = useRef<{
+    hash: string
+    from: HTMLElement | null
+  } | null>(null)
+  const step = (by: -1 | 1) => {
+    const position = detailPosition(shown, viewed)
+    if (position === null) return false
+    const target = by < 0 ? position.prev : position.next
+    if (target === null) return true
+    focusNextRef.current = { hash: target, from: focusedElement() }
+    setHash(target)
+    virtualizer.scrollToIndex(position.index + by, { align: 'auto' })
+    return true
+  }
+  useShortcutAction('prevItem', desktop ? () => step(-1) : null)
+  useShortcutAction('nextItem', desktop ? () => step(1) : null)
+  useLayoutEffect(() => {
+    const pending = focusNextRef.current
+    if (pending === null) return
+    const active = focusedElement()
+    const focusStayed =
+      active === null ||
+      active === pending.from ||
+      listRef.current?.contains(active) === true
+    if (!focusStayed || !shown.includes(pending.hash)) {
+      focusNextRef.current = null
+      return
+    }
+    const button = listRef.current?.querySelector<HTMLButtonElement>(
+      `[data-hash="${pending.hash}"] button`,
+    )
+    if (!button) return
+    focusNextRef.current = null
+    button.focus({ preventScroll: true })
+  })
+
   // Story 2.9: the rows in view rise and their rings turn in once the
   // virtualizer has measured the scroller (`scrollRect`, the rows of that
   // commit cover the view); after the virtualizer, so its layout effect ran
@@ -316,6 +371,7 @@ function TorrentRows({
               <div
                 key={item.key}
                 role="listitem"
+                data-hash={hash}
                 aria-setsize={total}
                 aria-posinset={item.index + 1}
                 className="absolute top-0 left-0 w-full"

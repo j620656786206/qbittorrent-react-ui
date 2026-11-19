@@ -1,4 +1,4 @@
-import { ChevronDown, Keyboard, Plus, Settings } from 'lucide-react'
+import { ChevronDown, Plus, Settings } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { categoryLabel } from '#/lib/category-tabs'
@@ -18,6 +18,7 @@ import {
   PhoneSearchHeader,
   SearchStatus,
 } from '#/features/header/search-box'
+import { ShortcutHelp } from '#/features/header/shortcut-help'
 import { DesktopSortMenu } from '#/features/header/sort-menu'
 import { rememberedHintLine } from '#/features/header/sort-model'
 import { PhoneSortPill } from '#/features/header/sort-sheet'
@@ -42,10 +43,11 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // pill's 「（這個分類記住的）」 instead), in the flow so it pushes the
 // content down. Story 3.5: the magnifier opens the search box
 // (search-box.tsx): on desktop it turns in place into the 240px pill, on
-// the phone the field covers the first row. Epic 1 placeholders (新增,
-// shortcuts) carry the native `disabled`: 50% and not-allowed from the
-// base rule, no hover, not focusable, and no `title` (their shortcuts do
-// not exist yet).
+// the phone the field covers the first row. Story 3.7: the desktop 快捷鍵
+// button opens the shortcut help (shortcut-help.tsx), its tooltip naming
+// `?`; the phone has no 快捷鍵 button. The Epic 1 placeholder 新增
+// carries the native `disabled`: 50% and not-allowed from the base rule,
+// no hover, not focusable, and no `title`.
 //
 // The header model is computed once per tick in HeaderProvider; the layout
 // and the page (`children`) keep their identity, so only the small leaves
@@ -77,9 +79,7 @@ export function ShellLayout({ children }: { children: ReactNode }) {
             <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
             新增
           </button>
-          <IconButton label="快捷鍵">
-            <Keyboard size={20} strokeWidth={2} aria-hidden="true" />
-          </IconButton>
+          <ShortcutHelp />
           <SettingsButton />
         </header>
         <DesktopBar />
