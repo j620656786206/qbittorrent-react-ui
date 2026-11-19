@@ -134,6 +134,49 @@ test('desktop: 2, 1, [ ] switch category, S then 3 picks 加入時間, ↓ moves
   expect(await historyLength(page)).toBe(entries)
 })
 
+test('desktop: with the ⋯ menu open, digits, [ ], / and ? do nothing behind it', async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  await openList(page)
+  await expect(rowButton(page, 0)).toHaveAttribute('aria-current', 'true')
+  const hash = param(page, 'hash')
+  await panel(page).getByRole('button', { name: '更多動作' }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu).toBeVisible()
+  for (const key of ['2', ']', '/', '?', 'S']) await page.keyboard.press(key)
+  await stays(page, () => param(page, 'category'), null)
+  expect(param(page, 'hash')).toBe(hash)
+  await expect(menu).toBeVisible()
+  await expect(helpDialog(page)).toHaveCount(0)
+  await expect(
+    page.getByRole('searchbox', { name: '找名字' }).filter({ visible: true }),
+  ).toHaveCount(0)
+  // Esc closes the menu (Radix), not the detail.
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  await expect(panel(page)).toBeVisible()
+})
+
+test('desktop: a held ↓ steps row by row and the URL ends on the last row', async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP)
+  await login(page)
+  await openList(page)
+  await expect(rowButton(page, 0)).toHaveAttribute('aria-current', 'true')
+  // A second `down` of a pressed key is an auto-repeat (sample: 4 rows).
+  for (let count = 0; count < 3; count += 1) {
+    await page.keyboard.down('ArrowDown')
+  }
+  await page.keyboard.up('ArrowDown')
+  await expect(rowButton(page, 3)).toBeFocused()
+  await expect(rowButton(page, 3)).toHaveAttribute('aria-current', 'true')
+  const last = await page.getByRole('listitem').nth(3).getAttribute('data-hash')
+  await expect.poll(() => param(page, 'hash')).toBe(last)
+})
+
 test('desktop board: with the detail open, ↑ ↓ stay in the card’s column', async ({
   page,
 }) => {

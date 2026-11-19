@@ -13,9 +13,10 @@ import { useLayoutEffect, useRef } from 'react'
 // Keys other than `Esc` only run an action a mounted component provides
 // (`useShortcutAction`), and only the desktop components provide them
 // (1024px and up), so the phone answers none. While a `dialog`-rank layer
-// is open (the help window, a bottom sheet) no action runs. While the sort
-// menu is open it provides `pickTopSort`, and the digits go to it instead
-// of the tabs.
+// is open (the help window, a bottom sheet) no action runs. A key pressed
+// inside an open menu (any Radix menu: sort, ⋯, file priority) runs only
+// the entries marked `inMenus`: the digits, which go to the sort menu's
+// `pickTopSort` when it provides one and do nothing in other menus.
 //
 // `Esc` closes one open layer: the highest-ranked one (story 3.5, AD-13:
 // a dialog or bottom sheet first, then the search box, then the detail,
@@ -31,9 +32,12 @@ import { useLayoutEffect, useRef } from 'react'
 // some layouts report as Ctrl and Alt and need to type `/` or `[`). Shift
 // is allowed with every printable key (`event.key` already says what it
 // typed: `?`, `S`, a German `/`, AZERTY digits); only Shift+`↑` `↓` are
-// left alone. While the sort menu is open, only its digits act: `/`,
-// `[` `]` and `?` are refused (the menu's close would pull focus back, or
-// the category would change behind it). `↑` `↓` are left to
+// left alone. Radix moves focus into a menu when it opens and closes a
+// non-modal menu when focus leaves, so a key pressed while one is open
+// lands inside it; there `/`, `[` `]`, `S` and `?` are refused (the
+// menu's close would pull focus back, or the category and torrent would
+// change behind the menu and its items would act on another torrent),
+// and Radix takes `Esc` and the arrows itself. `↑` `↓` are left to
 // whatever has focus inside an element marked `OWN_ARROWS` (the detail's
 // tab list and its scrolling body with the file list; not its header, so
 // they still step from ‹ › and ✕).
@@ -85,6 +89,8 @@ export interface Shortcut {
   display: ReadonlyArray<ShortcutKeyPart>
   /** Also handled while focus is in a text field. */
   inInputs: boolean
+  /** Also handled from inside an open menu (`run` gets `inMenu`). */
+  inMenus?: boolean
   /** A Shift combination is left alone (`↑` `↓`; printable keys allow it). */
   noShift?: boolean
   /** A held key keeps acting (`↑` `↓`). */
@@ -96,8 +102,11 @@ export interface Shortcut {
   /** A muted line under the description, or none. */
   note?: string
   group: ShortcutGroup
-  /** Does it for the key pressed; `false` when there was nothing to do. */
-  run: (key: string) => boolean
+  /**
+   * Does it for the key pressed (`inMenu`: pressed inside an open menu);
+   * `false` when there was nothing to do.
+   */
+  run: (key: string, inMenu: boolean) => boolean
 }
 
 /**
@@ -185,15 +194,17 @@ const SORT_DIGITS = TAB_DIGITS.slice(0, 5)
 const key = (name: string): ShortcutKeyPart => ({ key: name })
 const word = (text: string): ShortcutKeyPart => ({ word: text })
 
-/** The sort menu is open: it provides the digits. */
-function sortMenuOpen(): boolean {
-  return actions.has('pickTopSort')
-}
+/** Radix menu content; focus stays inside one while it is open. */
+const MENU_SELECTOR = '[role="menu"]'
 
-/** A digit: the open sort menu's top five, else the tab at that position. */
-function runDigit(pressed: string): boolean {
+/**
+ * A digit: in a menu, the sort menu's top five (`pickTopSort` is provided
+ * only while it is open; nothing in another menu), else the tab at that
+ * position.
+ */
+function runDigit(pressed: string, inMenu: boolean): boolean {
   const index = TAB_DIGITS.indexOf(pressed as (typeof TAB_DIGITS)[number])
-  if (sortMenuOpen()) {
+  if (inMenu) {
     return index < SORT_DIGITS.length && runAction('pickTopSort', index)
   }
   return runAction('selectTab', index)
@@ -219,6 +230,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     keys: TAB_DIGITS,
     display: [key(TAB_DIGITS[0]), word('到'), key(TAB_DIGITS.at(-1) ?? '')],
     inInputs: false,
+    inMenus: true,
     description: `跳到分類，照分頁順序，${TAB_DIGITS[0]} 是「全部」`,
     group: '換分類',
     run: runDigit,
@@ -230,8 +242,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     inInputs: false,
     description: '上一個、下一個分類',
     group: '換分類',
-    run: (pressed) =>
-      !sortMenuOpen() && runAction(pressed === '[' ? 'prevTab' : 'nextTab'),
+    run: (pressed) => runAction(pressed === '[' ? 'prevTab' : 'nextTab'),
   },
   {
     id: 'sort',
@@ -255,13 +266,14 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     inInputs: false,
     description: '打開搜尋框找名字',
     group: '搜尋和關閉',
-    run: () => !sortMenuOpen() && runAction('openSearch'),
+    run: () => runAction('openSearch'),
   },
   {
     id: 'escape',
     keys: ['Escape'],
     display: [key('Esc')],
     inInputs: true,
+    inMenus: true,
     description: '清除搜尋、關掉視窗或詳情',
     group: '搜尋和關閉',
     run: closeTopLayer,
@@ -273,9 +285,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     inInputs: false,
     description: '打開快捷鍵說明',
     group: '說明',
-    // Not over the open sort menu: its close would pull focus out of the
-    // help window, which closes it again.
-    run: () => !sortMenuOpen() && runAction('openHelp'),
+    run: () => runAction('openHelp'),
   },
 ]
 
@@ -354,16 +364,16 @@ export function handleShortcut(event: ShortcutEvent): boolean {
   if (event.repeat && shortcut.repeats !== true) return false
   if (event.shiftKey && shortcut.noShift === true) return false
   if (!shortcut.inInputs && isTypingTarget(event.target)) return false
-  const target = event.target
-  if (
-    shortcut.notInside !== undefined &&
-    typeof Element !== 'undefined' &&
-    target instanceof Element &&
-    target.closest(shortcut.notInside)
-  ) {
+  const target =
+    typeof Element !== 'undefined' && event.target instanceof Element
+      ? event.target
+      : null
+  if (shortcut.notInside !== undefined && target?.closest(shortcut.notInside)) {
     return false
   }
-  if (!shortcut.run(event.key)) return false
+  const inMenu = target?.closest(MENU_SELECTOR) != null
+  if (inMenu && shortcut.inMenus !== true) return false
+  if (!shortcut.run(event.key, inMenu)) return false
   event.preventDefault()
   return true
 }
