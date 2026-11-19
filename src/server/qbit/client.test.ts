@@ -212,6 +212,7 @@ describe('qBittorrent client', () => {
       'syncMaindata',
       'stopTorrents',
       'startTorrents',
+      'deleteTorrents',
       'torrentFiles',
       'setFilePriority',
       'logMain',
@@ -219,11 +220,12 @@ describe('qBittorrent client', () => {
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, files, filePrio and log/main', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, files, filePrio and log/main', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
       '/api/v2/log/main',
       '/api/v2/sync/maindata',
+      '/api/v2/torrents/delete',
       '/api/v2/torrents/filePrio',
       '/api/v2/torrents/files',
       '/api/v2/torrents/start',
@@ -259,6 +261,36 @@ describe('qBittorrent client', () => {
         stop: () => new Response('nope', { status }),
       })
       await expect(client.stopTorrents([HASH_A])).rejects.toEqual(
+        failure('qbit_rejected'),
+      )
+    },
+  )
+
+  it.each([true, false])(
+    'story 4.3 deleteTorrents POSTs hashes joined with | and deleteFiles=%s',
+    async (deleteFiles) => {
+      const { client, calls } = setup()
+      await client.deleteTorrents([HASH_A, HASH_B], deleteFiles)
+      const sent = calls.filter(
+        (call) => call.path === '/api/v2/torrents/delete',
+      )
+      expect(sent).toHaveLength(1)
+      expect(sent[0].method).toBe('POST')
+      expect([...sent[0].query.keys()]).toEqual([])
+      expect([...new URLSearchParams(sent[0].body).entries()]).toEqual([
+        ['hashes', `${HASH_A}|${HASH_B}`],
+        ['deleteFiles', String(deleteFiles)],
+      ])
+    },
+  )
+
+  it.each([400, 409, 500])(
+    'story 4.3 deleteTorrents answered %s: qbit_rejected',
+    async (status) => {
+      const { client } = setup({
+        delete: () => new Response('nope', { status }),
+      })
+      await expect(client.deleteTorrents([HASH_A], true)).rejects.toEqual(
         failure('qbit_rejected'),
       )
     },

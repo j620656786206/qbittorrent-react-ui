@@ -8,13 +8,27 @@ import { createStore } from '@tanstack/react-store'
 // key), so a new operation on one of them closes it (its 重試 would resend
 // an operation Alex has since replaced).
 
-export interface ShownToast {
-  id: number
-  text: string
-  /** The 「重試」 pill: closes the toast, then runs. */
-  retry: () => void
-  keys: ReadonlyArray<string>
-}
+export type ShownToast =
+  | {
+      id: number
+      kind: 'failure'
+      text: string
+      /** The 「重試」 pill: closes the toast, then runs. */
+      retry: () => void
+      keys: ReadonlyArray<string>
+    }
+  | {
+      /** Story 4.3: plain text, gone after `PLAIN_TOAST_MS`, no button. */
+      id: number
+      kind: 'plain'
+      text: string
+      keys: ReadonlyArray<string>
+    }
+
+/** Story 4.3: the spine's plain-text toast lasts 4 s. */
+export const PLAIN_TOAST_MS = 4000
+
+let plainTimer: ReturnType<typeof setTimeout> | undefined
 
 interface ToastState {
   toast: ShownToast | null
@@ -43,8 +57,24 @@ export function showFailureToast(
   nextId += 1
   toastStore.setState((state) => ({
     ...state,
-    toast: { id, text, retry, keys },
+    toast: { id, kind: 'failure', text, retry, keys },
   }))
+}
+
+/**
+ * Story 4.3: shows a plain toast, replacing whatever shows; it closes
+ * itself after 4 s unless something replaced it (nothing on the server).
+ */
+export function showPlainToast(text: string): void {
+  if (typeof window === 'undefined') return
+  const id = nextId
+  nextId += 1
+  toastStore.setState((state) => ({
+    ...state,
+    toast: { id, kind: 'plain', text, keys: [] },
+  }))
+  clearTimeout(plainTimer)
+  plainTimer = setTimeout(() => dismissToast(id), PLAIN_TOAST_MS)
 }
 
 /** Closes the toast; with `id`, only if that one still shows. */
@@ -69,5 +99,6 @@ export function setToastLift(lifted: boolean): void {
 
 /** Tests: nothing shown, not lifted. */
 export function resetToasts(): void {
+  clearTimeout(plainTimer)
   toastStore.setState(() => ({ toast: null, lifted: false }))
 }

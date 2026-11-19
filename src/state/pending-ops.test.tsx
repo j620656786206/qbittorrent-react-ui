@@ -10,7 +10,10 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import {
   PENDING_TIMEOUT_MS,
   clearPending,
+  clearPendingAll,
   markPending,
+  markPendingAll,
+  pendingStore,
   pendingOpOf,
   prunePending,
   resetPendingOps,
@@ -70,6 +73,60 @@ describe('the pending store', () => {
     markPending(A, 'stop')
     clearPending(A)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('4.3 marks and clears many hashes with one store update each', () => {
+    const updates = vi.fn()
+    const subscription = pendingStore.subscribe(updates)
+    markPendingAll([A, B], 'delete')
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(pendingOpOf(A)).toBe('delete')
+    expect(pendingOpOf(B)).toBe('delete')
+    clearPendingAll([A, B])
+    expect(updates).toHaveBeenCalledTimes(2)
+    expect(pendingOpOf(A)).toBeNull()
+    // Nothing left to clear: no update.
+    clearPendingAll([A])
+    expect(updates).toHaveBeenCalledTimes(2)
+    subscription.unsubscribe()
+  })
+
+  it('4.3 a batch of N times out and prunes in one store update each', () => {
+    const many = Array.from({ length: 500 }, (_, index) => fakeHash(index + 1))
+    markPendingAll(many, 'delete')
+    const updates = vi.fn()
+    const subscription = pendingStore.subscribe(updates)
+    vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(pendingOpOf(many[0])).toBeNull()
+
+    markPendingAll(many, 'delete')
+    updates.mockClear()
+    prunePending(() => false)
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(pendingOpOf(many[499])).toBeNull()
+    // The batch's timer has nothing left to do.
+    vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
+    expect(updates).toHaveBeenCalledTimes(1)
+    subscription.unsubscribe()
+  })
+
+  it('4.3 a hash marked again leaves its batch: the old timer keeps it', () => {
+    markPendingAll([A, B], 'delete')
+    vi.advanceTimersByTime(20_000)
+    markPending(A, 'stop')
+    vi.advanceTimersByTime(10_000)
+    expect(pendingOpOf(B)).toBeNull()
+    expect(pendingOpOf(A)).toBe('stop')
+    vi.advanceTimersByTime(20_000)
+    expect(pendingOpOf(A)).toBeNull()
+  })
+
+  it('4.3 many marked hashes clear themselves after 30 s too', () => {
+    markPendingAll([A, B], 'delete')
+    vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
+    expect(pendingOpOf(A)).toBeNull()
+    expect(pendingOpOf(B)).toBeNull()
   })
 
   it('prune drops hashes that no longer exist', () => {

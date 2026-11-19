@@ -7,6 +7,7 @@ import {
   resetToasts,
   setToastLift,
   showFailureToast,
+  showPlainToast,
 } from '#/shared/toast-store'
 import {
   TOAST_LIFT_CLASS,
@@ -103,6 +104,24 @@ describe('the toaster', () => {
     await act(async () => pill.click())
     expect(retry).toHaveBeenCalledOnce()
     expect(card()).toBeNull()
+  })
+
+  it('4.3 plain: the same card in a polite status region, ✕ but no 重試, gone after 4 s', async () => {
+    vi.useFakeTimers()
+    try {
+      await act(async () => showPlainToast('已刪除 3 個種子和檔案（301.2 GB）'))
+      const status = region().querySelector('[role="status"]')
+      expect(status?.contains(card())).toBe(true)
+      expect(alertBox().childElementCount).toBe(0)
+      expect(card()?.textContent).toContain('已刪除 3 個種子和檔案（301.2 GB）')
+      expect(card()?.className).toContain('rounded-card')
+      expect(button('重試')).toBeUndefined()
+      expect(button('關閉')).toBeDefined()
+      await act(async () => vi.advanceTimersByTime(4000))
+      expect(card()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('✕ closes without running the callback', async () => {

@@ -324,6 +324,39 @@
   }
 }
 
+/* Story 4.3, dialog open (mockup `pop` and `fade`, DESIGN dialog): the
+ * content grows from 95% and fades in, the scrim fades in, 0.2s ease-out.
+ * `transform` here composes with Tailwind's `translate` property (the
+ * centring), so the dialog stays centred. Off for reduced motion. */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility animate-pop {
+  animation: pop 0.2s ease-out both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-fade {
+  animation: fade 0.2s ease-out both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* Story 2.8, board auto-collapse (demo `.card.here`): the anchor card's 2px
  * frame in the brand accent, an inset ring on a pseudo-element (no layout
  * shift), shown for `--here-ms` (the animation plus about 0.9s). It is at

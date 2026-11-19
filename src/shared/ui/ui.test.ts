@@ -96,6 +96,7 @@ describe('shadcn components (row 21)', () => {
       'bottom-sheet.tsx',
       'button.tsx',
       'checkbox.tsx',
+      'confirm-shell.tsx',
       'dialog.tsx',
       'dropdown-menu.tsx',
       'input.tsx',
@@ -183,9 +184,11 @@ describe('BottomSheet (story 2.2, DESIGN bottom-sheet)', () => {
       'h-[5px] w-11 rounded-full',
       'h-5 justify-center pt-2',
       'text-[16px] leading-[1.2] font-bold',
-      'aria-label="關閉"',
+      "closeLabel = '關閉'",
+      'aria-label={closeLabel}',
       'size-11',
-      'role="dialog"',
+      "role = 'dialog'",
+      'role={role}',
       'aria-modal="true"',
     ]) {
       expect(source, token).toContain(token)

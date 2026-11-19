@@ -277,12 +277,13 @@ describe('modal behaviour (non-modal Radix plus the sheet session)', () => {
     expect(openLayerCount()).toBe(0)
   })
 
-  it('the scrim fades with the dialog (data-state open, then closed)', async () => {
+  it('the scrim and the window open with the 4.3 motion (data-state open)', async () => {
     await mount()
     await act(async () => button()?.click())
     const scrim = document.querySelector('[data-slot="dialog-overlay"]')
     expect(scrim?.getAttribute('data-state')).toBe('open')
-    expect(scrim?.className).toContain('data-[state=closed]:fade-out-0')
+    expect(scrim?.className).toContain('data-[state=open]:animate-fade')
+    expect(dialog()?.className).toContain('data-[state=open]:animate-pop')
   })
 
   it('focus or a press in the toast region does not dismiss it', async () => {

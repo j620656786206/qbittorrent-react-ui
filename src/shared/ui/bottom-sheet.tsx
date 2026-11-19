@@ -49,6 +49,13 @@ import type { SheetMode } from '#/shared/ui/sheet-snap'
 // header and tabs). It gets the id that names the dialog; the handle, the
 // drag, the focus trap and the scroll lock stay the sheet's.
 //
+// Story 4.3: `footer` is pinned under the scrolling content (the confirm
+// shell's full-width primary button), counted in the rest height. `locked`
+// (a send in flight) makes the scrim, the ✕ and a drag unable to close it:
+// a drag released past the close line springs back to the rest height.
+// `role` and `closeLabel` let the delete confirmation be an `alertdialog`
+// whose ✕ says 「關閉，不刪」.
+//
 // CSP (AD-10, no style-src): no `<style>` element is ever added. Inline
 // styles are set through the CSSOM (React `style`, `element.style`,
 // `element.animate`), which the policy does not cover; this route renders
@@ -90,6 +97,16 @@ export interface BottomSheetProps {
   returnFocus?: () => HTMLElement | null
   /** After the sheet is laid out on open, with its scrolling content. */
   onOpened?: (content: HTMLElement) => void
+  /** Story 4.3: pinned under the scrolling content, outside the scroller. */
+  footer?: ReactNode
+  /** Story 4.3: the scrim, the ✕ and a drag cannot close it. */
+  locked?: boolean
+  /** Story 4.3: `alertdialog` for a confirmation. */
+  role?: 'dialog' | 'alertdialog'
+  /** The ✕'s accessible name. */
+  closeLabel?: string
+  /** Story 4.3: the id of what describes the dialog (`aria-describedby`). */
+  describedBy?: string
 }
 
 export function BottomSheet({
@@ -102,6 +119,11 @@ export function BottomSheet({
   initialFocus,
   returnFocus,
   onOpened,
+  footer,
+  locked = false,
+  role = 'dialog',
+  closeLabel = '關閉',
+  describedBy,
 }: BottomSheetProps) {
   const titleId = useId()
   const [present, setPresent] = useState(open)
@@ -115,6 +137,7 @@ export function BottomSheet({
   const headRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
+  const footRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
   const offsetRef = useRef(0)
@@ -128,12 +151,16 @@ export function BottomSheet({
   const panDownRef = useRef<boolean | null>(null)
 
   // The latest props for effects that must not re-run when they change.
-  const propsRef = useRef({ onOpenChange, initialFocus, onOpened })
+  const propsRef = useRef({ onOpenChange, initialFocus, onOpened, locked })
   useLayoutEffect(() => {
-    propsRef.current = { onOpenChange, initialFocus, onOpened }
+    propsRef.current = { onOpenChange, initialFocus, onOpened, locked }
   })
 
-  const close = () => propsRef.current.onOpenChange(false)
+  /** The scrim, the ✕ and a drag; never while locked. */
+  const close = () => {
+    if (propsRef.current.locked) return
+    propsRef.current.onOpenChange(false)
+  }
 
   const session = useModalSession({ sheetRef, scrimRef, returnFocus })
 
@@ -230,7 +257,10 @@ export function BottomSheet({
     const inner = innerRef.current
     if (!sheet || !head || !inner) return 0
     const viewport = sheet.offsetHeight
-    const content = head.offsetHeight + inner.offsetHeight
+    const content =
+      head.offsetHeight +
+      inner.offsetHeight +
+      (footRef.current?.offsetHeight ?? 0)
     const rest = sheetRestHeight(mode, content, viewport)
     metricsRef.current = { viewport, rest }
     const offset = Math.max(0, Math.round(viewport - rest))
@@ -262,10 +292,11 @@ export function BottomSheet({
       distance: from - (expandedAtStart ? 0 : Math.max(base, restAt)),
       velocity: cancelled ? 0 : releaseVelocity(samples),
     })
-    if (snap === 'close') {
+    if (snap === 'close' && !propsRef.current.locked) {
       close()
       return
     }
+    // Locked: a release past the close line springs back to the rest.
     const toFull = snap === 'full' && mode !== 'full'
     setFullScreen(toFull)
     animate(from, toFull ? 0 : restAt)
@@ -361,6 +392,7 @@ export function BottomSheet({
     })
     observer.observe(sheet)
     observer.observe(inner)
+    if (footRef.current) observer.observe(footRef.current)
     return () => observer.disconnect()
   }, [present, open, measure, animate, currentOffset, updateTouchAction])
 
@@ -390,9 +422,10 @@ export function BottomSheet({
       />
       <div
         ref={sheetRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={describedBy}
         tabIndex={-1}
         inert={closing || undefined}
         data-slot="bottom-sheet"
@@ -427,7 +460,8 @@ export function BottomSheet({
               <button
                 ref={closeRef}
                 type="button"
-                aria-label="關閉"
+                aria-label={closeLabel}
+                aria-disabled={locked || undefined}
                 onClick={close}
                 className="inline-flex size-11 flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline"
               >
@@ -442,10 +476,24 @@ export function BottomSheet({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           onScroll={updateTouchAction}
         >
-          <div ref={innerRef} className="pb-[env(safe-area-inset-bottom)]">
+          <div
+            ref={innerRef}
+            className={cn(
+              footer === undefined && 'pb-[env(safe-area-inset-bottom)]',
+            )}
+          >
             {children}
           </div>
         </div>
+        {footer !== undefined && (
+          <div
+            ref={footRef}
+            data-slot="bottom-sheet-footer"
+            className="flex-none pb-[env(safe-area-inset-bottom)]"
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </>,
     document.body,

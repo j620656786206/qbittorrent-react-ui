@@ -60,6 +60,14 @@ export function pauseActionFailureText(
 }
 
 /**
+ * Story 4.3: the failure toast of a delete, 「刪除失敗：qBittorrent 拒絕這個
+ * 操作」, the reason from the code's fixed text (2.6's pattern).
+ */
+export function deleteFailureText(code: OperationFailureCode): string {
+  return `刪除失敗：${errorText(code)}`
+}
+
+/**
  * Story 2.7: the failure toast of a tick or a priority change in the files
  * tab, 「改檔案設定失敗：qBittorrent 拒絕這個操作」.
  */

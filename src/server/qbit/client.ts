@@ -29,6 +29,15 @@ export interface QbitClient {
   /** `torrents/start`, same contract as `stopTorrents`. */
   startTorrents: (hashes: ReadonlyArray<string>) => Promise<void>
   /**
+   * Story 4.3: `torrents/delete` for these hashes (validated, distinct,
+   * never `all`), with `deleteFiles` as qBittorrent's `true`/`false`. It
+   * answers 200 whatever happened; a non-2xx is `qbit_rejected`.
+   */
+  deleteTorrents: (
+    hashes: ReadonlyArray<string>,
+    deleteFiles: boolean,
+  ) => Promise<void>
+  /**
    * `torrents/files` for one validated hash: each file's index, name, size,
    * progress and priority only, in qBittorrent's order. A torrent
    * qBittorrent does not know answers 404 (`qbit_rejected`); an answer that
@@ -140,6 +149,15 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     })
   }
 
+  async function deleteTorrents(
+    hashes: ReadonlyArray<string>,
+    deleteFiles: boolean,
+  ): Promise<void> {
+    const form = hashesForm(hashes)
+    form.set('deleteFiles', deleteFiles ? 'true' : 'false')
+    await session.send(QBIT_PATHS.torrentsDelete, { method: 'POST', form })
+  }
+
   async function torrentFiles(hash: string): Promise<Array<TorrentFile>> {
     const path = QBIT_PATHS.torrentsFiles
     const query = new URLSearchParams()
@@ -203,6 +221,7 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     syncMaindata,
     stopTorrents,
     startTorrents,
+    deleteTorrents,
     torrentFiles,
     setFilePriority,
     logMain,

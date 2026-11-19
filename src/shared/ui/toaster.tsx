@@ -12,6 +12,9 @@ import type { ShownToast } from '#/shared/toast-store'
 //   entrance (keyed by id).
 // - A failure stays until ✕ or 「重試」 (a 32px outline pill, which closes
 //   the toast, then runs its callback).
+// - Story 4.3: a plain toast is the same card with only ✕; the store closes
+//   it after 4 s. It renders in a polite `status` region (a success is not
+//   an alert).
 // - Desktop (>= 1024px): bottom right, 24px in, 356px wide. Phone: at the
 //   top, 16px in (plus the safe area), above the bottom sheet and its scrim
 //   (z-index over `z-50`).
@@ -44,16 +47,18 @@ function ToastCard({ toast }: { toast: ShownToast }) {
       <p className="m-0 min-w-0 flex-1 text-[13px] leading-[1.4] font-semibold [overflow-wrap:anywhere]">
         {toast.text}
       </p>
-      <button
-        type="button"
-        onClick={() => {
-          dismissToast(toast.id)
-          toast.retry()
-        }}
-        className="h-8 flex-none rounded-full border bg-surface px-3.5 text-[13px] font-semibold whitespace-nowrap text-text hover-outline"
-      >
-        重試
-      </button>
+      {toast.kind === 'failure' && (
+        <button
+          type="button"
+          onClick={() => {
+            dismissToast(toast.id)
+            toast.retry()
+          }}
+          className="h-8 flex-none rounded-full border bg-surface px-3.5 text-[13px] font-semibold whitespace-nowrap text-text hover-outline"
+        >
+          重試
+        </button>
+      )}
       <button
         type="button"
         aria-label="關閉"
@@ -80,8 +85,13 @@ export function Toaster() {
       {...{ [TOAST_REGION_ATTR]: '' }}
       className={lifted ? `${REGION_CLASS} ${TOAST_LIFT_CLASS}` : REGION_CLASS}
     >
+      <div role="status">
+        {toast?.kind === 'plain' && <ToastCard key={toast.id} toast={toast} />}
+      </div>
       <div role="alert">
-        {toast && <ToastCard key={toast.id} toast={toast} />}
+        {toast?.kind === 'failure' && (
+          <ToastCard key={toast.id} toast={toast} />
+        )}
       </div>
     </div>
   )
