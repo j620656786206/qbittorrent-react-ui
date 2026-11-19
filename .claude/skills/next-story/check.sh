@@ -49,14 +49,16 @@ files_in_git() {
 }
 
 # 從 BASE 到現在新增的行，加上新檔案的全部內容。
+# 帶 text 參數時跳過二進位檔（只給破折號用）；IP 和秘密照樣掃二進位檔。
 added_lines() {
+  local text_only="${1:-}"
   { git diff "$BASE" --name-only --diff-filter=d; git ls-files --others --exclude-standard; } \
     | sort -u | grep -v -E '^package-lock\.json$' \
     | while IFS= read -r f; do
         if echo "$f" | grep -qE "$VENDOR_RE" && ! echo "$f" | grep -qE "$OURS_RE"; then continue; fi
         [ -f "$f" ] || continue
         # 二進位檔（影片、圖片）不是文字，裡面的位元組碰巧跟破折號一樣也不算。
-        grep -Iq . "$f" || continue
+        if [ -n "$text_only" ]; then grep -Iq . "$f" || continue; fi
         if git cat-file -e "$BASE:$f" 2>/dev/null; then
           git diff "$BASE" -U0 -- "$f" | grep '^+' | grep -v '^+++'
         else
@@ -67,7 +69,7 @@ added_lines() {
 
 # 1. 破折號（U+2014）。新增的內容裡要是 0。
 DASH=$(printf '\xe2\x80\x94')
-n=$(added_lines | grep -c "$DASH" || true)
+n=$(added_lines text | grep -c "$DASH" || true)
 report "$n" "破折號"
 
 # 2. 隱私：那個分類的真名。整個 repo（要進 git 的檔案）要是 0。

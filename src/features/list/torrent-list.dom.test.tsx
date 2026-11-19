@@ -33,6 +33,7 @@ import { clearShownList, shownListStore } from '#/state/shown-order'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import type { SortView } from '#/shared/list-search'
 import type * as ListModel from '#/features/list/list-model'
+import { HASH_WRITE_GAP_MS } from '#/features/list/use-arrow-stepping'
 import { TorrentList } from '#/features/list/torrent-list'
 
 // Review of 1.7 to 1.9: the list's wiring in a DOM (happy-dom), which the
@@ -1288,12 +1289,9 @@ describe('↑ ↓ (story 3.7)', () => {
     field.remove()
   })
 
-  it('a held ↓ steps on from the row it last went to while the URL lags', async () => {
-    deferWrites = true
-    await render(fakeResponse({ changed: many(5) }))
-    await press('ArrowDown')
+  async function holdDown() {
     await act(async () => {
-      document.body.dispatchEvent(
+      ;(document.activeElement ?? document.body).dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'ArrowDown',
           repeat: true,
@@ -1302,6 +1300,22 @@ describe('↑ ↓ (story 3.7)', () => {
         }),
       )
     })
+  }
+  const waitWriteGap = () =>
+    act(
+      () =>
+        new Promise((resolve) => setTimeout(resolve, HASH_WRITE_GAP_MS + 20)),
+    )
+
+  it('a held ↓ steps on from the row it last went to while the URL lags', async () => {
+    deferWrites = true
+    await render(fakeResponse({ changed: many(5) }))
+    await press('ArrowDown')
+    await holdDown()
+    // Focus follows each repeat; the URL gets the newest row when the gap ends.
+    expect(focusedName()).toBe('T2')
+    expect(setHash.mock.calls.map(([hash]) => hash)).toEqual([fakeHash(4)])
+    await waitWriteGap()
     expect(setHash.mock.calls.map(([hash]) => hash)).toEqual([
       fakeHash(4),
       fakeHash(3),
@@ -1310,6 +1324,46 @@ describe('↑ ↓ (story 3.7)', () => {
     await applyHash(fakeHash(3))
     await press('ArrowDown')
     expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+  })
+
+  it('a held ↓ writes the URL at most once per gap, and the last row always', async () => {
+    deferWrites = true
+    await render(fakeResponse({ changed: many(8) }))
+    await press('ArrowDown')
+    for (let count = 0; count < 4; count += 1) await holdDown()
+    expect(focusedName()).toBe('T2')
+    expect(setHash).toHaveBeenCalledTimes(1)
+    await waitWriteGap()
+    expect(setHash.mock.calls.map(([hash]) => hash)).toEqual([
+      fakeHash(7),
+      fakeHash(3),
+    ])
+  })
+
+  it('the waiting write goes out before another key acts, on a press and on blur', async () => {
+    deferWrites = true
+    await render(fakeResponse({ changed: many(8) }))
+    const written = () => setHash.mock.calls.map(([hash]) => hash)
+    await press('ArrowDown')
+    await holdDown()
+    await press(']')
+    expect(written()).toEqual([fakeHash(7), fakeHash(6)])
+    await waitWriteGap()
+    await press('ArrowDown')
+    await holdDown()
+    await act(async () => {
+      document.body.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true }),
+      )
+    })
+    expect(written().slice(2)).toEqual([fakeHash(7), fakeHash(6)])
+    await waitWriteGap()
+    await press('ArrowDown')
+    await holdDown()
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'))
+    })
+    expect(written().slice(4)).toEqual([fakeHash(7), fakeHash(6)])
   })
 
   it('another key or a press forgets the row stepped to and the focus still pending', async () => {

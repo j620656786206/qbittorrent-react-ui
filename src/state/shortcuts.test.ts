@@ -18,6 +18,7 @@ import {
   titleWithShortcut,
 } from '#/state/shortcuts'
 import type { ShortcutAction } from '#/state/shortcuts'
+import { TOP_SORT_FIELDS } from '#/shared/sort-fields'
 
 // Spec 2.4 row D13, AR-52: Esc closes the top layer; in a text field only
 // Esc is handled. Story 3.5: `/` opens the search box (an action the
@@ -25,8 +26,9 @@ import type { ShortcutAction } from '#/state/shortcuts'
 // then detail, whatever order they opened in); IME keys are ignored; the
 // listener is there while a layer is open or an action is provided.
 // Story 3.7: the full table (`↑` `↓`, `1` to `9`, `[` `]`, `S`, `?`) with
-// groups; digits go to the open sort menu before the tabs; the help
-// window's rows and every tooltip come from the same table.
+// groups; inside an open menu only the digits act, and they go to the sort
+// menu's top five; the help window's rows and every tooltip come from the
+// same table.
 
 function press(
   key: string,
@@ -41,6 +43,19 @@ function press(
   })
   target.dispatchEvent(event)
   return event
+}
+
+/** An open Radix menu's content, as Radix renders it, with focus in it. */
+function openMenu() {
+  const menu = document.createElement('div')
+  menu.setAttribute('role', 'menu')
+  menu.tabIndex = -1
+  const item = document.createElement('div')
+  item.setAttribute('role', 'menuitem')
+  item.tabIndex = -1
+  menu.append(item)
+  document.body.append(menu)
+  return item
 }
 
 afterEach(() => {
@@ -584,17 +599,20 @@ describe('story 3.7 keys', () => {
     expect(calls).toEqual(['nextTab(0)'])
   })
 
-  it('/, [ ] and ? are refused while the sort menu is open (it takes the digits)', () => {
+  it('inside any open menu only the digits act: /, [ ], S, ? and the arrows are refused', () => {
     const calls = provideAll()
-    const off = setShortcutAction('pickTopSort', () => true)
-    for (const key of ['?', '/', '[', ']']) {
-      expect(press(key).defaultPrevented).toBe(false)
+    // The ⋯ menu: no pickTopSort, so the digits do nothing there either
+    // (no category switch behind it, its item stays on the same torrent).
+    const item = openMenu()
+    for (const key of ['?', '/', '[', ']', 's', 'S', 'ArrowDown', '2']) {
+      expect(press(key, item).defaultPrevented).toBe(false)
     }
     expect(calls).toEqual([])
-    off()
+    // Out of the menu (it closed), the same keys act again.
     press('?')
     press(']')
-    expect(calls).toEqual(['openHelp(0)', 'nextTab(0)'])
+    press('2')
+    expect(calls).toEqual(['openHelp(0)', 'nextTab(0)', 'selectTab(1)'])
   })
 
   it('the digit descriptions name the keys of the table', () => {
@@ -644,18 +662,20 @@ describe('story 3.7 keys', () => {
 })
 
 describe('digits: the open sort menu first (story 3.7)', () => {
-  it('while pickTopSort is provided, 1 to 5 go to it and not to the tabs', () => {
+  it('inside the open sort menu, 1 to 5 go to pickTopSort and not to the tabs', () => {
     const calls = provideAll()
     const off = setShortcutAction('pickTopSort', (index) => {
       calls.push(`pickTopSort(${index})`)
       return true
     })
-    expect(press('3').defaultPrevented).toBe(true)
-    expect(press('1').defaultPrevented).toBe(true)
+    const item = openMenu()
+    expect(press('3', item).defaultPrevented).toBe(true)
+    expect(press('1', item).defaultPrevented).toBe(true)
     // 6 to 9 are no sort: nothing, and no tab behind the open menu either.
-    expect(press('7').defaultPrevented).toBe(false)
+    expect(press('7', item).defaultPrevented).toBe(false)
     expect(calls).toEqual(['pickTopSort(2)', 'pickTopSort(0)'])
     off()
+    item.parentElement?.remove()
     press('3')
     expect(calls.at(-1)).toBe('selectTab(2)')
   })
@@ -664,8 +684,15 @@ describe('digits: the open sort menu first (story 3.7)', () => {
     const select = vi.fn(() => true)
     setShortcutAction('selectTab', select)
     setShortcutAction('pickTopSort', () => false)
-    expect(press('1').defaultPrevented).toBe(false)
+    expect(press('1', openMenu()).defaultPrevented).toBe(false)
     expect(select).not.toHaveBeenCalled()
+  })
+
+  it('each top sort field has its digit after S, and no digit is left over', () => {
+    expect(
+      TOP_SORT_FIELDS.map((field) => sortMenuDigit(field.top ?? 0)),
+    ).toEqual(TOP_SORT_FIELDS.map((_, index) => String(index + 1)))
+    expect(sortMenuDigit(TOP_SORT_FIELDS.length + 1)).toBeUndefined()
   })
 })
 
@@ -717,7 +744,8 @@ describe('help rows and tooltips come from the table (story 3.7)', () => {
       calls.push(index)
       return true
     })
-    for (const top of [1, 2, 3, 4, 5]) press(sortMenuDigit(top) ?? '')
+    const item = openMenu()
+    for (const top of [1, 2, 3, 4, 5]) press(sortMenuDigit(top) ?? '', item)
     expect(calls).toEqual([0, 1, 2, 3, 4])
   })
 })

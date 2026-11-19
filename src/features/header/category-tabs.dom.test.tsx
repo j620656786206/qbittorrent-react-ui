@@ -269,9 +269,9 @@ describe('shortcuts and tooltips (story 3.7)', () => {
 
   afterEach(() => resetShortcuts())
 
-  const press = (key: string) =>
+  const press = (key: string, target: EventTarget = document.body) =>
     act(async () => {
-      document.body.dispatchEvent(
+      target.dispatchEvent(
         new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
       )
     })
@@ -338,14 +338,23 @@ describe('shortcuts and tooltips (story 3.7)', () => {
     expect(selectCategory).not.toHaveBeenCalled()
   })
 
-  it('while the sort menu takes digits, a digit is not a tab', async () => {
+  it('a digit pressed in an open menu is not a tab', async () => {
     await act(async () => render())
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    document.body.append(menu)
+    // Another menu (⋯): nothing switches behind it.
+    await press('2', menu)
+    await press(']', menu)
+    expect(selectCategory).not.toHaveBeenCalled()
+    // The sort menu: the digit is its pick.
     const pick = vi.fn(() => true)
     const off = setShortcutAction('pickTopSort', pick)
-    await press('2')
+    await press('2', menu)
     expect(pick).toHaveBeenCalledWith(1)
     expect(selectCategory).not.toHaveBeenCalled()
     off()
+    menu.remove()
   })
 
   it('while a dialog is open nothing switches', async () => {
