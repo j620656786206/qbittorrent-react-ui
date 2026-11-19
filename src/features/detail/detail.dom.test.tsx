@@ -153,7 +153,9 @@ function Url({
     setHashState(next)
   }, [])
   return (
-    <ViewedHashContext value={{ hash, setHash }}>{children}</ViewedHashContext>
+    <ViewedHashContext value={{ hash, setHash, followHash: setHash }}>
+      {children}
+    </ViewedHashContext>
   )
 }
 

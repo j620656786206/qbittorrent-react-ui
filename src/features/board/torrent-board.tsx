@@ -66,6 +66,8 @@ import { useBoardCollapse } from '#/features/board/use-board-collapse'
 // names holding it, 已整理 too (its collapsed count is the matches); a
 // partly empty board keeps its four columns, each empty one 「沒有」; only
 // when the four and 已整理 are all empty the no-result block covers it.
+// The phone has no 已整理 column, so while searching there archived
+// matches do not count (the block and the live region agree).
 // The board stays mounted (hidden) under that block and its key is the
 // category only, so a keyword that matches nothing for a moment keeps the
 // open 已整理 column, the collapse and the scroll. A category with no
@@ -91,16 +93,18 @@ export function TorrentBoard() {
   const { retry, retrying } = useMaindataRetry()
   const desktop = useIsDesktop()
   const { today } = useDayClock()
-  // Story 3.5: the category's own size (archived included), keyword aside.
-  const { data: categoryTotal = 0 } = useMatchCount(view.category, '', true)
+  // Story 3.5: the category's own size, keyword aside (archived ones only
+  // where the 已整理 column is: desktop).
+  const { data: categoryTotal = 0 } = useMatchCount(view.category, '', desktop)
+  const searching = view.query !== '' && categoryTotal > 0
 
   // Story 3.1 (AD-8): the first load also waits for the settings, which
   // may turn a URL without `sort` into the list.
   const state = boardView({
     hasData: columns !== undefined && viewReady,
-    total: columns ? totalOf(columns) : 0,
+    total: columns ? totalOf(columns, desktop || !searching) : 0,
     error: failure,
-    searching: view.query !== '' && categoryTotal > 0,
+    searching,
   })
   // Story 2.9: an empty board still has its entrance moment.
   useEmptyEntrance(state === 'empty' || state === 'no-result')

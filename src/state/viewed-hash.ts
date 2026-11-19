@@ -4,19 +4,24 @@ import { createContext, useContext } from 'react'
 // `_authed` layout reads the validated search and provides it here, with a
 // setter that writes the URL with `replace` (and `resetScroll: false`);
 // `null` removes `hash` (the detail closed). Rows, cards and the detail
-// containers read it without touching the router. Without a provider (node
-// tests) nothing is viewed and setting does nothing.
+// containers read it without touching the router. Story 3.6: the list's
+// own move to the next row (the viewed one left the list) goes through
+// `followHash`, so it is never remembered as a row Alex chose. Without a
+// provider (node tests) nothing is viewed and setting does nothing.
 
 export interface ViewedHashControl {
   /** The URL's `hash`, validated; `null` when there is none. */
   hash: string | null
   /** Stable. Writes the URL with `replace`; `null` removes `hash`. */
   setHash: (hash: string | null) => void
+  /** Stable. Like `setHash`, for a row the app moved to by itself. */
+  followHash: (hash: string | null) => void
 }
 
 export const NO_VIEWED_HASH: ViewedHashControl = Object.freeze({
   hash: null,
   setHash: () => {},
+  followHash: () => {},
 })
 
 export const ViewedHashContext =

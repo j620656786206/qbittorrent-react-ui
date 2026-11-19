@@ -181,7 +181,9 @@ function app() {
           closeSearch: () => {},
         }}
       >
-        <ViewedHashContext value={{ hash: viewedHash, setHash }}>
+        <ViewedHashContext
+          value={{ hash: viewedHash, setHash, followHash: setHash }}
+        >
           <TorrentList
             panel={withPanel ? <aside aria-label="詳情" /> : undefined}
           />

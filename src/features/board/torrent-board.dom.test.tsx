@@ -164,7 +164,7 @@ function boardTree() {
           closeSearch: () => {},
         }}
       >
-        <ViewedHashContext value={{ hash: null, setHash }}>
+        <ViewedHashContext value={{ hash: null, setHash, followHash: setHash }}>
           <TorrentBoard />
         </ViewedHashContext>
       </ListViewContext>

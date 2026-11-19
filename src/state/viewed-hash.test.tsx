@@ -38,7 +38,11 @@ describe('useViewedHash', () => {
   })
 
   it('reads what the layout provides', () => {
-    const provided = { hash: 'a'.repeat(40), setHash: () => {} }
+    const provided = {
+      hash: 'a'.repeat(40),
+      setHash: () => {},
+      followHash: () => {},
+    }
     expect(read(provided)).toBe(provided)
   })
 })

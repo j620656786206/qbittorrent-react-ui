@@ -354,6 +354,32 @@ describe('recording', () => {
     expect(readPref('lastViewedHash').get('X')).toBe(later)
   })
 
+  it('a row the app moved to by itself is not stored (a keyword hid the viewed one)', async () => {
+    await mount('/?category=mteam-X&sort=added_on&dir=desc')
+    await view(B)
+    expect(readPref('lastViewedHash').get('mteam-X')).toBe(B)
+    // `keep` matches A and C, not B: the panel follows to the next match.
+    await go('/', {
+      category: 'mteam-X',
+      sort: 'added_on',
+      dir: 'desc',
+      hash: B,
+      q: 'keep',
+    })
+    expect(search()).toMatchObject({ hash: C })
+    expect(readPref('lastViewedHash').get('mteam-X')).toBe(B)
+    // The keyword goes: still B remembered, until Alex picks a row.
+    await go('/', {
+      category: 'mteam-X',
+      sort: 'added_on',
+      dir: 'desc',
+      hash: C,
+    })
+    expect(readPref('lastViewedHash').get('mteam-X')).toBe(B)
+    await view(A)
+    expect(readPref('lastViewedHash').get('mteam-X')).toBe(A)
+  })
+
   it('a stale or foreign hash never replaces the category’s entry', async () => {
     remember(ALL, { X: E, 'mteam-X': B })
     // Another category's torrent.
@@ -610,6 +636,15 @@ describe('the restore waits, gives way, or gives up', () => {
     })
     expect(panel()).toContain('Fake.B')
     expect(written).not.toContain(JSON.stringify(ALL))
+  })
+
+  it('opening on the settings page, then the 「全部」 tab: 「全部」 stays', async () => {
+    await mount('/settings')
+    await click(tab('全部'))
+    expect(pathname()).toBe('/')
+    expect('category' in search()).toBe(false)
+    expect(selectedTab()).toBe('全部')
+    expect(readPref('lastCategory')).toBe(ALL)
   })
 
   it('opening on the settings page, then a list URL with a place: no restore', async () => {
