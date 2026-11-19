@@ -95,6 +95,7 @@ deferred: []
 ## Spec Change Log
 
 - 2026-11-18, review fixes (coordinator): matching folds both sides with `normalize('NFKC')` then `toLowerCase()` instead of `toLocaleLowerCase()` (full-width IME input matches, same result on every device locale); `q` is capped at 200 characters and refuses control characters; Enter (not while composing) leaves the field; a category with no torrent at all keeps 「這個分類沒有種子」 under a keyword; the board's no-result block covers the board instead of unmounting it; a keyword change applies at once even while an extra sort holds for its keys; one visually hidden polite status says 「找到 N 個」 or the no-result line once the keyword rests. KEEP: filtering only in the selectors; the Esc ranks.
+- 2026-11-19, multi-model review after merge (opus, fable, sonnet, haiku; Alex picked the fixes, PR "fix(epic-3): 多模型 review 3.4 到 3.6 的修正"): (1) whether the box is open is one piece of state in `src/state/search-open.ts` (Alex opened it, or a keyword is set); a close never re-opens while the URL catches up, and nothing is set during render. (2) A keyword closed on `/settings` is not shown and is removed from the URL when history goes back to the list entry that still holds it; typing again in between forgets it. (3) On the phone, while a keyword is set, archived matches do not count toward the board total, so the no-result block and the polite status agree (the phone has no 已整理 column); without a keyword the 2.3 board is unchanged. KEEP: filtering only in the selectors; `q` in the URL.
 
 ## Review Triage Log
 
