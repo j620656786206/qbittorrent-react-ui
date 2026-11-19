@@ -10,6 +10,7 @@ import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { useListView } from '#/state/list-view'
+import { useSelecting } from '#/state/selection'
 import {
   COLUMN_META,
   WORK_COLUMNS,
@@ -46,6 +47,13 @@ import { CardList } from '#/features/board/card-list'
 // through the CSSOM (no re-render); on release it settles with a 0.3 s
 // transition, none with `prefers-reduced-motion`. The selected column is
 // component state and starts at 要處理 on every mount (Claude 代決).
+//
+// Story 4.2: the panels are selectable the phone way (card-list.tsx): a
+// long press starts selection mode, a tap then toggles, and a swipe still
+// changes the column (the ticks stay; taking the pointer for the swipe
+// cancels a pending long press). Each panel keeps 10px above and 8px
+// beside the cards, so the checkbox 6px out of a card's corner is never
+// clipped, and 140px under the last card while selecting, for the bar.
 
 /** The status dot colour; Tailwind needs whole class names. */
 const DOT_CLASS: Readonly<Record<WorkColumn, string>> = {
@@ -57,6 +65,12 @@ const DOT_CLASS: Readonly<Record<WorkColumn, string>> = {
 
 const TABLIST_CLASS =
   'grid flex-none grid-cols-4 gap-1.5 rounded-card bg-surface-muted p-1'
+
+/** Story 4.2: room above the first card for its checkbox. */
+export const PHONE_PANEL_PADDING_START = 10
+/** Below the last card; 140px while selecting (mockup S07-delete-phone). */
+export const PHONE_PANEL_PADDING_END = 4
+export const PHONE_PANEL_SELECTING_PADDING_END = 140
 
 const TAB_CLASS =
   'flex h-14 min-w-0 flex-col items-center justify-center rounded-row text-text'
@@ -117,6 +131,7 @@ export function PhoneBoard({
 }: PhoneBoardProps) {
   // Story 3.5: while searching every empty column says 「沒有」.
   const searching = useListView().view.query !== ''
+  const selecting = useSelecting()
   const [index, setIndex] = useState(0)
   const idPrefix = useId()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -279,9 +294,15 @@ export function PhoneBoard({
               today={today}
               empty={emptyText(column, columns, searching)}
               label={COLUMN_META[column].name}
-              paddingStart={0}
-              paddingEnd={4}
-              className="h-full w-full flex-none touch-pan-y"
+              paddingStart={PHONE_PANEL_PADDING_START}
+              paddingEnd={
+                selecting
+                  ? PHONE_PANEL_SELECTING_PADDING_END
+                  : PHONE_PANEL_PADDING_END
+              }
+              className="h-full w-full flex-none touch-pan-y px-2"
+              selectable
+              phone
               bodyProps={{
                 role: 'tabpanel',
                 id: panelId(column),

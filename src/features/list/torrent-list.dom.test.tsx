@@ -29,6 +29,7 @@ import {
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
 import {
+  SELECTION_SHIFT_CLEAR_MS,
   clearSelection,
   resetSelection,
   selectionStore,
@@ -42,6 +43,7 @@ import type * as ListModel from '#/features/list/list-model'
 import { HASH_WRITE_GAP_MS } from '#/features/list/use-arrow-stepping'
 import { LIST_SCROLL_CLASS } from '#/features/list/list-states'
 import {
+  PHONE_SELECTING_SCROLL_CLASS,
   SELECTION_SCROLL_PADDING_END,
   TorrentList,
 } from '#/features/list/torrent-list'
@@ -1484,9 +1486,10 @@ describe('↑ ↓ (story 3.7)', () => {
 })
 
 // Story 4.1: the desktop checkbox in each row's wrapper, the selected
-// row's background, the list's freeze while anything is selected, and no
-// checkbox on the phone.
-describe('selection (story 4.1)', () => {
+// row's background and the list's freeze while anything is selected.
+// Story 4.2: the phone's selection mode (long press, tap toggles, the
+// 28px room and its slide, the 140px bottom).
+describe('selection (stories 4.1 and 4.2)', () => {
   let desktop = true
 
   beforeEach(() => {
@@ -1575,10 +1578,196 @@ describe('selection (story 4.1)', () => {
     expect(scroller().className).toBe(LIST_SCROLL_CLASS)
   })
 
-  it('below 1024px: no checkbox', async () => {
+  /** A finger held on row `item` for `ms`, then lifted (and its click). */
+  async function press(item: HTMLElement, ms: number) {
+    const button = rowButton(item)
+    const event = (type: string) =>
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'touch',
+        isPrimary: true,
+        clientX: 50,
+        clientY: 20,
+      })
+    await act(async () => {
+      button.dispatchEvent(event('pointerdown'))
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(ms)
+    })
+    await act(async () => {
+      button.dispatchEvent(event('pointerup'))
+      button.click()
+    })
+  }
+
+  const content = (item: HTMLElement) =>
+    rowButton(item).children[1] as HTMLElement
+  const checkboxes = () => [
+    ...main.querySelectorAll<HTMLButtonElement>('button[role="checkbox"]'),
+  ]
+
+  it('4.2 below 1024px: no checkbox until a long press', async () => {
     desktop = false
     await render(fakeResponse({ changed: many(3) }))
     expect(items()).toHaveLength(3)
-    expect(main.querySelector('button[role="checkbox"]')).toBeNull()
+    expect(checkboxes()).toHaveLength(0)
+    // Phone rows clip their own overflow and keep the callout away.
+    for (const token of [
+      'max-lg:overflow-x-clip',
+      // Room for the 2px focus outline, 2px out.
+      'max-lg:[overflow-clip-margin:4px]',
+      'max-lg:select-none',
+      'max-lg:[-webkit-touch-callout:none]',
+    ]) {
+      expect(items()[0].className).toContain(token)
+    }
+  })
+
+  it('4.2 matrix long press: the row is ticked, every row shows its checkbox 10px in and makes 28px of room, sliding; the release opens nothing', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await press(items()[1], 500)
+    expect(selectionStore.state.hashes).toEqual([fakeHash(2)])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(list().hasAttribute('data-selecting')).toBe(true)
+    expect(checkboxes().map((box) => box.getAttribute('aria-label'))).toEqual([
+      '選取 T2',
+      '選取 T1',
+      '選取 T0',
+    ])
+    const box = checkbox(items()[1]) as HTMLButtonElement
+    expect(box.getAttribute('aria-checked')).toBe('true')
+    expect(items()[1].firstElementChild).toBe(box)
+    expect(rowButton(items()[1]).contains(box)).toBe(false)
+    for (const token of ['absolute', 'left-2.5', 'animate-select-shift-in']) {
+      expect(box.className).toContain(token)
+    }
+    expect(box.className).not.toContain('opacity-0')
+    expect(rowButton(items()[1]).className).toContain('bg-selection-row')
+    for (const item of items()) {
+      expect(rowButton(item).className).toContain('pl-[38px]')
+      expect(content(item).className).toContain('animate-select-shift-in')
+    }
+    // After the 0.2 s slide (and a margin) nothing animates on a re-render.
+    await act(async () => {
+      vi.advanceTimersByTime(SELECTION_SHIFT_CLEAR_MS)
+    })
+    expect(content(items()[0]).className).not.toContain('animate-select')
+    expect(checkbox(items()[0])?.className).not.toContain('animate-select')
+    expect(rowButton(items()[0]).className).toContain('pl-[38px]')
+  })
+
+  it('4.2 matrix short tap and tap while selecting: a short press opens the row; while selecting a tap toggles and never opens', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await press(items()[0], 200)
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(3))
+    expect(selectionStore.state.hashes).toEqual([])
+    setHash.mockClear()
+
+    await press(items()[1], 500)
+    await press(items()[2], 100)
+    expect(selectionStore.state.hashes).toEqual([fakeHash(2), fakeHash(1)])
+    // While selecting a long press is an ordinary tap: it toggles once.
+    await press(items()[0], 700)
+    expect(selectionStore.state.hashes).toEqual([
+      fakeHash(2),
+      fakeHash(1),
+      fakeHash(3),
+    ])
+    await press(items()[0], 100)
+    expect(selectionStore.state.hashes).toEqual([fakeHash(2), fakeHash(1)])
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('4.2 matrix untick last: the mode ends, the checkboxes slide out and go, the rows shift back', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await press(items()[1], 500)
+    await act(async () => {
+      vi.advanceTimersByTime(SELECTION_SHIFT_CLEAR_MS)
+    })
+    await press(items()[1], 100)
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(list().hasAttribute('data-selecting')).toBe(false)
+    for (const item of items()) {
+      expect(rowButton(item).className).not.toContain('pl-[38px]')
+      expect(content(item).className).toContain('animate-select-shift-out')
+      const leaving = checkbox(item) as HTMLButtonElement
+      expect(leaving.getAttribute('aria-hidden')).toBe('true')
+      expect(leaving.tabIndex).toBe(-1)
+      for (const token of [
+        'pointer-events-none',
+        'animate-select-shift-away',
+        'motion-reduce:hidden',
+      ]) {
+        expect(leaving.className).toContain(token)
+      }
+    }
+    await act(async () => {
+      vi.advanceTimersByTime(SELECTION_SHIFT_CLEAR_MS)
+    })
+    expect(checkboxes()).toHaveLength(0)
+    expect(content(items()[0]).className).not.toContain('animate-select')
+    // A tap opens the row again.
+    await press(items()[1], 100)
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+  })
+
+  it('4.2 a selection made before the phone list mounts (as after crossing 1024px) shows the rows in place, no slide', async () => {
+    desktop = false
+    toggleSelected(fakeHash(1))
+    toggleSelected(fakeHash(2))
+    await render(fakeResponse({ changed: many(3) }))
+    expect(checkboxes()).toHaveLength(3)
+    expect(rowButton(items()[0]).className).toContain('pl-[38px]')
+    expect(content(items()[0]).className).not.toContain('animate-select')
+    expect(checkbox(items()[0])?.className).not.toContain('animate-select')
+    expect(checkbox(items()[2])?.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('4.2 the phone checkbox toggles too; clearing elsewhere (取消) ends the mode', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    await act(async () => toggleSelected(fakeHash(3)))
+    await act(async () => checkbox(items()[2])?.click())
+    expect(selectionStore.state.hashes).toEqual([fakeHash(3), fakeHash(1)])
+    await act(async () => clearSelection())
+    expect(list().hasAttribute('data-selecting')).toBe(false)
+    expect(rowButton(items()[0]).className).not.toContain('pl-[38px]')
+  })
+
+  it('4.2 the phone scroller keeps 140px under the last row only while selecting', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    expect(scroller().className).toBe(LIST_SCROLL_CLASS)
+    await act(async () => toggleSelected(fakeHash(1)))
+    expect(PHONE_SELECTING_SCROLL_CLASS).toContain('max-lg:pb-[140px]')
+    expect(scroller().className).toBe(PHONE_SELECTING_SCROLL_CLASS)
+    await act(async () => clearSelection())
+    expect(scroller().className).toBe(LIST_SCROLL_CLASS)
+  })
+
+  it('4.2 desktop: no long press, no phone checkbox, no room; a row click still opens the detail while selecting', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await press(items()[1], 800)
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+    await act(async () => checkbox(items()[0])?.click())
+    await press(items()[2], 100)
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(selectionStore.state.hashes).toEqual([fakeHash(3)])
+    expect(checkboxes()).toHaveLength(3)
+    expect(rowButton(items()[0]).className).not.toContain('pl-[38px]')
+    expect(content(items()[0]).className).not.toContain('animate-select')
+    expect(scroller().className).toBe(LIST_SCROLL_CLASS)
   })
 })

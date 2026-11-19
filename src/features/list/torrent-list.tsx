@@ -16,6 +16,7 @@ import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { Checkbox } from '#/shared/ui/checkbox'
+import { cn } from '#/shared/ui/cn'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useEmptyEntrance, useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
@@ -39,7 +40,11 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
-import { toggleSelected, useSelectedHashes } from '#/state/selection'
+import {
+  toggleSelected,
+  useSelectedHashes,
+  useSelectionShift,
+} from '#/state/selection'
 import { usePublishShownList } from '#/state/shown-order'
 import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -59,7 +64,7 @@ import {
   ListNoResult,
   ListSkeleton,
 } from '#/features/list/list-states'
-import { TorrentRow } from '#/features/list/torrent-row'
+import { SHIFT_CLASS, TorrentRow } from '#/features/list/torrent-row'
 import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 
 // FR-15, NFR-1, AR-7, AR-50: the torrent list. Order only from
@@ -96,8 +101,42 @@ import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 // of the row still opens the detail. The scroller keeps 110px under the
 // last row on desktop, always, so the selection bar never covers it and
 // the list never jumps when the bar comes.
+//
+// Story 4.2: below 1024px a long press on a row (enabled while nothing is
+// selected) ticks it and starts selection mode, which is simply anything
+// selected, so a desktop selection carries over when the width crosses
+// 1024px. While selecting on the phone a tap toggles the row instead of
+// opening the sheet, every row shows its checkbox 10px in (no hover on a
+// phone) and makes 28px of room for it (torrent-row.tsx), and the
+// scroller keeps 140px under the last row for the two-row bar. The slide
+// plays only on the rows mounted when the mode changes
+// (`useSelectionShift`): at the crossing or after a scroll they are
+// already in place. The leaving checkbox slides out too. Each phone row
+// clips its own overflow, so nothing ever scrolls sideways. Phone rows
+// keep the system callout and text selection away from a long press.
 
 const estimateSize = () => ROW_HEIGHT
+
+/**
+ * Story 4.2: the scroller while selecting on the phone, 140px under the
+ * last row (mockup S07-delete-phone) so the two-row bar never covers it.
+ * Only while selecting: it extends the scroll, nothing visible moves.
+ */
+export const PHONE_SELECTING_SCROLL_CLASS = `${LIST_SCROLL_CLASS} max-lg:pb-[140px]`
+
+/**
+ * Story 4.2: the phone rows clip their own overflow (the content sliding
+ * back never makes the scroller scroll sideways) and keep the system
+ * callout and text selection away from a long press. The clip leaves 4px
+ * for the focus outline (2px, 2px out), which fits the scroller's 4px
+ * padding.
+ */
+export const ROW_ITEM_CLASS =
+  'group/item absolute top-0 left-0 w-full max-lg:overflow-x-clip max-lg:[overflow-clip-margin:4px] max-lg:select-none max-lg:[-webkit-touch-callout:none]'
+
+/** Story 4.2: the phone checkbox, 10px in, vertically centred. */
+export const PHONE_ROW_CHECKBOX_CLASS =
+  'absolute top-1/2 left-2.5 z-[1] -translate-y-1/2'
 
 /**
  * Story 4.1: while anything is selected on desktop, a row scrolled to
@@ -296,6 +335,10 @@ function TorrentRows({
   }, [])
 
   const desktop = useIsDesktop()
+  const selecting = selected.size > 0
+  const phoneSelecting = !desktop && selecting
+  const modeShift = useSelectionShift()
+  const shift = desktop ? null : modeShift
   // A new `getItemKey` makes the virtualizer re-measure every row: keep it
   // stable (`shown` keeps its reference across polls and while frozen).
   const getItemKey = useCallback((index: number) => shown[index], [shown])
@@ -307,8 +350,7 @@ function TorrentRows({
     overscan: 10,
     gap: ROW_GAP,
     scrollMargin,
-    scrollPaddingEnd:
-      desktop && selected.size > 0 ? SELECTION_SCROLL_PADDING_END : 0,
+    scrollPaddingEnd: desktop && selecting ? SELECTION_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
@@ -342,11 +384,17 @@ function TorrentRows({
         if (event.pointerType === 'mouse') setPointerInList(false)
       }}
     >
-      <div ref={scrollRef} id={LIST_SCROLL_ID} className={LIST_SCROLL_CLASS}>
+      <div
+        ref={scrollRef}
+        id={LIST_SCROLL_ID}
+        className={
+          phoneSelecting ? PHONE_SELECTING_SCROLL_CLASS : LIST_SCROLL_CLASS
+        }
+      >
         <div
           ref={listRef}
           role="list"
-          data-selecting={selected.size > 0 ? '' : undefined}
+          data-selecting={selecting ? '' : undefined}
           className="group/list relative w-full"
           style={{ height: virtualizer.getTotalSize() }}
         >
@@ -370,7 +418,7 @@ function TorrentRows({
                 data-hash={hash}
                 aria-setsize={total}
                 aria-posinset={item.index + 1}
-                className="group/item absolute top-0 left-0 w-full"
+                className={ROW_ITEM_CLASS}
                 style={{
                   height: ROW_HEIGHT,
                   transform: `translateY(${item.start - scrollMargin}px)`,
@@ -384,12 +432,40 @@ function TorrentRows({
                     className={ROW_CHECKBOX_CLASS}
                   />
                 )}
+                {props && phoneSelecting && (
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelected(hash)}
+                    aria-label={`選取 ${props.torrent.name}`}
+                    className={cn(
+                      PHONE_ROW_CHECKBOX_CLASS,
+                      shift === 'in' && SHIFT_CLASS.in,
+                    )}
+                  />
+                )}
+                {props && !desktop && !selecting && shift === 'out' && (
+                  // The mode just ended: the checkbox slides out of the
+                  // row, then goes (at once under reduced motion).
+                  <Checkbox
+                    checked={false}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className={cn(
+                      PHONE_ROW_CHECKBOX_CLASS,
+                      'pointer-events-none animate-select-shift-away motion-reduce:hidden',
+                    )}
+                  />
+                )}
                 {props && (
                   <TorrentRow
                     {...props}
                     viewing={hash === viewed}
                     selected={isSelected}
-                    onOpen={setHash}
+                    onOpen={phoneSelecting ? toggleSelected : setHash}
+                    longPress={!desktop && !selecting}
+                    onLongPress={toggleSelected}
+                    phoneSelecting={phoneSelecting}
+                    shift={shift}
                   />
                 )}
               </div>

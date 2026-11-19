@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse } from '#/shared/maindata'
 import { MAINDATA_KEY } from '#/state/maindata'
@@ -21,12 +21,16 @@ import {
   selectionStore,
   syncSelectionScope,
   toggleSelected,
+  SELECTION_SHIFT_CLEAR_MS,
+  SELECTION_SHIFT_MS,
   useIsSelected,
+  useSelecting,
+  useSelectionShift,
   useSelectionUpkeep,
 } from '#/state/selection'
 
 // Spec 4.1: the ordered selection, its scope, the prune after maindata
-// and the list's freeze reason.
+// and the list's freeze reason. Spec 4.2: selection mode and its shift.
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -202,5 +206,74 @@ describe('useSelectionUpkeep and useIsSelected', () => {
     expect(hashes()).toEqual([])
     expect(freezeStore.state.selection).toBe(false)
     await view.unmount()
+  })
+})
+
+describe('useSelecting and useSelectionShift (story 4.2)', () => {
+  const seen: Array<[boolean, string | null]> = []
+
+  function Probe() {
+    seen.push([useSelecting(), useSelectionShift()])
+    return null
+  }
+
+  beforeEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    seen.length = 0
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+  })
+
+  const last = () => seen[seen.length - 1]
+  const wait = (ms: number) =>
+    act(async () => {
+      vi.advanceTimersByTime(ms)
+    })
+
+  it('in after the first tick, out after the last untick, each until 50 ms past the 200 ms shift; a tick inside the mode shifts nothing', async () => {
+    expect(SELECTION_SHIFT_MS).toBe(200)
+    expect(SELECTION_SHIFT_CLEAR_MS).toBe(250)
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(<Probe />))
+    expect(last()).toEqual([false, null])
+    await act(async () => toggleSelected(A))
+    expect(last()).toEqual([true, 'in'])
+    await wait(249)
+    expect(last()).toEqual([true, 'in'])
+    await wait(1)
+    expect(last()).toEqual([true, null])
+    await act(async () => toggleSelected(B))
+    expect(last()).toEqual([true, null])
+    await act(async () => clearSelection())
+    expect(last()).toEqual([false, 'out'])
+    await wait(250)
+    expect(last()).toEqual([false, null])
+    await act(async () => root.unmount())
+  })
+
+  it('a caller mounted while selecting (a crossing, a new list) starts settled', async () => {
+    toggleSelected(A)
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(<Probe />))
+    expect(seen).toEqual([[true, null]])
+    await act(async () => root.unmount())
+  })
+
+  it('leaving and coming back inside the shift restarts the timer', async () => {
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(<Probe />))
+    await act(async () => toggleSelected(A))
+    await wait(150)
+    await act(async () => toggleSelected(A))
+    expect(last()).toEqual([false, 'out'])
+    await wait(200)
+    expect(last()).toEqual([false, 'out'])
+    await wait(50)
+    expect(last()).toEqual([false, null])
+    await act(async () => root.unmount())
   })
 })

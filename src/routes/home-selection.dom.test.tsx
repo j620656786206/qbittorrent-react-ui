@@ -21,9 +21,9 @@ import {
 } from '#/state/selection'
 import { Route } from '#/routes/_authed/index'
 
-// Spec 4.1 review: the home route drops a desktop selection when the width
-// crosses below 1024px (no phone selection until story 4.2), so the phone
-// list is not left frozen. The screens themselves are stubbed out.
+// Spec 4.2 (replacing 4.1's clear below 1024px): the selection survives
+// the width crossing 1024px either way, and the bar takes the layout of
+// the side it is on. The screens themselves are stubbed out.
 
 vi.mock('#/features/board/torrent-board', () => ({ TorrentBoard: () => null }))
 vi.mock('#/features/list/torrent-list', () => ({ TorrentList: () => null }))
@@ -37,8 +37,12 @@ vi.mock('#/features/detail/phone-detail-sheet', () => ({
   BoardDetailSheet: () => null,
   ListDetailSheet: () => null,
 }))
+const barLayouts = vi.hoisted(() => [] as Array<boolean>)
 vi.mock('#/features/selection/selection-bar', () => ({
-  SelectionBar: () => null,
+  SelectionBar: ({ desktop }: { desktop: boolean }) => {
+    barLayouts.push(desktop)
+    return null
+  },
 }))
 
 declare global {
@@ -86,6 +90,7 @@ beforeEach(async () => {
   notifyManager.setScheduler((callback) => callback())
   resetSelection()
   resetOrderFreeze()
+  barLayouts.length = 0
   desktop = true
   query = ''
   vi.spyOn(window, 'matchMedia').mockImplementation(
@@ -129,14 +134,33 @@ describe('the home route and the width', () => {
     expect(freezeStore.state.selection).toBe(true)
   })
 
-  it('crossing below 1024px clears it and ends the freeze reason', async () => {
-    await act(async () => toggleSelected(A))
-    desktop = false
+  const cross = async (toDesktop: boolean) => {
+    desktop = toDesktop
     await act(async () => {
       for (const listener of listeners) listener()
     })
-    expect(selectionStore.state.hashes).toEqual([])
-    expect(freezeStore.state.selection).toBe(false)
+  }
+
+  it('crossing below 1024px keeps it (and the freeze); the bar takes the phone layout', async () => {
+    const B = fakeHash(2)
+    await act(async () => {
+      toggleSelected(A)
+      toggleSelected(B)
+    })
+    expect(barLayouts.at(-1)).toBe(true)
+    await cross(false)
+    expect(selectionStore.state.hashes).toEqual([A, B])
+    expect(freezeStore.state.selection).toBe(true)
+    expect(barLayouts.at(-1)).toBe(false)
+  })
+
+  it('a phone selection crossing to desktop is kept too', async () => {
+    await cross(false)
+    await act(async () => toggleSelected(A))
+    await cross(true)
+    expect(selectionStore.state.hashes).toEqual([A])
+    expect(freezeStore.state.selection).toBe(true)
+    expect(barLayouts.at(-1)).toBe(true)
   })
 
   it('a new search keyword (the view Home reads) clears it', async () => {

@@ -30,7 +30,12 @@ import {
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
-import { resetSelection, selectionStore } from '#/state/selection'
+import {
+  clearSelection,
+  resetSelection,
+  selectionStore,
+  toggleSelected,
+} from '#/state/selection'
 import {
   CARD_GAP,
   CARD_HEIGHT,
@@ -41,6 +46,11 @@ import {
   COLUMN_PADDING_END,
   COLUMN_PADDING_START,
 } from '#/features/board/board-column'
+import {
+  PHONE_PANEL_PADDING_END,
+  PHONE_PANEL_PADDING_START,
+  PHONE_PANEL_SELECTING_PADDING_END,
+} from '#/features/board/status-tabs'
 import { TorrentBoard } from '#/features/board/torrent-board'
 
 // Spec 2.3: the board's wiring in a DOM (happy-dom): columns from the live
@@ -1169,11 +1179,204 @@ describe('selection (story 4.1)', () => {
     ].map((box) => box.getAttribute('aria-label'))
     expect(boxes.sort()).toEqual(['選取 Arch1', '選取 Arch2'])
   })
+})
 
-  it('below 1024px: no checkbox on the phone cards', async () => {
+// Story 4.2: the phone board's selection mode. A long press on a card
+// ticks it; then every card shows its checkbox, a tap toggles, a swipe
+// still changes the column and keeps the ticks.
+describe('phone selection (story 4.2)', () => {
+  beforeEach(() => {
     desktop = false
+  })
+
+  const panels = () => [
+    ...main.querySelectorAll<HTMLElement>('[role="tabpanel"]'),
+  ]
+  const tabs = () => [
+    ...main.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+  ]
+  const selectedTab = () =>
+    tabs().findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+  const cards = (panel: Element) => [
+    ...panel.querySelectorAll<HTMLElement>('[role="listitem"]'),
+  ]
+  const cardButton = (item: Element) =>
+    item.querySelector(':scope > button[data-entrance]') as HTMLButtonElement
+  const checkboxes = (scope: Element = main) => [
+    ...scope.querySelectorAll<HTMLButtonElement>('button[role="checkbox"]'),
+  ]
+
+  function fire(
+    target: Element,
+    type: string,
+    x = 100,
+    y = 40,
+    kind = 'touch',
+  ) {
+    target.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: kind,
+        isPrimary: true,
+        clientX: x,
+        clientY: y,
+      }),
+    )
+  }
+
+  /** A finger held on card `item` for `ms`, lifted, and its click. */
+  async function press(item: Element, ms: number) {
+    const card = cardButton(item)
+    await act(async () => fire(card, 'pointerdown'))
+    await act(async () => {
+      vi.advanceTimersByTime(ms)
+    })
+    await act(async () => {
+      fire(card, 'pointerup')
+      card.click()
+    })
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('no checkbox until a long press; the panels keep 10px above and 8px beside the cards; the cards keep the callout away', async () => {
     await render(fakeResponse({ changed: sample() }))
-    expect(main.querySelector('[role="listitem"]')).not.toBeNull()
-    expect(main.querySelector('button[role="checkbox"]')).toBeNull()
+    expect(checkboxes()).toHaveLength(0)
+    const panel = panels()[0]
+    expect(PHONE_PANEL_PADDING_START).toBe(10)
+    expect(panel.className).toContain('px-2')
+    const [first] = cards(panel)
+    expect(first.style.transform).toBe(
+      `translateY(${PHONE_PANEL_PADDING_START}px)`,
+    )
+    expect(first.className).toContain('select-none')
+    expect(first.className).toContain('[-webkit-touch-callout:none]')
+  })
+
+  it('matrix long press: the card is ticked, every card shows its checkbox in the corner, the release opens nothing; 140px under the last card', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    setHash.mockClear()
+    const panel = panels()[0]
+    const list = panel.querySelector('[data-card-list]') as HTMLElement
+    const height = (end: number) =>
+      `${PHONE_PANEL_PADDING_START + CARD_HEIGHT_WITH_BAR + CARD_GAP + CARD_HEIGHT + end}px`
+    expect(list.style.height).toBe(height(PHONE_PANEL_PADDING_END))
+    await press(cards(panel)[1], 500)
+    expect(selectionStore.state.hashes).toEqual([h(4)])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(cardButton(cards(panel)[1]).className).toContain('bg-selection-row')
+    expect(
+      checkboxes(panel).map((box) => box.getAttribute('aria-label')),
+    ).toEqual(['選取 Stalled', '選取 Error'])
+    const box = checkboxes(panel)[1]
+    expect(box.getAttribute('aria-checked')).toBe('true')
+    expect(cards(panel)[1].firstElementChild).toBe(box)
+    for (const token of ['absolute', '-top-1.5', '-left-1.5', 'bg-surface']) {
+      expect(box.className).toContain(token)
+    }
+    expect(box.className).not.toContain('opacity-0')
+    // The other panels show theirs too.
+    expect(checkboxes(panels()[1])).toHaveLength(1)
+    expect(PHONE_PANEL_SELECTING_PADDING_END).toBe(140)
+    expect(list.style.height).toBe(height(PHONE_PANEL_SELECTING_PADDING_END))
+  })
+
+  it('matrix tap while selecting and untick last: a tap toggles and never opens; the last untick ends the mode', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    setHash.mockClear()
+    const panel = panels()[0]
+    await press(cards(panel)[0], 600)
+    await press(cards(panel)[1], 100)
+    expect(selectionStore.state.hashes).toEqual([h(3), h(4)])
+    await press(cards(panel)[0], 100)
+    await press(cards(panel)[1], 100)
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(checkboxes()).toHaveLength(0)
+    await press(cards(panel)[1], 100)
+    expect(setHash).toHaveBeenCalledWith(h(4))
+  })
+
+  it('matrix board swipe: with a tick, a swipe still changes the column and keeps it', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await act(async () => toggleSelected(h(3)))
+    const panel = panels()[0]
+    await act(async () => {
+      fire(panel, 'pointerdown', 300, 300)
+      fire(panel, 'pointermove', 280, 300)
+      fire(panel, 'pointermove', 200, 300)
+      fire(panel, 'pointerup', 180, 300)
+    })
+    expect(selectedTab()).toBe(1)
+    expect(selectionStore.state.hashes).toEqual([h(3)])
+    expect(checkboxes(panels()[1])).toHaveLength(1)
+  })
+
+  it('a sideways swipe starting on a card cancels its long press and changes the column', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const card = cardButton(cards(panels()[0])[0])
+    await act(async () => {
+      fire(card, 'pointerdown', 300, 40)
+      fire(card, 'pointermove', 285, 40)
+      fire(card, 'pointermove', 200, 40)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(700)
+    })
+    await act(async () => fire(card, 'pointerup', 180, 40))
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(selectedTab()).toBe(1)
+  })
+
+  it('the phone card checkbox toggles too, and never opens the detail', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    setHash.mockClear()
+    await act(async () => toggleSelected(h(3)))
+    const panel = panels()[0]
+    const box = (index: number) =>
+      cards(panel)[index].querySelector(
+        'button[role="checkbox"]',
+      ) as HTMLButtonElement
+    await act(async () => box(1).click())
+    expect(selectionStore.state.hashes).toEqual([h(3), h(4)])
+    expect(box(1).getAttribute('aria-checked')).toBe('true')
+    await act(async () => box(0).click())
+    expect(selectionStore.state.hashes).toEqual([h(4)])
+    expect(setHash).not.toHaveBeenCalled()
+  })
+
+  it('desktop: holding a card with a mouse is no long press; the click opens the detail', async () => {
+    desktop = true
+    await render(fakeResponse({ changed: sample() }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    setHash.mockClear()
+    const card = cardButton(
+      section('下載中，1 個').querySelector('[role="listitem"]') as Element,
+    )
+    await act(async () => fire(card, 'pointerdown', 100, 40, 'mouse'))
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+    })
+    await act(async () => {
+      fire(card, 'pointerup', 100, 40, 'mouse')
+      card.click()
+    })
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(setHash).toHaveBeenCalledWith(h(1))
+  })
+
+  it('a selection made on desktop shows on the phone cards at once; 取消 hides them', async () => {
+    toggleSelected(h(3))
+    await render(fakeResponse({ changed: sample() }))
+    expect(checkboxes(panels()[0])).toHaveLength(2)
+    await act(async () => clearSelection())
+    expect(checkboxes()).toHaveLength(0)
   })
 })

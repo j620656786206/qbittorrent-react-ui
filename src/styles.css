@@ -392,6 +392,54 @@
   }
 }
 
+/* Story 4.2, phone selection mode (DESIGN list-row, EXPERIENCE 手機選取模式):
+ * the rows make 28px of room on the left for the checkbox. The room is
+ * layout (padding) that changes at once; these slide the content and the
+ * checkbox to their new place, 0.2s, transform only, off for reduced
+ * motion. `in` and `out` start 28px away and end where layout put them;
+ * `away` takes the leaving checkbox 28px to the left, out of the row. */
+@keyframes select-shift-in {
+  from {
+    transform: translateX(-28px);
+  }
+}
+
+@keyframes select-shift-out {
+  from {
+    transform: translateX(28px);
+  }
+}
+
+@keyframes select-shift-away {
+  to {
+    transform: translateX(-28px);
+  }
+}
+
+@utility animate-select-shift-in {
+  animation: select-shift-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-select-shift-out {
+  animation: select-shift-out 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-select-shift-away {
+  animation: select-shift-away 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* 6. Base rules (UX-DR7, UX-DR75, NFR-6, NFR-7). */
 @layer base {
   html,

@@ -16,12 +16,15 @@ import {
 } from '#/state/selection'
 import {
   BAR_HIDDEN_CLASS,
+  PHONE_BAR_HIDDEN_CLASS,
   SelectionBar,
 } from '#/features/selection/selection-bar'
 
 // Spec 4.1: the desktop selection bar. Its texts and buttons, the total
 // without 已整理 and 找不到檔案, 取消, the slide (transform only, kept
 // mounted with the last numbers) and the toast lift.
+// Spec 4.2: the phone layout, two rows, the same texts and behaviour, no
+// toast lift (the phone's toasts are at the top).
 
 // The toast API as features see it (they never import the toast store):
 // records the lift the bar asks for.
@@ -47,7 +50,7 @@ const C = fakeHash(3)
 let root: Root
 let client: QueryClient
 
-async function render() {
+async function render(desktop = true) {
   client = createQueryClient({
     fetchMaindata: () =>
       Promise.resolve(
@@ -80,7 +83,7 @@ async function render() {
   await act(async () =>
     root.render(
       <QueryClientProvider client={client}>
-        <SelectionBar />
+        <SelectionBar desktop={desktop} />
       </QueryClientProvider>,
     ),
   )
@@ -244,5 +247,133 @@ describe('the selection bar', () => {
     await act(async () => root.unmount())
     expect(lift.on).toBe(false)
     root = createRoot(document.createElement('div'))
+  })
+})
+
+describe('the phone selection bar (story 4.2)', () => {
+  it('nothing selected: mounted below the viewport, inert, hidden from screen readers', async () => {
+    await render(false)
+    expect(bar().className).toContain(PHONE_BAR_HIDDEN_CLASS)
+    expect(bar().hasAttribute('inert')).toBe(true)
+    expect(bar().getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('a tick: two rows, the same region, status and texts; toasts never lifted', async () => {
+    await render(false)
+    await act(async () => {
+      toggleSelected(A)
+      toggleSelected(B)
+    })
+    expect(bar().getAttribute('role')).toBe('region')
+    expect(bar().getAttribute('aria-label')).toBe('選取的種子')
+    expect(bar().className).not.toContain(PHONE_BAR_HIDDEN_CLASS)
+    expect(bar().hasAttribute('inert')).toBe(false)
+    expect(bar().hasAttribute('aria-hidden')).toBe(false)
+    const [first, second] = [...bar().children] as Array<HTMLElement>
+    expect(bar().children).toHaveLength(2)
+    expect([...first.children].map((child) => child.textContent)).toEqual([
+      '已選 2 個，共 100 GB',
+      '取消',
+    ])
+    expect(first.children[0]).toBe(status())
+    expect([...status().children].map((child) => child.textContent)).toEqual([
+      '已選 2 個',
+      '，',
+      '共 100 GB',
+    ])
+    expect(status().children[1].className).toBe('sr-only')
+    expect([...second.children].map((child) => child.textContent)).toEqual([
+      '改路徑',
+      '刪除（含檔案）',
+    ])
+    expect(button('取消').disabled).toBe(false)
+    expect(button('改路徑').disabled).toBe(true)
+    expect(button('刪除（含檔案）').disabled).toBe(true)
+    expect(lift.calls).toBe(0)
+  })
+
+  it('the DESIGN looks: 16px from the sides and the bottom (plus the safe area), radius 22px, 8/12/12/18 padding, 44px buttons, transform-only slide', async () => {
+    await render(false)
+    const classes = bar().className
+    for (const token of [
+      'fixed',
+      'left-4',
+      'right-4',
+      'bottom-[calc(16px+env(safe-area-inset-bottom))]',
+      'flex-col',
+      'gap-2',
+      'rounded-panel',
+      'bg-selection-bar',
+      'text-selection-bar-foreground',
+      'shadow-float',
+      'pt-2',
+      'pr-3',
+      'pb-3',
+      'pl-[18px]',
+      'transition-transform',
+      'duration-300',
+      'ease-[cubic-bezier(0.2,0.8,0.2,1)]',
+      'motion-reduce:transition-none',
+    ]) {
+      expect(classes).toContain(token)
+    }
+    expect(bar().getAttribute('style')).toBeNull()
+    const [count, , size] = [...status().children]
+    expect(count.className).toContain('font-bold')
+    expect(size.className).toContain('text-[12px]')
+    expect(size.className).toContain('opacity-70')
+    for (const token of ['h-11', 'min-w-11', 'font-semibold']) {
+      expect(button('取消').className).toContain(token)
+    }
+    const grid = button('改路徑').parentElement as HTMLElement
+    expect(grid.className).toContain('grid-cols-2')
+    expect(grid.className).toContain('gap-2')
+    for (const token of ['h-11', 'border', 'rounded-full', 'font-semibold']) {
+      expect(button('改路徑').className).toContain(token)
+    }
+    for (const token of [
+      'h-11',
+      'bg-delete',
+      'text-delete-foreground',
+      'font-bold',
+    ]) {
+      expect(button('刪除（含檔案）').className).toContain(token)
+    }
+    for (const each of buttons()) {
+      expect(each.className).toContain(
+        'focus-visible:outline-selection-bar-foreground',
+      )
+    }
+  })
+
+  it('取消 clears: it slides out keeping its last numbers', async () => {
+    await render(false)
+    await act(async () => toggleSelected(A))
+    await act(async () => button('取消').click())
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(bar().className).toContain(PHONE_BAR_HIDDEN_CLASS)
+    expect(bar().textContent).toContain('已選 1 個')
+    expect(bar().hasAttribute('inert')).toBe(true)
+  })
+
+  it('crossing to desktop swaps the bar element (no slide) and lifts the toasts; back to phone lowers them', async () => {
+    await render(false)
+    await act(async () => toggleSelected(A))
+    expect(lift.on).toBe(false)
+    const tree = (desktop: boolean) => (
+      <QueryClientProvider client={client}>
+        <SelectionBar desktop={desktop} />
+      </QueryClientProvider>
+    )
+    const phoneBar = bar()
+    await act(async () => root.render(tree(true)))
+    expect(bar().className).toContain('rounded-full')
+    // Another element, so nothing slides between the two layouts.
+    expect(bar()).not.toBe(phoneBar)
+    expect(phoneBar.isConnected).toBe(false)
+    expect(lift.on).toBe(true)
+    await act(async () => root.render(tree(false)))
+    expect(bar().className).toContain('rounded-panel')
+    expect(lift.on).toBe(false)
   })
 })

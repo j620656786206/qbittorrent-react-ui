@@ -17,8 +17,16 @@ import {
 // expanded 已整理 column). Screenshots for the PR, 1440px, light and dark:
 // the hover checkbox, three ticked in the list and on the board, the bar
 // with a failure toast, and the 已整理 / 找不到檔案 total.
+// Story 4.2: phone selection mode with a touch screen at 390x844 (fingers
+// through the DevTools protocol, Chromium's real touch path): a long press
+// enters it, a drag only scrolls, a tap toggles, the last untick or 取消
+// leaves it, the board's swipe keeps it, nothing scrolls sideways, and a
+// desktop selection survives the crossing. Screenshots at 390px, light and
+// dark: the list and the board while selecting.
 
 const SCREENSHOT_DIR = '_bmad-output/implementation-artifacts/screenshots/4-1'
+const PHONE_SCREENSHOT_DIR =
+  '_bmad-output/implementation-artifacts/screenshots/4-2'
 const DESKTOP = { width: 1440, height: 900 }
 const PHONE = { width: 390, height: 844 }
 const SCHEMES = ['light', 'dark'] as const
@@ -334,14 +342,347 @@ test('reduced motion: the bar and the toast move without a transition', async ({
   )
 })
 
-test('below 1024px: no checkbox and no selection bar', async ({ page }) => {
-  await page.setViewportSize(PHONE)
+test('crossing from desktop to phone keeps the selection: phone checkboxes and bar at once, rows already shifted, nothing slides', async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP)
   await login(page)
-  await expect(page.getByRole('listitem').first()).toBeVisible()
-  await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
   await openList(page)
-  await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
-  await expect(bar(page)).toHaveCount(0)
+  await tick(page, 1)
+  await tick(page, 2)
+  await expectBarShown(page)
+  await page.setViewportSize(PHONE)
+  await expect(phoneRow(page, 1)).toHaveCSS('padding-left', '38px')
+  await expect(checkbox(page, 1)).toHaveAttribute('aria-checked', 'true')
+  await expect(checkbox(page, 2)).toHaveAttribute('aria-checked', 'true')
+  await expect(checkbox(page, 3)).toHaveAttribute('aria-checked', 'false')
+  await expect(checkbox(page, 3)).toBeVisible()
+  await expect(bar(page)).toContainText('已選 2 個')
+  // Nothing on the rows or the bar animates at the crossing.
+  expect(
+    await page.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          '[data-selection-bar], [role="listitem"] *',
+        ),
+      ].reduce((count, element) => count + element.getAnimations().length, 0),
+    ),
+  ).toBe(0)
+  await expectPhoneBarShown(page)
+  await hasNoHorizontalScroll(page)
+  await page.setViewportSize(DESKTOP)
+  // The desktop pill again (the width change reaches React a moment later).
+  await expect(bar(page)).toHaveClass(/rounded-full/)
+  await expect(bar(page)).toContainText('已選 2 個')
+  await expectBarShown(page)
+})
+
+/** Row `n`'s button (the row box; its padding makes the checkbox room). */
+const phoneRow = (page: Page, n: number) => rowButton(page, n)
+const anySheet = (page: Page) => page.getByRole('dialog')
+
+async function hasNoHorizontalScroll(page: Page) {
+  for (const selector of [':root', `#${LIST_SCROLL_ID}`]) {
+    const element = page.locator(selector)
+    if ((await element.count()) === 0) continue
+    const { scrollWidth, clientWidth } = await element.evaluate((each) => ({
+      scrollWidth: each.scrollWidth,
+      clientWidth: each.clientWidth,
+    }))
+    expect(scrollWidth, selector).toBeLessThanOrEqual(clientWidth)
+  }
+}
+
+/** The phone bar: 16px from the sides and the bottom, two rows. */
+async function expectPhoneBarShown(page: Page) {
+  await expect(bar(page)).not.toHaveAttribute('inert', '')
+  await settled(page)
+  const box = await bar(page).boundingBox()
+  expect(Math.round(box?.x ?? 0)).toBe(16)
+  expect(Math.round(box?.width ?? 0)).toBe(PHONE.width - 32)
+  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(PHONE.height - 16)
+  for (const name of ['取消', '改路徑', '刪除（含檔案）']) {
+    const button = await bar(page)
+      .getByRole('button', { name, exact: true })
+      .boundingBox()
+    expect(Math.round(button?.height ?? 0), name).toBe(44)
+  }
+}
+
+async function expectPhoneBarHidden(page: Page) {
+  await expect(bar(page)).toHaveAttribute('inert', '')
+  await settled(page)
+  const box = await bar(page).boundingBox()
+  expect(box?.y ?? 0).toBeGreaterThanOrEqual(PHONE.height)
+}
+
+/** A finger held still on `target` for `ms`, then lifted (DevTools protocol). */
+async function longPress(page: Page, target: Locator, ms = 650) {
+  const box = await target.boundingBox()
+  if (!box) throw new Error('nothing to press')
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [point],
+  })
+  await page.waitForTimeout(ms)
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  })
+  await cdp.detach()
+}
+
+/** A finger drag of `dx`, `dy` from the middle of `target`, quickly. */
+async function touchDrag(
+  page: Page,
+  target: Locator,
+  { dx, dy }: { dx: number; dy: number },
+) {
+  const box = await target.boundingBox()
+  if (!box) throw new Error('nothing to drag')
+  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = await page.context().newCDPSession(page)
+  const steps = 12
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [from],
+  })
+  for (let step = 1; step <= steps; step += 1) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        { x: from.x + (dx * step) / steps, y: from.y + (dy * step) / steps },
+      ],
+    })
+  }
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  })
+  await cdp.detach()
+}
+
+test.describe('phone selection mode (story 4.2)', () => {
+  test.use({ hasTouch: true })
+
+  test('list: no checkbox until a long press; it ticks the row, slides the rows 28px and the bar up, opens no sheet; a tap toggles; the last untick leaves', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await openList(page)
+    await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
+    await expectPhoneBarHidden(page)
+    const name = rowButton(page, 2).locator('[title]')
+    const before = await name.boundingBox()
+
+    await longPress(page, rowButton(page, 2))
+    await expect(checkbox(page, 2)).toHaveAttribute('aria-checked', 'true')
+    await expect(bar(page)).toContainText('已選 1 個')
+    await expectPhoneBarShown(page)
+    await expect(anySheet(page)).toHaveCount(0)
+    await expect(page).not.toHaveURL(/[?&]hash=/)
+    // Every row shows its checkbox and makes 28px of room for it.
+    await expect(checkbox(page, 1)).toBeVisible()
+    expect(
+      Math.round(((await name.boundingBox())?.x ?? 0) - (before?.x ?? 0)),
+    ).toBe(28)
+    const row = await item(page, 2).boundingBox()
+    const box = await checkbox(page, 2).boundingBox()
+    expect(Math.round((box?.x ?? 0) - (row?.x ?? 0))).toBe(10)
+    await hasNoHorizontalScroll(page)
+
+    await rowButton(page, 1).tap()
+    await expect(bar(page)).toContainText('已選 2 個')
+    await expect(checkbox(page, 1)).toHaveAttribute('aria-checked', 'true')
+    await expect(anySheet(page)).toHaveCount(0)
+    await rowButton(page, 1).tap()
+    await expect(bar(page)).toContainText('已選 1 個')
+
+    // Unticking the last: the mode ends, rows shift back, the bar goes.
+    await rowButton(page, 2).tap()
+    await expectPhoneBarHidden(page)
+    await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
+    expect(await name.boundingBox()).toEqual(before)
+    await expect(anySheet(page)).toHaveCount(0)
+    await hasNoHorizontalScroll(page)
+
+    // Out of the mode a tap opens the sheet again.
+    await rowButton(page, 3).tap()
+    await expect(anySheet(page)).toBeVisible()
+  })
+
+  test('list: a finger dragging more than 10px within 500 ms only scrolls; no callout styles missing', async ({
+    page,
+    request,
+  }) => {
+    await setModes(request, { data: 'many' })
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await openList(page)
+    const first = page.getByRole('listitem').nth(2)
+    await expect(first).toHaveCSS('user-select', 'none')
+    // Only iOS Safari knows the property (Chromium drops it), so check the
+    // class that sets it.
+    await expect(first).toHaveClass(/\[-webkit-touch-callout:none\]/)
+    const scroller = page.locator(`#${LIST_SCROLL_ID}`)
+    await touchDrag(page, first, { dx: 0, dy: -250 })
+    await page.waitForTimeout(700)
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0)
+    await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
+    await expect(bar(page)).toHaveAttribute('inert', '')
+    await expect(anySheet(page)).toHaveCount(0)
+  })
+
+  test('list: 取消 leaves the mode; a sheet covers the bar and keeps the selection; the last row clears the bar', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await openList(page)
+    await longPress(page, rowButton(page, 1))
+    await expectPhoneBarShown(page)
+
+    // The sort sheet sits over the bar; closing it changes nothing.
+    await page
+      .getByRole('button', { name: /^排序：.*，(列表|看板)$/ })
+      .filter({ visible: true })
+      .click()
+    const sheet = page.getByRole('dialog', { name: '排序' })
+    await expect(sheet).toBeVisible()
+    await settled(page)
+    const barBox = await bar(page).boundingBox()
+    const covered = await page.evaluate(
+      ({ x, y }) =>
+        document.elementFromPoint(x, y)?.closest('[role="dialog"]') !== null,
+      {
+        x: (barBox?.x ?? 0) + (barBox?.width ?? 0) / 2,
+        y: (barBox?.y ?? 0) + (barBox?.height ?? 0) / 2,
+      },
+    )
+    expect(covered).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(sheet).toHaveCount(0)
+    await expect(bar(page)).toContainText('已選 1 個')
+    await expect(checkbox(page, 1)).toHaveAttribute('aria-checked', 'true')
+
+    // The last row scrolls fully above the bar.
+    const scroller = page.locator(`#${LIST_SCROLL_ID}`)
+    await scroller.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await settled(page)
+    const lastBox = await page.getByRole('listitem').last().boundingBox()
+    const shown = await bar(page).boundingBox()
+    expect((lastBox?.y ?? 0) + (lastBox?.height ?? 0)).toBeLessThanOrEqual(
+      shown?.y ?? 0,
+    )
+
+    await bar(page).getByRole('button', { name: '取消' }).tap()
+    await expectPhoneBarHidden(page)
+    await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
+    await hasNoHorizontalScroll(page)
+  })
+
+  test('board: a long press on a card ticks it; a swipe to the next tab keeps the selection; a tap there toggles', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE)
+    await login(page)
+    const tabs = page.getByRole('tablist', { name: '狀態' }).getByRole('tab')
+    const card = (n: number) => item(page, n).locator('button[data-entrance]')
+    await expect(card(3)).toBeVisible()
+    await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
+
+    await longPress(page, card(3))
+    await expect(checkbox(page, 3)).toHaveAttribute('aria-checked', 'true')
+    await expect(bar(page)).toContainText('已選 1 個')
+    await expectPhoneBarShown(page)
+    await expect(anySheet(page)).toHaveCount(0)
+    // The corner checkbox is not clipped by the panel.
+    const hit = await checkbox(page, 4).evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const top = document.elementFromPoint(rect.left + 2, rect.top + 2)
+      return top === element || element.contains(top)
+    })
+    expect(hit).toBe(true)
+
+    await touchDrag(page, page.locator('[data-slot="board-swipe"]'), {
+      dx: -200,
+      dy: 0,
+    })
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
+    await settled(page)
+    await expect(bar(page)).toContainText('已選 1 個')
+    await expect(checkbox(page, 1)).toHaveAttribute('aria-checked', 'false')
+    await card(1).tap()
+    await expect(bar(page)).toContainText('已選 2 個')
+    await expect(anySheet(page)).toHaveCount(0)
+    await hasNoHorizontalScroll(page)
+  })
+
+  test('reduced motion: entering and leaving the mode plays no shift and no slide', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.setViewportSize(PHONE)
+    await login(page)
+    await openList(page)
+    expect(
+      await bar(page).evaluate(
+        (element) => getComputedStyle(element).transitionProperty,
+      ),
+    ).toBe('none')
+    await longPress(page, rowButton(page, 2))
+    await expect(checkbox(page, 2)).toHaveAttribute('aria-checked', 'true')
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+    const box = await bar(page).boundingBox()
+    expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(
+      PHONE.height - 16,
+    )
+    await rowButton(page, 2).tap()
+    await expect(bar(page)).toHaveAttribute('inert', '')
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+    await expect(page.locator('button[role="checkbox"]:visible')).toHaveCount(0)
+  })
+
+  test('screenshots: the list and the board while selecting at 390px; light and dark', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE)
+    await login(page)
+    const shot = (name: string) =>
+      page.screenshot({
+        path: `${PHONE_SCREENSHOT_DIR}/${name}.png`,
+        animations: 'disabled',
+      })
+    for (const scheme of SCHEMES) {
+      await page.emulateMedia({ colorScheme: scheme })
+
+      await openList(page)
+      await longPress(page, rowButton(page, 2))
+      await rowButton(page, 1).tap()
+      await expect(bar(page)).toContainText('已選 2 個')
+      await expectPhoneBarShown(page)
+      await shot(`list-selecting-${scheme}`)
+      await bar(page).getByRole('button', { name: '取消' }).tap()
+      await expectPhoneBarHidden(page)
+
+      await page.goto('/')
+      const card = item(page, 3).locator('button[data-entrance]')
+      await expect(card).toBeVisible()
+      await longPress(page, card)
+      await expect(bar(page)).toContainText('已選 1 個')
+      await expectPhoneBarShown(page)
+      await shot(`board-selecting-${scheme}`)
+      await bar(page).getByRole('button', { name: '取消' }).tap()
+      await expectPhoneBarHidden(page)
+    }
+  })
 })
 
 test('screenshots: hover checkbox, 3 ticked in list and board, bar with toast, the 已整理 / 找不到檔案 total; light and dark', async ({
