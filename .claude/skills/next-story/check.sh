@@ -55,6 +55,8 @@ added_lines() {
     | while IFS= read -r f; do
         if echo "$f" | grep -qE "$VENDOR_RE" && ! echo "$f" | grep -qE "$OURS_RE"; then continue; fi
         [ -f "$f" ] || continue
+        # 二進位檔（影片、圖片）不是文字，裡面的位元組碰巧跟破折號一樣也不算。
+        grep -Iq . "$f" || continue
         if git cat-file -e "$BASE:$f" 2>/dev/null; then
           git diff "$BASE" -U0 -- "$f" | grep '^+' | grep -v '^+++'
         else
