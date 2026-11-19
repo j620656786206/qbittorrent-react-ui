@@ -69,8 +69,12 @@ export function deleteSummary(
   return { count, bytes, missing, archived }
 }
 
-/** Every selected torrent's files are already gone. */
-function allGone(summary: DeleteSummary): boolean {
+/**
+ * Every selected torrent's files are already gone. The delete then never
+ * asks qBittorrent to delete files: a stale `missingFiles` (the NAS mount
+ * came back) must not lose real files the button said were not there.
+ */
+export function filesAllGone(summary: DeleteSummary): boolean {
   return (
     summary.count > 0 && summary.missing + summary.archived === summary.count
   )
@@ -93,7 +97,7 @@ export function deleteButtonText(
 ): string {
   const count = formatCount(summary.count)
   if (!deleteFiles) return `只刪 ${count} 個種子，檔案留著`
-  if (allGone(summary)) return `刪除 ${count} 個種子（檔案已經不在）`
+  if (filesAllGone(summary)) return `刪除 ${count} 個種子（檔案已經不在）`
   return `刪除 ${count} 個種子和檔案（${formatSize(summary.bytes)}）`
 }
 
@@ -111,7 +115,7 @@ export function deleteSuccessText(
 ): string {
   const count = formatCount(summary.count)
   if (!deleteFiles) return `已刪除 ${count} 個種子，檔案留著`
-  if (allGone(summary)) return `已刪除 ${count} 個種子`
+  if (filesAllGone(summary)) return `已刪除 ${count} 個種子`
   return `已刪除 ${count} 個種子和檔案（${formatSize(summary.bytes)}）`
 }
 

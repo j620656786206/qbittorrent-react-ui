@@ -611,6 +611,63 @@ describe('review fixes', () => {
     expect(rows()[0].parentElement?.getAttribute('role')).toBe('list')
   })
 
+  it('every file already gone: deleteFiles false whatever the checkbox says; a mixed selection follows it', async () => {
+    await render()
+    await select(B, C)
+    await openConfirm()
+    expect(checkbox().getAttribute('aria-checked')).toBe('true')
+    expect(primary().textContent).toBe('刪除 2 個種子（檔案已經不在）')
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent).toEqual([{ hashes: [B, C], deleteFiles: false }])
+    expect(toastCalls.plain).toHaveBeenLastCalledWith('已刪除 2 個種子')
+
+    torrents = baseTorrents()
+    await act(async () => {
+      await client.refetchQueries({ queryKey: MAINDATA_KEY })
+    })
+    await select(A, C)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent.at(-1)).toEqual({
+      hashes: [A, C],
+      deleteFiles: true,
+    })
+    await select(A, B)
+    await openConfirm()
+    await act(async () => checkbox().click())
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent.at(-1)).toEqual({
+      hashes: [A, B],
+      deleteFiles: false,
+    })
+  })
+
+  it('closing without a delete, or opening again, closes the failure toast (its 重試 never skips the dialog)', async () => {
+    deleteCalls.answer = () =>
+      Promise.resolve({
+        ok: false,
+        error: { code: 'qbit_rejected', message: 'x' },
+      })
+    await render()
+    await select(A, B)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    toastCalls.dismissFor.mockClear()
+    await act(async () => buttonNamed('取消').click())
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(A)
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(B)
+    toastCalls.dismissFor.mockClear()
+    await openConfirm()
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(A)
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(B)
+  })
+
   it('a double press in the same tick sends one delete', async () => {
     await render()
     await select(A)

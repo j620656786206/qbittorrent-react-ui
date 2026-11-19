@@ -5,7 +5,7 @@ created: '2026-11-19'
 status: 'done'
 baseline_revision: '58845b5df3c9c72d819e4175e83c65840b3185bd'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-4-2-phone-selection-mode.md'
@@ -270,6 +270,29 @@ deferred:
   - `[low]` `[reject]` (blind) The plain toast variant carries an empty `keys` field. Type tidiness only, with no behaviour difference.
   - `[low]` `[reject]` (blind) Some comment lines were not re-wrapped. Cosmetic.
 
+### 2026-11-20: Review pass (follow-up 2)
+- verdicts: 19 findings. high 0, medium 3, low 16, false 0, maybe-false 0
+- findings:
+  - `[low]` `[reject]` (intent) Readings beyond the contract, such as `role` and width as shell props and the third success text. carried: logged decisions.
+  - `[medium]` `[patch]` (blind) When every row is gone, the request still sends `deleteFiles=true`. A stale missingFiles state, for example after a NAS remount, would delete real files. Action: send false when all rows are gone, with a test of the request body for the all-gone and mixed cases. The mixed case stays deferred.
+  - `[medium]` `[patch]` (blind) A failure toast's 重試 still deletes after Alex cancels. Action: dismiss the dialog's failure toast on every close without a delete and on every open.
+  - `[low]` `[reject]` (blind) The plain toast replaces a failure toast. carried.
+  - `[low]` `[reject]` (blind) The plain toast does not pause on hover. The 4 s plain kind is the spine's design, and 重試 lives only on failure toasts, which never auto-close.
+  - `[low]` `[reject]` (blind) The `pendingOps` delete mark has little visible effect. AD-7 requires it, it disables the detail's pause, and 4.4 builds the fade on it.
+  - `[low]` `[reject]` (blind) Rows and summary take separate passes. carried.
+  - `[low]` `[patch]` (blind) The phone primary overflows at 320 px. Action: let the phone primary wrap, at least 44 px tall.
+  - `[low]` `[reject]` (blind) The row height constant and its class are duplicated. Developer-only, with no drift today.
+  - `[low]` `[reject]` (blind) The inner body gaps are 12 px and 8 px, not 14 px. Those are the mockup's own values inside the body. 14 px is the gap between sections.
+  - `[low]` `[reject]` (blind) The description is the whole body. carried.
+  - `[low]` `[reject]` (blind) The expanded list takes focus when it remounts across the breakpoint. That is a rare resize mid-dialog, and focus lands on the list the user expanded.
+  - `[low]` `[reject]` (blind) The phone expanded list has no e2e test. It is covered by the DOM tests and the screenshot. The nested scroller is a carried rejection.
+  - `[low]` `[reject]` (blind) The keyframe names are generic. Nothing collides today, and there are no third-party keyframes.
+  - `[medium]` `[patch]` (edge) Reopening resets 「連檔案一起刪」 while a stale toast's 重試 keeps the old choice. Grouped with the 重試-after-cancel row and fixed by dismissing the toast on open.
+  - `[low]` `[patch]` (edge) A stale op settling during a newer press clears the pressed lock. Action: a per-press token.
+  - `[low]` `[reject]` (edge) The e2e helper loop can spin. carried.
+  - `[low]` `[reject]` (edge) A footer added while the sheet is open is not measured. No caller does that: the phone confirm always passes a footer.
+  - `[low]` `[reject]` (edge) The plain toast replaces a failure toast. carried.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -358,3 +381,29 @@ Status: done.
 - The build passes.
 - Playwright: 143 passed in 18.1 min. The 4-3 screenshots were regenerated from this tree.
 - check.sh: every line ok.
+
+### Follow-up pass 2 (2026-11-20)
+
+Status: done.
+
+**Review findings: 19.**
+- Patched: 4 entries, 2 medium and 2 low.
+  - Medium: when every row's files are gone, the request sends `deleteFiles=false`.
+  - Medium: the dialog's failure toast is dismissed on every close without a delete and on every open.
+  - Low: a per-press token for the pressed lock.
+  - Low: the phone primary wraps and stays at least 44 px tall.
+- Deferred: the mixed-selection `deleteFiles` question stays deferred (medium, unverified).
+- Rejected: 15, each with its reason in the triage log.
+
+**Follow-up review: not recommended (false).** No high finding was patched on this follow-up pass, so the review has converged.
+
+**Verification.**
+- lint and typecheck are clean.
+- vitest: 136 files and 3321 tests pass.
+- The build passes.
+- Playwright: 143 passed in 18.1 min. The 4-3 screenshots were regenerated from this tree.
+- check.sh: every line ok.
+
+**Residual risks.**
+- A mixed selection (some files present, some gone) sends one `deleteFiles` for all of them. This is deferred to Alex.
+- The real qBittorrent 5.1.4 delete behaviour (a 200 for any hash, how files are removed) is checked by Alex on the NAS (AC), never in CI (AD-15).

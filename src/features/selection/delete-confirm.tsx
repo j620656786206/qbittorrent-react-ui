@@ -13,6 +13,7 @@ import {
   deleteSuccessText,
   deleteSummary,
   deleteTitle,
+  filesAllGone,
 } from '#/lib/delete-confirm'
 import type { DeleteRow, DeleteSummary } from '#/lib/delete-confirm'
 import { OPERATION_FAILURE_CODES, deleteFailureText } from '#/lib/error-text'
@@ -30,7 +31,11 @@ import {
   useMaindata,
 } from '#/state/maindata'
 import { clearPendingAll, markPendingAll } from '#/state/pending-ops'
-import { pruneSelection, useSelectedHashes } from '#/state/selection'
+import {
+  pruneSelection,
+  selectionStore,
+  useSelectedHashes,
+} from '#/state/selection'
 import { useEscapeLayer } from '#/state/shortcuts'
 import { sendOp, useOpsInFlight } from '#/state/tracked-op'
 import type { TrackedOp } from '#/state/tracked-op'
@@ -183,6 +188,14 @@ const EMPTY_VIEW: {
 
 const EMPTY_SET: ReadonlySet<string> = new Set()
 
+/**
+ * Closes a failure toast about any of these hashes, so its 重試 can never
+ * delete without this dialog's confirmation or with another choice.
+ */
+function dismissFailures(...lists: ReadonlyArray<Iterable<string>>): void {
+  for (const list of lists) for (const hash of list) toast.dismissFor(hash)
+}
+
 export interface DeleteConfirmProps {
   open: boolean
   desktop: boolean
@@ -244,9 +257,16 @@ export function DeleteConfirm({
   }
 
   // Set on press, before the in-flight state shows (the same tick): blocks
-  // a second send and every close path; cleared when that call settles.
+  // a second send and every close path; cleared when that press's call
+  // settles (a token, so an older call's late 重試 never clears it).
   const pressedRef = useRef(false)
+  const pressTokenRef = useRef(0)
   const [pressed, setPressed] = useState(false)
+
+  // Every open: an old failure toast's 重試 must not skip this dialog.
+  useEffect(() => {
+    if (open) dismissFailures(selectionStore.state.hashes)
+  }, [open])
 
   const inFlight = useOpsInFlight(deleteOp)
   const sending = useMemo(() => {
@@ -259,7 +279,12 @@ export function DeleteConfirm({
   }, [pressed, inFlight, sentHashes, hashes])
   /** Every close path; never while this dialog's delete is out. */
   const cancel = () => {
-    if (!sending && !pressedRef.current) onClose()
+    if (sending || pressedRef.current) return
+    dismissFailures(
+      sentHashes,
+      sendable.map((row) => row.hash),
+    )
+    onClose()
   }
   useEscapeLayer(open, cancel, 'dialog')
 
@@ -273,14 +298,18 @@ export function DeleteConfirm({
   const send = () => {
     if (pressedRef.current || sendable.length === 0) return
     pressedRef.current = true
+    pressTokenRef.current += 1
+    const token = pressTokenRef.current
     setPressed(true)
     const settle = () => {
+      if (pressTokenRef.current !== token) return
       pressedRef.current = false
       setPressed(false)
     }
     const variables = {
       hashes: sendable.map((row) => row.hash),
-      deleteFiles,
+      // Every file already gone: never ask qBittorrent to delete files.
+      deleteFiles: deleteFiles && !filesAllGone(summary),
       successText: deleteSuccessText(summary, deleteFiles),
     }
     setSentHashes(new Set(variables.hashes))
@@ -387,12 +416,10 @@ export function DeleteConfirm({
           onCheckedChange={(next) => {
             setDeleteFiles(next === true)
             // A failure toast's 重試 would resend the old choice: close it.
-            for (const hash of new Set([
-              ...sentHashes,
-              ...sendable.map((row) => row.hash),
-            ])) {
-              toast.dismissFor(hash)
-            }
+            dismissFailures(
+              sentHashes,
+              sendable.map((row) => row.hash),
+            )
           }}
         />
         連檔案一起刪

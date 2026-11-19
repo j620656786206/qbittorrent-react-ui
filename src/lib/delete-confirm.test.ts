@@ -8,6 +8,7 @@ import {
   deleteSuccessText,
   deleteSummary,
   deleteTitle,
+  filesAllGone,
 } from '#/lib/delete-confirm'
 import type { DeleteSummary } from '#/lib/delete-confirm'
 import { deleteFailureText } from '#/lib/error-text'
@@ -132,6 +133,14 @@ describe('deleteSummary and deleteRows', () => {
     expect(
       deleteSummary({ [A]: moving }, [A], { [A]: 'uploading' }).bytes,
     ).toBe(7 * GB)
+  })
+})
+
+describe('filesAllGone', () => {
+  it('only when every selected torrent is 找不到檔案 or 已整理', () => {
+    expect(filesAllGone(summary({ missing: 2, archived: 1 }))).toBe(true)
+    expect(filesAllGone(summary({ missing: 2 }))).toBe(false)
+    expect(filesAllGone(summary({ count: 0 }))).toBe(false)
   })
 })
 

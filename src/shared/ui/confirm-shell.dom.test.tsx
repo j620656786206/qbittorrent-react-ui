@@ -303,9 +303,11 @@ describe('phone sheet', () => {
     ) as HTMLElement
     const primary = buttonNamed('刪除 3 個種子和檔案（301.2 GB）')
     expect(footer.contains(primary)).toBe(true)
-    for (const token of ['h-11', 'w-full', 'bg-delete', 'text-[15px]']) {
-      expect(primary.className).toContain(token)
+    for (const token of ['min-h-11', 'w-full', 'bg-delete', 'text-[15px]']) {
+      expect(primary.className.split(' ')).toContain(token)
     }
+    // Long texts wrap at 320 to 360px instead of overflowing.
+    expect(primary.className).not.toContain('whitespace-nowrap')
     expect(buttonNamed('取消')).toBeUndefined()
     expect(buttonNamed('關閉，不刪')).toBeDefined()
     expect(

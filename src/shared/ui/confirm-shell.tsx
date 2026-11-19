@@ -140,7 +140,8 @@ export function ConfirmShell({
               data-sending={sending || undefined}
               onClick={press}
               className={cn(
-                'h-11 w-full rounded-full px-[18px] text-[15px] font-bold whitespace-nowrap tabular-nums data-[sending]:opacity-100',
+                // Wraps at 320 to 360px rather than overflow; never under 44px.
+                'min-h-11 w-full rounded-full px-[18px] py-2 text-[15px] leading-[1.3] font-bold tabular-nums data-[sending]:opacity-100',
                 TONE_CLASS[primaryTone],
               )}
             >
