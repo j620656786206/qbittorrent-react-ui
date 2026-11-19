@@ -185,7 +185,7 @@ test('desktop board: with the detail open, ↑ ↓ stay in the card’s column',
   await page
     .getByRole('region', { name: '看板' })
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({
       has: page.getByTitle('Fake.Show.S01E04.1080p', { exact: true }),
     })
@@ -213,6 +213,11 @@ test('desktop: Tab onto another row shows the outline; the viewed row keeps its 
   await expect(rowButton(page, 0)).toHaveAttribute('aria-current', 'true')
   await page.keyboard.press('ArrowDown')
   await expect(rowButton(page, 1)).toBeFocused()
+  // Story 4.1: the next row's checkbox comes first in the tab order.
+  await page.keyboard.press('Tab')
+  await expect(
+    page.getByRole('listitem').nth(2).getByRole('checkbox'),
+  ).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(rowButton(page, 2)).toBeFocused()
   const style = (index: number) =>

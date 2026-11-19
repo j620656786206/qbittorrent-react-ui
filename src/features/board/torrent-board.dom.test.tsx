@@ -30,12 +30,17 @@ import {
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
+import { resetSelection, selectionStore } from '#/state/selection'
 import {
   CARD_GAP,
   CARD_HEIGHT,
   CARD_HEIGHT_WITH_BAR,
 } from '#/features/board/board-model'
 import type * as BoardModel from '#/features/board/board-model'
+import {
+  COLUMN_PADDING_END,
+  COLUMN_PADDING_START,
+} from '#/features/board/board-column'
 import { TorrentBoard } from '#/features/board/torrent-board'
 
 // Spec 2.3: the board's wiring in a DOM (happy-dom): columns from the live
@@ -249,6 +254,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetSelection()
   resetEntrance()
   main = document.createElement('main')
   main.id = MAIN_ID
@@ -270,7 +276,7 @@ describe('opening the detail (spec 2.4)', () => {
     setHash.mockClear()
     await render(fakeResponse({ changed: sample() }))
     const card = section('下載中，1 個').querySelector(
-      '[role="listitem"] > button',
+      '[role="listitem"] > button[data-entrance]',
     ) as HTMLButtonElement
     expect(card.type).toBe('button')
     expect(card.className).toContain('hover-ring')
@@ -370,7 +376,7 @@ describe('the desktop board', () => {
 
   it('a height change inside a column moves the cards below it', async () => {
     /** The desktop column body's space above the first card. */
-    const PADDING_START = 4
+    const PADDING_START = COLUMN_PADDING_START
     await render(
       fakeResponse({
         changed: [
@@ -1085,5 +1091,89 @@ describe('the search keyword (story 3.5)', () => {
     await render(fakeResponse({ changed: sample() }))
     expect(main.textContent).not.toContain('都沒問題')
     expect(main.textContent).toContain('沒有')
+  })
+})
+
+// Story 4.1: the desktop cards' checkbox (the expanded 已整理 ones too),
+// sitting outside the card's button and its `overflow-hidden`, the ticked
+// card's background, the board never freezing for a selection, and no
+// checkbox on the phone.
+describe('selection (story 4.1)', () => {
+  const card = (scope: Element) =>
+    scope.querySelector('[role="listitem"]') as HTMLElement
+  const checkbox = (item: Element) =>
+    item.querySelector<HTMLButtonElement>('button[role="checkbox"]')
+  const cardButton = (item: Element) =>
+    item.querySelector('button[data-entrance]') as HTMLButtonElement
+
+  it('a desktop card: a checkbox named 選取 <name> before the card button, 6px out of its corner on a surface backing', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    const item = card(section('下載中，1 個'))
+    const box = checkbox(item) as HTMLButtonElement
+    expect(box.getAttribute('aria-label')).toBe('選取 Down')
+    expect(item.firstElementChild).toBe(box)
+    expect(cardButton(item).contains(box)).toBe(false)
+    for (const token of [
+      'absolute',
+      '-top-1.5',
+      '-left-1.5',
+      'bg-surface',
+      'ring-surface',
+      'opacity-0',
+      'group-hover/item:opacity-100',
+      'group-focus-within/item:opacity-100',
+    ]) {
+      expect(box.className).toContain(token)
+    }
+    // The first card starts below the checkbox's 6px (and its outline).
+    expect(COLUMN_PADDING_START).toBeGreaterThanOrEqual(6)
+    expect(item.style.transform).toBe(`translateY(${COLUMN_PADDING_START}px)`)
+    // 110px stay under the last card (the bar never covers it).
+    expect(COLUMN_PADDING_END).toBe(110)
+    const list = section('下載中，1 個').querySelector(
+      '[data-card-list]',
+    ) as HTMLElement
+    expect(list.style.height).toBe(
+      `${COLUMN_PADDING_START + CARD_HEIGHT_WITH_BAR + COLUMN_PADDING_END}px`,
+    )
+  })
+
+  it('ticking: only the selection changes; the card turns selection-row; every list shows its checkboxes; the board keeps its order', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    const down = card(section('下載中，1 個'))
+    await act(async () => checkbox(down)?.click())
+    expect(selectionStore.state.hashes).toEqual([h(1)])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(cardButton(down).className).toContain('bg-selection-row')
+    expect(cardButton(card(section('做種中，1 個'))).className).toContain(
+      'bg-surface',
+    )
+    for (const list of main.querySelectorAll('[data-card-list]')) {
+      expect(list.hasAttribute('data-selecting')).toBe(true)
+    }
+    expect(freezeStore.state.animation).toBe(false)
+    // A board is not frozen: a status change moves the card at once.
+    await poll(
+      delta([t({ hash: h(1), name: 'Down', state: 'uploading', progress: 1 })]),
+    )
+    expect(names(section('做種中，2 個'))).toContain('Down')
+    await act(async () => cardButton(card(section('要處理，2 個'))).click())
+    expect(setHash).toHaveBeenCalledWith(h(3))
+  })
+
+  it('the expanded 已整理 cards have the checkbox too', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await act(async () => button('展開已整理欄，2 個').click())
+    const boxes = [
+      ...section('已整理，2 個').querySelectorAll('button[role="checkbox"]'),
+    ].map((box) => box.getAttribute('aria-label'))
+    expect(boxes.sort()).toEqual(['選取 Arch1', '選取 Arch2'])
+  })
+
+  it('below 1024px: no checkbox on the phone cards', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: sample() }))
+    expect(main.querySelector('[role="listitem"]')).not.toBeNull()
+    expect(main.querySelector('button[role="checkbox"]')).toBeNull()
   })
 })

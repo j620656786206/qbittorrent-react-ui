@@ -12,13 +12,21 @@ import type { CardLayout, CardPin } from '#/features/board/card-list'
 // 22px; the header is the 28px status circle, the column name
 // (`column-title`) and the muted count, with the order as its tooltip (an
 // explanation, not a control: memlog #127). The body scrolls by itself
-// (padding 4px 12px 12px, cards 10px apart) and is virtualized.
+// (12px sides, cards 10px apart) and is virtualized. Story 4.1: the cards
+// carry the selection checkbox, so the first card starts 10px down (the
+// checkbox pokes 6px above it, plus its focus outline), and 110px stay
+// under the last one so the selection bar never covers it.
 //
 // Story 2.8 (demo `.col .bg`): the `surface-muted` background is its own
 // layer behind the content, so the auto-collapse can widen or narrow it
 // with `scaleX` while text is never scaled. The content sits above every
 // column's background (z 1 over z 0), so a strip's background still
 // shrinking never covers its neighbour's cards.
+
+/** Room above a desktop column's first card (story 4.1: its checkbox). */
+export const COLUMN_PADDING_START = 10
+/** Room under the last card: the selection bar's 110px (story 4.1). */
+export const COLUMN_PADDING_END = 110
 
 export const COLUMN_CLASS =
   'relative flex min-h-0 min-w-0 flex-col rounded-panel'
@@ -144,8 +152,9 @@ export function BoardColumnView({
         today={today}
         empty={empty}
         label={meta.name}
-        paddingStart={4}
-        paddingEnd={12}
+        paddingStart={COLUMN_PADDING_START}
+        paddingEnd={COLUMN_PADDING_END}
+        selectable
         // The section no longer clips (its background layer scales past it
         // during the collapse), so the body clips itself to the column's
         // rounded bottom corners, scrollbar included.

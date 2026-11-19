@@ -12,6 +12,7 @@ import {
   resetListFreeze,
   resetOrderFreeze,
   setPointerInList,
+  setSelectionFreeze,
   keepWithNewOnTop,
   shownOrderReducer,
   touchFrozen,
@@ -265,9 +266,36 @@ describe('F6 freeze reasons', () => {
       touchScroll: false,
       sheetOpen: true,
       animation: false,
+      selection: false,
     })
     release()
     expect(frozenNow()).toBe(false)
+  })
+
+  it('4.1 a selection freezes the list, not the board; the list unmounting keeps it', () => {
+    setSelectionFreeze(true)
+    expect(frozenNow()).toBe(true)
+    expect(isBoardFrozen(freezeStore.state)).toBe(false)
+    resetListFreeze()
+    expect(freezeStore.state.selection).toBe(true)
+    setSelectionFreeze(false)
+    expect(frozenNow()).toBe(false)
+  })
+
+  it('4.1 a poll reorders under a selection: positions hold, the last clear reorders once', () => {
+    let shown = shownOrderReducer(null, { live: ['a', 'b'], frozen: false })
+    setSelectionFreeze(true)
+    const held = shown
+    shown = shownOrderReducer(shown, { live: ['b', 'a'], frozen: frozenNow() })
+    shown = shownOrderReducer(shown, {
+      live: ['b', 'c', 'a'],
+      frozen: frozenNow(),
+    })
+    expect(shown).toBe(held)
+    setSelectionFreeze(false)
+    const live = ['b', 'c', 'a']
+    shown = shownOrderReducer(shown, { live, frozen: frozenNow() })
+    expect(shown).toBe(live)
   })
 
   it('B9 a poll reorders under an open sheet: positions hold, then one reorder', () => {

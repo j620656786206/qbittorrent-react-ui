@@ -28,12 +28,18 @@ import {
 } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { ListViewContext } from '#/state/list-view'
+import {
+  clearSelection,
+  resetSelection,
+  selectionStore,
+} from '#/state/selection'
 import { OWN_ARROWS, pushEscapeLayer, resetShortcuts } from '#/state/shortcuts'
 import { clearShownList, shownListStore } from '#/state/shown-order'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import type { SortView } from '#/shared/list-search'
 import type * as ListModel from '#/features/list/list-model'
 import { HASH_WRITE_GAP_MS } from '#/features/list/use-arrow-stepping'
+import { LIST_SCROLL_CLASS } from '#/features/list/list-states'
 import { TorrentList } from '#/features/list/torrent-list'
 
 // Review of 1.7 to 1.9: the list's wiring in a DOM (happy-dom), which the
@@ -301,6 +307,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetSelection()
   resetEntrance()
   mountMain()
 })
@@ -488,6 +495,7 @@ describe('the freeze', () => {
       touchScroll: false,
       sheetOpen: true,
       animation: false,
+      selection: false,
     })
     releaseSheet()
     root = createRoot(document.createElement('div'))
@@ -683,7 +691,9 @@ describe('sorting', () => {
 // Spec 2.4 rows D1, D2, D3, D9, D11: rows open the detail; the viewed row
 // has the ring; the list publishes what it shows; a vanished row moves on.
 const rowButtons = () => [
-  ...main.querySelectorAll<HTMLButtonElement>('[role="listitem"] > button'),
+  ...main.querySelectorAll<HTMLButtonElement>(
+    '[role="listitem"] > button[aria-current]',
+  ),
 ]
 const ringed = () =>
   rowButtons()
@@ -1447,5 +1457,105 @@ describe('↑ ↓ (story 3.7)', () => {
     const event = await press('ArrowDown')
     expect(event.defaultPrevented).toBe(false)
     expect(setHash).not.toHaveBeenCalled()
+  })
+})
+
+// Story 4.1: the desktop checkbox in each row's wrapper, the selected
+// row's background, the list's freeze while anything is selected, and no
+// checkbox on the phone.
+describe('selection (story 4.1)', () => {
+  let desktop = true
+
+  beforeEach(() => {
+    desktop = true
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === DESKTOP_QUERY ? desktop : false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+  })
+
+  const items = () => [
+    ...main.querySelectorAll<HTMLElement>('[role="listitem"]'),
+  ]
+  const checkbox = (item: HTMLElement) =>
+    item.querySelector<HTMLButtonElement>('button[role="checkbox"]')
+  const rowButton = (item: HTMLElement) =>
+    item.querySelector<HTMLButtonElement>(
+      'button[aria-current]',
+    ) as HTMLButtonElement
+  const list = () => main.querySelector('[role="list"]') as HTMLElement
+
+  it('each desktop row: a checkbox named 選取 <name>, before the row button, outside it, shown on hover or focus', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    const first = items()[0]
+    const box = checkbox(first) as HTMLButtonElement
+    expect(box.getAttribute('aria-label')).toBe('選取 T2')
+    expect(box.getAttribute('aria-checked')).toBe('false')
+    expect(first.firstElementChild).toBe(box)
+    expect(rowButton(first).contains(box)).toBe(false)
+    expect(first.className).toContain('group/item')
+    for (const token of [
+      'absolute',
+      'left-3',
+      'opacity-0',
+      'group-hover/item:opacity-100',
+      'group-focus-within/item:opacity-100',
+      'group-data-[selecting]/list:opacity-100',
+    ]) {
+      expect(box.className).toContain(token)
+    }
+    // The reserved slot stays, so nothing shifts.
+    expect(
+      rowButton(first).querySelector('span[aria-hidden="true"]'),
+    ).not.toBeNull()
+    expect(list().hasAttribute('data-selecting')).toBe(false)
+  })
+
+  it('a checkbox click only toggles the selection; the row body still opens the detail', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    await act(async () => checkbox(items()[1])?.click())
+    expect(selectionStore.state.hashes).toEqual([fakeHash(2)])
+    expect(setHash).not.toHaveBeenCalled()
+    expect(checkbox(items()[1])?.getAttribute('aria-checked')).toBe('true')
+    expect(list().hasAttribute('data-selecting')).toBe(true)
+    const selectedRow = rowButton(items()[1]).className
+    expect(selectedRow).toContain('bg-selection-row')
+    expect(selectedRow).not.toContain('hover-row')
+    expect(rowButton(items()[0]).className).toContain('hover-row')
+    await act(async () => checkbox(items()[0])?.click())
+    expect(selectionStore.state.hashes).toEqual([fakeHash(2), fakeHash(3)])
+    await act(async () => rowButton(items()[2]).click())
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(selectionStore.state.hashes).toHaveLength(2)
+    await act(async () => clearSelection())
+    expect(list().hasAttribute('data-selecting')).toBe(false)
+    expect(rowButton(items()[1]).className).not.toContain('bg-selection-row')
+  })
+
+  it('a selection holds the order through polls; clearing it reorders once', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    await act(async () => checkbox(items()[2])?.click())
+    await poll(delta([torrent(9)]))
+    expect(shownNames()).toEqual(['T2', 'T1', 'T0'])
+    await act(async () => clearSelection())
+    expect(shownNames()).toEqual(['T9', 'T2', 'T1', 'T0'])
+  })
+
+  it('the scroller keeps 110px under the last row on desktop', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    expect(LIST_SCROLL_CLASS).toContain('lg:pb-page-desktop-bottom')
+    expect(scroller().className).toBe(LIST_SCROLL_CLASS)
+  })
+
+  it('below 1024px: no checkbox', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: many(3) }))
+    expect(items()).toHaveLength(3)
+    expect(main.querySelector('button[role="checkbox"]')).toBeNull()
   })
 })

@@ -15,6 +15,10 @@ import type { ShownToast } from '#/shared/toast-store'
 // - Desktop (>= 1024px): bottom right, 24px in, 356px wide. Phone: at the
 //   top, 16px in (plus the safe area), above the bottom sheet and its scrim
 //   (z-index over `z-50`).
+// - Story 4.1: while the desktop selection bar shows (`lifted`, set through
+//   `toast.setLift`), the region moves up 68px, 16px above the 52px bar
+//   (24 + 52 + 16 = 92px from the bottom). Only `transform` moves (0.3s,
+//   the repo's curve), at once under reduced motion.
 // - The failure renders inside an always-mounted `role="alert"` region, so
 //   the change is announced
 //   (https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alert_role).
@@ -62,12 +66,19 @@ function ToastCard({ toast }: { toast: ShownToast }) {
   )
 }
 
+const REGION_CLASS =
+  'pointer-events-none fixed inset-x-4 top-[calc(16px+env(safe-area-inset-top))] z-[60] flex flex-col lg:top-auto lg:right-6 lg:bottom-6 lg:left-auto lg:w-[356px] lg:transition-transform lg:duration-300 lg:ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:motion-reduce:transition-none'
+
+/** Story 4.1: 68px up, 16px above the selection bar. */
+export const TOAST_LIFT_CLASS = 'lg:-translate-y-[68px]'
+
 export function Toaster() {
   const toast = useSelector(toastStore, (state) => state.toast)
+  const lifted = useSelector(toastStore, (state) => state.lifted)
   return (
     <div
       {...{ [TOAST_REGION_ATTR]: '' }}
-      className="pointer-events-none fixed inset-x-4 top-[calc(16px+env(safe-area-inset-top))] z-[60] flex flex-col lg:top-auto lg:right-6 lg:bottom-6 lg:left-auto lg:w-[356px]"
+      className={lifted ? `${REGION_CLASS} ${TOAST_LIFT_CLASS}` : REGION_CLASS}
     >
       <div role="alert">
         {toast && <ToastCard key={toast.id} toast={toast} />}

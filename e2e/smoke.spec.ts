@@ -223,7 +223,9 @@ async function bigValues(page: Page, count: number): Promise<Array<string>> {
     const items = [...document.querySelectorAll('[role="listitem"]')]
       .map((item) => ({
         index: Number(item.getAttribute('aria-posinset')),
-        cell: item.querySelector(':scope > button > span > span:last-child'),
+        cell: item.querySelector(
+          ':scope > button[data-entrance] > span > span:last-child',
+        ),
       }))
       .sort((a, b) => a.index - b.index)
       .slice(0, max)

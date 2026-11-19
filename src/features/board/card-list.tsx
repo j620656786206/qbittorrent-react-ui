@@ -4,9 +4,11 @@ import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import type { Range } from '@tanstack/react-virtual'
 import { reasonOf } from '#/lib/error-reason'
 import type { SlimTorrent } from '#/shared/maindata'
+import { Checkbox } from '#/shared/ui/checkbox'
 import { cn } from '#/shared/ui/cn'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
+import { toggleSelected, useSelectedHashes } from '#/state/selection'
 import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
 import {
@@ -46,6 +48,22 @@ import {
 // @tanstack/virtual-core 3.19.11 (what @tanstack/react-virtual 3.14.26
 // depends on): https://unpkg.com/@tanstack/virtual-core@3.19.11/src/index.ts
 // (`Range`, `defaultRangeExtractor`, `getVirtualIndexes`).
+//
+// Story 4.1: a `selectable` list (the desktop columns, the expanded 已整理
+// one too) puts the selection checkbox in each card's wrapper
+// (`group/item`), before the card's button, 6px outside its top-left
+// corner on a `surface` ring. It shows while the wrapper is hovered or
+// holds focus, and on every card once anything is selected
+// (`data-selecting` on the list). Clicking it only toggles the selection.
+// The column gives `paddingStart` room for it above the first card.
+
+/**
+ * Story 4.1: 6px out of the card's top-left corner, its own `surface`
+ * backing (a 2px ring) over the card and the column; hidden until hovered,
+ * focused or anything is selected; taps pass through while hidden.
+ */
+export const CARD_CHECKBOX_CLASS =
+  'pointer-events-none absolute -top-1.5 -left-1.5 z-[1] bg-surface opacity-0 ring-2 ring-surface group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100 group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-data-[selecting]/list:pointer-events-auto group-data-[selecting]/list:opacity-100'
 
 /** Cards drawn beyond the visible ones, above and below. */
 const OVERSCAN = 4
@@ -104,6 +122,8 @@ export interface CardListProps {
   hereHash?: string | null
   /** How long the frame shows, ms (its fade is part of it). */
   hereMs?: number
+  /** Story 4.1: desktop cards get the selection checkbox. */
+  selectable?: boolean
 }
 
 export function CardList({
@@ -122,12 +142,15 @@ export function CardList({
   pin = null,
   hereHash = null,
   hereMs = 0,
+  selectable = false,
 }: CardListProps) {
   // Story 2.4: a card opens its torrent in the detail.
   const { setHash } = useViewedHash()
   // Story 2.10: polled only while maindata has an errored torrent; every
   // column observes the same `['error-reasons']` query.
   const errorReasons = useErrorReasons()
+  const selectedHashes = useSelectedHashes()
+  const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -282,7 +305,8 @@ export function CardList({
           role="list"
           aria-label={label}
           data-card-list=""
-          className="relative w-full"
+          data-selecting={selected.size > 0 ? '' : undefined}
+          className="group/list relative w-full"
           style={{ height: virtualizer.getTotalSize() }}
         >
           {virtualizer.getVirtualItems().flatMap((item) => {
@@ -295,6 +319,7 @@ export function CardList({
               const x =
                 width === null ? 0 : (index - row.from) * (width + CARD_GAP)
               const here = hash === hereHash
+              const isSelected = selected.has(hash)
               cards.push(
                 <div
                   key={hash}
@@ -304,7 +329,7 @@ export function CardList({
                   data-hash={hash}
                   data-index={index}
                   className={cn(
-                    'absolute top-0 left-0',
+                    'group/item absolute top-0 left-0',
                     width === null && 'w-full',
                     here && 'anchor-frame',
                   )}
@@ -318,6 +343,14 @@ export function CardList({
                         : `translate(${x}px, ${item.start}px)`,
                   }}
                 >
+                  {torrent && selectable && (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelected(hash)}
+                      aria-label={`選取 ${torrent.name}`}
+                      className={CARD_CHECKBOX_CLASS}
+                    />
+                  )}
                   {torrent && (
                     <BoardCard
                       torrent={torrent}
@@ -328,6 +361,7 @@ export function CardList({
                       }
                       today={today}
                       errorReason={reasonOf(errorReasons, hash)}
+                      selected={isSelected}
                       onOpen={setHash}
                     />
                   )}

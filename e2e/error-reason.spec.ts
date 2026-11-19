@@ -37,7 +37,7 @@ const sheet = (page: Page) => page.getByRole('dialog')
 const erroredCard = (page: Page) =>
   board(page)
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({ has: page.getByTitle(ERRORED_NAME, { exact: true }) })
 const heroSummary = (scope: ReturnType<typeof panel>) =>
   scope.locator('[role="tabpanel"] p').nth(1)
@@ -134,7 +134,7 @@ test('states: an unknown reason with a path shows the fixed text; the answer car
   await login(page)
   const card = board(page)
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({ has: page.getByTitle(UNKNOWN_NAME, { exact: true }) })
   await expect(card).toContainText(FIXED_TEXT)
   await page.goto(`/?hash=${UNKNOWN_HASH}`)

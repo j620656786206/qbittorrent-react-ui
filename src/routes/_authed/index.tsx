@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { useListView } from '#/state/list-view'
+import { clearSelection, useSelectionUpkeep } from '#/state/selection'
 import { useViewedHash } from '#/state/viewed-hash'
 import { TorrentBoard } from '#/features/board/torrent-board'
 import { BoardDetailPanel } from '#/features/detail/board-detail-panel'
@@ -12,6 +13,7 @@ import {
   ListDetailSheet,
 } from '#/features/detail/phone-detail-sheet'
 import { TorrentList } from '#/features/list/torrent-list'
+import { SelectionBar } from '#/features/selection/selection-bar'
 
 export const Route = createFileRoute('/_authed/')({ component: Home })
 
@@ -24,14 +26,31 @@ export const Route = createFileRoute('/_authed/')({ component: Home })
 // sheet over either. The list keeps its tree across the 1024px line, so
 // crossing it does not remount it; the board swaps its desktop and phone
 // trees (the open 已整理 column and the phone tab start over).
+// Story 4.1: the selection lives here too. Its scope is the category and
+// keyword (another clears it, the same one kept across a /settings round
+// trip); gone torrents drop out after each maindata update. The desktop
+// selection bar floats over the list or the board (4.2 adds the phone);
+// below 1024px the selection is cleared.
 function Home() {
   const { view } = useListView()
   const desktop = useIsDesktop()
-  if (view.sort === 'state') return <BoardHome desktop={desktop} />
+  useSelectionUpkeep(view.category, view.query)
+  // No phone selection yet (story 4.2): below 1024px nothing could clear
+  // it, so crossing the line drops it (and the list's freeze with it).
+  useEffect(() => {
+    if (!desktop) clearSelection()
+  }, [desktop])
   return (
     <>
-      <TorrentList panel={desktop ? <ListDetailPanel /> : undefined} />
-      {!desktop && <ListDetailSheet />}
+      {view.sort === 'state' ? (
+        <BoardHome desktop={desktop} />
+      ) : (
+        <>
+          <TorrentList panel={desktop ? <ListDetailPanel /> : undefined} />
+          {!desktop && <ListDetailSheet />}
+        </>
+      )}
+      {desktop && <SelectionBar />}
     </>
   )
 }

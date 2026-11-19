@@ -65,3 +65,17 @@ describe('T2 replace', () => {
     expect(shown()?.text).toBe('second')
   })
 })
+
+describe('setLift (spec 4.1)', () => {
+  it('lifts and lowers without touching the toast showing', () => {
+    toast.failure('f', { keys: ['a'], onRetry: vi.fn() })
+    toast.setLift(true)
+    expect(toastStore.state.lifted).toBe(true)
+    expect(shown()?.text).toBe('f')
+    toast.failure('g', { keys: ['b'], onRetry: vi.fn() })
+    expect(toastStore.state.lifted).toBe(true)
+    toast.setLift(false)
+    expect(toastStore.state.lifted).toBe(false)
+    expect(shown()?.text).toBe('g')
+  })
+})

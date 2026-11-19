@@ -274,7 +274,7 @@ test('P1 the board detail panel keeps its place and width through a collapse', a
     .getByRole('group', { name: '下載中' })
     .getByRole('listitem')
     .first()
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .click()
   const panel = page.getByRole('complementary', { name: '詳情' })
   await expect(panel).toBeVisible()

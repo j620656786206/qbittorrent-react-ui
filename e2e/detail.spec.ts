@@ -38,14 +38,14 @@ test.afterEach(async ({ request }) => {
 
 const panel = (page: Page) => page.getByRole('complementary', { name: '詳情' })
 const rowButtons = (page: Page) =>
-  page.getByRole('listitem').locator(':scope > button')
+  page.getByRole('listitem').locator(':scope > button[data-entrance]')
 const rowButton = (page: Page, n: number) =>
   rowButtons(page).filter({ has: page.getByTitle(name(n), { exact: true }) })
 const board = (page: Page) => page.getByRole('region', { name: '看板' })
 const card = (page: Page, n: number) =>
   board(page)
     .getByRole('listitem')
-    .locator(':scope > button')
+    .locator(':scope > button[data-entrance]')
     .filter({ has: page.getByTitle(name(n), { exact: true }) })
 const detailSheet = (page: Page) => page.getByRole('dialog')
 const positionText = (scope: Locator) => scope.getByText(/個／共/)
@@ -60,7 +60,7 @@ async function clickInside(page: Page, scroller: string) {
     const box = document.querySelector(selector)?.getBoundingClientRect()
     if (!box) return null
     const buttons = document.querySelectorAll<HTMLElement>(
-      `${selector} [role="listitem"] > button`,
+      `${selector} [role="listitem"] > button[data-entrance]`,
     )
     for (const button of buttons) {
       const rect = button.getBoundingClientRect()

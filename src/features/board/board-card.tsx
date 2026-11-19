@@ -22,8 +22,11 @@ import type { CardModel } from '#/features/board/board-model'
 // the category tag (only when there is one) and the location tag. Fixed
 // heights (board-model.ts), so the column's virtualizer never measures.
 // Story 2.4: the card is a button that opens the detail (`onOpen` sets the
-// URL's `hash`), with the 1px `text-faint` inset hover ring. No checkbox
-// (Epic 4). Names and lines are JSX text, never HTML.
+// URL's `hash`), with the 1px `text-faint` inset hover ring. Story 4.1: a
+// selected card has the `selection-row` background; its desktop checkbox
+// sits outside the button, in card-list.tsx's wrapper (no control nested in
+// a button, and the card's `overflow-hidden` would clip it). Names and
+// lines are JSX text, never HTML.
 
 /** Status colour of the bar fill; Tailwind needs whole class names. */
 const BAR_FILL: Readonly<Record<string, string>> = {
@@ -36,6 +39,9 @@ const CARD_CLASS =
   'box-border flex flex-col gap-2 overflow-hidden rounded-card bg-surface px-3.5 py-3 shadow-card'
 
 const CARD_BUTTON_CLASS = `${CARD_CLASS} w-full text-left text-text hover-ring`
+
+/** Story 4.1: the ticked card's background. */
+const CARD_SELECTED_CLASS = cn(CARD_BUTTON_CLASS, 'bg-selection-row')
 
 const TAG_CLASS =
   'inline-flex h-5 min-w-0 items-center gap-1 rounded-full border px-2 text-tag leading-4 whitespace-nowrap text-text-muted'
@@ -52,6 +58,8 @@ export interface BoardCardProps {
    * only when its own reason changes); `undefined` for none.
    */
   errorReason?: string
+  /** Story 4.1: the card is ticked (the `selection-row` background). */
+  selected?: boolean
   /** Stable: opens this card's torrent in the detail. */
   onOpen: (hash: string) => void
 }
@@ -62,6 +70,7 @@ export const BoardCard = memo(function Card({
   stateBeforeMove,
   today,
   errorReason,
+  selected = false,
   onOpen,
 }: BoardCardProps) {
   const model = cardModel(torrent, {
@@ -70,15 +79,23 @@ export const BoardCard = memo(function Card({
       stateBeforeMove !== undefined ? { [torrent.hash]: stateBeforeMove } : {},
     errorReason,
   })
-  return <CardContent model={model} onOpen={() => onOpen(torrent.hash)} />
+  return (
+    <CardContent
+      model={model}
+      selected={selected}
+      onOpen={() => onOpen(torrent.hash)}
+    />
+  )
 })
 
 /** The card from a fixed model (tests render this directly). */
 export function CardContent({
   model,
+  selected = false,
   onOpen,
 }: {
   model: CardModel
+  selected?: boolean
   onOpen?: () => void
 }) {
   const { circle, progress } = model
@@ -88,7 +105,7 @@ export function CardContent({
       data-entrance=""
       onClick={onOpen}
       style={{ height: cardHeight(model) }}
-      className={CARD_BUTTON_CLASS}
+      className={selected ? CARD_SELECTED_CLASS : CARD_BUTTON_CLASS}
     >
       <span className="flex h-[37px] w-full flex-none items-start gap-2.5">
         <StatusCircle {...circle} size={32} />

@@ -93,7 +93,7 @@ export function BoardDetailPanel() {
       <DetailPanelBody
         torrent={target.torrent}
         tabs={tabs}
-        className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-[22px] [scrollbar-width:thin]"
+        className="min-h-0 flex-1 overflow-y-auto px-[22px] pt-3 pb-page-desktop-bottom [scrollbar-width:thin]"
       />
     </aside>
   )

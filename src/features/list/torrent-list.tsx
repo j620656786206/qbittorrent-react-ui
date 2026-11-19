@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -14,6 +15,7 @@ import { getSortKeys } from '#/server/functions/get-sort-keys'
 import { isExtraSortField } from '#/shared/sort-fields'
 import type { SortFieldId } from '#/shared/sort-fields'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
+import { Checkbox } from '#/shared/ui/checkbox'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useEmptyEntrance, useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
@@ -37,6 +39,7 @@ import {
   touchScrollStart,
   useFrozenOrder,
 } from '#/state/order-freeze'
+import { toggleSelected, useSelectedHashes } from '#/state/selection'
 import { usePublishShownList } from '#/state/shown-order'
 import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -83,8 +86,27 @@ import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 // 「這個分類沒有種子」).
 //
 // Story 3.7: on desktop `↑` `↓` step the viewed row (use-arrow-stepping.ts).
+//
+// Story 4.1: on desktop each row's wrapper (`group/item`) holds the
+// selection checkbox before the row's button (tab order, and no control
+// nested in a button), placed over the row's empty 20px slot so nothing
+// shifts. It shows while the wrapper is hovered or holds focus, and on
+// every row once anything is selected (`data-selecting` on the list).
+// Clicking it only toggles the selection (src/state/selection.ts); the rest
+// of the row still opens the detail. The scroller keeps 110px under the
+// last row on desktop, always, so the selection bar never covers it and
+// the list never jumps when the bar comes.
 
 const estimateSize = () => ROW_HEIGHT
+
+/**
+ * Story 4.1: over the row's 20px slot (12px in, centred), above the row's
+ * button; hidden until the row is hovered or focused, or anything is
+ * selected. Still focusable while hidden, so Tab reaches it; taps pass
+ * through while hidden (a touch screen at desktop width opens the row).
+ */
+export const ROW_CHECKBOX_CLASS =
+  'pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 opacity-0 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100 group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-data-[selecting]/list:pointer-events-auto group-data-[selecting]/list:opacity-100'
 
 /**
  * Only a real mouse can rest on the list: a phone keeps a sticky `:hover`
@@ -208,6 +230,8 @@ function TorrentRows({
   const { setHash } = useViewedHash()
   const { data: torrents } = useMaindata(selectTorrents)
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
+  const selectedHashes = useSelectedHashes()
+  const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
   // Story 2.10: polled only while maindata has an errored torrent.
   const errorReasons = useErrorReasons()
   const clock = useDayClock()
@@ -313,7 +337,8 @@ function TorrentRows({
         <div
           ref={listRef}
           role="list"
-          className="relative w-full"
+          data-selecting={selected.size > 0 ? '' : undefined}
+          className="group/list relative w-full"
           style={{ height: virtualizer.getTotalSize() }}
         >
           {virtualizer.getVirtualItems().map((item) => {
@@ -328,6 +353,7 @@ function TorrentRows({
                     errorReasons,
                   })
                 : null
+            const isSelected = selected.has(hash)
             return (
               <div
                 key={item.key}
@@ -335,16 +361,25 @@ function TorrentRows({
                 data-hash={hash}
                 aria-setsize={total}
                 aria-posinset={item.index + 1}
-                className="absolute top-0 left-0 w-full"
+                className="group/item absolute top-0 left-0 w-full"
                 style={{
                   height: ROW_HEIGHT,
                   transform: `translateY(${item.start - scrollMargin}px)`,
                 }}
               >
+                {props && desktop && (
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelected(hash)}
+                    aria-label={`選取 ${props.torrent.name}`}
+                    className={ROW_CHECKBOX_CLASS}
+                  />
+                )}
                 {props && (
                   <TorrentRow
                     {...props}
                     viewing={hash === viewed}
+                    selected={isSelected}
                     onOpen={setHash}
                   />
                 )}
