@@ -103,6 +103,7 @@ baseline_commit: '32936ec3dfef450a6a13b73c9be5f733e473bfaa'
 ## Spec Change Log
 
 - 2026-11-19, first review pass: `src/shared/ui/dialog.tsx` became non-modal Radix plus `useModalSession` (Radix's modal scroll lock injects a `<style>` the CSP blocks); the session starts in a child inside the content and ends on close, `modal` and `DialogOverlay` are removed, focus returns through `returnFocus` only. `↑` `↓` repeats step; Shift is allowed only for `?` and `S`; `↑` `↓` are not handled while focus is in the detail tab list or tab panel (`OWN_ARROWS`), but are from the header's ‹ › and ✕. `openHelp` refuses while the sort menu is open; the help closes below desktop width. KEEP: one registry as the text source; actions provided only at desktop width; `setHash` for arrows; `selectCategory` and `pickSort` paths.
+- 2026-11-19, follow-up pass: Shift is rejected only for `↑` `↓` (printable keys keep it: German `/`, AZERTY digits). While the sort menu is open only its digits act (`/`, `[`, `]`, `?` refused); an outside close leaves focus where Alex put it. The scrim carries `data-state`; the toast region does not dismiss the dialog. Held `↓` steps from the last stepped-to row; a pending row focus is dropped on the next other key or pointer press. Help groups are `role="group"`, not landmarks.
 
 ## Review Triage Log
 
@@ -142,6 +143,37 @@ baseline_commit: '32936ec3dfef450a6a13b73c9be5f733e473bfaa'
   - `[false]` `[reject]` (intent) "UI strings exactly as below" points at nothing : the strings are in Design Notes of the same spec and the code matches them.
   - `[low]` `[reject]` (intent) Files outside the named paths changed : each is needed (CSP fix, focus logic, `data-hash` for focus, the recording the AC asks for).
 
+### 2026-11-19: Review pass (follow-up)
+- verdicts: 27 findings, high 0, medium 4, low 18, false 5, maybe-false 0
+- findings:
+  - `[false]` `[reject]` (verification-gap) No gaps found in the changed behaviour : nothing to act on.
+  - `[medium]` `[patch]` (verification-gap) Shift now blocks `/`, digits and Esc on layouts that need Shift : Shift is rejected only for `↑` `↓`.
+  - `[low]` `[patch]` (verification-gap) The scrim lost its fade : `data-state` set from the open state.
+  - `[low]` `[reject]` (intent) Held repeats step instead of being ignored : first-pass decision recorded in the change log.
+  - `[low]` `[reject]` (intent) Digits go to the open sort menu however it opened : the menu's digits are the menu's keys; the AC says "效果同點選單".
+  - `[false]` `[reject]` (intent) The dialog file was changed : first-pass decision (CSP) recorded.
+  - `[low]` `[reject]` (intent) Sort hints share a constant rather than reading the entry : one source module; descriptions now built from it too.
+  - `[low]` `[reject]` (intent) The help layer lives with the content mount : intended, so the exit animation does not let keys act behind it.
+  - `[false]` `[reject]` (intent) Arrows are not taken inside the detail tabs and body : first-pass decision recorded.
+  - `[low]` `[reject]` (intent) Downstream effects of `selectCategory` and `setHash` are asserted through mocks : those functions keep their own tests from 3.2 and 3.6.
+  - `[medium]` `[patch]` (blind) `/`, `[`, `]` still run while the sort menu is open : refused like `?`.
+  - `[medium]` `[patch]` (blind) The Shift rule breaks `/` on some layouts : same as the verification-gap entry.
+  - `[low]` `[patch]` (blind) The scrim animation classes never apply : same as above.
+  - `[low]` `[patch]` (blind) A pending row focus never expires : cleared on the next keydown or pointerdown.
+  - `[false]` `[reject]` (blind) List arrows do nothing with no viewed row : desktop list mode always views a row (`fallbackFirst`); an empty list has nothing to step to.
+  - `[low]` `[reject]` (blind) Board arrows keep focus on the old card and do not scroll : same rule as the board ‹ › (first pass).
+  - `[low]` `[patch]` (blind) Two descriptions hard-code text the table builds : built from the digit constants.
+  - `[low]` `[reject]` (blind) The sort pill tooltip does not name `S` : the AC names only the search and 快捷鍵 buttons and the tabs.
+  - `[low]` `[patch]` (blind) Help groups are region landmarks : heading plus list, no landmarks.
+  - `[low]` `[patch]` (blind) `[` `]` and `/` over the sort menu are untested in a browser : e2e for brackets, DOM for the menu cases.
+  - `[false]` `[reject]` (blind) `[` `]` do nothing when the selected category has no tab : the selected category always keeps a tab (count 0 when empty, 3.2).
+  - `[low]` `[patch]` (blind) The recording script has an unexplained wait : real wait or comment.
+  - `[low]` `[reject]` (blind) The video adds a binary to history : the AC asks for the recording.
+  - `[medium]` `[patch]` (edge) An `S`-opened menu closed from outside pulls focus back : outside interaction clears the return target.
+  - `[low]` `[patch]` (edge) Focus into the toast region dismisses the dialog : prevented for the toast region.
+  - `[low]` `[patch]` (edge) Held repeats can compute the same target before the URL updates : step from the last stepped-to hash.
+  - `[low]` `[patch]` (edge) The browser can be orphaned if the server exits early : closed inside `record()`.
+
 ## Design Notes
 
 **Claude 代決.**
@@ -167,3 +199,15 @@ baseline_commit: '32936ec3dfef450a6a13b73c9be5f733e473bfaa'
 - `source ~/.nvm/nvm.sh && nvm use && npm test` -- expected: all pass
 - `source ~/.nvm/nvm.sh && nvm use && npm run build && npx playwright test` -- expected: all pass, no CSP violations
 - `bash .claude/skills/next-story/check.sh` -- expected: every line ok
+
+## Auto Run Result
+
+Status: done
+
+**Summary.** One registry in `src/state/shortcuts.ts` (key, description, group per entry) with desktop-only actions: `↑` `↓` step the list (frozen order, `setHash`, focus follows, scroll into view) or the board column while the detail is open; `1` to `9` and `[` `]` switch tabs through `selectCategory` without wrapping; `S` then `1` to `5` pick through the menu's own path; `?` and the 快捷鍵 button open a Dialog generated from the registry. Tooltips read the same table.
+
+**Review.** First pass: 32 findings (high 2, medium 4), patched the dialog's modal session never starting, stale focus, arrows inside the detail, repeats, Shift, e2e gaps; rejected 7 with reasons. Follow-up pass: 27 findings (no high, medium 4), patched Shift on non-US layouts, keys over the open sort menu, outside-close focus, scrim fade, toast region, held-key stepping; rejected 12 with reasons. Nothing deferred.
+
+**Follow-up review: not recommended.** No high was patched on the follow-up pass.
+
+**Deviation.** `src/shared/ui/dialog.tsx` is non-modal Radix plus `useModalSession`, because Radix's modal scroll lock injects a `<style>` the CSP blocks.

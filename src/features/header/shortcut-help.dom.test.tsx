@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
+import { TOAST_REGION_ATTR } from '#/shared/ui/toaster'
 import {
   helpGroups,
   openLayerCount,
@@ -108,7 +109,13 @@ describe('the help window', () => {
     const open = dialog() as HTMLElement
     expect(open).not.toBeNull()
     expect(open.querySelector('h2')?.textContent).toBe('快捷鍵')
-    const sections = [...open.querySelectorAll('section')]
+    // Named groups, no region landmarks.
+    expect(open.querySelectorAll('section, [role="region"]')).toHaveLength(0)
+    const sections = [...open.querySelectorAll('[role="group"]')]
+    for (const section of sections) {
+      const id = section.getAttribute('aria-labelledby') ?? ''
+      expect(document.getElementById(id)?.tagName).toBe('H3')
+    }
     const groups = helpGroups()
     expect(
       sections.map((section) => section.querySelector('h3')?.textContent),
@@ -268,6 +275,35 @@ describe('modal behaviour (non-modal Radix plus the sheet session)', () => {
     expect(dialog()).toBeNull()
     expect(page.hasAttribute('inert')).toBe(false)
     expect(openLayerCount()).toBe(0)
+  })
+
+  it('the scrim fades with the dialog (data-state open, then closed)', async () => {
+    await mount()
+    await act(async () => button()?.click())
+    const scrim = document.querySelector('[data-slot="dialog-overlay"]')
+    expect(scrim?.getAttribute('data-state')).toBe('open')
+    expect(scrim?.className).toContain('data-[state=closed]:fade-out-0')
+  })
+
+  it('focus or a press in the toast region does not dismiss it', async () => {
+    const toasts = document.createElement('div')
+    toasts.setAttribute(TOAST_REGION_ATTR, '')
+    const retry = document.createElement('button')
+    toasts.append(retry)
+    document.body.append(toasts)
+    await mount()
+    await act(async () => button()?.click())
+    await settle()
+    await act(async () => {
+      retry.focus()
+      retry.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+      )
+      retry.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+    expect(dialog()).not.toBeNull()
+    expect(document.activeElement).toBe(retry)
   })
 
   it('narrowing below 1024px closes it; widening again does not reopen it', async () => {

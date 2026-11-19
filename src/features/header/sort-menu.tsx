@@ -53,7 +53,9 @@ import { ViewIcon } from '#/features/header/view-icon'
 // selected does nothing); the digits shown come from the registry. A menu
 // `S` opened gives focus back where it was when it closes, not to the
 // pill: from the pill, `↓` would open the menu again instead of moving to
-// the next row. Closed by a press on the pill, focus stays on the pill.
+// the next row. Closed by a press on the pill, focus stays on the pill;
+// closed by a press elsewhere, or focus moving out, focus stays where Alex
+// put it (Radix's own: no pull back).
 
 export function DesktopSortMenu() {
   const { view, pickView, rememberedHint } = useListView()
@@ -69,6 +71,13 @@ export function DesktopSortMenu() {
    * from the pill, focus goes back to it (Radix's own).
    */
   const returnRef = useRef<HTMLElement | null | undefined>(undefined)
+  const pillRef = useRef<HTMLButtonElement>(null)
+  /** A press or focus outside the menu, not on the pill: no pull back. */
+  const leftOutside = (event: { target: EventTarget | null }) => {
+    const target = event.target
+    if (target instanceof Node && pillRef.current?.contains(target)) return
+    returnRef.current = undefined
+  }
 
   const show = () => {
     setExpanded(isUnderMore(view.sort))
@@ -173,6 +182,7 @@ export function DesktopSortMenu() {
           type="button"
           aria-label={pill.ariaLabel}
           title={pill.title}
+          ref={pillRef}
           // A press that closes the menu keeps focus here (a press that
           // opens it resets this in `onOpenChange`, which Radix calls after).
           onPointerDown={(event) => {
@@ -195,6 +205,8 @@ export function DesktopSortMenu() {
         align="end"
         aria-label="排序"
         className="w-[260px]"
+        onPointerDownOutside={leftOutside}
+        onFocusOutside={leftOutside}
         onCloseAutoFocus={(event) => {
           const back = returnRef.current
           returnRef.current = undefined

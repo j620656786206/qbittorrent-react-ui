@@ -386,6 +386,43 @@ describe('S then 1 to 5 (story 3.7)', () => {
     row.remove()
   })
 
+  it('while the menu is open, / and ] do nothing (only its digits act)', async () => {
+    const openSearch = vi.fn(() => true)
+    const nextTab = vi.fn(() => true)
+    setShortcutAction('openSearch', openSearch)
+    setShortcutAction('nextTab', nextTab)
+    await mount({ sort: 'ratio', dir: 'asc' })
+    await press('s')
+    await press('/')
+    await press(']')
+    expect(openSearch).not.toHaveBeenCalled()
+    expect(nextTab).not.toHaveBeenCalled()
+    expect(menu()).not.toBeNull()
+  })
+
+  it('a menu S opened, closed by a press elsewhere, leaves focus on what was pressed', async () => {
+    const row = document.createElement('button')
+    const other = document.createElement('button')
+    document.body.append(row, other)
+    await mount({ sort: 'ratio', dir: 'asc' })
+    row.focus()
+    await press('s')
+    await act(async () => {
+      other.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+      )
+      // The browser focuses the pressed button on mousedown.
+      other.focus()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(menu()).toBeNull()
+    expect(document.activeElement).toBe(other)
+    row.remove()
+    other.remove()
+  })
+
   it('a menu the pill opened still gives focus back to the pill', async () => {
     await mount({ sort: 'ratio', dir: 'asc' })
     trigger().focus()

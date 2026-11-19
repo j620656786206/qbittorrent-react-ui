@@ -24,6 +24,13 @@ const VIDEO = join(OUT_DIR, 'shortcuts.webm')
 const RAW_DIR = join(OUT_DIR, '.raw-video')
 const VIEWPORT = { width: 1280, height: 800 }
 const PAUSE_MS = 900
+/**
+ * The container reuses a qBittorrent pull for 1 s (syncer
+ * MIN_PULL_INTERVAL_MS), so a page loaded right after the data mode
+ * changed could still get the old torrents; e2e/fixtures.ts waits the same
+ * (PULL_REUSE_WAIT_MS). Nothing on the page says when that window ends.
+ */
+const PULL_REUSE_WAIT_MS = 1100
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -76,10 +83,19 @@ async function record() {
   await waitForHealth()
   await post('/__fake/mode?data=sample')
   await post('/__fake/settings?reset=1')
-  await sleep(1100)
+  await sleep(PULL_REUSE_WAIT_MS)
   rmSync(RAW_DIR, { recursive: true, force: true })
   mkdirSync(RAW_DIR, { recursive: true })
-  browser = await chromium.launch()
+  // Closed here, whatever happens, so a run cut short leaves no browser.
+  const browser = await chromium.launch()
+  try {
+    await recordWith(browser)
+  } finally {
+    await browser.close()
+  }
+}
+
+async function recordWith(browser) {
   const context = await browser.newContext({
     viewport: VIEWPORT,
     baseURL: BASE,
@@ -170,7 +186,6 @@ const serverExited = new Promise((_, reject) => {
 })
 serverExited.catch(() => {})
 
-let browser
 try {
   await Promise.race([record(), serverExited])
 } catch (error) {
@@ -178,7 +193,6 @@ try {
   process.exitCode = 1
 } finally {
   finished = true
-  await browser?.close()
   rmSync(RAW_DIR, { recursive: true, force: true })
   server.kill('SIGTERM')
 }

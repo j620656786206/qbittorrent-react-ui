@@ -109,7 +109,9 @@ function ShortcutList() {
   return (
     <div className="flex flex-col gap-4">
       {helpGroups().map(({ group, rows }, index) => (
-        <section
+        // A named group, not a landmark: five regions in one dialog would be noise.
+        <div
+          role="group"
           key={group}
           aria-labelledby={`${idPrefix}-${index}`}
           data-shortcut-group={group}
@@ -137,7 +139,7 @@ function ShortcutList() {
               </Fragment>
             ))}
           </dl>
-        </section>
+        </div>
       ))}
     </div>
   )

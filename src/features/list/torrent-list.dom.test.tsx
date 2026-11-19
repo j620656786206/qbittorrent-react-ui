@@ -1288,6 +1288,64 @@ describe('↑ ↓ (story 3.7)', () => {
     field.remove()
   })
 
+  it('a held ↓ steps on from the row it last went to while the URL lags', async () => {
+    deferWrites = true
+    await render(fakeResponse({ changed: many(5) }))
+    await press('ArrowDown')
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          repeat: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(setHash.mock.calls.map(([hash]) => hash)).toEqual([
+      fakeHash(4),
+      fakeHash(3),
+    ])
+    // The URL catches up: steps go on from there.
+    await applyHash(fakeHash(3))
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(2))
+  })
+
+  it('another key or a press forgets the row stepped to and the focus still pending', async () => {
+    deferWrites = true
+    await render(fakeResponse({ changed: many(5) }))
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(4))
+    await act(async () => {
+      document.body.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true }),
+      )
+    })
+    // From the viewed row again (the URL never answered).
+    await press('ArrowDown')
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(4))
+  })
+
+  it('a pending focus expires on the next other key, so a late row does not take it', async () => {
+    await render(fakeResponse({ changed: many(40) }))
+    Object.defineProperty(scroller(), 'scrollHeight', { value: 40 * 61 })
+    vi.spyOn(scroller(), 'scrollTo').mockImplementation(() => {})
+    viewedHash = fakeHash(11)
+    await act(async () => root.render(app()))
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    await press('ArrowDown')
+    await press('a')
+    scroller().scrollTop = 1300
+    await act(async () => {
+      scroller().dispatchEvent(new Event('scroll'))
+    })
+    expect(
+      rowButtons().some((button) => button.textContent.includes('T9')),
+    ).toBe(true)
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it('Tab onto another row: it gets focus, the viewed row keeps its ring', async () => {
     await render(fakeResponse({ changed: many(3) }))
     rowButtons()[2].focus()

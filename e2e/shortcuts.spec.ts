@@ -11,7 +11,8 @@ import {
 
 // Story 3.7: the desktop keyboard shortcuts in Chromium against the built
 // app and scripts/fake-qbit.mjs (`sample` data, code-name categories only).
-// `2` switches to the second tab and `1` back to 「全部」, `S` then `3`
+// `2` switches to the second tab and `1` back to 「全部」, `[` on the first
+// tab stays and `]` goes to the second, `S` then `3`
 // picks 加入時間, `↓` views the next row (the URL `hash` replaced, no new
 // history entry) and focus follows it, `↑` at the top neither moves nor
 // scrolls (Tab to another row shows the focus outline while the viewed row
@@ -70,7 +71,7 @@ async function stays<T>(
   }
 }
 
-test('desktop: 2 and 1 switch category, S then 3 picks 加入時間, ↓ moves the viewed row and focus', async ({
+test('desktop: 2, 1, [ ] switch category, S then 3 picks 加入時間, ↓ moves the viewed row and focus', async ({
   page,
 }) => {
   await page.setViewportSize(DESKTOP)
@@ -87,6 +88,15 @@ test('desktop: 2 and 1 switch category, S then 3 picks 加入時間, ↓ moves t
   // `1`: back to 「全部」 (more than one row to step through).
   await page.keyboard.press('1')
   await expect(tabs(page).first()).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(() => param(page, 'category')).toBeNull()
+
+  // `[` on the first tab stays (no wrap); `]` goes to the second tab.
+  await page.keyboard.press('[')
+  await stays(page, () => param(page, 'category'), null)
+  await page.keyboard.press(']')
+  await expect(second).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(() => param(page, 'category')).toBe(secondKey)
+  await page.keyboard.press('1')
   await expect.poll(() => param(page, 'category')).toBeNull()
 
   // `S` opens the menu, `3` picks 加入時間 and closes it.

@@ -543,17 +543,29 @@ describe('story 3.7 keys', () => {
     ])
   })
 
-  it('Shift only where it types the key: Shift+↓, Shift+1, Shift+[ are left alone', () => {
+  it('Shift+↑ ↓ are left alone; printable keys typed with Shift act (German /, AZERTY digits)', () => {
     const calls = provideAll()
-    for (const key of ['ArrowDown', 'ArrowUp', '1', '[', '/']) {
+    for (const key of ['ArrowDown', 'ArrowUp']) {
       expect(
         press(key, document.body, { shiftKey: true }).defaultPrevented,
       ).toBe(false)
     }
     expect(calls).toEqual([])
+    for (const key of ['/', '1', '[', '?', 'S']) {
+      expect(
+        press(key, document.body, { shiftKey: true }).defaultPrevented,
+      ).toBe(true)
+    }
+    expect(calls).toEqual([
+      'openSearch(0)',
+      'selectTab(0)',
+      'prevTab(0)',
+      'openHelp(0)',
+      'openSortMenu(0)',
+    ])
     expect(
-      SHORTCUTS.filter((entry) => entry.shift === true).map((e) => e.id),
-    ).toEqual(['sort', 'help'])
+      SHORTCUTS.filter((entry) => entry.noShift === true).map((e) => e.id),
+    ).toEqual(['item'])
   })
 
   it('↑ ↓ are left to an element marked OWN_ARROWS (the detail panel)', () => {
@@ -572,14 +584,28 @@ describe('story 3.7 keys', () => {
     expect(calls).toEqual(['nextTab(0)'])
   })
 
-  it('? is refused while the sort menu is open (it takes the digits)', () => {
+  it('/, [ ] and ? are refused while the sort menu is open (it takes the digits)', () => {
     const calls = provideAll()
     const off = setShortcutAction('pickTopSort', () => true)
-    expect(press('?').defaultPrevented).toBe(false)
+    for (const key of ['?', '/', '[', ']']) {
+      expect(press(key).defaultPrevented).toBe(false)
+    }
     expect(calls).toEqual([])
     off()
     press('?')
-    expect(calls).toEqual(['openHelp(0)'])
+    press(']')
+    expect(calls).toEqual(['openHelp(0)', 'nextTab(0)'])
+  })
+
+  it('the digit descriptions name the keys of the table', () => {
+    const digits = SHORTCUTS.find((entry) => entry.id === 'tabDigit')
+    const sort = SHORTCUTS.find((entry) => entry.id === 'sort')
+    expect(digits?.description).toBe(
+      `跳到分類，照分頁順序，${digits?.keys[0]} 是「全部」`,
+    )
+    expect(sort?.description).toBe(
+      `打開排序選單，再按 ${sortMenuDigit(1)} 到 ${sortMenuDigit(5)} 選常用排序`,
+    )
   })
 
   it('focusedElement: what has focus, null for body', () => {

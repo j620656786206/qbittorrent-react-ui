@@ -291,24 +291,49 @@ function TorrentRows({
   })
   // Story 3.7: `↑` `↓` on desktop. The row to focus once it is rendered
   // (it may only appear after the scroll), and what had focus at the press:
-  // focus moved anywhere else since (`/` into the search box) cancels it.
+  // focus moved anywhere else since (`/` into the search box) cancels it,
+  // and so does any other key or a press. The row last stepped to: a held
+  // key repeats faster than the URL comes back, so the next step starts
+  // there until `viewed` catches up (or another key or a press).
   const desktop = useIsDesktop()
   const focusNextRef = useRef<{
     hash: string
     from: HTMLElement | null
   } | null>(null)
+  const steppedRef = useRef<string | null>(null)
   const step = (by: -1 | 1) => {
-    const position = detailPosition(shown, viewed)
+    const stepped = steppedRef.current
+    const from = stepped !== null && shown.includes(stepped) ? stepped : viewed
+    const position = detailPosition(shown, from)
     if (position === null) return false
     const target = by < 0 ? position.prev : position.next
     if (target === null) return true
     focusNextRef.current = { hash: target, from: focusedElement() }
+    steppedRef.current = target
     setHash(target)
     virtualizer.scrollToIndex(position.index + by, { align: 'auto' })
     return true
   }
   useShortcutAction('prevItem', desktop ? () => step(-1) : null)
   useShortcutAction('nextItem', desktop ? () => step(1) : null)
+  useLayoutEffect(() => {
+    if (viewed === steppedRef.current) steppedRef.current = null
+  }, [viewed])
+  useEffect(() => {
+    const forget = (event: Event) => {
+      const key = event instanceof KeyboardEvent ? event.key : null
+      if (key === 'ArrowUp' || key === 'ArrowDown') return
+      focusNextRef.current = null
+      steppedRef.current = null
+    }
+    // Capture: before the registry's own listener sees the key.
+    document.addEventListener('keydown', forget, true)
+    document.addEventListener('pointerdown', forget, true)
+    return () => {
+      document.removeEventListener('keydown', forget, true)
+      document.removeEventListener('pointerdown', forget, true)
+    }
+  }, [])
   useLayoutEffect(() => {
     const pending = focusNextRef.current
     if (pending === null) return

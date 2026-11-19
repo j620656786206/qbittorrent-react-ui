@@ -29,7 +29,11 @@ import { useLayoutEffect, useRef } from 'react'
 // stepping, so the list does not scroll on its own instead), and a
 // combination with Cmd, Ctrl or Alt are left alone (except AltGr, which
 // some layouts report as Ctrl and Alt and need to type `/` or `[`). Shift
-// is allowed only where it types the key (`?`, `S`). `↑` `↓` are left to
+// is allowed with every printable key (`event.key` already says what it
+// typed: `?`, `S`, a German `/`, AZERTY digits); only Shift+`↑` `↓` are
+// left alone. While the sort menu is open, only its digits act: `/`,
+// `[` `]` and `?` are refused (the menu's close would pull focus back, or
+// the category would change behind it). `↑` `↓` are left to
 // whatever has focus inside an element marked `OWN_ARROWS` (the detail's
 // tab list and its scrolling body with the file list; not its header, so
 // they still step from ‹ › and ✕).
@@ -81,8 +85,8 @@ export interface Shortcut {
   display: ReadonlyArray<ShortcutKeyPart>
   /** Also handled while focus is in a text field. */
   inInputs: boolean
-  /** Shift types it (`?`, `S`); elsewhere a Shift combination is left alone. */
-  shift?: boolean
+  /** A Shift combination is left alone (`↑` `↓`; printable keys allow it). */
+  noShift?: boolean
   /** A held key keeps acting (`↑` `↓`). */
   repeats?: boolean
   /** Left alone while focus is inside this selector. */
@@ -181,10 +185,15 @@ const SORT_DIGITS = TAB_DIGITS.slice(0, 5)
 const key = (name: string): ShortcutKeyPart => ({ key: name })
 const word = (text: string): ShortcutKeyPart => ({ word: text })
 
+/** The sort menu is open: it provides the digits. */
+function sortMenuOpen(): boolean {
+  return actions.has('pickTopSort')
+}
+
 /** A digit: the open sort menu's top five, else the tab at that position. */
 function runDigit(pressed: string): boolean {
   const index = TAB_DIGITS.indexOf(pressed as (typeof TAB_DIGITS)[number])
-  if (actions.has('pickTopSort')) {
+  if (sortMenuOpen()) {
     return index < SORT_DIGITS.length && runAction('pickTopSort', index)
   }
   return runAction('selectTab', index)
@@ -197,6 +206,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     display: [key('↑'), key('↓')],
     inInputs: false,
     repeats: true,
+    noShift: true,
     notInside: '[data-own-arrows]',
     description: '上一個、下一個',
     note: '看板打開詳情時換同一欄',
@@ -209,7 +219,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     keys: TAB_DIGITS,
     display: [key(TAB_DIGITS[0]), word('到'), key(TAB_DIGITS.at(-1) ?? '')],
     inInputs: false,
-    description: '跳到分類，照分頁順序，1 是「全部」',
+    description: `跳到分類，照分頁順序，${TAB_DIGITS[0]} 是「全部」`,
     group: '換分類',
     run: runDigit,
   },
@@ -220,7 +230,8 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     inInputs: false,
     description: '上一個、下一個分類',
     group: '換分類',
-    run: (pressed) => runAction(pressed === '[' ? 'prevTab' : 'nextTab'),
+    run: (pressed) =>
+      !sortMenuOpen() && runAction(pressed === '[' ? 'prevTab' : 'nextTab'),
   },
   {
     id: 'sort',
@@ -233,8 +244,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
       key(SORT_DIGITS.at(-1) ?? ''),
     ],
     inInputs: false,
-    shift: true,
-    description: '打開排序選單，再按 1 到 5 選常用排序',
+    description: `打開排序選單，再按 ${SORT_DIGITS[0]} 到 ${SORT_DIGITS.at(-1) ?? ''} 選常用排序`,
     group: '排序',
     run: () => runAction('openSortMenu'),
   },
@@ -245,7 +255,7 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     inInputs: false,
     description: '打開搜尋框找名字',
     group: '搜尋和關閉',
-    run: () => runAction('openSearch'),
+    run: () => !sortMenuOpen() && runAction('openSearch'),
   },
   {
     id: 'escape',
@@ -261,12 +271,11 @@ export const SHORTCUTS: ReadonlyArray<Shortcut> = [
     keys: ['?'],
     display: [key('?')],
     inInputs: false,
-    shift: true,
     description: '打開快捷鍵說明',
     group: '說明',
     // Not over the open sort menu: its close would pull focus out of the
     // help window, which closes it again.
-    run: () => !actions.has('pickTopSort') && runAction('openHelp'),
+    run: () => !sortMenuOpen() && runAction('openHelp'),
   },
 ]
 
@@ -343,7 +352,7 @@ export function handleShortcut(event: ShortcutEvent): boolean {
   if (!shortcut) return false
   // A held Esc repeats: one press closes one layer, not the ones below.
   if (event.repeat && shortcut.repeats !== true) return false
-  if (event.shiftKey && shortcut.shift !== true) return false
+  if (event.shiftKey && shortcut.noShift === true) return false
   if (!shortcut.inInputs && isTypingTarget(event.target)) return false
   const target = event.target
   if (

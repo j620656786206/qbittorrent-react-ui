@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 
 import { Button } from '#/shared/ui/button.tsx'
 import { useModalSession } from '#/shared/ui/sheet-session'
+import { isInToastRegion } from '#/shared/ui/toaster'
 
 // shadcn Dialog (https://ui.shadcn.com/docs/components/dialog). Story 3.7:
 // non-modal Radix underneath, like dropdown-menu.tsx: a modal Radix dialog
@@ -19,7 +20,9 @@ import { useModalSession } from '#/shared/ui/sheet-session'
 // closes (the root's open state, which Radix keeps private, is passed
 // down here), so the exit animation already has the page back; focus goes
 // back through the session only (`returnFocus`, else what had focus when
-// it opened), never through Radix's close autofocus as well.
+// it opened), never through Radix's close autofocus as well. The toast
+// region stays usable over it (story 2.6): a press or focus there does not
+// dismiss it.
 // Radix docs: https://www.radix-ui.com/primitives/docs/components/dialog
 
 /** The root's open state, for the content's session. */
@@ -99,12 +102,14 @@ function DialogContent({
   returnFocus,
   onKeyDown,
   onCloseAutoFocus,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Focused on close; by default what had focus when it opened. */
   returnFocus?: () => HTMLElement | null
 }) {
+  const open = React.useContext(DialogOpenContext)
   const scrimRef = React.useRef<HTMLDivElement>(null)
   const contentRef = React.useRef<HTMLDivElement>(null)
   const session = useModalSession({
@@ -118,6 +123,8 @@ function DialogContent({
         ref={scrimRef}
         aria-hidden="true"
         data-slot="dialog-overlay"
+        // Its fade in and out, like Radix's own overlay.
+        data-state={open ? 'open' : 'closed'}
         className={SCRIM_CLASS}
       />
       <DialogPrimitive.Content
@@ -127,6 +134,13 @@ function DialogContent({
         onKeyDown={(event) => {
           onKeyDown?.(event)
           session.onKeyDown(event)
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          const target = event.target
+          if (target instanceof Node && isInToastRegion(target)) {
+            event.preventDefault()
+          }
         }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
