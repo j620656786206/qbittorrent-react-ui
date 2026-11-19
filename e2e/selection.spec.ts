@@ -434,11 +434,17 @@ async function longPress(page: Page, target: Locator, ms = 650) {
   await cdp.detach()
 }
 
-/** A finger drag of `dx`, `dy` from the middle of `target`, quickly. */
+/**
+ * A finger drag of `dx`, `dy` from the middle of `target`, quickly. With
+ * `holdMs` the finger rests that long at the end before lifting, so the
+ * release has no speed. The 12 protocol moves arrive within a few ms, a
+ * flick no finger makes: Chromium (Linux) then starts a fling and takes
+ * the next quick tap as "stop the fling", sending no `click` at all.
+ */
 async function touchDrag(
   page: Page,
   target: Locator,
-  { dx, dy }: { dx: number; dy: number },
+  { dx, dy, holdMs = 0 }: { dx: number; dy: number; holdMs?: number },
 ) {
   const box = await target.boundingBox()
   if (!box) throw new Error('nothing to drag')
@@ -455,6 +461,13 @@ async function touchDrag(
       touchPoints: [
         { x: from.x + (dx * step) / steps, y: from.y + (dy * step) / steps },
       ],
+    })
+  }
+  if (holdMs > 0) {
+    await page.waitForTimeout(holdMs)
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: from.x + dx, y: from.y + dy }],
     })
   }
   await cdp.send('Input.dispatchTouchEvent', {
@@ -611,9 +624,11 @@ test.describe('phone selection mode (story 4.2)', () => {
     })
     expect(hit).toBe(true)
 
+    // Released at rest: the tap below must not land in a fling.
     await touchDrag(page, page.locator('[data-slot="board-swipe"]'), {
       dx: -200,
       dy: 0,
+      holdMs: 300,
     })
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
     await settled(page)
