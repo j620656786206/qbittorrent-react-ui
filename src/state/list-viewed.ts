@@ -10,7 +10,8 @@ import { useViewedHash } from '#/state/viewed-hash'
 // the order (deleted, archived) the URL follows with `replace`: desktop to
 // the row that took its place, phone to no `hash` (the sheet closes). Until
 // the router answers, the row already written keeps showing, so the panel
-// never blinks to the first row in between. Story 3.6: where the first row
+// never blinks to the first row in between; that move is the app's own
+// (`followHash`), never remembered as Alex's pick. Story 3.6: where the first row
 // would be viewed (desktop list mode, `fallbackFirst`), the category's last
 // viewed torrent on this device (`lastViewedHash` in src/lib/prefs.ts) is,
 // when the order holds it. It is never scrolled into view (PRD FR-16).
@@ -31,7 +32,7 @@ export function useListViewed(
     scope?: string
   },
 ): string | null {
-  const { hash, setHash } = useViewedHash()
+  const { hash, followHash } = useViewedHash()
   const lastRef = useRef<(LastViewed & { scope: string }) | null>(null)
   /**
    * A `hash` written and not yet back from the router, with the URL's
@@ -72,7 +73,7 @@ export function useListViewed(
     if (order !== undefined) lastRef.current = { order, viewed, scope }
     if (write === undefined) return
     pendingRef.current = { hash: write, from: hash }
-    setHash(write)
+    followHash(write)
   })
 
   return viewed

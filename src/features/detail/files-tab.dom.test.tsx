@@ -142,7 +142,9 @@ function Url({
   const setHash = useCallback((next: string | null) => setHashState(next), [])
   writeHash = setHash
   return (
-    <ViewedHashContext value={{ hash, setHash }}>{children}</ViewedHashContext>
+    <ViewedHashContext value={{ hash, setHash, followHash: setHash }}>
+      {children}
+    </ViewedHashContext>
   )
 }
 

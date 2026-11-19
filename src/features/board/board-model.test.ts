@@ -62,7 +62,9 @@ describe('columns', () => {
     for (const column of WORK_COLUMNS) {
       expect(emptyText(column, columns)).toBe('沒有')
     }
-    expect(totalOf(columns)).toBe(1)
+    // Desktop counts the 已整理 column; the phone has none.
+    expect(totalOf(columns, true)).toBe(1)
+    expect(totalOf(columns, false)).toBe(0)
   })
 })
 

@@ -125,7 +125,7 @@ export function boardView({
   searching = false,
 }: {
   hasData: boolean
-  /** Every torrent, archived ones included. */
+  /** The torrents on the board (totalOf). */
   total: number
   error: unknown
   /** A search keyword is set. */
@@ -136,13 +136,18 @@ export function boardView({
   return searching ? 'no-result' : 'empty'
 }
 
-export function totalOf(columns: BoardColumns): number {
+/**
+ * The torrents on the board; the phone's board has no 已整理 column, so
+ * without `withArchived` they do not count (story 3.5: its search result
+ * and its live region agree).
+ */
+export function totalOf(columns: BoardColumns, withArchived: boolean): number {
   return (
     columns.attention.length +
     columns.downloading.length +
     columns.seeding.length +
     columns.done.length +
-    columns.archived.length
+    (withArchived ? columns.archived.length : 0)
   )
 }
 

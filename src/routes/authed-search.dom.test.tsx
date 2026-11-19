@@ -470,6 +470,88 @@ describe('closing on the settings page', () => {
   })
 })
 
+describe('closing on the settings page, then back', () => {
+  it('the browser’s back: the list comes back without the keyword, the box closed', async () => {
+    await mount('/?q=show&sort=added_on')
+    const settings = desktopHeader().querySelector(
+      'button[aria-label="設定"]',
+    ) as HTMLButtonElement
+    await click(settings)
+    const clear = desktopHeader().querySelector(
+      'button[aria-label="清除搜尋"]',
+    ) as HTMLButtonElement
+    await click(clear)
+    await settle()
+    // The list's history entry still holds `q=show`.
+    await act(async () => router.history.back())
+    await settle()
+    expect(pathname()).toBe('/')
+    expect('q' in search()).toBe(false)
+    expect(search()).toMatchObject({ sort: 'added_on' })
+    expect(field()).toBeNull()
+    expect(listCount()).toBe('5')
+  })
+
+  it('typing the same keyword again on the settings page keeps it', async () => {
+    await mount('/?q=show&sort=added_on')
+    await click(
+      desktopHeader().querySelector(
+        'button[aria-label="設定"]',
+      ) as HTMLButtonElement,
+    )
+    await click(
+      desktopHeader().querySelector(
+        'button[aria-label="清除搜尋"]',
+      ) as HTMLButtonElement,
+    )
+    await settle()
+    await click(magnifier() as HTMLButtonElement)
+    await type(field() as HTMLInputElement, 'show')
+    await settle()
+    expect(pathname()).toBe('/')
+    expect(search()).toMatchObject({ q: 'show' })
+    expect(listCount()).toBe('2')
+  })
+})
+
+describe('the phone board under a keyword', () => {
+  beforeEach(() => {
+    settingsAnswer = defaultSettings()
+    maindata = fakeResponse({
+      changed: [
+        ...torrents(),
+        t({
+          hash: fakeHash(6),
+          name: 'Fake.Gone',
+          category: 'X',
+          added_on: 1_790_000_050,
+          state: 'missingFiles',
+          private: false,
+        }),
+      ],
+    })
+  })
+
+  it('only an archived torrent matches: the no-result block (no 已整理 column there)', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: false,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    await mount('/?category=X&q=gone')
+    expect(noResult()?.textContent).toContain('在全部裡找')
+  })
+
+  it('desktop: the 已整理 column holds it, so the board stays', async () => {
+    await mount('/?category=X&q=gone')
+    expect(noResult()).toBeNull()
+  })
+})
+
 describe('the screen reader status', () => {
   const status = () =>
     document.querySelector('p.sr-only[role="status"]') as HTMLElement

@@ -140,7 +140,9 @@ async function render(first: MaindataResponse) {
   await act(async () => {
     root.render(
       <QueryClientProvider client={client}>
-        <ViewedHashContext value={{ hash: null, setHash: () => {} }}>
+        <ViewedHashContext
+          value={{ hash: null, setHash: () => {}, followHash: () => {} }}
+        >
           <TorrentBoard />
         </ViewedHashContext>
       </QueryClientProvider>,
