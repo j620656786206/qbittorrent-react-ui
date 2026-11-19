@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { useListView } from '#/state/list-view'
-import { clearSelection, useSelectionUpkeep } from '#/state/selection'
+import { useSelectionUpkeep } from '#/state/selection'
 import { useViewedHash } from '#/state/viewed-hash'
 import { TorrentBoard } from '#/features/board/torrent-board'
 import { BoardDetailPanel } from '#/features/detail/board-detail-panel'
@@ -28,18 +28,14 @@ export const Route = createFileRoute('/_authed/')({ component: Home })
 // trees (the open 已整理 column and the phone tab start over).
 // Story 4.1: the selection lives here too. Its scope is the category and
 // keyword (another clears it, the same one kept across a /settings round
-// trip); gone torrents drop out after each maindata update. The desktop
-// selection bar floats over the list or the board (4.2 adds the phone);
-// below 1024px the selection is cleared.
+// trip); gone torrents drop out after each maindata update. The selection
+// bar floats over the list or the board. Story 4.2: the same selection on
+// both sides of 1024px (crossing keeps it); the bar takes the desktop pill
+// or the phone panel layout.
 function Home() {
   const { view } = useListView()
   const desktop = useIsDesktop()
   useSelectionUpkeep(view.category, view.query)
-  // No phone selection yet (story 4.2): below 1024px nothing could clear
-  // it, so crossing the line drops it (and the list's freeze with it).
-  useEffect(() => {
-    if (!desktop) clearSelection()
-  }, [desktop])
   return (
     <>
       {view.sort === 'state' ? (
@@ -50,7 +46,7 @@ function Home() {
           {!desktop && <ListDetailSheet />}
         </>
       )}
-      {desktop && <SelectionBar />}
+      <SelectionBar desktop={desktop} />
     </>
   )
 }

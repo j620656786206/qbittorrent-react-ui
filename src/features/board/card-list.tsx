@@ -56,6 +56,13 @@ import {
 // holds focus, and on every card once anything is selected
 // (`data-selecting` on the list). Clicking it only toggles the selection.
 // The column gives `paddingStart` room for it above the first card.
+//
+// Story 4.2: a `phone` list (the phone board's panels) is selectable its
+// own way. No hover: the checkbox shows on every card while anything is
+// selected, and not at all otherwise. A long press on a card (armed while
+// nothing is selected) ticks it and starts selection mode; while
+// selecting, a tap toggles the card instead of opening the sheet. Phone
+// cards keep the system callout and text selection away from a long press.
 
 /**
  * Story 4.1: 6px out of the card's top-left corner, its own `surface`
@@ -70,6 +77,10 @@ export const CARD_CHECKBOX_CLASS =
  * above the column's bottom, above the floating selection bar.
  */
 const SELECTION_SCROLL_PADDING_END = 92
+
+/** Story 4.2: the phone checkbox, the same corner, shown while selecting. */
+export const PHONE_CARD_CHECKBOX_CLASS =
+  'absolute -top-1.5 -left-1.5 z-[1] bg-surface ring-2 ring-surface'
 
 /** Cards drawn beyond the visible ones, above and below. */
 const OVERSCAN = 4
@@ -130,6 +141,8 @@ export interface CardListProps {
   hereMs?: number
   /** Story 4.1: desktop cards get the selection checkbox. */
   selectable?: boolean
+  /** Story 4.2: the phone's way of selecting (long press, tap toggles). */
+  phone?: boolean
 }
 
 export function CardList({
@@ -149,6 +162,7 @@ export function CardList({
   hereHash = null,
   hereMs = 0,
   selectable = false,
+  phone = false,
 }: CardListProps) {
   // Story 2.4: a card opens its torrent in the detail.
   const { setHash } = useViewedHash()
@@ -157,6 +171,8 @@ export function CardList({
   const errorReasons = useErrorReasons()
   const selectedHashes = useSelectedHashes()
   const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
+  const selecting = selected.size > 0
+  const phoneSelecting = selectable && phone && selecting
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -264,7 +280,7 @@ export function CardList({
     paddingStart,
     paddingEnd,
     scrollPaddingEnd:
-      selectable && selected.size > 0 ? SELECTION_SCROLL_PADDING_END : 0,
+      selectable && !phone && selecting ? SELECTION_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
@@ -313,7 +329,7 @@ export function CardList({
           role="list"
           aria-label={label}
           data-card-list=""
-          data-selecting={selected.size > 0 ? '' : undefined}
+          data-selecting={selecting ? '' : undefined}
           className="group/list relative w-full"
           style={{ height: virtualizer.getTotalSize() }}
         >
@@ -339,6 +355,7 @@ export function CardList({
                   className={cn(
                     'group/item absolute top-0 left-0',
                     width === null && 'w-full',
+                    phone && 'select-none [-webkit-touch-callout:none]',
                     here && 'anchor-frame',
                   )}
                   style={{
@@ -351,7 +368,15 @@ export function CardList({
                         : `translate(${x}px, ${item.start}px)`,
                   }}
                 >
-                  {torrent && selectable && (
+                  {torrent && phoneSelecting && (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelected(hash)}
+                      aria-label={`選取 ${torrent.name}`}
+                      className={PHONE_CARD_CHECKBOX_CLASS}
+                    />
+                  )}
+                  {torrent && selectable && !phone && (
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleSelected(hash)}
@@ -370,7 +395,9 @@ export function CardList({
                       today={today}
                       errorReason={reasonOf(errorReasons, hash)}
                       selected={isSelected}
-                      onOpen={setHash}
+                      onOpen={phoneSelecting ? toggleSelected : setHash}
+                      longPress={selectable && phone && !selecting}
+                      onLongPress={toggleSelected}
                     />
                   )}
                 </div>,

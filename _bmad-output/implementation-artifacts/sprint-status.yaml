@@ -73,7 +73,7 @@ development_status:
 
   epic-4: in-progress
   4-1-電腦勾選和選取列: done # PR #44：電腦勾選和選取列
-  4-2-手機選取模式: backlog
+  4-2-手機選取模式: done # PR #45：手機長按進入選取
   4-3-刪除確認和刪除: backlog
   4-4-刪除淡出: backlog
   4-5-info-hash-和貼上內容的判斷: backlog

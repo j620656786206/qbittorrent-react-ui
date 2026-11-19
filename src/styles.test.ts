@@ -417,6 +417,33 @@ describe('Tailwind theme (row 20)', () => {
     expect(declarations(reduced[0].body).get('animation')).toBe('none')
   })
 
+  it('has the phone selection shift: 28px, 0.2s, transform only, off for reduced motion (spec 4.2)', () => {
+    for (const [name, step, transform] of [
+      ['select-shift-in', 'from', 'translateX(-28px)'],
+      ['select-shift-out', 'from', 'translateX(28px)'],
+      ['select-shift-away', 'to', 'translateX(-28px)'],
+    ] as const) {
+      const keyframes = byPrelude(`@keyframes ${name}`)
+      expect(keyframes, name).toHaveLength(1)
+      const steps = blocks(keyframes[0].body)
+      expect(steps.map((b) => b.prelude)).toEqual([step])
+      const decl = declarations(steps[0].body)
+      expect(decl.get('transform')).toBe(transform)
+      expect([...decl.keys()]).toEqual(['transform'])
+
+      const utility = byPrelude(`@utility animate-${name}`)
+      expect(utility, name).toHaveLength(1)
+      expect(declarations(utility[0].body).get('animation')).toBe(
+        `${name} 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both`,
+      )
+      const reduced = blocks(utility[0].body)
+      expect(reduced.map((b) => b.prelude)).toEqual([
+        '@media (prefers-reduced-motion: reduce)',
+      ])
+      expect(declarations(reduced[0].body).get('animation')).toBe('none')
+    }
+  })
+
   it('has the anchor frame and the strip fade-in, opacity only, off for reduced motion (spec 2.8)', () => {
     const frame = byPrelude('@keyframes anchor-frame')
     expect(frame).toHaveLength(1)

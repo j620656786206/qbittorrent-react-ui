@@ -4,6 +4,9 @@ import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { useLongPress } from '#/state/long-press'
+import type { LongPressHandlers } from '#/state/long-press'
+import type { SelectionShift } from '#/state/selection'
 import { ROW_HEIGHT, rowModel } from '#/features/list/list-model'
 import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 
@@ -22,6 +25,12 @@ import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 // never changes. The desktop checkbox is not in here (no control inside the
 // row's button): torrent-list.tsx draws it in the row's `group/item`
 // wrapper, over the 20px slot, so hovering it still shows the row's hover.
+// Story 4.2: on the phone a long press (src/state/long-press.ts) ticks the
+// row and starts selection mode, and while selecting the row makes 28px of
+// room on its left for the checkbox torrent-list.tsx draws there (10px in,
+// as in mockup S07-delete-phone). The room is padding, set at once; the
+// content slides into it (`select-shift-in`, and `-out` back) only when
+// the mode has just changed, so a row mounted later is already in place.
 // Names and details are JSX text, never HTML or links.
 
 export interface RowActionProps {
@@ -29,8 +38,24 @@ export interface RowActionProps {
   viewing: boolean
   /** Story 4.1: the row is ticked (the `selection-row` background). */
   selected: boolean
-  /** Stable: opens this row's torrent in the detail. */
+  /** Stable: opens this row's torrent in the detail (phone selecting: toggles it). */
   onOpen: (hash: string) => void
+  /** Story 4.2: a long press is armed (phone, nothing selected). */
+  longPress?: boolean
+  /** Stable: what a long press does, with this row's hash. */
+  onLongPress?: (hash: string) => void
+  /** Story 4.2: phone selection mode, the 28px room for the checkbox. */
+  phoneSelecting?: boolean
+  /** Story 4.2: the mode just changed on the phone (the content slides). */
+  shift?: SelectionShift
+}
+
+const NOTHING = () => {}
+
+/** Story 4.2: the content slide when phone selection mode just changed. */
+export const SHIFT_CLASS: Readonly<Record<'in' | 'out', string>> = {
+  in: 'animate-select-shift-in',
+  out: 'animate-select-shift-out',
 }
 
 /** A box of fixed height on both breakpoints, so a short line cannot shrink it. */
@@ -44,7 +69,15 @@ export const TorrentRow = memo(function Row({
   viewing,
   selected,
   onOpen,
+  longPress = false,
+  onLongPress = NOTHING,
+  phoneSelecting = false,
+  shift = null,
 }: RowProps & RowActionProps) {
+  const press = useLongPress({
+    enabled: longPress,
+    onFire: () => onLongPress(torrent.hash),
+  })
   const model = rowModel(torrent, {
     now: today,
     stateBeforeMove: stateBeforeMove ? { [torrent.hash]: stateBeforeMove } : {},
@@ -58,6 +91,9 @@ export const TorrentRow = memo(function Row({
       viewing={viewing}
       selected={selected}
       onOpen={() => onOpen(torrent.hash)}
+      press={press}
+      phoneSelecting={phoneSelecting}
+      shift={shift}
     />
   )
 })
@@ -68,11 +104,18 @@ export function RowContent({
   viewing = false,
   selected = false,
   onOpen,
+  press,
+  phoneSelecting = false,
+  shift = null,
 }: {
   model: RowModel
   viewing?: boolean
   selected?: boolean
   onOpen?: () => void
+  /** Story 4.2: the long press's pointer handlers. */
+  press?: LongPressHandlers
+  phoneSelecting?: boolean
+  shift?: SelectionShift
 }) {
   return (
     <button
@@ -81,9 +124,12 @@ export function RowContent({
       // Story 2.9: the element that rises in the entrance.
       data-entrance=""
       onClick={onOpen}
+      {...press}
       style={{ height: ROW_HEIGHT }}
       className={cn(
         'box-border flex w-full items-center gap-2 rounded-row px-2.5 py-[9px] text-left text-text lg:gap-2.5 lg:px-3',
+        // 10px, the 20px checkbox and an 8px gap (S07-delete-phone).
+        phoneSelecting && 'pl-[38px]',
         selected
           ? 'bg-selection-row'
           : 'hover-row lg:group-hover/item:bg-surface-muted',
@@ -91,7 +137,12 @@ export function RowContent({
       )}
     >
       <span aria-hidden="true" className="hidden size-5 flex-none lg:block" />
-      <span className="flex min-w-0 flex-1 items-center gap-2.5 lg:gap-3">
+      <span
+        className={cn(
+          'flex min-w-0 flex-1 items-center gap-2.5 lg:gap-3',
+          shift !== null && SHIFT_CLASS[shift],
+        )}
+      >
         <StatusCircle {...model.circle} />
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <span

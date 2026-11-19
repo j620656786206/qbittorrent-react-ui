@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
 import { selectTorrents, useMaindata } from '#/state/maindata'
 import { setSelectionFreeze } from '#/state/order-freeze'
@@ -11,6 +11,10 @@ import { setSelectionFreeze } from '#/state/order-freeze'
 // trip to /settings changes nothing. After every maindata update, hashes
 // no longer in `torrents` drop out. While anything is selected the list
 // order holds (order-freeze's `selection` reason); the board never does.
+// Story 4.2: selection mode is "anything selected", the same on desktop
+// and phone (the breakpoint is the features' business), so a selection
+// survives crossing 1024px. `useSelectionShift` tells the phone rows that
+// the mode has just changed, so only the rows on screen then slide.
 // Docs: TanStack Store 0.11 `createStore`, `useSelector`
 // (https://tanstack.com/store/v0/docs/framework/react/quick-start).
 
@@ -69,6 +73,45 @@ export function syncSelectionScope(scopeKey: string): void {
 
 export function useSelectedHashes(): ReadonlyArray<string> {
   return useSelector(selectionStore, (state) => state.hashes)
+}
+
+/** Story 4.2: selection mode, which is anything selected. */
+export function useSelecting(): boolean {
+  return useSelector(selectionStore, (state) => state.hashes.length > 0)
+}
+
+/** Story 4.2: how long the phone rows' shift takes, ms. */
+export const SELECTION_SHIFT_MS = 200
+
+/**
+ * The shift is cleared this long after the mode change: the 0.2s keyframes
+ * start at commit and this timer a little later, so a late first frame
+ * still finishes before the class goes.
+ */
+export const SELECTION_SHIFT_CLEAR_MS = SELECTION_SHIFT_MS + 50
+
+/** `in`: the mode just started; `out`: it just ended; `null`: settled. */
+export type SelectionShift = 'in' | 'out' | null
+
+/**
+ * Story 4.2: `in` or `out` for `SELECTION_SHIFT_CLEAR_MS` after the mode changes
+ * while the caller is mounted, then `null`. A caller mounted later (a
+ * crossing of 1024px that swaps trees, a new list) starts settled.
+ */
+export function useSelectionShift(): SelectionShift {
+  const selecting = useSelecting()
+  const [seen, setSeen] = useState(selecting)
+  const [shift, setShift] = useState<SelectionShift>(null)
+  if (seen !== selecting) {
+    setSeen(selecting)
+    setShift(selecting ? 'in' : 'out')
+  }
+  useEffect(() => {
+    if (shift === null) return
+    const timer = setTimeout(() => setShift(null), SELECTION_SHIFT_CLEAR_MS)
+    return () => clearTimeout(timer)
+  }, [shift])
+  return shift
 }
 
 export function useIsSelected(hash: string): boolean {

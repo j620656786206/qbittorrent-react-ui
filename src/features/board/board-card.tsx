@@ -4,6 +4,8 @@ import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { useLongPress } from '#/state/long-press'
+import type { LongPressHandlers } from '#/state/long-press'
 import {
   CARD_HEIGHT,
   CARD_HEIGHT_WITH_BAR,
@@ -25,8 +27,9 @@ import type { CardModel } from '#/features/board/board-model'
 // URL's `hash`), with the 1px `text-faint` inset hover ring. Story 4.1: a
 // selected card has the `selection-row` background; its desktop checkbox
 // sits outside the button, in card-list.tsx's wrapper (no control nested in
-// a button, and the card's `overflow-hidden` would clip it). Names and
-// lines are JSX text, never HTML.
+// a button, and the card's `overflow-hidden` would clip it). Story 4.2: on
+// the phone a long press (src/state/long-press.ts) ticks the card and
+// starts selection mode. Names and lines are JSX text, never HTML.
 
 /** Status colour of the bar fill; Tailwind needs whole class names. */
 const BAR_FILL: Readonly<Record<string, string>> = {
@@ -60,9 +63,15 @@ export interface BoardCardProps {
   errorReason?: string
   /** Story 4.1: the card is ticked (the `selection-row` background). */
   selected?: boolean
-  /** Stable: opens this card's torrent in the detail. */
+  /** Stable: opens this card's torrent in the detail (phone selecting: toggles it). */
   onOpen: (hash: string) => void
+  /** Story 4.2: a long press is armed (phone, nothing selected). */
+  longPress?: boolean
+  /** Stable: what a long press does, with this card's hash. */
+  onLongPress?: (hash: string) => void
 }
+
+const NOTHING = () => {}
 
 /** Keyed by hash and memoized: a poll that leaves the torrent alone skips it. */
 export const BoardCard = memo(function Card({
@@ -72,7 +81,13 @@ export const BoardCard = memo(function Card({
   errorReason,
   selected = false,
   onOpen,
+  longPress = false,
+  onLongPress = NOTHING,
 }: BoardCardProps) {
+  const press = useLongPress({
+    enabled: longPress,
+    onFire: () => onLongPress(torrent.hash),
+  })
   const model = cardModel(torrent, {
     now: today,
     stateBeforeMove:
@@ -84,6 +99,7 @@ export const BoardCard = memo(function Card({
       model={model}
       selected={selected}
       onOpen={() => onOpen(torrent.hash)}
+      press={press}
     />
   )
 })
@@ -93,10 +109,13 @@ export function CardContent({
   model,
   selected = false,
   onOpen,
+  press,
 }: {
   model: CardModel
   selected?: boolean
   onOpen?: () => void
+  /** Story 4.2: the long press's pointer handlers. */
+  press?: LongPressHandlers
 }) {
   const { circle, progress } = model
   return (
@@ -104,6 +123,7 @@ export function CardContent({
       type="button"
       data-entrance=""
       onClick={onOpen}
+      {...press}
       style={{ height: cardHeight(model) }}
       className={selected ? CARD_SELECTED_CLASS : CARD_BUTTON_CLASS}
     >
