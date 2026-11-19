@@ -138,9 +138,10 @@ test('list: hover shows one checkbox; ticking 3 shows the bar and the total with
   await expect(bar(page)).toContainText('已選 3 個')
   await expect(bar(page)).toContainText('共 8 GB')
   await expect(bar(page).getByRole('button', { name: '改路徑' })).toBeDisabled()
+  // Story 4.3 wired delete (e2e/delete.spec.ts).
   await expect(
     bar(page).getByRole('button', { name: '刪除（含檔案）' }),
-  ).toBeDisabled()
+  ).toBeEnabled()
   await expectBarShown(page)
   // A ticked row: the selection-row background (hover does not change it).
   const ticked = await rowButton(page, 2).evaluate(

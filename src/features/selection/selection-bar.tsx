@@ -1,19 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { selectionBarText, selectionTotal } from '#/lib/selection-total'
 import { toast } from '#/lib/toast'
 import { cn } from '#/shared/ui/cn'
+import { getMain } from '#/shared/ui/main-scroll'
 import {
   selectStateBeforeMove,
   selectTorrents,
   useMaindata,
 } from '#/state/maindata'
-import { clearSelection, useSelectedHashes } from '#/state/selection'
+import {
+  clearSelection,
+  selectionStore,
+  useSelectedHashes,
+} from '#/state/selection'
+import { DeleteConfirm } from '#/features/selection/delete-confirm'
 
 // Story 4.1, DESIGN selection-bar (mockup S07-delete-desktop): the desktop
 // selection bar, a pill floating 24px above the bottom, centred, in the
 // `selection-bar` colours. Left to right: 「已選 N 個」 (700), 「共 X GB」
 // (12px, 70%), 取消 (text only), 改路徑 (1px outline pill, disabled until
-// Epic 5) and 刪除（含檔案） (solid `delete`, disabled until story 4.3).
+// Epic 5) and 刪除（含檔案） (solid `delete`).
 // The size counts only torrents whose files exist (src/lib/selection-total.ts).
 // Story 4.2 (DESIGN selection-bar, mockup S07-delete-phone): below 1024px
 // the same bar is a two-row panel 16px from the sides and the bottom (plus
@@ -29,6 +35,10 @@ import { clearSelection, useSelectedHashes } from '#/state/selection'
 // shows, toasts sit 16px above it (`toast.setLift`; the phone's toasts are
 // at the top). No keyboard shortcut clears it. The
 // count and size sit in a polite `status` region, so changes are read out.
+// Story 4.3: 刪除（含檔案） opens the delete confirmation in both layouts
+// (src/features/selection/delete-confirm.tsx). Closing it without a delete
+// gives focus back to that button; after a delete (nothing selected, the
+// bar sliding out) focus goes to the main area.
 
 /** 52px tall: 8px padding around the 36px buttons. */
 const BAR_CLASS =
@@ -67,6 +77,23 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
   if (visible && kept !== total) setKept(total)
   const text = selectionBarText(visible ? total : kept)
 
+  // The confirmation closes itself when the selection empties (never in
+  // the middle of its own delete).
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const deleteRef = useRef<HTMLButtonElement>(null)
+  const closeConfirm = useCallback(() => setConfirmOpen(false), [])
+  const confirm = (
+    <DeleteConfirm
+      open={confirmOpen}
+      desktop={desktop}
+      onClose={closeConfirm}
+      returnFocus={() =>
+        selectionStore.state.hashes.length > 0 ? deleteRef.current : getMain()
+      }
+    />
+  )
+  const openConfirm = () => setConfirmOpen(true)
+
   // Only the desktop toasts sit at the bottom, where the bar is.
   const lift = visible && desktop
   useEffect(() => {
@@ -79,109 +106,117 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
   // in place, with no slide between the two.
   if (!desktop) {
     return (
+      <>
+        <div
+          key="phone"
+          role="region"
+          aria-label="選取的種子"
+          aria-hidden={visible ? undefined : true}
+          inert={!visible}
+          data-selection-bar=""
+          className={cn(PHONE_BAR_CLASS, !visible && PHONE_BAR_HIDDEN_CLASS)}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              role="status"
+              className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"
+            >
+              <b className="font-bold">{text.count}</b>
+              <span className="sr-only">，</span>
+              <span className="ml-3 text-[12px] opacity-70">{text.size}</span>
+            </span>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className={cn(
+                'h-11 min-w-11 flex-none px-2 font-semibold',
+                FOCUS_CLASS,
+              )}
+            >
+              取消
+            </button>
+          </div>
+          {/* 6px back left, so both buttons sit 12px from the sides (S07). */}
+          <div className="-ml-1.5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled
+              className={cn(
+                'h-11 rounded-full border border-selection-bar-foreground font-semibold',
+                FOCUS_CLASS,
+                DISABLED_CLASS,
+              )}
+            >
+              改路徑
+            </button>
+            <button
+              ref={deleteRef}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={openConfirm}
+              className={cn(
+                'h-11 rounded-full bg-delete font-bold text-delete-foreground',
+                FOCUS_CLASS,
+              )}
+            >
+              刪除（含檔案）
+            </button>
+          </div>
+        </div>
+        {confirm}
+      </>
+    )
+  }
+
+  return (
+    <>
       <div
-        key="phone"
+        key="desktop"
         role="region"
         aria-label="選取的種子"
         aria-hidden={visible ? undefined : true}
         inert={!visible}
         data-selection-bar=""
-        className={cn(PHONE_BAR_CLASS, !visible && PHONE_BAR_HIDDEN_CLASS)}
+        className={cn(BAR_CLASS, !visible && BAR_HIDDEN_CLASS)}
       >
-        <div className="flex items-center gap-3">
-          <span
-            role="status"
-            className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"
-          >
-            <b className="font-bold">{text.count}</b>
-            <span className="sr-only">，</span>
-            <span className="ml-3 text-[12px] opacity-70">{text.size}</span>
-          </span>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className={cn(
-              'h-11 min-w-11 flex-none px-2 font-semibold',
-              FOCUS_CLASS,
-            )}
-          >
-            取消
-          </button>
-        </div>
-        {/* 6px back left, so both buttons sit 12px from the sides (S07). */}
-        <div className="-ml-1.5 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled
-            className={cn(
-              'h-11 rounded-full border border-selection-bar-foreground font-semibold',
-              FOCUS_CLASS,
-              DISABLED_CLASS,
-            )}
-          >
-            改路徑
-          </button>
-          <button
-            type="button"
-            disabled
-            className={cn(
-              'h-11 rounded-full bg-delete font-bold text-delete-foreground',
-              FOCUS_CLASS,
-              DISABLED_CLASS,
-            )}
-          >
-            刪除（含檔案）
-          </button>
-        </div>
+        {/* Announced when the count or size changes. */}
+        <span role="status" className="contents">
+          <b className="font-bold">{text.count}</b>
+          <span className="sr-only">，</span>
+          <span className="text-[12px] opacity-70">{text.size}</span>
+        </span>
+        <button
+          type="button"
+          onClick={clearSelection}
+          className={cn('h-9 px-2 font-semibold', FOCUS_CLASS)}
+        >
+          取消
+        </button>
+        <button
+          type="button"
+          disabled
+          className={cn(
+            'h-9 rounded-full border border-selection-bar-foreground px-4 font-semibold',
+            FOCUS_CLASS,
+            DISABLED_CLASS,
+          )}
+        >
+          改路徑
+        </button>
+        <button
+          ref={deleteRef}
+          type="button"
+          aria-haspopup="dialog"
+          onClick={openConfirm}
+          className={cn(
+            'h-9 rounded-full bg-delete px-[18px] font-bold text-delete-foreground',
+            FOCUS_CLASS,
+          )}
+        >
+          刪除（含檔案）
+        </button>
       </div>
-    )
-  }
-
-  return (
-    <div
-      key="desktop"
-      role="region"
-      aria-label="選取的種子"
-      aria-hidden={visible ? undefined : true}
-      inert={!visible}
-      data-selection-bar=""
-      className={cn(BAR_CLASS, !visible && BAR_HIDDEN_CLASS)}
-    >
-      {/* Announced when the count or size changes. */}
-      <span role="status" className="contents">
-        <b className="font-bold">{text.count}</b>
-        <span className="sr-only">，</span>
-        <span className="text-[12px] opacity-70">{text.size}</span>
-      </span>
-      <button
-        type="button"
-        onClick={clearSelection}
-        className={cn('h-9 px-2 font-semibold', FOCUS_CLASS)}
-      >
-        取消
-      </button>
-      <button
-        type="button"
-        disabled
-        className={cn(
-          'h-9 rounded-full border border-selection-bar-foreground px-4 font-semibold',
-          FOCUS_CLASS,
-          DISABLED_CLASS,
-        )}
-      >
-        改路徑
-      </button>
-      <button
-        type="button"
-        disabled
-        className={cn(
-          'h-9 rounded-full bg-delete px-[18px] font-bold text-delete-foreground',
-          FOCUS_CLASS,
-          DISABLED_CLASS,
-        )}
-      >
-        刪除（含檔案）
-      </button>
-    </div>
+      {confirm}
+    </>
   )
 }

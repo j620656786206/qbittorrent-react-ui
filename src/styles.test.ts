@@ -417,6 +417,38 @@ describe('Tailwind theme (row 20)', () => {
     expect(declarations(reduced[0].body).get('animation')).toBe('none')
   })
 
+  it('has the dialog open motion: pop from 95% plus a fade, a scrim fade, 0.2s, off for reduced motion (spec 4.3)', () => {
+    const pop = byPrelude('@keyframes pop')
+    expect(pop).toHaveLength(1)
+    const popFrom = blocks(pop[0].body)
+    expect(popFrom.map((b) => b.prelude)).toEqual(['from'])
+    const popDecl = declarations(popFrom[0].body)
+    expect(popDecl.get('opacity')).toBe('0')
+    expect(popDecl.get('transform')).toBe('scale(0.95)')
+    expect([...popDecl.keys()].sort()).toEqual(['opacity', 'transform'])
+
+    const fade = byPrelude('@keyframes fade')
+    expect(fade).toHaveLength(1)
+    const fadeFrom = blocks(fade[0].body)
+    expect(fadeFrom.map((b) => b.prelude)).toEqual(['from'])
+    expect([...declarations(fadeFrom[0].body).entries()]).toEqual([
+      ['opacity', '0'],
+    ])
+
+    for (const name of ['pop', 'fade']) {
+      const utility = byPrelude(`@utility animate-${name}`)
+      expect(utility, name).toHaveLength(1)
+      expect(declarations(utility[0].body).get('animation')).toBe(
+        `${name} 0.2s ease-out both`,
+      )
+      const reduced = blocks(utility[0].body)
+      expect(reduced.map((b) => b.prelude)).toEqual([
+        '@media (prefers-reduced-motion: reduce)',
+      ])
+      expect(declarations(reduced[0].body).get('animation')).toBe('none')
+    }
+  })
+
   it('has the phone selection shift: 28px, 0.2s, transform only, off for reduced motion (spec 4.2)', () => {
     for (const [name, step, transform] of [
       ['select-shift-in', 'from', 'translateX(-28px)'],

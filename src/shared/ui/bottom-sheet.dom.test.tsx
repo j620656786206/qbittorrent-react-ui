@@ -25,6 +25,8 @@ declare global {
 
 const VIEWPORT = 800
 const REST = 400
+/** Story 4.3: a pinned footer's height. */
+const FOOTER = 60
 
 let root: Root
 let container: HTMLElement
@@ -129,7 +131,8 @@ beforeEach(() => {
   // The sheet is a fixed box as tall as the screen; its content is REST tall.
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
     function (this: HTMLElement) {
-      if (this.getAttribute('role') === 'dialog') return VIEWPORT
+      if (this.dataset.slot === 'bottom-sheet') return VIEWPORT
+      if (this.dataset.slot === 'bottom-sheet-footer') return FOOTER
       return this.parentElement?.dataset.slot === 'bottom-sheet-content'
         ? REST
         : 0
@@ -736,5 +739,91 @@ describe('header slot (story 2.4)', () => {
       ),
     )
     expect(onOpenChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('footer and lock (story 4.3)', () => {
+  function Locked({
+    locked,
+    footer = true,
+  }: {
+    locked: boolean
+    footer?: boolean
+  }) {
+    const [open, setOpen] = useState(true)
+    return (
+      <BottomSheet
+        open={open}
+        onOpenChange={(next) => {
+          onOpenChange(next)
+          setOpen(next)
+        }}
+        title="刪除 3 個種子？"
+        role="alertdialog"
+        closeLabel="關閉，不刪"
+        locked={locked}
+        footer={
+          footer ? (
+            <button type="button" data-testid="primary">
+              刪除
+            </button>
+          ) : undefined
+        }
+      >
+        <p>清單</p>
+      </BottomSheet>
+    )
+  }
+
+  const sheet = () =>
+    document.querySelector<HTMLElement>('[data-slot="bottom-sheet"]')
+  const footerSlot = () =>
+    document.querySelector<HTMLElement>('[data-slot="bottom-sheet-footer"]')
+  const lockedClose = () =>
+    document.querySelector<HTMLButtonElement>('button[aria-label="關閉，不刪"]')
+
+  it('pins the footer outside the scroller and counts it in the rest height', async () => {
+    await act(async () => root.render(<Locked locked={false} />))
+    expect(sheet()?.getAttribute('role')).toBe('alertdialog')
+    expect(content()?.contains(footerSlot())).toBe(false)
+    expect(sheet()?.lastElementChild).toBe(footerSlot())
+    expect(footerSlot()?.className).toContain(
+      'pb-[env(safe-area-inset-bottom)]',
+    )
+    expect(content()?.firstElementChild?.className).not.toContain(
+      'safe-area-inset-bottom',
+    )
+    // 400px of content plus the 60px footer.
+    expect(sheet()?.style.paddingBottom).toBe(`${VIEWPORT - REST - FOOTER}px`)
+  })
+
+  it('without a footer nothing changes: no slot, the content keeps the safe area', async () => {
+    await act(async () => root.render(<Locked locked={false} footer={false} />))
+    expect(footerSlot()).toBeNull()
+    expect(content()?.firstElementChild?.className).toContain(
+      'pb-[env(safe-area-inset-bottom)]',
+    )
+  })
+
+  it('locked: the scrim, the ✕ and a drag past the close line never close it; the drag springs back', async () => {
+    await act(async () => root.render(<Locked locked />))
+    expect(lockedClose()?.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => scrim()?.click())
+    await act(async () => lockedClose()?.click())
+    const grip = sheet()?.querySelector('[aria-hidden="true"]') as Element
+    await drag(grip, 500, 750)
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(sheet()?.dataset.state).toBe('open')
+    expect(sheet()?.style.transform).toBe(
+      `translate3d(0, ${VIEWPORT - REST - FOOTER}px, 0)`,
+    )
+  })
+
+  it('unlocked again: the ✕ closes', async () => {
+    await act(async () => root.render(<Locked locked />))
+    await act(async () => root.render(<Locked locked={false} />))
+    expect(lockedClose()?.hasAttribute('aria-disabled')).toBe(false)
+    await act(async () => lockedClose()?.click())
+    expect(onOpenChange).toHaveBeenLastCalledWith(false)
   })
 })

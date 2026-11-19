@@ -167,6 +167,8 @@ export interface FakeQbitRoutes {
   /** `torrents/stop` and `torrents/start`; 200 with an empty body by default. */
   stop?: Handler
   start?: Handler
+  /** Story 4.3: `torrents/delete`; 200 with an empty body by default. */
+  delete?: Handler
   /** Story 2.7: `torrents/files` (two fake files) and `torrents/filePrio`. */
   files?: Handler
   filePrio?: Handler
@@ -198,6 +200,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
       routes.maindata ?? (() => jsonResponse(fullMaindata())),
     '/api/v2/torrents/stop': routes.stop ?? (() => new Response('')),
     '/api/v2/torrents/start': routes.start ?? (() => new Response('')),
+    '/api/v2/torrents/delete': routes.delete ?? (() => new Response('')),
     '/api/v2/torrents/files':
       routes.files ??
       (() =>

@@ -51,19 +51,30 @@
 //          torrent, so the desktop tab row overflows; categories-emptied:
 //          the same without mteam-X
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
-//   ops:   normal | reject (story 2.6: reject answers torrents/stop and
-//          torrents/start with HTTP 400, which the container maps to
-//          qbit_rejected)
+//   ops:   normal | reject | slow (story 2.6: reject answers torrents/stop
+//          and torrents/start, story 4.3 torrents/delete too, with HTTP
+//          400, which the container maps to qbit_rejected; slow: see 4.3
+//          below)
 //   files: normal | slow | fail (story 2.7: slow delays torrents/files
 //          25 s, fail answers it with HTTP 500, which the container maps
 //          to qbit_rejected; for the loading and failure screenshots)
-//   Any `data` parameter (even the current one) also clears the stop/start
-//   state overrides, the file priorities set, the call log, the
+//   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
+//   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
+//   Any `data` parameter (even the current one) also clears the deleted
+//   torrents, the stop/start state overrides, the file priorities set, the call log, the
 //   torrents/files request log and the log/main request log below.
 // Story 2.6: POST /api/v2/torrents/stop and /start (cookie required, form
 // field `hashes`, `|` between) record each call and override those
 // torrents' states for the next maindata: stop gives stoppedUP when complete
 // else stoppedDL; start gives uploading when complete else downloading.
+// Story 4.3: POST /api/v2/torrents/delete (cookie required, form fields
+// `hashes` with `|` between and `deleteFiles` true or false) logs
+// `{ op: 'delete', hashes, deleteFiles }` and drops those torrents from
+// every later maindata until the next `data` change; `ops=reject` answers
+// 400 and logs it with `rejected: true`. Another device's delete (the
+// selection emptying under an open dialog) is a loopback-only control
+// that drops torrents without logging a call:
+//   curl -X POST 'http://localhost:3100/__fake/remove?hashes=<a>|<b>'
 // Story 2.7: GET /api/v2/torrents/files?hash= (cookie required) answers
 // deterministic fake files for every torrent of the data set (fake names
 // under the torrent's own name, so only code-name paths); sample E03 has
@@ -112,6 +123,11 @@ const USERNAME = 'fake-user'
 const PASSWORD = 'fake-pass'
 const SERVER_FN_PREFIX = '/_serverFn/'
 const SLOW_MS = 25_000
+/**
+ * Story 4.3 `ops=slow`: operations answer after this long, past the
+ * dialog's 10 s 「還在等 NAS 回應」 and well inside the 30 s timeout.
+ */
+const OPS_SLOW_MS = 12_000
 const APP_ENV = [
   'QBIT_URL',
   'QBIT_USERNAME',
@@ -146,7 +162,7 @@ const DATA_MODES = new Set([
   'categories-emptied',
 ])
 const GROW_MODES = new Set(['0', '1'])
-const OPS_MODES = new Set(['normal', 'reject'])
+const OPS_MODES = new Set(['normal', 'reject', 'slow'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const FRONT_MODES = new Set([
   'normal',
@@ -670,6 +686,20 @@ function withSpeeds(torrents, tick) {
 const stateOverrides = new Map()
 /** Stories 2.6, 2.7: every stop/start and filePrio call, oldest first. */
 const opLog = []
+/** Story 4.3: torrents deleted (by the app or "another device"). */
+const removed = new Set()
+/**
+ * Story 4.3: bumped by every `data` change, so an `ops=slow` call still
+ * waiting across a reset does not apply to the next test's data.
+ */
+let dataEpoch = 0
+
+function withoutRemoved(torrents) {
+  if (removed.size === 0) return torrents
+  return Object.fromEntries(
+    Object.entries(torrents).filter(([key]) => !removed.has(key)),
+  )
+}
 
 function withOverrides(torrents) {
   if (stateOverrides.size === 0) return torrents
@@ -683,12 +713,15 @@ function withOverrides(torrents) {
 function currentTorrents(tick) {
   const base = DATA[mode.data]
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
-  return withOverrides(growCount > 0 ? { ...torrents, ...grown } : torrents)
+  return withoutRemoved(
+    withOverrides(growCount > 0 ? { ...torrents, ...grown } : torrents),
+  )
 }
 
 const OP_PATHS = {
   '/api/v2/torrents/stop': 'stop',
   '/api/v2/torrents/start': 'start',
+  '/api/v2/torrents/delete': 'delete',
 }
 
 /**
@@ -696,6 +729,15 @@ const OP_PATHS = {
  * state code as it was (TorrentImpl::updateState); the fake does the same.
  */
 const KEPT_STATES = new Set(['error', 'missingFiles'])
+
+/**
+ * Story 4.3: delete: record the call (with `deleteFiles`) and drop the
+ * torrents from later maindata.
+ */
+function applyDelete(hashes, deleteFiles) {
+  opLog.push({ op: 'delete', hashes, deleteFiles })
+  for (const key of hashes) removed.add(key)
+}
 
 /** stop/start: record the call and override the states it names. */
 function applyOp(op, hashes) {
@@ -942,12 +984,23 @@ const fakeQbit = createServer(async (req, res) => {
       return send(res, 403, 'Forbidden')
     const form = new URLSearchParams(await readBody(req))
     const hashes = (form.get('hashes') ?? '').split('|').filter(Boolean)
+    const op = OP_PATHS[url.pathname]
+    const deleteFiles = form.get('deleteFiles')
+    if (op === 'delete' && deleteFiles !== 'true' && deleteFiles !== 'false')
+      return send(res, 400, 'Bad Request')
+    const extra = op === 'delete' ? { deleteFiles: deleteFiles === 'true' } : {}
     if (mode.ops === 'reject') {
       // Logged too, so a test can see 重試 really sent again.
-      opLog.push({ op: OP_PATHS[url.pathname], hashes, rejected: true })
+      opLog.push({ op, hashes, ...extra, rejected: true })
       return send(res, 400, 'Bad Request')
     }
-    applyOp(OP_PATHS[url.pathname], hashes)
+    if (mode.ops === 'slow') {
+      const epoch = dataEpoch
+      await new Promise((resolve) => setTimeout(resolve, OPS_SLOW_MS))
+      if (epoch !== dataEpoch) return send(res, 200, '')
+    }
+    if (op === 'delete') applyDelete(hashes, deleteFiles === 'true')
+    else applyOp(op, hashes)
     return send(res, 200, '')
   }
   if (req.method === 'GET' && url.pathname === '/api/v2/torrents/files') {
@@ -1037,6 +1090,8 @@ function controlMode(req, res, url) {
     }
     // Any data parameter starts from the data set as written.
     if (next.data) {
+      dataEpoch += 1
+      removed.clear()
       stateOverrides.clear()
       filePriorities.clear()
       filesLog.length = 0
@@ -1051,6 +1106,23 @@ function controlMode(req, res, url) {
     return send(res, 405, 'POST or GET\n')
   }
   send(res, 200, `${JSON.stringify(mode)}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
+/**
+ * Story 4.3: another device deletes these torrents (loopback only, POST,
+ * `hashes` with `|` between); not logged as a call.
+ */
+function controlRemove(req, res, url) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'POST') return send(res, 405, 'POST\n')
+  const hashes = (url.searchParams.get('hashes') ?? '')
+    .split('|')
+    .filter(Boolean)
+  for (const key of hashes) removed.add(key)
+  send(res, 200, `${JSON.stringify({ removed: hashes })}\n`, {
     'content-type': 'application/json',
   })
 }
@@ -1106,6 +1178,7 @@ function frontHandler(appPort) {
     const url = new URL(req.url ?? '/', 'http://front')
     if (url.pathname === '/__fake/mode') return controlMode(req, res, url)
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
+    if (url.pathname === '/__fake/remove') return controlRemove(req, res, url)
     if (url.pathname === '/__fake/files') return controlFiles(req, res)
     if (url.pathname === '/__fake/log') return controlLog(req, res)
     if (url.pathname === '/__fake/settings') {

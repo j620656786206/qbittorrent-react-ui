@@ -23,6 +23,17 @@ export const torrentHashesInputSchema = z.strictObject({
 
 export type TorrentHashesInput = z.infer<typeof torrentHashesInputSchema>
 
+/**
+ * Story 4.3: `deleteTorrents`. `deleteFiles` is required with no default, so
+ * a client that forgets it gets `invalid_input` instead of a guess.
+ */
+export const deleteTorrentsInputSchema = z.strictObject({
+  hashes: torrentHashListSchema,
+  deleteFiles: z.boolean(),
+})
+
+export type DeleteTorrentsInput = z.infer<typeof deleteTorrentsInputSchema>
+
 export type BatchItem =
   | { key: string; ok: true }
   | { key: string; ok: false; code: ErrorCode; message: string }

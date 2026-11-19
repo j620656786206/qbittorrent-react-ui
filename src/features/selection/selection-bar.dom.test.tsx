@@ -156,7 +156,7 @@ describe('the selection bar', () => {
     ])
     expect(button('取消').disabled).toBe(false)
     expect(button('改路徑').disabled).toBe(true)
-    expect(button('刪除（含檔案）').disabled).toBe(true)
+    expect(button('刪除（含檔案）').disabled).toBe(false)
     expect(lift.on).toBe(true)
   })
 
@@ -288,7 +288,7 @@ describe('the phone selection bar (story 4.2)', () => {
     ])
     expect(button('取消').disabled).toBe(false)
     expect(button('改路徑').disabled).toBe(true)
-    expect(button('刪除（含檔案）').disabled).toBe(true)
+    expect(button('刪除（含檔案）').disabled).toBe(false)
     expect(lift.calls).toBe(0)
   })
 

@@ -170,9 +170,10 @@ export interface Modes {
   grow?: '0' | '1'
   /**
    * Story 2.6: `reject` answers torrents/stop and /start with HTTP 400
-   * (story 2.7: torrents/filePrio too).
+   * (story 2.7: torrents/filePrio too; story 4.3: torrents/delete too).
+   * Story 4.3: `slow` answers stop, start and delete after 12 s.
    */
-  ops?: 'normal' | 'reject'
+  ops?: 'normal' | 'reject' | 'slow'
   /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
   files?: 'normal' | 'slow' | 'fail'
 }
@@ -195,18 +196,37 @@ export interface FilePrioCall {
   rejected?: true
 }
 
-/** Stories 2.6, 2.7: the stop/start and filePrio calls the fake received. */
+/** A delete call as fake-qbit logs it (story 4.3). */
+export interface DeleteCall {
+  op: 'delete'
+  hashes: Array<string>
+  deleteFiles: boolean
+  rejected?: true
+}
+
+/** Stories 2.6, 2.7, 4.3: the stop/start, filePrio and delete calls the fake received. */
 export async function opCalls(
   request: APIRequestContext,
 ): Promise<
   Array<
     | { op: 'stop' | 'start'; hashes: Array<string>; rejected?: true }
     | FilePrioCall
+    | DeleteCall
   >
 > {
   const response = await request.get('/__fake/ops')
   expect(response.ok(), await response.text()).toBe(true)
   return ((await response.json()) as { calls: never }).calls
+}
+
+/** Story 4.3: another device deletes these torrents (no call logged). */
+export async function removeElsewhere(
+  request: APIRequestContext,
+  hashes: ReadonlyArray<string>,
+) {
+  const query = new URLSearchParams({ hashes: hashes.join('|') }).toString()
+  const response = await request.post(`/__fake/remove?${query}`)
+  expect(response.ok(), await response.text()).toBe(true)
 }
 
 /** Story 2.7: the hashes the fake's torrents/files was asked for. */

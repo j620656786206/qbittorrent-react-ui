@@ -28,13 +28,54 @@ describe('T1 failure', () => {
     })
     vi.advanceTimersByTime(10 * 60_000)
     expect(shown()?.text).toBe('暫停失敗：qBittorrent 拒絕這個操作')
-    shown()?.retry()
+    const failure = shown()
+    expect(failure?.kind).toBe('failure')
+    if (failure?.kind === 'failure') failure.retry()
     expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it('shows nothing on the server', () => {
     vi.unstubAllGlobals()
     toast.failure('f', { keys: ['a'], onRetry: vi.fn() })
+    expect(shown()).toBeNull()
+  })
+})
+
+describe('plain (spec 4.3)', () => {
+  it('shows plain text with no 重試 and closes itself after 4 s', () => {
+    toast.plain('已刪除 3 個種子，檔案留著')
+    expect(shown()).toMatchObject({
+      kind: 'plain',
+      text: '已刪除 3 個種子，檔案留著',
+    })
+    expect(shown()).not.toHaveProperty('retry')
+    vi.advanceTimersByTime(3999)
+    expect(shown()?.text).toBe('已刪除 3 個種子，檔案留著')
+    vi.advanceTimersByTime(1)
+    expect(shown()).toBeNull()
+  })
+
+  it('its timer never closes a toast that replaced it', () => {
+    toast.plain('first')
+    vi.advanceTimersByTime(3000)
+    toast.failure('f', { keys: ['a'], onRetry: vi.fn() })
+    vi.advanceTimersByTime(10_000)
+    expect(shown()?.text).toBe('f')
+  })
+
+  it('a second plain toast gets its own 4 s', () => {
+    toast.plain('one')
+    vi.advanceTimersByTime(3000)
+    toast.plain('two')
+    vi.advanceTimersByTime(3000)
+    expect(shown()?.text).toBe('two')
+    vi.advanceTimersByTime(1000)
+    expect(shown()).toBeNull()
+  })
+
+  it('shows nothing on the server', () => {
+    vi.unstubAllGlobals()
+    toast.plain('p')
     expect(shown()).toBeNull()
   })
 })

@@ -23,6 +23,13 @@ import { isInToastRegion } from '#/shared/ui/toaster'
 // it opened), never through Radix's close autofocus as well. The toast
 // region stays usable over it (story 2.6): a press or focus there does not
 // dismiss it.
+// Story 4.3: the open motion is real now (`animate-pop` on the content, 0.2 s
+// from 95% plus a fade, and `animate-fade` on the scrim, both off under
+// reduced motion, src/styles.css; the old `animate-in` classes had no
+// definition). There is no exit motion, so Radix unmounts at once.
+// `closeOnOutsidePress={false}` keeps it open on a press outside (the
+// delete confirmation, like an AlertDialog); `showCloseButton={false}`
+// drops the ✕.
 // Radix docs: https://www.radix-ui.com/primitives/docs/components/dialog
 
 /** The root's open state, for the content's session. */
@@ -72,7 +79,7 @@ function DialogClose({
 
 /** DialogContent's own scrim (Radix draws its overlay only when modal). */
 const SCRIM_CLASS =
-  'fixed inset-0 z-50 bg-scrim-dialog data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0'
+  'fixed inset-0 z-50 bg-scrim-dialog data-[state=open]:animate-fade'
 
 /**
  * Rendered inside the content, so it mounts only with it (Radix Presence);
@@ -99,6 +106,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeOnOutsidePress = true,
   returnFocus,
   onKeyDown,
   onCloseAutoFocus,
@@ -106,6 +114,8 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** `false`: a press outside (the scrim included) leaves it open. */
+  closeOnOutsidePress?: boolean
   /** Focused on close; by default what had focus when it opened. */
   returnFocus?: () => HTMLElement | null
 }) {
@@ -138,7 +148,10 @@ function DialogContent({
         onInteractOutside={(event) => {
           onInteractOutside?.(event)
           const target = event.target
-          if (target instanceof Node && isInToastRegion(target)) {
+          if (
+            !closeOnOutsidePress ||
+            (target instanceof Node && isInToastRegion(target))
+          ) {
             event.preventDefault()
           }
         }}
@@ -148,7 +161,7 @@ function DialogContent({
           event.preventDefault()
         }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-panel border bg-surface p-6 shadow-float duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-panel border bg-surface p-6 shadow-float data-[state=open]:animate-pop sm:max-w-lg',
           className,
         )}
         {...props}

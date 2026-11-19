@@ -34,14 +34,27 @@ export function selectionTotal(
   return { count, bytes }
 }
 
+/**
+ * Story 4.3: why a torrent's files are not there, or `null` when they are:
+ * `archived` (已整理, organised elsewhere, not an error) or `missing`
+ * (找不到檔案). A moving torrent keeps the kind it had before the move.
+ */
+export type GoneKind = 'archived' | 'missing'
+
+export function goneKindOf(
+  torrent: SlimTorrent,
+  stateBeforeMove: Readonly<Record<string, string>>,
+): GoneKind | null {
+  if (statusOf(torrent, stateBeforeMove) === 'archived') return 'archived'
+  if (heroKindOf(torrent, stateBeforeMove) === 'missing_files') return 'missing'
+  return null
+}
+
 function filesGone(
   torrent: SlimTorrent,
   stateBeforeMove: Readonly<Record<string, string>>,
 ): boolean {
-  return (
-    statusOf(torrent, stateBeforeMove) === 'archived' ||
-    heroKindOf(torrent, stateBeforeMove) === 'missing_files'
-  )
+  return goneKindOf(torrent, stateBeforeMove) !== null
 }
 
 /** The bar's two texts: 「已選 3,626 個」 and 「共 301.2 GB」. */
