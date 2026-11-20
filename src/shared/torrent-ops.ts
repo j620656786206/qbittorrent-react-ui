@@ -32,8 +32,6 @@ export const deleteTorrentsInputSchema = z.strictObject({
   deleteFiles: z.boolean(),
 })
 
-export type DeleteTorrentsInput = z.infer<typeof deleteTorrentsInputSchema>
-
 export type BatchItem =
   | { key: string; ok: true }
   | { key: string; ok: false; code: ErrorCode; message: string }

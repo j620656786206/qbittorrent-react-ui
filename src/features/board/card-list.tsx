@@ -6,6 +6,7 @@ import { reasonOf } from '#/lib/error-reason'
 import type { SlimTorrent } from '#/shared/maindata'
 import { Checkbox } from '#/shared/ui/checkbox'
 import { cn } from '#/shared/ui/cn'
+import { BAR_SCROLL_PADDING_END } from '#/shared/ui/selection-bar-geometry'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
 import { useLeavingExit } from '#/state/leaving-exit'
@@ -78,12 +79,6 @@ import {
  */
 export const CARD_CHECKBOX_CLASS =
   'pointer-events-none absolute -top-1.5 -left-1.5 z-[1] bg-surface opacity-0 ring-2 ring-surface group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100 group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-data-[selecting]/list:pointer-events-auto group-data-[selecting]/list:opacity-100'
-
-/**
- * Story 4.1: while anything is selected, a card scrolled to stops 92px
- * above the column's bottom, above the floating selection bar.
- */
-const SELECTION_SCROLL_PADDING_END = 92
 
 /** Story 4.2: the phone checkbox, the same corner, shown while selecting. */
 export const PHONE_CARD_CHECKBOX_CLASS =
@@ -290,7 +285,9 @@ export function CardList({
     paddingStart,
     paddingEnd,
     scrollPaddingEnd:
-      selectable && !phone && selecting ? SELECTION_SCROLL_PADDING_END : 0,
+      // Story 4.1: a card scrolled to while anything is selected lands
+      // above the floating selection bar.
+      selectable && !phone && selecting ? BAR_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
@@ -390,20 +387,14 @@ export function CardList({
                         : `translate(${x}px, ${item.start}px)`,
                   }}
                 >
-                  {torrent && phoneSelecting && (
+                  {torrent && (phoneSelecting || (selectable && !phone)) && (
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleSelected(hash)}
                       aria-label={`選取 ${torrent.name}`}
-                      className={PHONE_CARD_CHECKBOX_CLASS}
-                    />
-                  )}
-                  {torrent && selectable && !phone && (
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleSelected(hash)}
-                      aria-label={`選取 ${torrent.name}`}
-                      className={CARD_CHECKBOX_CLASS}
+                      className={
+                        phone ? PHONE_CARD_CHECKBOX_CLASS : CARD_CHECKBOX_CLASS
+                      }
                     />
                   )}
                   {torrent && (

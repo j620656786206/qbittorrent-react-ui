@@ -45,9 +45,9 @@ import { HASH_WRITE_GAP_MS } from '#/features/list/use-arrow-stepping'
 import { LIST_SCROLL_CLASS } from '#/features/list/list-states'
 import {
   PHONE_SELECTING_SCROLL_CLASS,
-  SELECTION_SCROLL_PADDING_END,
   TorrentList,
 } from '#/features/list/torrent-list'
+import { BAR_SCROLL_PADDING_END } from '#/shared/ui/selection-bar-geometry'
 
 // Review of 1.7 to 1.9: the list's wiring in a DOM (happy-dom), which the
 // node tests in torrent-list.test.tsx cannot reach: the virtualizer window,
@@ -1425,10 +1425,9 @@ describe('↑ ↓ (story 3.7)', () => {
     await act(async () => root.render(app()))
     await press('ArrowDown')
     expect(setHash).toHaveBeenLastCalledWith(fakeHash(10))
-    expect(SELECTION_SCROLL_PADDING_END).toBe(92)
-    // Index 30's bottom lands 92px above the scroller's bottom edge.
+    // Index 30's bottom lands above the selection bar.
     expect(lastTop()).toBeCloseTo(
-      30 * (ROW_HEIGHT_PX + 2) + ROW_HEIGHT_PX - 600 + 92,
+      30 * (ROW_HEIGHT_PX + 2) + ROW_HEIGHT_PX - 600 + BAR_SCROLL_PADDING_END,
       -1,
     )
   })

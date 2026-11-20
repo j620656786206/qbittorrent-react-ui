@@ -23,9 +23,9 @@ import {
   toggleSelected,
   SELECTION_SHIFT_CLEAR_MS,
   SELECTION_SHIFT_MS,
-  useIsSelected,
   useSelecting,
   useSelectionShift,
+  useSelectedHashes,
   useSelectionUpkeep,
 } from '#/state/selection'
 
@@ -116,14 +116,14 @@ describe('the selection store', () => {
   })
 })
 
-describe('useSelectionUpkeep and useIsSelected', () => {
+describe('useSelectionUpkeep', () => {
   let client: QueryClient
   let answers: Array<MaindataResponse>
   const seen: Array<boolean> = []
 
   function Probe({ category, query }: { category: string; query: string }) {
     useSelectionUpkeep(category, query)
-    seen.push(useIsSelected(A))
+    seen.push(useSelectedHashes().includes(A))
     return null
   }
 

@@ -4,6 +4,7 @@ import { cn } from '#/shared/ui/cn'
 import type { BoardColumn } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { PAGE_BOTTOM_DESKTOP } from '#/shared/ui/selection-bar-geometry'
 import { COLUMN_META } from '#/features/board/board-model'
 import { CardList } from '#/features/board/card-list'
 import type { CardLayout, CardPin } from '#/features/board/card-list'
@@ -14,8 +15,9 @@ import type { CardLayout, CardPin } from '#/features/board/card-list'
 // explanation, not a control: memlog #127). The body scrolls by itself
 // (12px sides, cards 10px apart) and is virtualized. Story 4.1: the cards
 // carry the selection checkbox, so the first card starts 10px down (the
-// checkbox pokes 6px above it, plus its focus outline), and 110px stay
-// under the last one so the selection bar never covers it.
+// checkbox pokes 6px above it, plus its focus outline), and
+// `PAGE_BOTTOM_DESKTOP` stays under the last one so the selection bar
+// never covers it.
 //
 // Story 2.8 (demo `.col .bg`): the `surface-muted` background is its own
 // layer behind the content, so the auto-collapse can widen or narrow it
@@ -25,8 +27,6 @@ import type { CardLayout, CardPin } from '#/features/board/card-list'
 
 /** Room above a desktop column's first card (story 4.1: its checkbox). */
 export const COLUMN_PADDING_START = 10
-/** Room under the last card: the selection bar's 110px (story 4.1). */
-export const COLUMN_PADDING_END = 110
 
 export const COLUMN_CLASS =
   'relative flex min-h-0 min-w-0 flex-col rounded-panel'
@@ -156,7 +156,7 @@ export function BoardColumnView({
         empty={empty}
         label={meta.name}
         paddingStart={COLUMN_PADDING_START}
-        paddingEnd={COLUMN_PADDING_END}
+        paddingEnd={PAGE_BOTTOM_DESKTOP}
         selectable
         // The section no longer clips (its background layer scales past it
         // during the collapse), so the body clips itself to the column's

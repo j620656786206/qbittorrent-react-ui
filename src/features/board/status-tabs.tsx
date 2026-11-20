@@ -9,6 +9,7 @@ import type { BoardColumns } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { PHONE_SELECTING_BOTTOM } from '#/shared/ui/selection-bar-geometry'
 import { useListView } from '#/state/list-view'
 import { useSelecting } from '#/state/selection'
 import {
@@ -68,9 +69,8 @@ const TABLIST_CLASS =
 
 /** Story 4.2: room above the first card for its checkbox. */
 export const PHONE_PANEL_PADDING_START = 10
-/** Below the last card; 140px while selecting (mockup S07-delete-phone). */
+/** Below the last card (while selecting, `PHONE_SELECTING_BOTTOM`). */
 export const PHONE_PANEL_PADDING_END = 4
-export const PHONE_PANEL_SELECTING_PADDING_END = 140
 
 const TAB_CLASS =
   'flex h-14 min-w-0 flex-col items-center justify-center rounded-row text-text'
@@ -296,9 +296,7 @@ export function PhoneBoard({
               label={COLUMN_META[column].name}
               paddingStart={PHONE_PANEL_PADDING_START}
               paddingEnd={
-                selecting
-                  ? PHONE_PANEL_SELECTING_PADDING_END
-                  : PHONE_PANEL_PADDING_END
+                selecting ? PHONE_SELECTING_BOTTOM : PHONE_PANEL_PADDING_END
               }
               className="h-full w-full flex-none touch-pan-y px-2"
               selectable

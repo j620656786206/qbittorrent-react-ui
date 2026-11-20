@@ -8,6 +8,13 @@ import {
   setModes,
   test,
 } from './fixtures'
+import {
+  BAR_BOTTOM,
+  BAR_GAP,
+  BAR_HEIGHT,
+  PHONE_BAR_BOTTOM,
+  PHONE_BAR_HEIGHT,
+} from '../src/shared/ui/selection-bar-geometry'
 
 // Story 4.1: desktop checkboxes and the selection bar, in Chromium against
 // the built server and scripts/fake-qbit.mjs (fake data only, AD-15;
@@ -78,9 +85,9 @@ async function expectBarShown(page: Page) {
   await settled(page)
   const box = await bar(page).boundingBox()
   expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(
-    DESKTOP.height - 24,
+    DESKTOP.height - BAR_BOTTOM,
   )
-  expect(Math.round(box?.height ?? 0)).toBe(52)
+  expect(Math.round(box?.height ?? 0)).toBe(BAR_HEIGHT)
 }
 
 async function expectBarHidden(page: Page) {
@@ -308,7 +315,7 @@ test('a failure toast with a selection sits 16px above the bar', async ({
   await settled(page)
   const toastBox = await toastCard(page).boundingBox()
   expect(Math.round((toastBox?.y ?? 0) + (toastBox?.height ?? 0))).toBe(
-    DESKTOP.height - 24 - 52 - 16,
+    DESKTOP.height - BAR_BOTTOM - BAR_HEIGHT - BAR_GAP,
   )
   await bar(page).getByRole('button', { name: '取消' }).click()
   await settled(page)
@@ -401,7 +408,10 @@ async function expectPhoneBarShown(page: Page) {
   const box = await bar(page).boundingBox()
   expect(Math.round(box?.x ?? 0)).toBe(16)
   expect(Math.round(box?.width ?? 0)).toBe(PHONE.width - 32)
-  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(PHONE.height - 16)
+  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(
+    PHONE.height - PHONE_BAR_BOTTOM,
+  )
+  expect(Math.round(box?.height ?? 0)).toBe(PHONE_BAR_HEIGHT)
   for (const name of ['取消', '改路徑', '刪除（含檔案）']) {
     const button = await bar(page)
       .getByRole('button', { name, exact: true })

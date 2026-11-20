@@ -2,6 +2,7 @@ import { useSelector } from '@tanstack/react-store'
 import { X } from 'lucide-react'
 import { dismissToast, toastStore } from '#/shared/toast-store'
 import type { ShownToast } from '#/shared/toast-store'
+import { TOAST_LIFT_CLASS } from '#/shared/ui/selection-bar-geometry'
 
 // Story 2.6, DESIGN toast (mockups S06-add-success-desktop, S08-done-desktop),
 // EXPERIENCE toast: the 「底層 toast」. Features call src/lib/toast.ts,
@@ -73,9 +74,6 @@ function ToastCard({ toast }: { toast: ShownToast }) {
 
 const REGION_CLASS =
   'pointer-events-none fixed inset-x-4 top-[calc(16px+env(safe-area-inset-top))] z-[60] flex flex-col lg:top-auto lg:right-6 lg:bottom-6 lg:left-auto lg:w-[356px] lg:transition-transform lg:duration-300 lg:ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:motion-reduce:transition-none'
-
-/** Story 4.1: 68px up, 16px above the selection bar. */
-export const TOAST_LIFT_CLASS = 'lg:-translate-y-[68px]'
 
 export function Toaster() {
   const toast = useSelector(toastStore, (state) => state.toast)

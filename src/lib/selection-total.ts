@@ -28,7 +28,7 @@ export function selectionTotal(
     if (!Object.hasOwn(torrents, hash)) continue
     const torrent = torrents[hash]
     count += 1
-    if (filesGone(torrent, stateBeforeMove)) continue
+    if (goneKindOf(torrent, stateBeforeMove) !== null) continue
     bytes += torrent.size
   }
   return { count, bytes }
@@ -48,13 +48,6 @@ export function goneKindOf(
   if (statusOf(torrent, stateBeforeMove) === 'archived') return 'archived'
   if (heroKindOf(torrent, stateBeforeMove) === 'missing_files') return 'missing'
   return null
-}
-
-function filesGone(
-  torrent: SlimTorrent,
-  stateBeforeMove: Readonly<Record<string, string>>,
-): boolean {
-  return goneKindOf(torrent, stateBeforeMove) !== null
 }
 
 /** The bar's two texts: 「已選 3,626 個」 and 「共 301.2 GB」. */

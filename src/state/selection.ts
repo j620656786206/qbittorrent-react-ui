@@ -114,10 +114,6 @@ export function useSelectionShift(): SelectionShift {
   return shift
 }
 
-export function useIsSelected(hash: string): boolean {
-  return useSelector(selectionStore, (state) => state.hashes.includes(hash))
-}
-
 /** Tests: nothing selected, no scope, no freeze reason. */
 export function resetSelection(): void {
   selectionStore.setState(() => ({ hashes: EMPTY, scope: null }))

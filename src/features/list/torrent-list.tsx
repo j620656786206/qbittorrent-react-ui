@@ -18,6 +18,7 @@ import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { Checkbox } from '#/shared/ui/checkbox'
 import { cn } from '#/shared/ui/cn'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
+import { BAR_SCROLL_PADDING_END } from '#/shared/ui/selection-bar-geometry'
 import { useEmptyEntrance, useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
 import { useLeavingExit } from '#/state/leaving-exit'
@@ -99,9 +100,10 @@ import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 // shifts. It shows while the wrapper is hovered or holds focus, and on
 // every row once anything is selected (`data-selecting` on the list).
 // Clicking it only toggles the selection (src/state/selection.ts); the rest
-// of the row still opens the detail. The scroller keeps 110px under the
-// last row on desktop, always, so the selection bar never covers it and
-// the list never jumps when the bar comes.
+// of the row still opens the detail. The scroller keeps
+// `page-desktop-bottom` under the last row on desktop, always, so the
+// selection bar never covers it and the list never jumps when the bar
+// comes.
 //
 // Story 4.2: below 1024px a long press on a row (enabled while nothing is
 // selected) ticks it and starts selection mode, which is simply anything
@@ -145,13 +147,6 @@ export const ROW_ITEM_CLASS =
 /** Story 4.2: the phone checkbox, 10px in, vertically centred. */
 export const PHONE_ROW_CHECKBOX_CLASS =
   'absolute top-1/2 left-2.5 z-[1] -translate-y-1/2'
-
-/**
- * Story 4.1: while anything is selected on desktop, a row scrolled to
- * (`↑` `↓`) stops 92px above the scroller's bottom, so it lands above the
- * floating selection bar (24px up, 52px tall, 16px clear).
- */
-export const SELECTION_SCROLL_PADDING_END = 92
 
 /**
  * Story 4.1: over the row's 20px slot (12px in, centred), above the row's
@@ -358,7 +353,9 @@ function TorrentRows({
     overscan: 10,
     gap: ROW_GAP,
     scrollMargin,
-    scrollPaddingEnd: desktop && selecting ? SELECTION_SCROLL_PADDING_END : 0,
+    // Story 4.1: a row scrolled to (`↑` `↓`) while anything is selected
+    // lands above the floating selection bar.
+    scrollPaddingEnd: desktop && selecting ? BAR_SCROLL_PADDING_END : 0,
     // React 19 warns about flushSync inside lifecycle methods.
     useFlushSync: false,
   })
@@ -434,23 +431,19 @@ function TorrentRows({
                   transform: `translateY(${item.start - scrollMargin}px)`,
                 }}
               >
-                {props && desktop && (
+                {props && (desktop || phoneSelecting) && (
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelected(hash)}
                     aria-label={`選取 ${props.torrent.name}`}
-                    className={ROW_CHECKBOX_CLASS}
-                  />
-                )}
-                {props && phoneSelecting && (
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => toggleSelected(hash)}
-                    aria-label={`選取 ${props.torrent.name}`}
-                    className={cn(
-                      PHONE_ROW_CHECKBOX_CLASS,
-                      shift === 'in' && SHIFT_CLASS.in,
-                    )}
+                    className={
+                      desktop
+                        ? ROW_CHECKBOX_CLASS
+                        : cn(
+                            PHONE_ROW_CHECKBOX_CLASS,
+                            shift === 'in' && SHIFT_CLASS.in,
+                          )
+                    }
                   />
                 )}
                 {props && !desktop && !selecting && shift === 'out' && (

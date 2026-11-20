@@ -104,4 +104,26 @@ describe('sendOp failure codes', () => {
     await flush()
     expect(onSuccess).toHaveBeenCalledWith(client, { id: 'k' }, { value: 7 })
   })
+
+  it('the promise settles after the callbacks, and never rejects on a failure', async () => {
+    const client = createQueryClient({ currentPath: () => '/' })
+    const order: Array<string> = []
+    const op = (ok: boolean): TrackedOp<{ id: string }> => ({
+      name: 'promise-op',
+      call: () =>
+        ok ? Promise.resolve(null) : Promise.reject(new AppError('timeout')),
+      keysOf: ({ id }) => [id],
+      failureCodes: OPERATION_FAILURE_CODES,
+      failureText: () => 'failed',
+      onSuccess: () => {
+        order.push('success')
+      },
+      onFailure: () => {
+        order.push('failure')
+      },
+    })
+    await sendOp(op(true), client, { id: 'a' }).then(() => order.push('done'))
+    await sendOp(op(false), client, { id: 'b' }).then(() => order.push('done'))
+    expect(order).toEqual(['success', 'done', 'failure', 'done'])
+  })
 })

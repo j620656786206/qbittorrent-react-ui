@@ -43,16 +43,16 @@ import {
   CARD_HEIGHT_WITH_BAR,
 } from '#/features/board/board-model'
 import type * as BoardModel from '#/features/board/board-model'
-import {
-  COLUMN_PADDING_END,
-  COLUMN_PADDING_START,
-} from '#/features/board/board-column'
+import { COLUMN_PADDING_START } from '#/features/board/board-column'
 import {
   PHONE_PANEL_PADDING_END,
   PHONE_PANEL_PADDING_START,
-  PHONE_PANEL_SELECTING_PADDING_END,
 } from '#/features/board/status-tabs'
 import { TorrentBoard } from '#/features/board/torrent-board'
+import {
+  PAGE_BOTTOM_DESKTOP,
+  PHONE_SELECTING_BOTTOM,
+} from '#/shared/ui/selection-bar-geometry'
 
 // Spec 2.3: the board's wiring in a DOM (happy-dom): columns from the live
 // maindata, cards that do not re-render on a poll that leaves them alone,
@@ -1302,13 +1302,13 @@ describe('selection (story 4.1)', () => {
     // The first card starts below the checkbox's 6px (and its outline).
     expect(COLUMN_PADDING_START).toBeGreaterThanOrEqual(6)
     expect(item.style.transform).toBe(`translateY(${COLUMN_PADDING_START}px)`)
-    // 110px stay under the last card (the bar never covers it).
-    expect(COLUMN_PADDING_END).toBe(110)
+    // The page's bottom room stays under the last card (the bar never
+    // covers it; selection-bar-geometry.test.ts checks it is enough).
     const list = section('下載中，1 個').querySelector(
       '[data-card-list]',
     ) as HTMLElement
     expect(list.style.height).toBe(
-      `${COLUMN_PADDING_START + CARD_HEIGHT_WITH_BAR + COLUMN_PADDING_END}px`,
+      `${COLUMN_PADDING_START + CARD_HEIGHT_WITH_BAR + PAGE_BOTTOM_DESKTOP}px`,
     )
   })
 
@@ -1446,8 +1446,7 @@ describe('phone selection (story 4.2)', () => {
     expect(box.className).not.toContain('opacity-0')
     // The other panels show theirs too.
     expect(checkboxes(panels()[1])).toHaveLength(1)
-    expect(PHONE_PANEL_SELECTING_PADDING_END).toBe(140)
-    expect(list.style.height).toBe(height(PHONE_PANEL_SELECTING_PADDING_END))
+    expect(list.style.height).toBe(height(PHONE_SELECTING_BOTTOM))
   })
 
   it('matrix tap while selecting and untick last: a tap toggles and never opens; the last untick ends the mode', async () => {
