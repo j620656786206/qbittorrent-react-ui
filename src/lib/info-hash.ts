@@ -106,7 +106,7 @@ export async function readTorrentFile(
   const decoded = decodeBencode(bytes)
   if (!decoded.ok) return UNREADABLE_FILE
   await options.yieldToMain()
-  const parsed = parseTorrent(bytes, decoded.root)
+  const parsed = await parseTorrent(bytes, decoded.root, options.yieldToMain)
   if (parsed === null) return UNREADABLE_FILE
 
   const sha1 = createSha1()
@@ -153,7 +153,11 @@ const MAX_PIECE_LENGTH = 0x7fffffff
  * length` outside 1 to 2^31 - 1, `pieces` that do not match the size, or a
  * size that is neither a valid `files` nor a valid single-file `length`.
  */
-function parseTorrent(bytes: Uint8Array, root: BSpan): ParsedTorrent | null {
+async function parseTorrent(
+  bytes: Uint8Array,
+  root: BSpan,
+  yieldToMain: () => Promise<void>,
+): Promise<ParsedTorrent | null> {
   const infoSpan = dictEntries(bytes, root)?.get('info')
   if (infoSpan === undefined) return null
   const info = dictEntries(bytes, infoSpan)
@@ -170,7 +174,7 @@ function parseTorrent(bytes: Uint8Array, root: BSpan): ParsedTorrent | null {
   ) {
     return null
   }
-  const sizes = v1Sizes(bytes, info)
+  const sizes = await v1Sizes(bytes, info, yieldToMain)
   if (sizes === null) return null
   // v1 needs `pieces` (a hybrid has it too); v2-only has none. One 20-byte
   // hash per piece, the last piece possibly short.
@@ -200,6 +204,9 @@ function lengthOf(
     : null
 }
 
+/** Files checked between two yields in a multi-file `info`. */
+const FILES_PER_SLICE = 5000
+
 const PADDING_ATTR = 0x70 // `p` in a file's `attr` (BEP 47)
 
 interface V1Sizes {
@@ -215,10 +222,11 @@ interface V1Sizes {
  * strings. Without `files`, a single-file info with a valid `length`.
  * Anything else, or a total past 2^53, is `null`.
  */
-function v1Sizes(
+async function v1Sizes(
   bytes: Uint8Array,
   info: ReadonlyMap<string, BSpan>,
-): V1Sizes | null {
+  yieldToMain: () => Promise<void>,
+): Promise<V1Sizes | null> {
   const filesSpan = info.get('files')
   if (filesSpan === undefined) {
     const length = lengthOf(bytes, info.get('length'))
@@ -228,7 +236,10 @@ function v1Sizes(
   if (files === null || files.length === 0) return null
   let total = 0
   let content = 0
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
+    // A torrent with a huge `files` list checks it in parts, so a slow CPU
+    // (a phone, a shared CI runner) never runs one long slice.
+    if (index > 0 && index % FILES_PER_SLICE === 0) await yieldToMain()
     const fileLength = lengthOf(bytes, dictValue(bytes, file, 'length'))
     if (fileLength === null) return null
     if (!isByteStringList(bytes, dictValue(bytes, file, 'path'))) return null
