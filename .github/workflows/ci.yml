@@ -11,10 +11,19 @@ concurrency:
   group: ci-${{ github.head_ref }}
   cancel-in-progress: true
 
+# Three kinds of job run side by side, each on its own runner:
+# - verify: the quick checks and the build (about 2 minutes). Kept as one job:
+#   split further, every job pays its own npm ci for under a minute of work.
+# - e2e: the Playwright suite in four shards (scripts/e2e-shards.mjs), each with its
+#   own built app and fake qBittorrent (AD-15). The slowest shard sets the
+#   wall clock, about 6 minutes instead of 19 on one runner.
+# - image: the Docker image built from this PR's merge commit, with its smoke.
+# ci-ok sums them up, so one check name stays stable when shards change.
+
 jobs:
-  check:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,28 +51,98 @@ jobs:
       # scripts/audit.mjs (one advisory with no fixed release, 2026-11-18).
       - run: npm run audit:prod
       - run: node --check scripts/fake-qbit.mjs
+      - run: node --check scripts/smoke-image.mjs
+      # Every e2e spec runs in exactly one shard, and the matrix below
+      # matches scripts/e2e-shards.mjs.
+      - run: node scripts/verify-shards.mjs
       - run: npm run build
       # Boots .output: CSP nonce on HTML, asset CSP, refuses to start without env.
       - run: npm run smoke
-      # Story 2.0: the Playwright browser smoke (Chromium only) against the
-      # built server behind scripts/fake-qbit.mjs, which only talks to its
-      # own fake qBittorrent (AD-15). No .env, no real credentials.
-      - run: npx playwright install --with-deps chromium
-      - run: npm run smoke:browser
-      # Light and dark screenshots at 1440px and 390px, plus the report.
+      # The build regenerates the route tree; a stale committed copy fails here.
+      - run: git diff --exit-code src/routeTree.gen.ts
+
+  # Story 2.0: the Playwright browser smoke (Chromium only) against the built
+  # server behind scripts/fake-qbit.mjs, which only talks to its own fake
+  # qBittorrent (AD-15). No .env, no real credentials.
+  e2e:
+    name: e2e (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The official Playwright image has Chromium and its system libraries, so
+    # no `playwright install`. Its tag must match @playwright/test in
+    # package.json exactly (1.64.1), or the browser revision is missing.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      # A red shard must not cancel the others: each shard reports what it
+      # found, so one run shows everything that broke.
+      fail-fast: false
+      matrix:
+        # Keep this a one-line array: scripts/verify-shards.mjs reads it.
+        shard: [delete, detail, smoke, rest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-e2e-shard.mjs ${{ matrix.shard }}
+      # Light and dark screenshots at 1440px and 390px, plus the report. The
+      # shard is in the artifact name: two uploads with one name fail.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: browser-smoke
+          name: browser-smoke-${{ matrix.shard }}
           path: |
             e2e-output/screenshots/
             playwright-report/
           retention-days: 14
-      # The build regenerates the route tree; a stale committed copy fails here.
-      - run: git diff --exit-code src/routeTree.gen.ts
-      # AR-11: the image built from this PR's merge commit (github.sha), with
-      # the same Dockerfile and smoke as main, run with fake env and the
-      # hardened Unraid flags. Never pushed or logged in to a registry here.
-      - run: node --check scripts/smoke-image.mjs
+          if-no-files-found: ignore
+
+  # AR-11: the image built from this PR's merge commit (github.sha), with the
+  # same Dockerfile and smoke as main, run with fake env and the hardened
+  # Unraid flags. Never pushed or logged in to a registry here.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # scripts/smoke-image.mjs imports seroval through scripts/server-fn.mjs.
+      - run: npm ci
       - run: docker build --platform linux/amd64 --build-arg COMMIT_SHA=${{ github.sha }} -t react-torrent:ci .
       - run: node scripts/smoke-image.mjs react-torrent:ci ${{ github.sha }}
+
+  ci-ok:
+    needs: [verify, e2e, image]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::a CI job ended with $result"
+              exit 1
+            fi
+          done

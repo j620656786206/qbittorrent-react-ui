@@ -154,17 +154,35 @@ describe('deploy files', () => {
     expect(ci).not.toMatch(/docker (push|login)|login-action/)
     expect(ci).toContain('--platform linux/amd64')
     expect(ci).toContain('node scripts/smoke-image.mjs')
-    // Story 2.0: the browser smoke runs after the build and the built-server
-    // smoke, and its screenshots are uploaded even when it fails.
-    const build = ci.indexOf('npm run build')
-    const builtSmoke = ci.indexOf('npm run smoke\n')
-    const install = ci.indexOf('npx playwright install --with-deps chromium')
-    const browserSmoke = ci.indexOf('npm run smoke:browser')
+    // The verify job: the built-server smoke runs after the build, and the
+    // e2e split is checked (scripts/verify-shards.mjs).
+    const verifyJob = ci.slice(
+      ci.indexOf('\n  verify:'),
+      ci.indexOf('\n  e2e:'),
+    )
+    const build = verifyJob.indexOf('npm run build')
+    const builtSmoke = verifyJob.indexOf('npm run smoke\n')
     expect(build).toBeGreaterThan(-1)
     expect(builtSmoke).toBeGreaterThan(build)
-    expect(install).toBeGreaterThan(builtSmoke)
-    expect(browserSmoke).toBeGreaterThan(install)
-    const afterBrowserSmoke = ci.slice(browserSmoke)
+    expect(verifyJob).toContain('node scripts/verify-shards.mjs')
+    // Story 2.0: the browser smoke, in shards. Each shard builds, then runs
+    // its specs in the Playwright image matching @playwright/test, and its
+    // screenshots are uploaded even when it fails.
+    const e2eJob = ci.slice(ci.indexOf('\n  e2e:'), ci.indexOf('\n  image:'))
+    const pkg = JSON.parse(read('package.json')) as {
+      devDependencies: Record<string, string>
+    }
+    expect(e2eJob).toContain(
+      `image: mcr.microsoft.com/playwright:v${pkg.devDependencies['@playwright/test']}-noble`,
+    )
+    expect(e2eJob).toContain('fail-fast: false')
+    const shardBuild = e2eJob.indexOf('npm run build')
+    const browserSmoke = e2eJob.indexOf(
+      'node scripts/run-e2e-shard.mjs ${{ matrix.shard }}',
+    )
+    expect(shardBuild).toBeGreaterThan(-1)
+    expect(browserSmoke).toBeGreaterThan(shardBuild)
+    const afterBrowserSmoke = e2eJob.slice(browserSmoke)
     expect(afterBrowserSmoke).toMatch(
       /uses: actions\/upload-artifact@[0-9a-f]{40} # v\S+\n\s+if: always\(\)/,
     )
