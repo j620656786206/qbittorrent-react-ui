@@ -481,6 +481,24 @@ describe('parseMagnet', () => {
     })
   })
 
+  it('spec 4.7: a space counts as the %20 it is sent as, at the allowance boundary', () => {
+    const head = `magnet:?xt=urn:btih:${HEX}&dn=`
+    // Each space is sent as 3 bytes: fill to exactly the allowance.
+    const spaces = 100
+    const fill = ADD_FORM_ENTRY_ALLOWANCE - head.length - spaces * 3
+    const at = head + ' '.repeat(spaces) + 'y'.repeat(fill)
+    expect(at.length).toBeLessThan(ADD_FORM_ENTRY_ALLOWANCE)
+    expect(parseMagnet(at)).toMatchObject({
+      kind: 'magnet',
+      linkBytes: ADD_FORM_ENTRY_ALLOWANCE,
+    })
+    // One more space in the name (2 bytes more as sent) is over.
+    expect(parseMagnet(at.replace('y', ' '))).toEqual({
+      kind: 'unreadable',
+      reason: 'link',
+    })
+  })
+
   it('linkBytes is the UTF-8 length of the trimmed link', () => {
     const link = `magnet:?xt=urn:btih:${HEX}&dn=中文`
     expect(parseMagnet(`  ${link}\n`)).toMatchObject({

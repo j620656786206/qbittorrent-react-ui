@@ -58,8 +58,17 @@ export interface TrackedOp<
     variables: TVariables,
     data: TData,
   ) => Promise<unknown> | void
-  /** Any failure, toast or not. */
-  onFailure?: (variables: TVariables) => void
+  /**
+   * Any failure, toast or not; `code` is the AppError's (story 4.7: an add
+   * discards its list on `not_logged_in`), absent for anything else, and
+   * `error` what the call threw.
+   */
+  onFailure?: (variables: TVariables, code?: ErrorCode, error?: unknown) => void
+  /**
+   * Story 4.7: what 「重試」 does instead of sending the same variables
+   * again (an add judges its current rows again, like a press).
+   */
+  retry?: (variables: TVariables) => void
 }
 
 /**
@@ -84,11 +93,14 @@ export function sendOp<TVariables, TCode extends ErrorCode, TData>(
     },
     onSuccess: (data, sent) => op.onSuccess?.(client, sent, data),
     onError: (error, sent) => {
-      op.onFailure?.(sent)
+      op.onFailure?.(sent, isAppError(error) ? error.code : undefined, error)
       if (!isAppError(error) || !isFailureCode(error.code)) return
       toast.failure(op.failureText(sent, error.code), {
         keys: op.keysOf(sent),
-        onRetry: () => void sendOp(op, client, sent),
+        onRetry: () => {
+          if (op.retry) op.retry(sent)
+          else void sendOp(op, client, sent)
+        },
       })
     },
   })

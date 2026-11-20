@@ -56,7 +56,12 @@ export interface QbitSessionOptions {
 export interface SendOptions {
   method: 'GET' | 'POST'
   query?: URLSearchParams
-  form?: URLSearchParams
+  /**
+   * The body: URL-encoded, or multipart (story 4.7: `torrents/add` with a
+   * .torrent file). fetch sets the content type for either; a resend after
+   * a 403 sends the same form again.
+   */
+  form?: URLSearchParams | FormData
 }
 
 /** A 2xx answer, body already read inside the deadline. */

@@ -12,6 +12,7 @@ import { createSha1 } from '#/lib/sha1'
 import {
   ADD_FORM_ENTRY_ALLOWANCE,
   MAX_TORRENT_FILE_BYTES,
+  magnetSendText,
 } from '#/shared/torrent-add'
 
 // AR-41, story 4.5: the only place info hashes are worked out. A .torrent's
@@ -272,7 +273,8 @@ function nameOf(
 export function parseMagnet(text: string): MagnetInfo | Unreadable {
   const trimmed = text.trim()
   if (!/^magnet:\?/i.test(trimmed)) return UNREADABLE_LINK
-  const linkBytes = utf8Encoder.encode(trimmed).length
+  // Story 4.7: measured as sent (spaces as `%20`), so the cap holds there.
+  const linkBytes = utf8Encoder.encode(magnetSendText(trimmed)).length
   if (linkBytes > ADD_FORM_ENTRY_ALLOWANCE) return UNREADABLE_LINK
   const params = new URLSearchParams(trimmed.slice('magnet:?'.length))
   let hash: string | null = null

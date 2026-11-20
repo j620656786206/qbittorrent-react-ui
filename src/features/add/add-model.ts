@@ -1,17 +1,28 @@
 import type { AddEntry, EntryStatus, JudgedEntry } from '#/lib/add-entries'
+import { addItemFailureText } from '#/lib/error-text'
 import { categoryLabel, orderCategoryKeys } from '#/lib/category-tabs'
 import { formatCount } from '#/lib/format'
 import { ALL, UNCATEGORIZED } from '#/shared/categories'
+import type { ErrorCode } from '#/shared/errors'
 import type { Category } from '#/shared/maindata'
+import {
+  ADD_FIELDS,
+  addFormAllowance,
+  magnetSendText,
+} from '#/shared/torrent-add'
+import type { BatchResult } from '#/shared/torrent-ops'
 
 // Story 4.6 (DESIGN and EXPERIENCE add-torrent, mockups S06-add-*): the add
 // screen's text and choices, pure, so they are tested in node. Judging and
 // ordering are src/lib/add-entries.ts (story 4.5); this file only turns
 // the judged rows into what the screen shows.
 
-/** Where an entry came from: one pasted token or one file. */
+/**
+ * Where an entry came from: one pasted token or one file. Story 4.7: the
+ * picked or dropped `File` stays on its entry, so the send can include it.
+ */
 export type AddSource =
-  { kind: 'link'; text: string } | { kind: 'file'; name: string }
+  { kind: 'link'; text: string } | { kind: 'file'; name: string; file: File }
 
 /** One entry on the screen: 4.5's read result plus its source. */
 export interface AddItem extends AddEntry {
@@ -151,3 +162,112 @@ export function savePathLine(
 
 export const SAVE_PATH_PREFIX = '會存到 '
 export const SAVE_PATH_DEFAULT = '會存到 qBittorrent 的預設位置'
+
+// Story 4.7: submitting. The send, the results and their text.
+
+/** The button while the add is out. */
+export const ADD_SENDING_TEXT = '新增中…'
+
+/** Alex's decision (2026-11-20): why 新增 stays disabled. */
+export const NO_CATEGORIES_TEXT = 'qBittorrent 還沒有分類'
+
+/** The all-ok toast's button. */
+export const GO_SEE_LABEL = '去看'
+
+/** The all-ok toast: 「已新增 3 個種子」. */
+export function addedToastText(count: number): string {
+  return `已新增 ${formatCount(count)} 個種子`
+}
+
+/**
+ * The line at the top of the list after a partial failure: 「5 個加好了，2
+ * 個失敗」; with nothing added, only 「2 個失敗」 (Claude 代決).
+ */
+export function addResultText(added: number, failed: number): string {
+  const failedText = `${formatCount(failed)} 個失敗`
+  return added > 0
+    ? `${formatCount(added)} 個加好了，${failedText}`
+    : failedText
+}
+
+/** One request's form and its entries in key order (key n is `order[n]`). */
+export interface AddForm {
+  form: FormData
+  order: Array<AddItem>
+  /** About how long the body is: the entries' bytes and the allowance. */
+  bytes: number
+}
+
+/**
+ * The `addTorrents` form of one batch: magnet links first, then files,
+ * each group in list order (the server keys its answer by that order),
+ * and the category. A magnet goes as `magnetSendText` (a space in its
+ * name as `%20`), the text `parseMagnet` measured.
+ */
+export function addFormOf(
+  batch: ReadonlyArray<AddItem>,
+  category: string,
+): AddForm {
+  const magnets = batch.filter((item) => item.source.kind === 'link')
+  const files = batch.filter((item) => item.source.kind === 'file')
+  const form = new FormData()
+  for (const { source } of magnets) {
+    if (source.kind === 'link') {
+      form.append(ADD_FIELDS.magnet, magnetSendText(source.text))
+    }
+  }
+  for (const { source } of files) {
+    if (source.kind === 'file') {
+      form.append(ADD_FIELDS.torrent, source.file, source.name)
+    }
+  }
+  form.append(ADD_FIELDS.category, category)
+  const order = [...magnets, ...files]
+  let bytes = addFormAllowance(order.length)
+  for (const { result } of order) {
+    if (result.kind === 'file') bytes += result.fileBytes
+    if (result.kind === 'magnet') bytes += result.linkBytes
+  }
+  return { form, order, bytes }
+}
+
+export interface AddFailure {
+  item: AddItem
+  code: ErrorCode
+}
+
+/** What a send did, entry by entry, in list order per batch. */
+export interface AddOutcome {
+  added: Array<AddItem>
+  failed: Array<AddFailure>
+}
+
+/**
+ * Reads one answer against its form's order. An entry the answer leaves
+ * out (never expected) counts as rejected, so it stays in the list.
+ */
+export function outcomeOf(
+  order: ReadonlyArray<AddItem>,
+  result: BatchResult,
+): AddOutcome {
+  const byKey = new Map(result.items.map((item) => [item.key, item]))
+  const outcome: AddOutcome = { added: [], failed: [] }
+  for (const [index, item] of order.entries()) {
+    const answer = byKey.get(String(index))
+    if (answer?.ok) outcome.added.push(item)
+    else
+      outcome.failed.push({
+        item,
+        code: answer ? answer.code : 'qbit_rejected',
+      })
+  }
+  return outcome
+}
+
+/** A failed entry's reason under its row. */
+export function addFailureReason({ item, code }: AddFailure): string {
+  return addItemFailureText(
+    code,
+    item.result.kind === 'file' ? 'file' : 'magnet',
+  )
+}

@@ -18,6 +18,8 @@ import { resetDetailOutside } from '#/state/detail-outside'
 import { ListViewContext } from '#/state/list-view'
 import type { ListViewControl } from '#/state/list-view'
 import { MAINDATA_KEY } from '#/state/maindata'
+import { clearLoginRequired } from '#/state/login-required'
+import { resetOpenWhenAdded } from '#/state/open-when-added'
 import { resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import { resetShortcuts } from '#/state/shortcuts'
@@ -26,9 +28,10 @@ import { AddScreen } from '#/features/add/add-screen'
 
 // Spec 4.6: the add screen's DOM test harness, shared by
 // add-screen.dom.test.tsx and add-screen-more.dom.test.tsx (one file was
-// past 1,000 lines). Maindata and the settings are faked; nothing is sent
-// (AD-15, and submitting is story 4.7). Test torrents are generated with
-// bencode. Importing it registers the shared beforeEach and afterEach.
+// past 1,000 lines) and add-submit.dom.test.tsx (spec 4.7). Maindata and
+// the settings are faked; a test that submits mocks `addTorrents` itself
+// (AD-15). Test torrents are generated with bencode. Importing it
+// registers the shared beforeEach and afterEach.
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined
@@ -61,6 +64,9 @@ interface Env {
   viewCategory: string
   desktop: boolean
   setHash: ReturnType<typeof vi.fn<(hash: string | null) => void>>
+  selectCategory: ReturnType<typeof vi.fn<(category: string) => void>>
+  /** Maindata answers so far (spec 4.7: a refresh after an add). */
+  maindataFetches: number
   client: QueryClient
   /** Resolves the first maindata answer of a `render({ loaded: false })`. */
   loadMaindata: () => void
@@ -89,7 +95,7 @@ export function control(): ListViewControl {
     viewReady: true,
     setView: () => {},
     pickView: () => {},
-    selectCategory: () => {},
+    selectCategory: env.selectCategory,
     rememberedHint: false,
     openSettings: () => {},
     settingsOpen: false,
@@ -114,10 +120,16 @@ export function tree() {
   )
 }
 
+/** Draws the screen again with the current `env` (a category switch). */
+export async function rerender() {
+  await act(async () => root.render(tree()))
+}
+
 export async function render({ loaded = true } = {}) {
   let first = true
   env.client = createQueryClient({
     fetchMaindata: () => {
+      env.maindataFetches += 1
       const answer = fakeResponse({
         changed: env.torrents,
         categories: env.categories,
@@ -305,7 +317,12 @@ beforeEach(() => {
   env.viewCategory = ALL
   setDesktop(true)
   env.setHash = vi.fn<(hash: string | null) => void>()
+  env.selectCategory = vi.fn<(category: string) => void>()
+  env.maindataFetches = 0
+  // A test that ends logged out (spec 4.7 C9) must not disable the next.
+  clearLoginRequired()
   resetAddOpen()
+  resetOpenWhenAdded()
   resetDetailOutside()
   resetOrderFreeze()
   resetShortcuts()
@@ -316,6 +333,7 @@ afterEach(async () => {
   env.client.clear()
   document.body.replaceChildren()
   resetAddOpen()
+  resetOpenWhenAdded()
   resetDetailOutside()
   resetOrderFreeze()
   resetShortcuts()

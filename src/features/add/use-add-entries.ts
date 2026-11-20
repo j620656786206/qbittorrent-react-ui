@@ -19,6 +19,9 @@ import type { AddItem, JudgedItem } from '#/features/add/add-model'
 // loaded nothing can be judged as already downloaded, so `ready` is false.
 // A read that throws counts as 看不懂這個檔案 and never stalls the queue.
 // Removing a row removes the copies of its hash that judging merged into it.
+// Story 4.7: each file entry keeps its `File` (the send includes it), the
+// entries as given are exposed for judging again at the press, and the
+// rows an add went through leave together (`removeAdded`).
 
 /** Gives the main thread back (src/lib has no timers). */
 export const yieldToMain = () =>
@@ -28,6 +31,8 @@ const NO_ITEMS: ReadonlyArray<AddItem> = []
 
 export interface AddEntries {
   rows: ReadonlyArray<JudgedItem>
+  /** Every entry as given, unjudged, in order. */
+  items: ReadonlyArray<AddItem>
   /** Maindata has loaded, so the judging is final. */
   ready: boolean
   /** Files given and not read yet. */
@@ -35,6 +40,27 @@ export interface AddEntries {
   addText: (text: string) => void
   addFiles: (files: ReadonlyArray<File>) => void
   remove: (id: number) => void
+  /** Removes these entries (and the copies of their hashes). */
+  removeAdded: (ids: ReadonlyArray<number>) => void
+}
+
+/** `items` without `ids` and without the copies judging merged into them. */
+function withoutIds(
+  items: ReadonlyArray<AddItem>,
+  ids: ReadonlySet<number>,
+): ReadonlyArray<AddItem> {
+  const hashes = new Set<string>()
+  for (const item of items) {
+    if (ids.has(item.id) && item.result.kind !== 'unreadable') {
+      hashes.add(item.result.hash)
+    }
+  }
+  const kept = items.filter(
+    (item) =>
+      !ids.has(item.id) &&
+      (item.result.kind === 'unreadable' || !hashes.has(item.result.hash)),
+  )
+  return kept.length === items.length ? items : kept
 }
 
 export function useAddEntries(open: boolean): AddEntries {
@@ -93,7 +119,7 @@ export function useAddEntries(open: boolean): AddEntries {
         if (!live()) return
         const item: AddItem = {
           id: nextIdRef.current++,
-          source: { kind: 'file', name: file.name },
+          source: { kind: 'file', name: file.name, file },
           result,
         }
         setItems((current) => [...current, item])
@@ -103,20 +129,12 @@ export function useAddEntries(open: boolean): AddEntries {
   }, [])
 
   const remove = useCallback((id: number) => {
-    setItems((current) => {
-      const removed = current.find((item) => item.id === id)
-      if (removed === undefined) return current
-      const { result } = removed
-      // A merged copy (same hash) would take the row's place otherwise.
-      const hash = result.kind === 'unreadable' ? null : result.hash
-      return current.filter(
-        (item) =>
-          item.id !== id &&
-          (hash === null ||
-            item.result.kind === 'unreadable' ||
-            item.result.hash !== hash),
-      )
-    })
+    setItems((current) => withoutIds(current, new Set([id])))
+  }, [])
+
+  const removeAdded = useCallback((ids: ReadonlyArray<number>) => {
+    if (ids.length === 0) return
+    setItems((current) => withoutIds(current, new Set(ids)))
   }, [])
 
   // Closed, nothing is read from maindata; open, each poll works the key
@@ -145,10 +163,12 @@ export function useAddEntries(open: boolean): AddEntries {
 
   return {
     rows: rows ?? shownRows,
+    items,
     ready: hashKey !== undefined,
     reading,
     addText,
     addFiles,
     remove,
+    removeAdded,
   }
 }

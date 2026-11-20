@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
 import { useIsDesktop } from '#/shared/ui/breakpoint'
 import { cn } from '#/shared/ui/cn'
+import { STILL_WAITING_TEXT, useStillWaiting } from '#/shared/ui/confirm-shell'
 import { Dialog, DialogContent, DialogTitle } from '#/shared/ui/dialog'
 import {
   closeAdd,
@@ -13,14 +14,18 @@ import {
 import { openDetailOutside } from '#/state/detail-outside'
 import { useListView } from '#/state/list-view'
 import { selectCategories, useMaindata } from '#/state/maindata'
+import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useSettings } from '#/state/settings'
 import { useSheetLayer } from '#/state/sheet-layer'
 import { useEscapeLayer } from '#/state/shortcuts'
 import { useViewedHash } from '#/state/viewed-hash'
 import {
+  ADD_SENDING_TEXT,
   ADD_TITLE,
+  NO_CATEGORIES_TEXT,
   addButtonText,
   addCounts,
+  addResultText,
   addDisabled,
   categoryOptions,
   defaultCategory,
@@ -36,6 +41,7 @@ import {
 } from '#/features/add/add-parts'
 import type { PasteInput } from '#/features/add/add-parts'
 import { useAddEntries } from '#/features/add/use-add-entries'
+import { dismissAddFailure, useAddSubmit } from '#/features/add/use-add-submit'
 
 // Story 4.6 (DESIGN and EXPERIENCE add-torrent, mockups S06-add-empty-
 // desktop, S06-add-many-desktop, S06-add-phone): the add screen, mounted
@@ -53,8 +59,15 @@ import { useAddEntries } from '#/features/add/use-add-entries'
 // paste strip at its bottom, and new entries are judged together with the
 // old ones. Under it: the category menu (preset to the category on screen,
 // empty in 全部 and 未分類) and 「會存到 …」; then 「有 N 個不會加」 and
-// 「新增 N 個」, disabled with nothing addable or no category. Submitting is
-// story 4.7: the button does nothing yet. 「打開」 closes the screen and
+// 「新增 N 個」, disabled with nothing addable or no category (with no
+// qBittorrent category at all, a line under the menu says so). Story 4.7
+// submits (use-add-submit.ts): 「新增中…」 on the button, after 10 s
+// 「還在等 NAS 回應」 under it, and every close path (取消, ✕, Esc, a drag
+// down, 打開) and every change (paste, 選檔案, a drop, 拿掉, the category)
+// does nothing until the send ends; 新增 also waits for files still being
+// read. A failed row shows its
+// reason, and the list frame's top line counts what went and what failed.
+// 「打開」 closes the screen and
 // opens that torrent's detail, without a position when no list or column
 // holds it (src/state/detail-outside.ts). Any close discards the list;
 // files still being read are dropped (use-add-entries.ts). Crossing 1024px
@@ -73,18 +86,41 @@ export function AddScreen() {
   const { rows, ready, reading, addText, addFiles, remove } = entries
   const queued = useQueuedFiles()
   const { setHash } = useViewedHash()
-  const { view } = useListView()
+  const { view, selectCategory } = useListView()
+  const { sending, isSending, failures, summary, submit } = useAddSubmit(
+    open,
+    entries,
+    selectCategory,
+  )
+  const waiting = useStillWaiting(sending)
+  useOpenWhenAddedUpkeep()
   const { settings } = useSettings()
   const { data: categories } = useMaindata(selectCategories)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Dropped files (opened by a drop, or appended while open).
+  /** New entries; none while the add is out (the list is locked). */
+  const onText = (text: string) => {
+    if (isSending()) return
+    dismissAddFailure()
+    addText(text)
+  }
+  const onFiles = useCallback(
+    (files: ReadonlyArray<File>) => {
+      if (isSending() || files.length === 0) return
+      dismissAddFailure()
+      addFiles(files)
+    },
+    [isSending, addFiles],
+  )
+
+  // Dropped files (opened by a drop, or appended while open); a drop while
+  // the add is out is dropped like any other input.
   useEffect(() => {
     if (!open || queued.length === 0) return
-    addFiles(takeQueuedFiles())
-  }, [open, queued, addFiles])
+    onFiles(takeQueuedFiles())
+  }, [open, queued, onFiles])
 
   const options = categoryOptions(categories, settings?.categoryOrder ?? [])
   // `null`: untouched, the preset applies. Reset on every open.
@@ -103,24 +139,39 @@ export function AddScreen() {
     ? chosen
     : ''
 
-  const close = useCallback(() => closeAdd(), [])
+  /** Every close path; never while the add is out. */
+  const close = useCallback(() => {
+    if (isSending()) return
+    dismissAddFailure()
+    closeAdd()
+  }, [isSending])
+  const pickCategory = (value: string) => {
+    if (isSending()) return
+    dismissAddFailure()
+    setPicked(value)
+  }
   useEscapeLayer(open && desktop, close, 'dialog')
   useSheetLayer(open && !desktop, close)
 
-  const onPick = () => fileInputRef.current?.click()
+  const onPick = () => {
+    if (!isSending()) fileInputRef.current?.click()
+  }
   const onFileInput = (event: ChangeEvent<HTMLInputElement>) => {
     const files = [...(event.target.files ?? [])]
     // The same file can be picked again.
     event.target.value = ''
-    addFiles(files)
+    onFiles(files)
   }
   const onOpenExisting = (hash: string) => {
+    if (isSending()) return
+    dismissAddFailure()
     openDetailOutside(hash)
     setHash(hash)
     closeAdd()
   }
   /** Removes a row; focus goes to the next row's ✕, else the paste area. */
   const onRemove = (id: number, from: HTMLElement) => {
+    if (isSending()) return
     const row = from.closest('li')
     const next = row?.nextElementSibling ?? row?.previousElementSibling
     const target =
@@ -129,6 +180,7 @@ export function AddScreen() {
     if (row?.contains(document.activeElement)) {
       target?.focus({ preventScroll: true })
     }
+    dismissAddFailure()
     remove(id)
   }
   // The box became the list or back: the focused textarea or 選檔案 is
@@ -144,18 +196,29 @@ export function AddScreen() {
 
   const phone = !desktop
   const paste: PasteInput = {
-    onText: addText,
-    onFiles: addFiles,
+    onText,
+    onFiles,
     onPick,
     textareaRef,
     draft,
     setDraft,
     phone,
     reading: reading > 0,
+    locked: sending,
   }
   const { addable, skipped } = addCounts(rows)
-  // Before maindata loads every entry looks addable: wait for it.
-  const disabled = !ready || addDisabled(addable, category)
+  // Before maindata loads every entry looks addable, and a file still being
+  // read is not in the list yet: wait for both.
+  const disabled = !ready || reading > 0 || addDisabled(addable, category)
+  const noCategories = categories !== undefined && options.length === 0
+  // Failed rows still shown: one removed, or now in maindata, leaves the count.
+  const failedShown = rows.filter(
+    (row) => row.status === 'addable' && failures.has(row.entry.id),
+  ).length
+  const resultLine =
+    summary !== null && failedShown > 0
+      ? addResultText(summary.added, failedShown)
+      : null
 
   const fileInput = (
     <input
@@ -176,14 +239,18 @@ export function AddScreen() {
       paste={paste}
       onRemove={onRemove}
       onOpen={onOpenExisting}
+      failures={failures}
+      resultLine={resultLine}
     />
   )
   const categoryField = (
     <CategoryField
       value={category}
       options={options}
-      onChange={setPicked}
+      onChange={pickCategory}
       path={savePathLine(category, categories)}
+      note={noCategories ? NO_CATEGORIES_TEXT : null}
+      locked={sending}
       phone={phone}
     />
   )
@@ -191,18 +258,29 @@ export function AddScreen() {
     <button
       type="button"
       data-add-submit=""
-      aria-disabled={disabled || undefined}
+      aria-disabled={disabled || sending || undefined}
+      data-sending={sending || undefined}
       onClick={() => {
-        if (disabled) return
-        // Story 4.7 sends; until then a press does nothing.
+        if (disabled || sending) return
+        submit(category)
       }}
       className={cn(
-        'rounded-full bg-primary px-[18px] font-bold whitespace-nowrap text-primary-foreground tabular-nums hover-solid',
+        'rounded-full bg-primary px-[18px] font-bold whitespace-nowrap text-primary-foreground tabular-nums hover-solid data-[sending]:opacity-100',
         phone ? 'h-11 w-full text-[15px]' : 'h-9 flex-none',
       )}
     >
-      {addButtonText(addable)}
+      {sending ? ADD_SENDING_TEXT : addButtonText(addable)}
     </button>
+  )
+  /** Always mounted, so the line is announced when it fills in. */
+  const waitingLine = (align: string) => (
+    <p
+      role="status"
+      data-add-waiting=""
+      className={cn('m-0 text-meta text-text-muted', align, waiting && 'mt-2')}
+    >
+      {waiting ? STILL_WAITING_TEXT : ''}
+    </p>
   )
   const note = skippedText(skipped)
 
@@ -215,11 +293,13 @@ export function AddScreen() {
         }}
         mode="fixed90"
         title={ADD_TITLE}
+        locked={sending}
         footer={
           <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
             {categoryField}
             <FooterNote text={note} className="mt-1 text-center" />
             {primary}
+            {waitingLine('text-center')}
           </div>
         }
       >
@@ -254,23 +334,27 @@ export function AddScreen() {
           <DialogTitle className="m-0 flex-1 text-[18px] leading-[1.2] font-bold">
             {ADD_TITLE}
           </DialogTitle>
-          <IconClose onClick={close} phone={false} />
+          <IconClose onClick={close} phone={false} disabled={sending} />
         </div>
         {fileInput}
         {entriesArea}
         {categoryField}
-        <div className="flex flex-none items-center gap-4">
-          <FooterNote text={note} className="min-w-0 flex-1" />
-          <div className="flex flex-none gap-2">
-            <button
-              type="button"
-              onClick={close}
-              className="h-9 flex-none rounded-full border bg-surface px-[18px] font-semibold whitespace-nowrap text-text hover-outline"
-            >
-              取消
-            </button>
-            {primary}
+        <div className="flex flex-none flex-col">
+          <div className="flex items-center gap-4">
+            <FooterNote text={note} className="min-w-0 flex-1" />
+            <div className="flex flex-none gap-2">
+              <button
+                type="button"
+                aria-disabled={sending || undefined}
+                onClick={close}
+                className="h-9 flex-none rounded-full border bg-surface px-[18px] font-semibold whitespace-nowrap text-text hover-outline aria-disabled:cursor-not-allowed"
+              >
+                取消
+              </button>
+              {primary}
+            </div>
           </div>
+          {waitingLine('text-right')}
         </div>
       </DialogContent>
     </Dialog>

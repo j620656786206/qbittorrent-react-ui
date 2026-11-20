@@ -275,7 +275,7 @@ describe('guard() hardening', () => {
     })
   })
 
-  it.each([409_601, -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY])(
+  it.each([52_428_801, -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY])(
     'throws at definition time for bodyLimit %s',
     (bodyLimit) => {
       expect(() => makeGuarded(async () => ok(1), { bodyLimit })).toThrow(
@@ -288,6 +288,10 @@ describe('guard() hardening', () => {
     expect(() => makeGuarded(async () => ok(1), { bodyLimit: 0 })).not.toThrow()
     expect(() =>
       makeGuarded(async () => ok(1), { bodyLimit: 409_600 }),
+    ).not.toThrow()
+    // Story 4.7: the upload limit is the request ceiling.
+    expect(() =>
+      makeGuarded(async () => ok(1), { bodyLimit: 52_428_800 }),
     ).not.toThrow()
   })
 

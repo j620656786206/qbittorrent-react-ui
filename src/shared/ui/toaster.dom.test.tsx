@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resetToasts,
   setToastLift,
+  showActionToast,
   showFailureToast,
   showPlainToast,
 } from '#/shared/toast-store'
@@ -116,6 +117,34 @@ describe('the toaster', () => {
       expect(button('關閉')).toBeDefined()
       await act(async () => vi.advanceTimersByTime(4000))
       expect(card()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('4.7 action: the plain card with a 32px 去看 pill in the status region; the pill closes, then runs; gone after 8 s', async () => {
+    vi.useFakeTimers()
+    try {
+      const run = vi.fn()
+      await act(async () => showActionToast('已新增 3 個種子', '去看', run))
+      const status = region().querySelector('[role="status"]')
+      expect(status?.contains(card())).toBe(true)
+      expect(alertBox().childElementCount).toBe(0)
+      expect(card()?.querySelector('p')?.textContent).toBe('已新增 3 個種子')
+      const pill = button('去看')
+      expect(pill.className).toContain('h-8')
+      expect(pill.className).toContain('rounded-full')
+      expect(button('重試')).toBeUndefined()
+      expect(button('關閉')).toBeDefined()
+      await act(async () => vi.advanceTimersByTime(7999))
+      expect(card()).not.toBeNull()
+      await act(async () => vi.advanceTimersByTime(1))
+      expect(card()).toBeNull()
+
+      await act(async () => showActionToast('已新增 1 個種子', '去看', run))
+      await act(async () => button('去看').click())
+      expect(card()).toBeNull()
+      expect(run).toHaveBeenCalledOnce()
     } finally {
       vi.useRealTimers()
     }

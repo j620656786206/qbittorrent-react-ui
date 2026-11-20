@@ -126,4 +126,42 @@ describe('sendOp failure codes', () => {
     await sendOp(op(false), client, { id: 'b' }).then(() => order.push('done'))
     expect(order).toEqual(['success', 'done', 'failure', 'done'])
   })
+
+  it('spec 4.7: onFailure gets the AppError code, nothing for another error', async () => {
+    const client = createQueryClient({ currentPath: () => '/' })
+    const onFailure = vi.fn()
+    const op = (error: Error): TrackedOp<{ id: string }> => ({
+      name: 'code-op',
+      call: () => Promise.reject(error),
+      keysOf: ({ id }) => [id],
+      failureCodes: OPERATION_FAILURE_CODES,
+      failureText: () => 'failed',
+      onFailure,
+    })
+    await sendOp(op(new AppError('not_logged_in')), client, { id: 'a' })
+    await sendOp(op(new Error('boom')), client, { id: 'b' })
+    expect(onFailure.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [{ id: 'a' }, 'not_logged_in'],
+      [{ id: 'b' }, undefined],
+    ])
+    expect(onFailure.mock.calls[1][2]).toEqual(new Error('boom'))
+  })
+
+  it('spec 4.7: an op with retry runs it from 重試 instead of resending', async () => {
+    const client = createQueryClient({ currentPath: () => '/' })
+    const call = vi.fn(() => Promise.reject(new AppError('timeout')))
+    const retry = vi.fn()
+    const op: TrackedOp<{ id: string }> = {
+      name: 'retry-op',
+      call,
+      keysOf: ({ id }) => [id],
+      failureCodes: OPERATION_FAILURE_CODES,
+      failureText: () => 'failed',
+      retry,
+    }
+    await sendOp(op, client, { id: 'a' })
+    toastCalls.failures[0].onRetry()
+    expect(retry).toHaveBeenCalledExactlyOnceWith({ id: 'a' })
+    expect(call).toHaveBeenCalledOnce()
+  })
 })

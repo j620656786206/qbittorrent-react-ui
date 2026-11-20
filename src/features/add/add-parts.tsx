@@ -33,7 +33,12 @@ import type { JudgedItem, SavePathLine } from '#/features/add/add-model'
 //   Desktop puts the label after the name; the phone on the line below.
 // - The category menu: a native `<select>` drawn as the 36px pill (44px
 //   on the phone), so the keyboard and the phone's own picker come free;
-//   then 「會存到 …」, read only.
+//   then 「會存到 …」, read only (story 4.7: or why 新增 cannot work, with
+//   no qBittorrent category at all).
+// - Story 4.7: a row whose add failed shows its reason like an unreadable
+//   row's label (12px/600 `status-error` with the alert icon), and after a
+//   partial failure the frame's top line (13px/600 `status-error`, icon,
+//   hairline under it) says how many went and how many failed.
 // Docs (AD-11): https://developer.mozilla.org/en-US/docs/Web/API/Element/paste_event
 
 const ICON = { size: 16, strokeWidth: 2, 'aria-hidden': true } as const
@@ -93,6 +98,8 @@ export interface PasteInput {
   phone: boolean
   /** Files still being read: the text reads 「讀取中…」. */
   reading: boolean
+  /** Story 4.7: the add is out; a paste, Enter and 選檔案 do nothing. */
+  locked: boolean
 }
 
 const FOCUS_RING =
@@ -121,6 +128,7 @@ function PasteTextarea({
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const data = event.clipboardData
     event.preventDefault()
+    if (input.locked) return
     const files = [...data.files]
     if (files.length > 0) {
       // A copied file also carries its name as text: only the file counts.
@@ -145,7 +153,8 @@ function PasteTextarea({
     if (event.key !== 'Enter' || event.shiftKey) return
     if (event.nativeEvent.isComposing || event.keyCode === 229) return
     event.preventDefault()
-    if (draft.trim() === '') return
+    // Locked: the draft stays for after the send.
+    if (input.locked || draft.trim() === '') return
     onText(draft)
     setDraft('')
   }
@@ -178,15 +187,18 @@ function PickButton({
   onPick,
   phone,
   small,
+  locked,
 }: {
   onPick: () => void
   phone: boolean
   small: boolean
+  locked: boolean
 }) {
   return (
     <span className="relative z-[2] flex-none">
       <button
         type="button"
+        aria-disabled={locked || undefined}
         onClick={onPick}
         className={cn(
           'flex-none rounded-full border bg-surface font-semibold whitespace-nowrap text-text hover-outline',
@@ -224,7 +236,12 @@ export function PasteBox(input: PasteInput) {
           {input.reading ? READING_TEXT : label}
         </span>
       </span>
-      <PickButton onPick={input.onPick} phone={input.phone} small={false} />
+      <PickButton
+        onPick={input.onPick}
+        phone={input.phone}
+        small={false}
+        locked={input.locked}
+      />
     </div>
   )
 }
@@ -258,7 +275,12 @@ function PasteStrip(input: PasteInput) {
           {input.reading ? READING_TEXT : label}
         </span>
       </span>
-      <PickButton onPick={input.onPick} phone={input.phone} small />
+      <PickButton
+        onPick={input.onPick}
+        phone={input.phone}
+        small
+        locked={input.locked}
+      />
     </div>
   )
 }
@@ -271,29 +293,33 @@ function Row({
   phone,
   onRemove,
   onOpen,
+  failure,
 }: {
   row: JudgedItem
   phone: boolean
   onRemove: (id: number, from: HTMLElement) => void
   onOpen: (hash: string) => void
+  /** Story 4.7: why this entry's add failed; only an addable row shows it. */
+  failure: string | undefined
 }) {
   const view = rowView(row)
   const { id, source } = row.entry
   const problem = view.status !== 'addable'
   const remove = (event: { currentTarget: HTMLElement }) =>
     onRemove(id, event.currentTarget)
+  const failed = view.status === 'addable' && failure !== undefined
+  const labelText = failed ? failure : view.label
+  const alert = view.status === 'unreadable' || failed
 
-  const label = view.label !== null && (
+  const label = labelText !== null && (
     <span
-      data-add-label={view.status}
+      data-add-label={failed ? 'failed' : view.status}
       className={cn(
         'inline-flex min-w-0 items-center gap-1.5 text-[12px] leading-[1.4] whitespace-nowrap',
-        view.status === 'unreadable'
-          ? 'font-semibold text-status-error'
-          : 'text-text-muted',
+        alert ? 'font-semibold text-status-error' : 'text-text-muted',
       )}
     >
-      {view.status === 'unreadable' ? (
+      {alert ? (
         <CircleAlert
           size={16}
           strokeWidth={2.4}
@@ -303,7 +329,7 @@ function Row({
       ) : (
         <ArchivedIcon />
       )}
-      {view.label}
+      {labelText}
     </span>
   )
   const textButton =
@@ -425,11 +451,17 @@ export function AddList({
   paste,
   onRemove,
   onOpen,
+  failures,
+  resultLine,
 }: {
   rows: ReadonlyArray<JudgedItem>
   paste: PasteInput
   onRemove: (id: number, from: HTMLElement) => void
   onOpen: (hash: string) => void
+  /** Story 4.7: each failed entry's reason, by id. */
+  failures: ReadonlyMap<number, string>
+  /** Story 4.7: 「5 個加好了，2 個失敗」 after a partial failure. */
+  resultLine: string | null
 }) {
   const { phone } = paste
   return (
@@ -442,6 +474,26 @@ export function AddList({
           : 'min-h-[120px] flex-[1_1_auto] overflow-hidden',
       )}
     >
+      {/* Always mounted, so the line is announced when it fills in. */}
+      <div role="status" className="flex-none">
+        {resultLine !== null && (
+          <p
+            data-add-result=""
+            className={cn(
+              'm-0 flex items-center gap-1.5 border-b px-3 text-[13px] leading-[1.4] font-semibold text-status-error',
+              phone ? 'min-h-11 py-2' : 'min-h-9 py-2',
+            )}
+          >
+            <CircleAlert
+              size={16}
+              strokeWidth={2.4}
+              aria-hidden="true"
+              className="flex-none"
+            />
+            {resultLine}
+          </p>
+        )}
+      </div>
       <ul
         aria-label={listLabel(rows.length)}
         data-add-list=""
@@ -457,6 +509,7 @@ export function AddList({
             phone={phone}
             onRemove={onRemove}
             onOpen={onOpen}
+            failure={failures.get(row.entry.id)}
           />
         ))}
       </ul>
@@ -471,12 +524,18 @@ export function CategoryField({
   options,
   onChange,
   path,
+  note,
+  locked,
   phone,
 }: {
   value: string
   options: ReadonlyArray<{ value: string; label: string }>
   onChange: (value: string) => void
   path: SavePathLine
+  /** Story 4.7: shown in place of the path (no qBittorrent category). */
+  note: string | null
+  /** Story 4.7: the add is out; the category cannot change. */
+  locked: boolean
   phone: boolean
 }) {
   const id = useId()
@@ -493,6 +552,7 @@ export function CategoryField({
         <select
           id={id}
           value={value}
+          disabled={locked}
           aria-describedby={pathId}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
@@ -522,8 +582,9 @@ export function CategoryField({
         data-add-path=""
         className="m-0 text-[12px] leading-[1.4] text-text-muted"
       >
-        {path.kind === 'default' && SAVE_PATH_DEFAULT}
-        {path.kind === 'path' && (
+        {note}
+        {note === null && path.kind === 'default' && SAVE_PATH_DEFAULT}
+        {note === null && path.kind === 'path' && (
           <>
             {SAVE_PATH_PREFIX}
             <span className="font-mono text-text [overflow-wrap:anywhere]">
@@ -557,14 +618,18 @@ export function FooterNote({
 export function IconClose({
   onClick,
   phone,
+  disabled = false,
 }: {
   onClick: () => void
   phone: boolean
+  /** Story 4.7: the add is out; a press does nothing. */
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       aria-label="關閉"
+      aria-disabled={disabled || undefined}
       onClick={onClick}
       className={cn(
         'inline-flex flex-none items-center justify-center rounded-full border bg-surface text-text hover-outline',

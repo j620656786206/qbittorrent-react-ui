@@ -360,6 +360,25 @@ describe('callFn timeout (row 7)', () => {
     expect(fetchSignal?.aborted).toBe(true)
   })
 
+  it('spec 4.7: timeoutMs replaces the 35 s for that call', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    )
+    let settled = false
+    const promise = callFn(
+      fakeServerFn('rt-test', 'POST'),
+      { a: 1 },
+      { timeoutMs: CALL_TIMEOUT_MS + 60_000 },
+    )
+    const outcome = settle(promise).finally(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(CALL_TIMEOUT_MS + 59_999)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await outcome).toEqual({ code: 'home_unreachable' })
+  })
+
   it.each([
     ['success', async () => json({ ok: true, data: 1 })],
     ['failure', async () => html(502)],

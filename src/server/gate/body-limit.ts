@@ -1,6 +1,7 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { isVerifiedSession } from '#/server/auth/verified'
 import { failureResponse } from '#/server/gate/respond'
+import { MAX_ADD_REQUEST_BYTES } from '#/shared/torrent-add'
 
 // AD-12 / AR-27. Start reads the body after middleware and the function id is
 // opaque here, so this enforces a request-level ceiling and passes the
@@ -22,8 +23,24 @@ export const DEFAULT_BODY_LIMIT = 65_536
  * found not to fit (spec 2.6).
  */
 export const HASH_LIST_BODY_LIMIT = 409_600
-/** Request-level ceiling: the largest per-function limit (uploads raise it). */
-export const MAX_REQUEST_BODY = HASH_LIST_BODY_LIMIT
+/**
+ * Story 4.7 (AD-12): `addTorrents` takes .torrent files, up to 50 MB per
+ * request (`MAX_ADD_REQUEST_BYTES`, form overhead included). Only that
+ * function names it as its `bodyLimit`.
+ */
+export const UPLOAD_BODY_LIMIT = MAX_ADD_REQUEST_BYTES
+/**
+ * The largest per-function limit (the upload): the request ceiling for a
+ * verified session's multipart request. Any other verified request's
+ * ceiling stays `HASH_LIST_BODY_LIMIT`, so a JSON body (which Start reads
+ * and parses before guard() sees its size) never grows past 400 KB. Each
+ * function's own limit is then checked by guard().
+ */
+export const MAX_REQUEST_BODY = Math.max(
+  DEFAULT_BODY_LIMIT,
+  HASH_LIST_BODY_LIMIT,
+  UPLOAD_BODY_LIMIT,
+)
 /** Ceiling without a valid session. Stays 64 KB when MAX_REQUEST_BODY grows. */
 export const ANONYMOUS_BODY_LIMIT = 65_536
 
@@ -76,9 +93,13 @@ export const bodyLimit = createMiddleware().server(
     if (handlerType !== 'serverFn') return next()
     // Runs after sessionGate, which always sets `context.session`.
     const session = (context as { session?: unknown } | undefined)?.session
-    const ceiling = isVerifiedSession(session)
-      ? MAX_REQUEST_BODY
-      : ANONYMOUS_BODY_LIMIT
+    const multipart = (request.headers.get('content-type') ?? '')
+      .toLowerCase()
+      .startsWith('multipart/form-data')
+    let ceiling = ANONYMOUS_BODY_LIMIT
+    if (isVerifiedSession(session)) {
+      ceiling = multipart ? MAX_REQUEST_BODY : HASH_LIST_BODY_LIMIT
+    }
     const bodyBytes = await measureBody(request, ceiling)
     if (bodyBytes === null) return tooLargeResponse()
     return next({ context: { bodyBytes } })

@@ -173,12 +173,18 @@ export interface Modes {
    * (story 2.7: torrents/filePrio too; story 4.3: torrents/delete too).
    * Story 4.3: `slow` answers stop, start and delete after 12 s.
    * `reject-files` rejects only a delete with deleteFiles=true.
+   * Story 4.7, torrents/add: `reject` rejects every add, `reject-files`
+   * only file adds, `slow` answers after 12 s, `drop` closes the
+   * connection (qbit_unreachable).
    */
-  ops?: 'normal' | 'reject' | 'slow' | 'reject-files'
+  ops?: 'normal' | 'reject' | 'slow' | 'reject-files' | 'drop'
   /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
   files?: 'normal' | 'slow' | 'fail'
-  /** Story 4.6: `default-path` adds X-default, whose savePath is ''. */
-  cats?: 'normal' | 'default-path'
+  /**
+   * Story 4.6: `default-path` adds X-default, whose savePath is ''.
+   * Story 4.7: `none` answers no categories at all.
+   */
+  cats?: 'normal' | 'default-path' | 'none'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -208,7 +214,17 @@ export interface DeleteCall {
   rejected?: true
 }
 
-/** Stories 2.6, 2.7, 4.3: the stop/start, filePrio and delete calls the fake received. */
+/** An add call as fake-qbit logs it (story 4.7): `urls` or `file`. */
+export interface AddCall {
+  op: 'add'
+  urls?: string
+  file?: string
+  category: string
+  autoTMM: boolean
+  rejected?: true
+}
+
+/** Stories 2.6, 2.7, 4.3, 4.7: the stop/start, filePrio, delete and add calls the fake received. */
 export async function opCalls(
   request: APIRequestContext,
 ): Promise<
@@ -216,6 +232,7 @@ export async function opCalls(
     | { op: 'stop' | 'start'; hashes: Array<string>; rejected?: true }
     | FilePrioCall
     | DeleteCall
+    | AddCall
   >
 > {
   const response = await request.get('/__fake/ops')
@@ -230,6 +247,18 @@ export async function removeElsewhere(
 ) {
   const query = new URLSearchParams({ hashes: hashes.join('|') }).toString()
   const response = await request.post(`/__fake/remove?${query}`)
+  expect(response.ok(), await response.text()).toBe(true)
+}
+
+/** Story 4.7: another device adds this torrent (no call logged). */
+export async function addElsewhere(
+  request: APIRequestContext,
+  hash: string,
+  name: string,
+  category = 'X',
+) {
+  const query = new URLSearchParams({ hash, name, category }).toString()
+  const response = await request.post(`/__fake/added?${query}`)
   expect(response.ok(), await response.text()).toBe(true)
 }
 

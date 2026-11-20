@@ -97,3 +97,32 @@ export function orderSaveFailureText(code: SettingsWriteFailureCode): string {
 function settingsWriteReason(code: SettingsWriteFailureCode): string {
   return code === 'timeout' ? '容器沒有回應，請再試一次' : errorText(code)
 }
+
+/**
+ * Story 4.7: the failure toast of an add that failed as a whole,
+ * 「新增失敗：qBittorrent 拒絕這個操作」 (4.3's pattern).
+ */
+export function addFailureText(code: OperationFailureCode): string {
+  return `新增失敗：${errorText(code)}`
+}
+
+/** Story 4.7 (Claude 代決): a rejected .torrent file's row reason. */
+export const ADD_FILE_REJECTED = 'qBittorrent 讀不了這個檔案'
+/** Story 4.7 (Claude 代決): a rejected magnet link's row reason. */
+export const ADD_LINK_REJECTED = 'qBittorrent 拒絕這個連結'
+
+/**
+ * Story 4.7: why one entry of an add failed, shown under its row. A
+ * rejection names what qBittorrent refused (the file or the link); any
+ * other code is its fixed text (`timeout`: 「qBittorrent 沒有回應，請再試
+ * 一次」).
+ */
+export function addItemFailureText(
+  code: ErrorCode,
+  kind: 'magnet' | 'file',
+): string {
+  if (code === 'qbit_rejected') {
+    return kind === 'file' ? ADD_FILE_REJECTED : ADD_LINK_REJECTED
+  }
+  return errorText(code)
+}

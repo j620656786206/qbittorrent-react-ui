@@ -16,6 +16,9 @@ import { TOAST_LIFT_CLASS } from '#/shared/ui/selection-bar-geometry'
 // - Story 4.3: a plain toast is the same card with only ✕; the store closes
 //   it after 4 s. It renders in a polite `status` region (a success is not
 //   an alert).
+// - Story 4.7: a toast with a button (「去看」) is the plain card with that
+//   pill before ✕, in the same `status` region; the store closes it after
+//   8 s, and the pill closes it, then runs.
 // - Desktop (>= 1024px): bottom right, 24px in, 356px wide. Phone: at the
 //   top, 16px in (plus the safe area), above the bottom sheet and its scrim
 //   (z-index over `z-50`).
@@ -39,6 +42,9 @@ export function isInToastRegion(node: Node | null): boolean {
   return element?.closest(`[${TOAST_REGION_ATTR}]`) != null
 }
 
+const PILL_CLASS =
+  'h-8 flex-none rounded-full border bg-surface px-3.5 text-[13px] font-semibold whitespace-nowrap text-text hover-outline'
+
 function ToastCard({ toast }: { toast: ShownToast }) {
   return (
     <div
@@ -55,9 +61,22 @@ function ToastCard({ toast }: { toast: ShownToast }) {
             dismissToast(toast.id)
             toast.retry()
           }}
-          className="h-8 flex-none rounded-full border bg-surface px-3.5 text-[13px] font-semibold whitespace-nowrap text-text hover-outline"
+          className={PILL_CLASS}
         >
           重試
+        </button>
+      )}
+      {toast.kind === 'action' && (
+        <button
+          type="button"
+          data-toast-action=""
+          onClick={() => {
+            dismissToast(toast.id)
+            toast.run()
+          }}
+          className={PILL_CLASS}
+        >
+          {toast.label}
         </button>
       )}
       <button
@@ -84,7 +103,9 @@ export function Toaster() {
       className={lifted ? `${REGION_CLASS} ${TOAST_LIFT_CLASS}` : REGION_CLASS}
     >
       <div role="status">
-        {toast?.kind === 'plain' && <ToastCard key={toast.id} toast={toast} />}
+        {(toast?.kind === 'plain' || toast?.kind === 'action') && (
+          <ToastCard key={toast.id} toast={toast} />
+        )}
       </div>
       <div role="alert">
         {toast?.kind === 'failure' && (

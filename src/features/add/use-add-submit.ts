@@ -1,0 +1,281 @@
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { addBatches, judgeEntries } from '#/lib/add-entries'
+import { AppError, isAppError } from '#/lib/app-error'
+import { OPERATION_FAILURE_CODES, addFailureText } from '#/lib/error-text'
+import type { Maindata } from '#/lib/maindata-merge'
+import { toast } from '#/lib/toast'
+import { addTorrents } from '#/server/functions/add-torrents'
+import { closeAdd } from '#/state/add-open'
+import { callFn } from '#/state/call-fn'
+import { MAINDATA_KEY, refreshMaindata } from '#/state/maindata'
+import { cancelOpenWhenAdded, openWhenAdded } from '#/state/open-when-added'
+import { addCallTimeoutMs } from '#/shared/torrent-add'
+import { sendOp, useOpsInFlight } from '#/state/tracked-op'
+import type { TrackedOp } from '#/state/tracked-op'
+import {
+  GO_SEE_LABEL,
+  addFailureReason,
+  addFormOf,
+  addedToastText,
+  outcomeOf,
+} from '#/features/add/add-model'
+import type { AddItem, AddOutcome } from '#/features/add/add-model'
+import type { AddEntries } from '#/features/add/use-add-entries'
+
+// Story 4.7 (EXPERIENCE add results, 送出中): submitting the add screen.
+// The press judges every entry again against the `['maindata']` in the
+// cache (a pasted torrent added elsewhere since is 以前下載過 and stays
+// out), then sends the addable ones as 4.5's batches, one request after
+// another, as ONE tracked op. 「重試」 is a press again: the rows on screen
+// judged against the latest maindata (after a timeout some may be there
+// already). Each request gets its own timeout, longer by its upload
+// (`addCallTimeoutMs`). What came back:
+// - every entry added: the screen closes when it still shows only what
+//   the press saw (the current screen and category stay), maindata
+//   refreshes (never edited here), and the 8 s toast
+//   「已新增 N 個種子」 offers 「去看」: the add category like a tab press,
+//   and with exactly one torrent its detail once it shows up
+//   (src/state/open-when-added.ts);
+// - some rejected: the added rows leave, each failed row keeps a reason,
+//   the list frame's top line counts both, the dialog stays and a press
+//   sends only what is left;
+// - the first request failed as a whole (nothing was done): `qbit_rejected`,
+//   `timeout` and `invalid_input` show 「新增失敗：…」 with 「重試」
+//   (sendOp), connection codes are the global handler's; the list and the
+//   category stay either way. `not_logged_in` discards the list (AD-9).
+//   A whole `invalid_input` or `timeout` refreshes maindata too (a deleted
+//   category leaves the menu; a timeout may have added some). A later
+//   request failing as a whole only fails its own entries, with that code,
+//   since the earlier ones were added; `not_logged_in` there still shows
+//   what was added before the list goes.
+// While the add is out (the press, or a 重試) the screen is `sending`: it
+// ignores every close path and every change to the list or the category.
+// Closing it, adding or removing a row or changing the category closes
+// the failure toast, so a 重試 never runs for a list the screen no longer
+// shows.
+
+/** The add's failure toast is about this (one add screen at a time). */
+export const ADD_TOAST_KEY = 'add-torrents'
+
+export interface AddVariables {
+  entries: ReadonlyArray<AddItem>
+  category: string
+}
+
+/**
+ * `not_logged_in` after an earlier request added some: the global handler
+ * sees the code (login), the screen sees what was added.
+ */
+export class AddInterrupted extends AppError {
+  readonly outcome: AddOutcome
+
+  constructor(outcome: AddOutcome) {
+    super('not_logged_in')
+    this.outcome = outcome
+  }
+}
+
+/** Sends the batches in order and merges the answers (see the top). */
+async function sendAdd({ entries, category }: AddVariables) {
+  const outcome: AddOutcome = { added: [], failed: [] }
+  const batches = addBatches(entries)
+  for (const [index, batch] of batches.entries()) {
+    const { form, order, bytes } = addFormOf(batch, category)
+    try {
+      const result = await callFn(addTorrents, form, {
+        timeoutMs: addCallTimeoutMs(bytes),
+      })
+      const part = outcomeOf(order, result)
+      outcome.added.push(...part.added)
+      outcome.failed.push(...part.failed)
+    } catch (error) {
+      if (index === 0) throw error
+      const code = isAppError(error) ? error.code : 'qbit_rejected'
+      if (code === 'not_logged_in') {
+        for (const item of batches.slice(index).flat()) {
+          outcome.failed.push({ item, code })
+        }
+        throw new AddInterrupted(outcome)
+      }
+      for (const item of batch) outcome.failed.push({ item, code })
+    }
+  }
+  return outcome
+}
+
+export const addTorrentsOp: TrackedOp<
+  AddVariables,
+  (typeof OPERATION_FAILURE_CODES)[number],
+  AddOutcome
+> = {
+  name: 'add-torrents',
+  call: sendAdd,
+  keysOf: () => [ADD_TOAST_KEY],
+  failureCodes: OPERATION_FAILURE_CODES,
+  failureText: (_variables, code) => addFailureText(code),
+}
+
+const NO_FAILURES: ReadonlyMap<number, string> = new Map()
+
+export interface AddResultSummary {
+  added: number
+  failed: number
+}
+
+export interface AddSubmit {
+  /** A send (the press or a 重試) is out: nothing closes, nothing sends. */
+  sending: boolean
+  /** Read in event handlers, which may run before a re-render. */
+  isSending: () => boolean
+  /** The reason under each failed row, by entry id. */
+  failures: ReadonlyMap<number, string>
+  /** The last partial failure's counts, until the next press or open. */
+  summary: AddResultSummary | null
+  submit: (category: string) => void
+}
+
+export function useAddSubmit(
+  open: boolean,
+  entries: AddEntries,
+  selectCategory: (category: string) => void,
+): AddSubmit {
+  const client = useQueryClient()
+  const { items, reading, removeAdded } = entries
+  const [failures, setFailures] = useState(NO_FAILURES)
+  const [summary, setSummary] = useState<AddResultSummary | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) {
+      setFailures(NO_FAILURES)
+      setSummary(null)
+    }
+  }
+  /** Bumped on every open and close: an answer for an older one is dropped. */
+  const generationRef = useRef(0)
+  useLayoutEffect(() => {
+    generationRef.current += 1
+  }, [open])
+
+  // Set on press, before the in-flight state shows (the same tick).
+  const pressedRef = useRef(false)
+  const [pressed, setPressed] = useState(false)
+  const inFlight = useOpsInFlight(addTorrentsOp)
+  const sending = pressed || inFlight.length > 0
+  const sendingRef = useRef(sending)
+  const isSending = useCallback(
+    () => pressedRef.current || sendingRef.current,
+    [],
+  )
+  // Kept current for an answer, or a 重試, that comes renders later.
+  const latestRef = useRef({
+    items,
+    reading,
+    removeAdded,
+    selectCategory,
+    submit: (_category: string) => {},
+  })
+
+  const submit = (category: string) => {
+    if (isSending() || category === '' || reading > 0) return
+    const torrents = client.getQueryData<Maindata>(MAINDATA_KEY)?.torrents
+    if (torrents === undefined) return
+    const addable = judgeEntries(items, new Set(Object.keys(torrents)))
+      .filter((row) => row.status === 'addable')
+      .map((row) => row.entry)
+    if (addable.length === 0) return
+    cancelOpenWhenAdded()
+    setFailures(NO_FAILURES)
+    setSummary(null)
+    pressedRef.current = true
+    setPressed(true)
+    const generation = generationRef.current
+    const live = () => generation === generationRef.current
+    /** What the press saw: the screen closes only if it still shows no more. */
+    const seen = new Set(items.map((item) => item.id))
+
+    const showAdded = (added: AddOutcome['added'], sentCategory: string) => {
+      const single = added.length === 1 ? added[0].result : null
+      toast.action(addedToastText(added.length), {
+        label: GO_SEE_LABEL,
+        run: () => {
+          latestRef.current.selectCategory(sentCategory)
+          if (single !== null && single.kind !== 'unreadable') {
+            openWhenAdded(single.hash, sentCategory)
+          }
+        },
+      })
+    }
+
+    const op: typeof addTorrentsOp = {
+      ...addTorrentsOp,
+      retry: (sent) => latestRef.current.submit(sent.category),
+      onSuccess: (sentClient, sent, outcome) => {
+        void refreshMaindata(sentClient)
+        if (!live()) return
+        const latest = latestRef.current
+        latest.removeAdded(outcome.added.map((item) => item.id))
+        if (outcome.failed.length === 0) {
+          showAdded(outcome.added, sent.category)
+          const unchanged =
+            latest.reading === 0 &&
+            latest.items.every((item) => seen.has(item.id))
+          if (unchanged) closeAdd()
+          return
+        }
+        setFailures(
+          new Map(
+            outcome.failed.map((failure) => [
+              failure.item.id,
+              addFailureReason(failure),
+            ]),
+          ),
+        )
+        setSummary({
+          added: outcome.added.length,
+          failed: outcome.failed.length,
+        })
+      },
+      onFailure: (_sent, code, error) => {
+        if (error instanceof AddInterrupted) {
+          void refreshMaindata(client)
+          if (!live()) return
+          latestRef.current.removeAdded(
+            error.outcome.added.map((item) => item.id),
+          )
+          if (error.outcome.added.length > 0) {
+            toast.plain(addedToastText(error.outcome.added.length))
+          }
+          closeAdd()
+          return
+        }
+        if (code === 'not_logged_in') {
+          if (live()) closeAdd()
+          return
+        }
+        // A deleted category leaves the menu; a timeout may still have
+        // added some. Any other whole failure did nothing.
+        if (code === 'timeout' || code === 'invalid_input') {
+          void refreshMaindata(client)
+        }
+      },
+    }
+    void sendOp(op, client, { entries: addable, category }).then(() => {
+      pressedRef.current = false
+      setPressed(false)
+    })
+  }
+
+  useLayoutEffect(() => {
+    sendingRef.current = sending
+    latestRef.current = { items, reading, removeAdded, selectCategory, submit }
+  })
+
+  return { sending, isSending, failures, summary, submit }
+}
+
+/** Closes the add's failure toast (its 重試 would send the old list). */
+export function dismissAddFailure(): void {
+  toast.dismissFor(ADD_TOAST_KEY)
+}

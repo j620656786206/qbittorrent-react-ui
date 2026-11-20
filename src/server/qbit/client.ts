@@ -38,6 +38,14 @@ export interface QbitClient {
     deleteFiles: boolean,
   ) => Promise<void>
   /**
+   * Story 4.7: `torrents/add` for one entry, multipart: a magnet link as
+   * `urls` or a .torrent file as `torrents`, with `category` and
+   * `autoTMM=true` (the category's save path applies). Never `savepath`
+   * or `cookie`, never a URL fetched here. A non-2xx (415 for a file
+   * qBittorrent cannot read) or a body of `Fails.` is `qbit_rejected`.
+   */
+  addTorrent: (entry: AddTorrentEntry, category: string) => Promise<void>
+  /**
    * `torrents/files` for one validated hash: each file's index, name, size,
    * progress and priority only, in qBittorrent's order. A torrent
    * qBittorrent does not know answers 404 (`qbit_rejected`); an answer that
@@ -59,6 +67,33 @@ export interface QbitClient {
    * not that shape is `qbit_rejected`.
    */
   logMain: (lastKnownId: number) => Promise<Array<LogEntry>>
+}
+
+/** One entry for `addTorrent`, validated by the server function. */
+export type AddTorrentEntry =
+  | { kind: 'magnet'; url: string }
+  | { kind: 'file'; bytes: Uint8Array<ArrayBuffer>; name: string }
+
+/**
+ * qBittorrent 5.0 answers `Ok.` or `Fails.` with 200; newer versions may
+ * answer JSON with counts. Anything that says nothing was added is a
+ * rejection; an answer it cannot read counts as accepted (the next
+ * maindata tells).
+ */
+function addRejected(body: string): boolean {
+  const text = body.trim()
+  if (text === 'Fails.') return true
+  if (!text.startsWith('{')) return false
+  try {
+    const json = JSON.parse(text) as Record<string, unknown>
+    return (
+      typeof json.failure_count === 'number' &&
+      json.failure_count > 0 &&
+      json.success_count === 0
+    )
+  } catch {
+    return false
+  }
 }
 
 /** One `log/main` line (qBittorrent 5.1.4 `Log::Msg`). */
@@ -158,6 +193,23 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     await session.send(QBIT_PATHS.torrentsDelete, { method: 'POST', form })
   }
 
+  async function addTorrent(
+    entry: AddTorrentEntry,
+    category: string,
+  ): Promise<void> {
+    const path = QBIT_PATHS.torrentsAdd
+    const form = new FormData()
+    if (entry.kind === 'magnet') form.set('urls', entry.url)
+    else form.set('torrents', new Blob([entry.bytes]), entry.name)
+    form.set('category', category)
+    form.set('autoTMM', 'true')
+    const response = await session.send(path, { method: 'POST', form })
+    if (addRejected(response.body)) {
+      logger.warn('qbit_bad_response', { path, reason: 'add_failed' })
+      throw new ServerFailure('qbit_rejected', 'add: failed')
+    }
+  }
+
   async function torrentFiles(hash: string): Promise<Array<TorrentFile>> {
     const path = QBIT_PATHS.torrentsFiles
     const query = new URLSearchParams()
@@ -222,6 +274,7 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     stopTorrents,
     startTorrents,
     deleteTorrents,
+    addTorrent,
     torrentFiles,
     setFilePriority,
     logMain,
