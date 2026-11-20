@@ -327,6 +327,96 @@ test.describe('desktop', () => {
     await expect(item(page, 3)).toHaveCount(0, { timeout: 15_000 })
     expect(await exits(page)).toEqual([])
   })
+
+  test('anchoring: rows deleted above the view leave the rows in view where they are, in every frame', async ({
+    page,
+    request,
+  }) => {
+    // More rows above than the list draws beyond the view (overscan 10),
+    // so the rows in view must be drawn in the removal commit itself.
+    const ABOVE = 20
+    await setModes(request, { data: 'many' })
+    await login(page)
+    await openList(page)
+    await settled(page)
+    const first = page.getByRole('listitem').first()
+    await first.hover()
+    await first.getByRole('checkbox').click()
+    await page.mouse.move(0, 0)
+    await page.evaluate((want) => {
+      let total = 1
+      for (const box of document.querySelectorAll<HTMLButtonElement>(
+        '[role="listitem"] button[role="checkbox"][aria-checked="false"]',
+      )) {
+        if (total >= want) break
+        box.click()
+        total += 1
+      }
+    }, ABOVE)
+    await expect(bar(page)).toContainText(`已選 ${ABOVE} 個`)
+    const scroller = page.locator('#rt-list-scroll')
+    await scroller.evaluate(
+      (element, top) => {
+        element.scrollTop = top
+      },
+      (ABOVE + 5) * ROW_STEP,
+    )
+    await settled(page)
+    await barDelete(page).click()
+    await expect(confirm(page)).toBeVisible()
+    await settled(page)
+
+    // The first row wholly in view, then its top in every frame.
+    const anchor = await page.evaluate(() => {
+      const box = document.getElementById('rt-list-scroll') as HTMLElement
+      const top = box.getBoundingClientRect().top
+      const row = [
+        ...document.querySelectorAll<HTMLElement>('[role="listitem"]'),
+      ].find((each) => each.getBoundingClientRect().top >= top)
+      if (!row) throw new Error('no row in view')
+      const tops: Array<number | null> = []
+      const state = { tops, stop: false }
+      ;(window as unknown as { __rtAnchor: typeof state }).__rtAnchor = state
+      const sample = () => {
+        const now = document.querySelector(
+          `[role="listitem"][data-hash="${row.dataset.hash}"]`,
+        )
+        tops.push(now ? now.getBoundingClientRect().top : null)
+        if (!state.stop) requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+      return {
+        hash: row.dataset.hash,
+        top: row.getBoundingClientRect().top,
+        scrollTop: box.scrollTop,
+      }
+    })
+    await primary(page).click()
+    await expect(confirm(page)).toHaveCount(0)
+    await expect(bar(page)).toHaveAttribute('inert', '')
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBe(anchor.scrollTop - ABOVE * ROW_STEP)
+    await settled(page)
+    await page.waitForTimeout(300)
+    const tops = await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __rtAnchor: { tops: Array<number | null>; stop: boolean }
+        }
+      ).__rtAnchor
+      state.stop = true
+      return state.tops
+    })
+    expect(tops.length).toBeGreaterThan(10)
+    // Drawn in every frame, never moved by more than a pixel.
+    expect(tops.filter((top) => top === null)).toEqual([])
+    expect(tops.filter((top) => Math.abs((top ?? 0) - anchor.top) > 1)).toEqual(
+      [],
+    )
+    // Focus goes to the main area after a delete (Alex, after 4.4).
+    await expect(page.locator('#rt-main')).toBeFocused()
+  })
 })
 
 test.describe('phone', () => {

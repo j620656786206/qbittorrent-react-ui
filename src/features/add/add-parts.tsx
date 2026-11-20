@@ -308,9 +308,12 @@ function Row({
   )
   const textButton =
     view.status === 'unreadable' ? (
+      // The ✕ is the row's one 「拿掉」 for the keyboard and screen readers;
+      // this is the same action as a bigger mouse and touch target.
       <button
         type="button"
-        aria-label={`拿掉 ${view.name}`}
+        tabIndex={-1}
+        aria-hidden="true"
         onClick={remove}
         className={cn(
           TEXT_BUTTON_CLASS,

@@ -1,7 +1,8 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { judgeEntries, splitPaste } from '#/lib/add-entries'
 import { parseMagnet, readTorrentFile } from '#/lib/info-hash'
-import { selectTorrents, useMaindata } from '#/state/maindata'
+import { useMaindata } from '#/state/maindata'
+import type { Maindata } from '#/lib/maindata-merge'
 import type { AddItem, JudgedItem } from '#/features/add/add-model'
 
 // Story 4.6: the add screen's entries. Pasted text becomes one entry per
@@ -118,21 +119,18 @@ export function useAddEntries(open: boolean): AddEntries {
     })
   }, [])
 
-  const { data: torrents } = useMaindata(selectTorrents)
-  // Each poll brings a new torrents object: the key is worked out again, the
-  // set only when the key changed.
-  const hashKey = useMemo(
-    () =>
-      open
-        ? Object.keys(torrents ?? {})
-            .sort()
-            .join(' ')
-        : null,
-    [open, torrents],
+  // Closed, nothing is read from maindata; open, each poll works the key
+  // out again, and an equal string re-renders nothing.
+  const selectHashKey = useCallback(
+    (data: Maindata) =>
+      open ? Object.keys(data.torrents).sort().join(' ') : null,
+    [open],
   )
+  // `undefined` until maindata first arrives.
+  const { data: hashKey } = useMaindata(selectHashKey)
   const existing = useMemo(
     () =>
-      hashKey === null
+      hashKey === null || hashKey === undefined
         ? null
         : new Set(hashKey === '' ? [] : hashKey.split(' ')),
     [hashKey],
@@ -147,7 +145,7 @@ export function useAddEntries(open: boolean): AddEntries {
 
   return {
     rows: rows ?? shownRows,
-    ready: torrents !== undefined,
+    ready: hashKey !== undefined,
     reading,
     addText,
     addFiles,

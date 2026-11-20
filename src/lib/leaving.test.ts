@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { exitShifts, isExpectationLive } from '#/lib/leaving'
+import { exitShifts, isExpectationLive, removedAbove } from '#/lib/leaving'
 
 // Story 4.4: how far each remaining row slides after a removal, and when an
 // expected hash stops counting.
@@ -70,5 +70,40 @@ describe('isExpectationLive', () => {
   it('counts until the expiry, not at it', () => {
     expect(isExpectationLive(1000, 999)).toBe(true)
     expect(isExpectationLive(1000, 1000)).toBe(false)
+  })
+})
+
+describe('removedAbove', () => {
+  const removed = new Set(['a', 'c', 'e'])
+
+  it('sums the removed rows before the first row in view', () => {
+    expect(
+      removedAbove(['a', 'b', 'c', 'd', 'e'], 'd', removed, rows, GAP),
+    ).toBe(2 * (ROW + GAP))
+  })
+
+  it('leaves out a removed row that is itself the first in view', () => {
+    expect(removedAbove(['a', 'b', 'c', 'd'], 'c', removed, rows, GAP)).toBe(
+      ROW + GAP,
+    )
+  })
+
+  it('is 0 with nothing removed above, or nothing in view', () => {
+    expect(removedAbove(['a', 'b'], 'a', removed, rows, GAP)).toBe(0)
+    expect(removedAbove(['a', 'b'], null, removed, rows, GAP)).toBe(0)
+    expect(removedAbove(['a', 'b'], 'z', removed, rows, GAP)).toBe(0)
+  })
+
+  it('asks each removed row its own size', () => {
+    const sizes: Record<string, number> = { a: 100, c: 40 }
+    expect(
+      removedAbove(
+        ['a', 'b', 'c', 'd'],
+        'd',
+        removed,
+        (hash) => sizes[hash],
+        8,
+      ),
+    ).toBe(100 + 8 + 40 + 8)
   })
 })

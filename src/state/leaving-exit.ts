@@ -2,7 +2,13 @@ import { useLayoutEffect, useReducer, useRef } from 'react'
 import type { RefObject } from 'react'
 import { HOLD_SLACK_MS, intersectBoxes, isVisible } from '#/lib/entrance'
 import type { Box } from '#/lib/entrance'
-import { EXIT_EASING, FADE_MS, SLIDE_MS, exitShifts } from '#/lib/leaving'
+import {
+  EXIT_EASING,
+  FADE_MS,
+  SLIDE_MS,
+  exitShifts,
+  removedAbove,
+} from '#/lib/leaving'
 import {
   canAnimate,
   clippingAncestors,
@@ -23,20 +29,31 @@ import { holdOrderForAnimation } from '#/state/order-freeze'
 // and in the layout effect after that commit every rendered wrapper below
 // a removed row starts `translate`d down by what was removed above it
 // (exitShifts) and slides to its place (SLIDE_MS); rows rendered only by
-// that commit slide in too. When the shorter content made the browser
-// clamp `scrollTop` (scrolled to the bottom), every row starts that much
-// higher too, so rows above the removed ones slide down from where they
-// were. The order hold ends with the slide, or on a backstop timer (one
-// for the fade and the removal commit, another for the slide), or on
-// unmount (which also lets the fading rows go). Only
-// `opacity` and the `translate` property move: the virtualizer's inline
-// `transform` on the wrapper is never animated, and nothing is measured
-// per frame. Reduced motion, no Web Animations, or `disabled` (the board's
-// collapse FLIP owns the wrappers): the rows leave at once, no hold.
+// that commit slide in too.
+// Scroll anchoring (Alex, after 4.4): rows removed above the first row in
+// view (`removedAbove`, read when the fade ends) take their height out of
+// `scrollTop` in the removal commit, so the rows in view stay where they
+// are; the virtualizer hears of the new `scrollTop` in that same commit
+// (a `scroll` event), so it draws the rows in view before paint. Each row
+// then starts from where it was on screen: its shift minus how far
+// `scrollTop` moved, which also covers the browser clamping `scrollTop`
+// when the shorter content ends above the view (scrolled to the bottom).
+// The order hold ends with the slide, or on a backstop timer (one for the
+// fade and the removal commit, another for the slide), or on unmount
+// (which also lets the fading rows go). Only `opacity` and the `translate`
+// property move: the virtualizer's inline `transform` on the wrapper is
+// never animated, and nothing is measured per frame. Nothing in view to
+// fade, reduced motion, or no Web Animations: the rows leave at once (no
+// hold), still anchored. `disabled` (the board's collapse FLIP owns the
+// wrappers and the scroll): they leave at once, not anchored. The grid
+// layout (`slide: false`) is not anchored either.
 // Docs: https://developer.mozilla.org/en-US/docs/Web/API/Element/animate ,
 // https://developer.mozilla.org/en-US/docs/Web/CSS/translate ,
 // https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion ,
-// https://react.dev/reference/react/useLayoutEffect
+// https://react.dev/reference/react/useLayoutEffect ,
+// https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTop ,
+// https://unpkg.com/@tanstack/virtual-core@3.19.11/src/index.ts
+// (`observeElementOffset`: the range follows `scroll` events)
 
 export interface LeavingExitOptions {
   /** The hashes the surface shows, in order (leaving ones included). */
@@ -75,6 +92,10 @@ interface Run {
   before: ReadonlyArray<string>
   sizes: ReadonlyMap<string, number>
   scrollTop: number
+  /** What leaves above the first row in view, px (anchoring). */
+  above: number
+  /** The rows may slide (motion allowed, Web Animations there). */
+  animate: boolean
 }
 
 /** Ends the order hold early and lets the fading rows go (unmount, cut). */
@@ -111,6 +132,27 @@ function wrappersOf(
   return out
 }
 
+/** The first hash of `order` whose wrapper shows in `container`. */
+function firstInView(
+  container: HTMLElement,
+  order: ReadonlyArray<string>,
+): string | null {
+  const box = visibleBox(container)
+  const viewport = { width: window.innerWidth, height: window.innerHeight }
+  const index = new Map(order.map((hash, at) => [hash, at]))
+  let first: string | null = null
+  let best = Infinity
+  for (const [hash, element] of wrappersOf(container, null)) {
+    const at = index.get(hash)
+    if (at === undefined || at >= best) continue
+    if (isVisible(element.getBoundingClientRect(), box, viewport)) {
+      best = at
+      first = hash
+    }
+  }
+  return first
+}
+
 /**
  * Runs the delete exit on `containerRef` (a surface's scroll box). Call it
  * after the surface's virtualizer, so its layout effect sees this commit's
@@ -139,6 +181,31 @@ export function useLeavingExit(
         rerender()
       }, ms)
     }
+    // The fade ended (or nothing fades): note what the slide and the
+    // anchoring need, then let the rows leave the order.
+    const startRemoval = (run: Run) => {
+      const latest = latestRef.current
+      const container = containerRef.current
+      const sizeOf = (hash: string) =>
+        run.sizes.get(hash) ?? latest.sizeOf(hash)
+      run.before = latest.order
+      run.sizes = new Map(
+        [...run.hashes].map((hash) => [hash, latest.sizeOf(hash)]),
+      )
+      run.scrollTop = container?.scrollTop ?? 0
+      run.above =
+        container && latest.slide
+          ? removedAbove(
+              latest.order,
+              firstInView(container, latest.order),
+              run.hashes,
+              sizeOf,
+              latest.gap,
+            )
+          : 0
+      run.phase = 'removing'
+      finishLeaving(run.hashes)
+    }
     const end = (run: Run) => {
       clearTimeout(run.backstop)
       run.release()
@@ -162,7 +229,14 @@ export function useLeavingExit(
         run.phase = 'slide'
         const container = containerRef.current
         // A collapse FLIP that started during the fade owns the wrappers.
-        if (!slide || !container || disabled?.() === true) return end(run)
+        if (!container || disabled?.() === true) return end(run)
+        if (run.above > 0) {
+          container.scrollTop = run.scrollTop - run.above
+          // Without it the virtualizer would draw the rows now in view
+          // only after paint (its own listener hears the browser's event).
+          container.dispatchEvent(new Event('scroll'))
+        }
+        if (!slide || !run.animate) return end(run)
         armBackstop(run, SLIDE_MS + HOLD_SLACK_MS)
         const shifts = exitShifts(
           run.before,
@@ -170,12 +244,12 @@ export function useLeavingExit(
           (hash) => run.sizes.get(hash) ?? sizeOf(hash),
           gap,
         )
-        // Scrolled to the bottom, the shorter content made the browser
-        // clamp `scrollTop`: every row moved down by that much, so each
-        // starts where it was (rows above the removed ones slide down).
-        const clamp = run.scrollTop - container.scrollTop
+        // Each row starts where it was on screen: `scrollTop` moved by the
+        // anchoring, and by the browser's clamp at the bottom (then rows
+        // above the removed ones slide down).
+        const moved = run.scrollTop - container.scrollTop
         for (const [hash, element] of wrappersOf(container, null)) {
-          const offset = (shifts.get(hash) ?? 0) - clamp
+          const offset = (shifts.get(hash) ?? 0) - moved
           if (offset === 0) continue
           run.animations.push(
             element.animate(
@@ -197,31 +271,43 @@ export function useLeavingExit(
     const mine = order.filter((hash) => activeSet.has(hash))
     if (mine.length === 0) return
     const container = containerRef.current
-    if (
-      !container ||
-      disabled?.() === true ||
-      prefersReducedMotion() ||
-      !canAnimate(container)
-    ) {
+    if (!container || disabled?.() === true) {
       finishLeaving(mine)
       return
     }
+    const hashes = new Set(mine)
+    const animate = !prefersReducedMotion() && canAnimate(container)
     // Every box is read before anything starts (one layout).
-    const wrappers = wrappersOf(container, new Set(mine))
     const box = visibleBox(container)
     const viewport = { width: window.innerWidth, height: window.innerHeight }
-    const fading = [...wrappers].filter(([, element]) =>
-      isVisible(element.getBoundingClientRect(), box, viewport),
-    )
-    // Nothing visible: they all leave at once, no hold.
+    const fading = animate
+      ? [...wrappersOf(container, hashes)].filter(([, element]) =>
+          isVisible(element.getBoundingClientRect(), box, viewport),
+        )
+      : []
+    // Nothing fades: they all leave at once, no hold, the view anchored.
     if (fading.length === 0) {
-      finishLeaving(mine)
+      const instant: Run = {
+        phase: 'removing',
+        hashes,
+        fading: [],
+        animations: [],
+        release: () => {},
+        backstop: undefined,
+        before: order,
+        sizes: new Map(),
+        scrollTop: 0,
+        above: 0,
+        animate,
+      }
+      armBackstop(instant, SLIDE_MS + HOLD_SLACK_MS)
+      runRef.current = instant
+      startRemoval(instant)
       return
     }
     // The rows out of view stay in the order, unanimated, and leave with
     // the faded ones, so rows above the box never jump the visible ones
     // up mid-fade and the slide covers them too.
-    const hashes = new Set(mine)
     claimLeaving(hashes)
     const animations = fading.map(([, element]) => {
       // A fading row can no longer be clicked, ticked or focused.
@@ -243,6 +329,8 @@ export function useLeavingExit(
       before: order,
       sizes: new Map(),
       scrollTop: 0,
+      above: 0,
+      animate,
     }
     // The fade and the removal commit; the slide arms its own.
     armBackstop(started, FADE_MS + SLIDE_MS + HOLD_SLACK_MS)
@@ -251,14 +339,7 @@ export function useLeavingExit(
       animations.map((animation) => animation.finished),
     ).then(() => {
       if (runRef.current !== started || started.phase !== 'fade') return
-      const latest = latestRef.current
-      started.before = latest.order
-      started.sizes = new Map(
-        [...hashes].map((hash) => [hash, latest.sizeOf(hash)]),
-      )
-      started.scrollTop = containerRef.current?.scrollTop ?? 0
-      started.phase = 'removing'
-      finishLeaving(hashes)
+      startRemoval(started)
     })
   })
 

@@ -53,3 +53,24 @@ export function exitShifts(
   }
   return shifts
 }
+
+/**
+ * Scroll anchoring (Alex, after 4.4): how much shorter the content above
+ * the view gets when `removed` leave `order`. That is the size plus `gap`
+ * of each removed hash before `first`, the first row in view (kept or
+ * removed). `0` when `first` is not in `order` (nothing in view).
+ */
+export function removedAbove(
+  order: ReadonlyArray<string>,
+  first: string | null,
+  removed: ReadonlySet<string>,
+  sizeOf: (hash: string) => number,
+  gap: number,
+): number {
+  let total = 0
+  for (const hash of order) {
+    if (hash === first) return total
+    if (removed.has(hash)) total += sizeOf(hash) + gap
+  }
+  return 0
+}

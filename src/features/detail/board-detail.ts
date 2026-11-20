@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { detailPosition } from '#/lib/detail-position'
 import { BOARD_COLUMN_NAMES } from '#/lib/torrent-status'
 import { boardColumnOf } from '#/lib/visible-torrents'
@@ -56,6 +56,28 @@ export function useBoardDetailTarget({
     if (gone) setHash(null)
   }, [gone, setHash])
 
+  let live: DetailTarget | null = null
+  if (
+    hash !== null &&
+    column !== null &&
+    columns &&
+    torrents &&
+    Object.hasOwn(torrents, hash)
+  ) {
+    const position = detailPosition(columns[column], hash)
+    if (position) {
+      live = {
+        torrent: torrents[hash],
+        position,
+        columnName: BOARD_COLUMN_NAMES[column],
+      }
+    }
+  }
+  // Kept once committed, never from a render React may throw away.
+  useLayoutEffect(() => {
+    if (hash !== null && live !== null) lastRef.current = { hash, target: live }
+  })
+
   if (fading) {
     const last = lastRef.current
     return last !== null && last.hash === hash ? last.target : null
@@ -63,15 +85,5 @@ export function useBoardDetailTarget({
   if (fromOutside && torrents && Object.hasOwn(torrents, hash)) {
     return { torrent: torrents[hash], position: null, columnName: null }
   }
-  if (hash === null || column === null || !columns || !torrents) return null
-  if (!Object.hasOwn(torrents, hash)) return null
-  const position = detailPosition(columns[column], hash)
-  if (!position) return null
-  const target = {
-    torrent: torrents[hash],
-    position,
-    columnName: BOARD_COLUMN_NAMES[column],
-  }
-  lastRef.current = { hash, target }
-  return target
+  return live
 }

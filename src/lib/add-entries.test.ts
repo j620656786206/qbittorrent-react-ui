@@ -75,6 +75,29 @@ describe('splitPaste', () => {
     ])
   })
 
+  it('P1 a name word with a colon still joins; a parameter after it ends the name', () => {
+    expect(
+      splitPaste(
+        'magnet:?xt=urn:btih:x&dn=Title Re:Zero Vol.2: end&tr=udp://t.invalid next',
+      ),
+    ).toEqual([
+      'magnet:?xt=urn:btih:x&dn=Title Re:Zero Vol.2: end&tr=udp://t.invalid',
+      'next',
+    ])
+    expect(splitPaste('magnet:?xt=urn:btih:x&dn=A b&dn=C d')).toEqual([
+      'magnet:?xt=urn:btih:x&dn=A b&dn=C d',
+    ])
+  })
+
+  it('P1 a long line after an open dn joins every word', () => {
+    const words = Array.from({ length: 20_000 }, (_, i) => `w${i}`)
+    const [entry, ...rest] = splitPaste(
+      `magnet:?xt=urn:btih:x&dn=x ${words.join(' ')}`,
+    )
+    expect(rest).toEqual([])
+    expect(entry.endsWith(' w19999')).toBe(true)
+  })
+
   it('P1 the dn join never crosses a line', () => {
     expect(splitPaste('magnet:?xt=urn:btih:x&dn=Fake\nShow')).toEqual([
       'magnet:?xt=urn:btih:x&dn=Fake',

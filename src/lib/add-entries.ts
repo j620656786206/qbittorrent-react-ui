@@ -17,28 +17,32 @@ const PASTE_SPACE = /[\s\u200b-\u200d\u2060\ufeff]+/
 /** A magnet whose last parameter is `dn=`: a space here is inside the name. */
 const OPEN_DN = /^magnet:\?(?:.*&)?dn=[^&]*$/i
 
+/** A token that starts another link: a magnet, or `scheme://`. */
+const LINK_START = /^(?:magnet:|[a-z][a-z0-9+.-]*:\/\/)/i
+
 /**
  * Pasted text, one entry per line, and within a line one per token between
  * spaces or tabs. A token after a magnet that ends in `dn=…` joins it with a
  * space (an unencoded space in the name, as chat apps copy it), unless the
- * token starts with a URI scheme (another magnet, an https link).
+ * token starts another link (a magnet, an https link). A name word such as
+ * `Re:Zero` still joins. Each token is looked at once, so a long line costs
+ * no more than its length.
  */
 export function splitPaste(text: string): Array<string> {
   const entries: Array<string> = []
   for (const line of text.split(/\r\n|\r|\n/)) {
-    let last: string | null = null
+    /** The last entry of this line is a magnet whose `dn=` is still open. */
+    let openDn = false
     for (const token of line.split(PASTE_SPACE)) {
       if (token === '') continue
-      if (
-        last !== null &&
-        OPEN_DN.test(last) &&
-        !/^[a-z][a-z0-9+.-]*:/i.test(token)
-      ) {
-        last = `${last} ${token}`
-        entries[entries.length - 1] = last
+      if (openDn && !LINK_START.test(token)) {
+        entries[entries.length - 1] += ` ${token}`
+        // An `&` in the joined word starts a parameter after the name.
+        const amp = token.lastIndexOf('&')
+        if (amp >= 0) openDn = /^dn=/i.test(token.slice(amp + 1))
         continue
       }
-      last = token
+      openDn = OPEN_DN.test(token)
       entries.push(token)
     }
   }

@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
-import { selectTorrents, useMaindata } from '#/state/maindata'
+import { useMaindata } from '#/state/maindata'
+import type { Maindata } from '#/lib/maindata-merge'
 import { useViewedHash } from '#/state/viewed-hash'
 
 // Story 4.6 (PRD FR-38, EXPERIENCE add-torrent 「打開」): a torrent's detail
@@ -44,9 +45,20 @@ export function clearDetailOutside(): void {
 export function useOutsideHash(): string | null {
   const stored = useSelector(detailOutsideStore, (state) => state.hash)
   const { hash } = useViewedHash()
-  const { data: torrents } = useMaindata(selectTorrents)
-  if (stored === null || stored !== hash || !torrents) return null
-  return Object.hasOwn(torrents, stored) ? stored : null
+  const has = useMaindataHas(stored)
+  return stored !== null && stored === hash && has === true ? stored : null
+}
+
+/**
+ * Whether maindata has `hash` (`undefined` before the first poll). Only
+ * this boolean is selected, so a poll that keeps it re-renders nothing.
+ */
+function useMaindataHas(hash: string | null): boolean | undefined {
+  const select = useCallback(
+    (data: Maindata) => hash !== null && Object.hasOwn(data.torrents, hash),
+    [hash],
+  )
+  return useMaindata(select).data
 }
 
 /**
@@ -56,10 +68,10 @@ export function useOutsideHash(): string | null {
  */
 export function useDetailOutsideUpkeep(hash: string | null): void {
   const state = useSelector(detailOutsideStore, (each) => each)
-  const { data: torrents } = useMaindata(selectTorrents)
+  const has = useMaindataHas(state.hash)
   useEffect(() => {
     if (state.hash === null) return
-    if (torrents !== undefined && !Object.hasOwn(torrents, state.hash)) {
+    if (has === false) {
       clearDetailOutside()
       return
     }
@@ -72,7 +84,7 @@ export function useDetailOutsideUpkeep(hash: string | null): void {
       return
     }
     if (state.seen) clearDetailOutside()
-  }, [hash, state, torrents])
+  }, [hash, state, has])
 }
 
 /** Tests: nothing opened from outside. */
