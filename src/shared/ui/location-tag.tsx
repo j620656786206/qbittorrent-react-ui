@@ -11,7 +11,9 @@ import { cn } from '#/shared/ui/cn'
 // border stays as a transparent 1px so both looks have the same size.
 // Purple means media library and nothing else. Display only. `title` is the
 // full name (a long one is cut); screen readers also hear 「，媒體庫」, since
-// colour and weight are all a sighted reader gets.
+// colour and weight are all a sighted reader gets. Story 5.2: a tag whose
+// label already is 「媒體庫」 (the change-path rows) passes
+// `mediaLibraryNote={false}`, so it is read once.
 // https://tailwindcss.com/docs/dark-mode
 
 const NORMAL_CLASS = 'border text-text-muted'
@@ -21,10 +23,13 @@ const MEDIA_LIBRARY_CLASS =
 export function LocationTag({
   label,
   mediaLibrary = false,
+  mediaLibraryNote = true,
   className,
 }: {
   label: string
   mediaLibrary?: boolean
+  /** Whether a media library's tag adds the hidden 「，媒體庫」. */
+  mediaLibraryNote?: boolean
   className?: string
 }) {
   return (
@@ -52,7 +57,9 @@ export function LocationTag({
         <path d="M3 7h6l2 2h10v10H3z" />
       </svg>
       <span className="min-w-0 truncate">{label}</span>
-      {mediaLibrary && <span className="sr-only">，媒體庫</span>}
+      {mediaLibrary && mediaLibraryNote && (
+        <span className="sr-only">，媒體庫</span>
+      )}
     </span>
   )
 }

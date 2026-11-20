@@ -293,6 +293,37 @@ describe('accessibility and guards (review)', () => {
   )
 })
 
+describe('subtitle (story 5.2)', () => {
+  const subtitle = () =>
+    document.querySelector<HTMLElement>('[data-slot="confirm-subtitle"]')
+
+  it('none by default', async () => {
+    await render()
+    expect(subtitle()).toBeNull()
+  })
+
+  it('desktop: one cut meta line right under the title, outside the scrolling body', async () => {
+    await render({ subtitle: 'Fake.Show.S01.1080p' })
+    const line = subtitle() as HTMLElement
+    expect(line.textContent).toBe('Fake.Show.S01.1080p')
+    expect(line.title).toBe('Fake.Show.S01.1080p')
+    for (const token of ['truncate', 'text-meta', 'text-text-muted']) {
+      expect(line.className.split(' ')).toContain(token)
+    }
+    expect(line.previousElementSibling?.textContent).toBe('刪除 3 個種子？')
+    const body = document.getElementById(
+      shell().getAttribute('aria-describedby') ?? '',
+    )
+    expect(body?.contains(line)).toBe(false)
+  })
+
+  it('phone: the first line of the body', async () => {
+    await render({ desktop: false, subtitle: 'Fake.Show.S01.1080p' })
+    const line = subtitle() as HTMLElement
+    expect(line.nextElementSibling?.textContent).toBe('內容')
+  })
+})
+
 describe('phone sheet', () => {
   it('an alertdialog sheet with the ✕ 「關閉，不刪」 and one full-width 44px primary pinned outside the scroller', async () => {
     await render({ desktop: false })

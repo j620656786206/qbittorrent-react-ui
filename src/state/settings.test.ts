@@ -8,8 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import { ALL } from '#/shared/categories'
-import { defaultSettings } from '#/shared/settings'
+import { MAX_COMMON_PATHS, defaultSettings } from '#/shared/settings'
 import type {
+  AddCommonPathInput,
   SetCategoryOrderInput,
   SetCategorySortInput,
   Settings,
@@ -20,6 +21,7 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
 import {
   SETTINGS_KEY,
+  addCommonPathOp,
   applySettings,
   ORDER_SAVE_OP,
   bindFetchSettings,
@@ -557,5 +559,79 @@ describe('categoryOrderOp (story 3.3)', () => {
     expect(fetchSettings).toHaveBeenCalledTimes(1)
     await refreshSettings(client)
     expect(fetchSettings).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('addCommonPathOp (spec 5.2)', () => {
+  const input: AddCommonPathInput = {
+    path: '/data/media/anime',
+    name: 'media/anime',
+    mediaLibrary: false,
+  }
+  const withPaths = (count: number): Settings => ({
+    ...defaultSettings(),
+    commonPaths: Array.from({ length: count }, (_, index) => ({
+      path: `/data/p${index}`,
+      name: `p${index}`,
+      mediaLibrary: false,
+    })),
+  })
+
+  it('success: the answer becomes ["settings"], in the settings write queue', async () => {
+    const client = setup(async () => withPaths(1)).client
+    await flush()
+    const answer = {
+      ...withPaths(1),
+      commonPaths: [...withPaths(1).commonPaths, { ...input }],
+    }
+    const call = vi.fn((_values: AddCommonPathInput) => Promise.resolve(answer))
+    const op = addCommonPathOp(call, client)
+    expect(op.scopeOf?.(input)).toBe('settings-write')
+    sendOp(op, client, input)
+    await flush()
+    await flush()
+    expect(call.mock.calls[0][0]).toEqual(input)
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(answer)
+    expect(toastCalls.dismissed).toEqual([
+      'settings:common-path:/data/media/anime',
+    ])
+    expect(toastCalls.failures).toEqual([])
+  })
+
+  it.each([
+    ['invalid_input', MAX_COMMON_PATHS, '常用路徑最多 50 個'],
+    ['invalid_input', 3, '沒加到常用：這個路徑不在允許的下載資料夾底下'],
+    ['settings_write_failed', MAX_COMMON_PATHS, '沒加到常用：設定檔寫不進去'],
+    ['timeout', 0, '沒加到常用：容器沒有回應，請再試一次'],
+  ] as const)(
+    '%s with %i listed: the failure toast reads %s, 重試 sends the same call',
+    async (code, listed, text) => {
+      const client = setup(async () => withPaths(listed)).client
+      await flush()
+      const call = vi
+        .fn<(values: AddCommonPathInput) => Promise<Settings>>()
+        .mockRejectedValueOnce(new AppError(code))
+        .mockResolvedValue(withPaths(listed))
+      sendOp(addCommonPathOp(call, client), client, input)
+      await flush()
+      await flush()
+      expect(toastCalls.failures).toHaveLength(1)
+      expect(toastCalls.failures[0].text).toBe(text)
+      toastCalls.failures[0].onRetry()
+      await flush()
+      await flush()
+      expect(call).toHaveBeenCalledTimes(2)
+      expect(call.mock.calls[1][0]).toEqual(input)
+    },
+  )
+
+  it('a connection code: no toast (the global handler)', async () => {
+    const client = setup(async () => withPaths(0)).client
+    await flush()
+    const call = vi.fn(() => Promise.reject(new AppError('home_unreachable')))
+    sendOp(addCommonPathOp(call, client), client, input)
+    await flush()
+    await flush()
+    expect(toastCalls.failures).toEqual([])
   })
 })

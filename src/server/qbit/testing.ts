@@ -179,6 +179,8 @@ export interface FakeQbitRoutes {
   log?: Handler
   /** Story 4.7: `torrents/add`; 200 `Ok.` by default. */
   add?: Handler
+  /** Story 5.2: `torrents/setLocation`; 200 with an empty body by default. */
+  setLocation?: Handler
 }
 
 /** Story 2.7: a raw `torrents/files` entry with qBittorrent's extra fields. */
@@ -216,6 +218,8 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
     '/api/v2/torrents/filePrio': routes.filePrio ?? (() => new Response('')),
     '/api/v2/log/main': routes.log ?? (() => jsonResponse([])),
     '/api/v2/torrents/add': routes.add ?? (() => new Response('Ok.')),
+    '/api/v2/torrents/setLocation':
+      routes.setLocation ?? (() => new Response('')),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

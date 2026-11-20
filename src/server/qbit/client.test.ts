@@ -213,6 +213,7 @@ describe('qBittorrent client', () => {
       'stopTorrents',
       'startTorrents',
       'deleteTorrents',
+      'setLocation',
       'addTorrent',
       'torrentFiles',
       'setFilePriority',
@@ -221,7 +222,7 @@ describe('qBittorrent client', () => {
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, add, files, filePrio and log/main', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, setLocation, add, files, filePrio and log/main', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
       '/api/v2/log/main',
@@ -230,6 +231,7 @@ describe('qBittorrent client', () => {
       '/api/v2/torrents/delete',
       '/api/v2/torrents/filePrio',
       '/api/v2/torrents/files',
+      '/api/v2/torrents/setLocation',
       '/api/v2/torrents/start',
       '/api/v2/torrents/stop',
     ])
@@ -444,6 +446,33 @@ describe('qBittorrent client', () => {
       await expect(client.deleteTorrents([HASH_A], true)).rejects.toEqual(
         failure('qbit_rejected'),
       )
+    },
+  )
+
+  it('story 5.2 setLocation POSTs hashes joined with | and location only', async () => {
+    const { client, calls } = setup()
+    await client.setLocation([HASH_A, HASH_B], '/downloads/media/tv')
+    const sent = calls.filter(
+      (call) => call.path === '/api/v2/torrents/setLocation',
+    )
+    expect(sent).toHaveLength(1)
+    expect(sent[0].method).toBe('POST')
+    expect([...sent[0].query.keys()]).toEqual([])
+    expect([...new URLSearchParams(sent[0].body).entries()]).toEqual([
+      ['hashes', `${HASH_A}|${HASH_B}`],
+      ['location', '/downloads/media/tv'],
+    ])
+  })
+
+  it.each([400, 409, 500])(
+    'story 5.2 setLocation answered %s: qbit_rejected',
+    async (status) => {
+      const { client } = setup({
+        setLocation: () => new Response('nope', { status }),
+      })
+      await expect(
+        client.setLocation([HASH_A], '/downloads/tv'),
+      ).rejects.toEqual(failure('qbit_rejected'))
     },
   )
 

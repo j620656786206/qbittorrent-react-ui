@@ -54,8 +54,9 @@ const rawSortExtrasSchema = sortExtrasSchema
   })
   .partial()
 
+// `movingTo` is the container's own record (story 5.2), never qBittorrent's.
 export const rawTorrentSchema = slimTorrentSchema
-  .omit({ hash: true })
+  .omit({ hash: true, movingTo: true })
   .partial()
   .extend(rawSortExtrasSchema.shape)
   .transform(({ tracker, ...torrent }) => ({

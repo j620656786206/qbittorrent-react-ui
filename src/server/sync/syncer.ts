@@ -43,7 +43,10 @@ import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 // by name only), with the same pull reuse as the detail. The browser shows
 // a reason only where classify says `error`, a move from error included.
 // `readCategoryNames` (story 4.7) answers the categories an add may name,
-// with the same reuse.
+// with the same reuse. `readMoveStates` (story 5.2) answers, for
+// `setLocation`'s pre-check, whether each known torrent is already moving
+// (`movingTo` set or qBittorrent's `moving`), with the same reuse; `markMoving`
+// records the target of a move qBittorrent accepted (`movingTo`, AR-43).
 
 export const MIN_PULL_INTERVAL_MS = 1000
 /** The detail read reuses a pull this recent: a little over one 5 s poll. */
@@ -82,6 +85,15 @@ export interface Syncer {
    * (the same pull reuse as the detail).
    */
   readCategoryNames: () => Promise<Array<string>>
+  /**
+   * Story 5.2: for each hash the table has, whether it is already moving
+   * (`movingTo` set or qBittorrent's `moving`); unknown hashes are absent.
+   */
+  readMoveStates: (
+    hashes: ReadonlyArray<string>,
+  ) => Promise<Map<string, boolean>>
+  /** Story 5.2: qBittorrent accepted moving these torrents to `target`. */
+  markMoving: (hashes: ReadonlyArray<string>, target: string) => void
 }
 
 /** Story 2.10: a torrent whose log line may be matched by name. */
@@ -107,7 +119,7 @@ export function createSyncer(options: SyncerOptions): Syncer {
   const now = options.now ?? (() => performance.now())
   const instanceId = options.instanceId ?? randomBytes(4).toString('hex')
   const logger = options.logger ?? defaultLog
-  const table: TorrentTable = createTorrentTable(now)
+  const table: TorrentTable = createTorrentTable(now, { logger })
   const extras = createExtrasTable()
 
   let rid = 0
@@ -240,6 +252,23 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return Object.keys(table.categories)
   }
 
+  async function readMoveStates(
+    hashes: ReadonlyArray<string>,
+  ): Promise<Map<string, boolean>> {
+    await pull(DETAIL_PULL_REUSE_MS)
+    const found = new Map<string, boolean>()
+    for (const hash of hashes) {
+      const torrent = table.get(hash)
+      if (torrent) {
+        found.set(
+          hash,
+          torrent.movingTo !== undefined || isMovingTorrent(torrent),
+        )
+      }
+    }
+    return found
+  }
+
   return {
     instanceId,
     read,
@@ -247,5 +276,7 @@ export function createSyncer(options: SyncerOptions): Syncer {
     readTorrentDetail,
     readErrorCandidates,
     readCategoryNames,
+    readMoveStates,
+    markMoving: (hashes, target) => table.setMovingTo(hashes, target),
   }
 }

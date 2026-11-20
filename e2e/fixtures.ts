@@ -190,7 +190,8 @@ export interface Modes {
    * `reject-files` rejects only a delete with deleteFiles=true.
    * Story 4.7, torrents/add: `reject` rejects every add, `reject-files`
    * only file adds, `slow` answers after 12 s, `drop` closes the
-   * connection (qbit_unreachable).
+   * connection (qbit_unreachable). Story 5.2, torrents/setLocation:
+   * `reject` answers 400, `slow` answers after 12 s.
    */
   ops?: 'normal' | 'reject' | 'slow' | 'reject-files' | 'drop'
   /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
@@ -203,9 +204,12 @@ export interface Modes {
   /**
    * Story 5.1: `varied` gives every torrent its own folder under one of 50
    * parents (sample: E01 /data/media/tv, E02 /data/torrent/mteam-seed, E03
-   * /data/downloads, E04 /data/media/movies).
+   * /data/downloads, E04 /data/media/movies). Story 5.2: `library` puts
+   * each torrent right in a folder, no subfolder (sample: E01
+   * /data/torrents/tv, E02 /data/torrent/mteam-seed, E03 /data/downloads,
+   * E04 /data/media/movies).
    */
-  paths?: 'normal' | 'varied'
+  paths?: 'normal' | 'varied' | 'library'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -246,7 +250,15 @@ export interface AddCall {
   rejected?: true
 }
 
-/** Stories 2.6, 2.7, 4.3, 4.7: the stop/start, filePrio, delete and add calls the fake received. */
+/** A setLocation call as fake-qbit logs it (story 5.2). */
+export interface SetLocationCall {
+  op: 'setLocation'
+  hashes: Array<string>
+  location: string
+  rejected?: true
+}
+
+/** Stories 2.6, 2.7, 4.3, 4.7, 5.2: the stop/start, filePrio, delete, add and setLocation calls the fake received. */
 export async function opCalls(
   request: APIRequestContext,
 ): Promise<
@@ -255,6 +267,7 @@ export async function opCalls(
     | FilePrioCall
     | DeleteCall
     | AddCall
+    | SetLocationCall
   >
 > {
   const response = await request.get('/__fake/ops')

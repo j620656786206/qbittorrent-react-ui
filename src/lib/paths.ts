@@ -52,30 +52,72 @@ function normalizeCommonPaths(
   }))
 }
 
+/**
+ * The index of the longest common path `path` (normalized) lies in, the
+ * first of equal ones, or -1; whether any match is a media library.
+ */
+function longestMatch(
+  path: string,
+  commonPaths: ReadonlyArray<NormalizedCommonPath>,
+): { index: number; mediaLibrary: boolean } {
+  // `..` survives normalizing, so `/data/media/tv/../movies` would look
+  // like it sits under `/data/media/tv`: never a match.
+  if (path.split('/').includes('..')) return { index: -1, mediaLibrary: false }
+  let index = -1
+  let mediaLibrary = false
+  commonPaths.forEach((common, at) => {
+    if (!isInFolder(path, common.path)) return
+    if (common.mediaLibrary) mediaLibrary = true
+    // Matching paths are all folders above `path`: a longer one is deeper.
+    // Equal length means the same folder listed twice: the first wins.
+    if (index === -1 || common.path.length > commonPaths[index].path.length) {
+      index = at
+    }
+  })
+  return { index, mediaLibrary }
+}
+
 function match(
   savePath: string,
   commonPaths: ReadonlyArray<NormalizedCommonPath>,
 ): TagLocation {
   const path = normalizeSavePath(savePath)
-  // `..` survives normalizing, so `/data/media/tv/../movies` would look
-  // like it sits under `/data/media/tv`: never a match.
-  if (path.split('/').includes('..')) {
-    return { name: locationLabel(path), mediaLibrary: false }
-  }
-  let longest: NormalizedCommonPath | null = null
-  let mediaLibrary = false
-  for (const common of commonPaths) {
-    if (!isInFolder(path, common.path)) continue
-    if (common.mediaLibrary) mediaLibrary = true
-    // Matching paths are all folders above `path`: a longer one is deeper.
-    // Equal length means the same folder listed twice: the first wins.
-    if (longest === null || common.path.length > longest.path.length) {
-      longest = common
-    }
-  }
-  return longest === null
+  const { index, mediaLibrary } = longestMatch(path, commonPaths)
+  return index === -1
     ? { name: locationLabel(path), mediaLibrary: false }
-    : { name: longest.name, mediaLibrary }
+    : { name: commonPaths[index].name, mediaLibrary }
+}
+
+/**
+ * Story 5.2: the common path a torrent is in now (its row reads 「目前」):
+ * the same longest match as its location tag, the first of two that
+ * normalize to the same folder; `null` when none holds it.
+ */
+export function currentCommonPath(
+  savePath: string,
+  commonPaths: ReadonlyArray<CommonPath>,
+): CommonPath | null {
+  const { index } = longestMatch(
+    normalizeSavePath(savePath),
+    normalizeCommonPaths(commonPaths),
+  )
+  return index === -1 ? null : commonPaths[index]
+}
+
+/**
+ * Story 5.2: the first common path whose normalized path is `path`'s, or
+ * `null` (the change-path screen's selected row, and 「加到常用」's
+ * 「已經在清單裡」).
+ */
+export function listedCommonPath(
+  path: string,
+  commonPaths: ReadonlyArray<CommonPath>,
+): CommonPath | null {
+  const target = normalizeSavePath(path)
+  return (
+    commonPaths.find((common) => normalizeSavePath(common.path) === target) ??
+    null
+  )
 }
 
 /**
@@ -84,7 +126,7 @@ function match(
  * under it on a folder boundary (`/data/media/tv` does not hold
  * `/data/media/tv2`). The name comes from the longest match; when two
  * common paths normalize to the same folder, the first in the list wins
- * (story 5.2 decides whether to refuse such duplicates). Media library when
+ * (story 5.2: `addCommonPath` refuses such duplicates). Media library when
  * any match is ticked. A save path with a `..` segment never matches. No
  * match: the last two folders.
  */

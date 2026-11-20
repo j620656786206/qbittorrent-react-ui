@@ -8,12 +8,17 @@ import {
   LIST_LOAD_FAILED,
   OPERATION_FAILURE_CODES,
   SETTINGS_WRITE_FAILURE_CODES,
+  COMMON_PATHS_FULL,
+  SAVE_PATH_REASONS,
+  addCommonPathFailureText,
   addFailureText,
   addItemFailureText,
   errorText,
   fileActionFailureText,
   orderSaveFailureText,
   pauseActionFailureText,
+  savePathFormatReason,
+  setLocationFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
 import { ERROR_CODES } from '#/shared/errors'
@@ -157,5 +162,62 @@ describe('add failure text (spec 4.7)', () => {
         '家裡的 qBittorrent 沒有回應',
       )
     }
+  })
+})
+
+describe('change path texts (spec 5.2)', () => {
+  it('the move failure toast reads 改路徑失敗：<reason>; invalid_input names the download folders', () => {
+    expect(setLocationFailureText('qbit_rejected')).toBe(
+      '改路徑失敗：qBittorrent 拒絕這個操作',
+    )
+    expect(setLocationFailureText('timeout')).toBe(
+      '改路徑失敗：qBittorrent 沒有回應，請再試一次',
+    )
+    expect(setLocationFailureText('invalid_input')).toBe(
+      '改路徑失敗：這個路徑不在允許的下載資料夾底下',
+    )
+  })
+
+  it('加到常用: full list only for invalid_input with 50 listed; else the settings-write reason', () => {
+    expect(COMMON_PATHS_FULL).toBe('常用路徑最多 50 個')
+    expect(addCommonPathFailureText('invalid_input', true)).toBe(
+      COMMON_PATHS_FULL,
+    )
+    // The name is built by the client: a refused input is the path.
+    expect(addCommonPathFailureText('invalid_input', false)).toBe(
+      '沒加到常用：這個路徑不在允許的下載資料夾底下',
+    )
+    expect(addCommonPathFailureText('settings_write_failed', true)).toBe(
+      '沒加到常用：設定檔寫不進去',
+    )
+    expect(addCommonPathFailureText('timeout', false)).toBe(
+      '沒加到常用：容器沒有回應，請再試一次',
+    )
+  })
+
+  it.each([
+    ['/data/media/tv', null],
+    ['/data/media/tv/', null],
+    ['/', null],
+    ['', SAVE_PATH_REASONS.relative],
+    ['data/tv', SAVE_PATH_REASONS.relative],
+    ['/data/../x', SAVE_PATH_REASONS.dotDot],
+    ['data/../x', SAVE_PATH_REASONS.relative],
+    [`/${'x'.repeat(1024)}`, SAVE_PATH_REASONS.tooLong],
+    [`/${'x'.repeat(1023)}`, null],
+    [`/${'x'.repeat(1023)}/`, null],
+    ['/data/a\\b', SAVE_PATH_REASONS.badCharacter],
+    ['/data/a\tb', SAVE_PATH_REASONS.badCharacter],
+  ])('the 會搬到 reason for %j', (text, reason) => {
+    expect(savePathFormatReason(text)).toBe(reason)
+  })
+
+  it('the box reasons read as the spec says', () => {
+    expect(SAVE_PATH_REASONS).toEqual({
+      relative: '路徑要從 / 開頭',
+      dotDot: '路徑不能有 ..',
+      tooLong: '路徑太長',
+      badCharacter: '路徑不能有反斜線或控制字元',
+    })
   })
 })

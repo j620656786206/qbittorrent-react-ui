@@ -78,6 +78,22 @@ export const setCategorySortInputSchema = z.strictObject({
 export type SetCategorySortInput = z.infer<typeof setCategorySortInputSchema>
 
 /**
+ * Story 5.2: `addCommonPath`. `path` goes through the shared path schema
+ * (the container also requires it under `SAVE_ROOTS`); `name` is trimmed
+ * before the name schema checks it.
+ */
+export const addCommonPathInputSchema = z.strictObject({
+  path: savePathSchema,
+  name: z
+    .string()
+    .transform((name) => name.trim())
+    .pipe(commonPathNameSchema),
+  mediaLibrary: z.boolean(),
+})
+
+export type AddCommonPathInput = z.input<typeof addCommonPathInputSchema>
+
+/**
  * Story 3.3: the whole new tab order (`setCategoryOrder`). Each entry is a
  * `categoryOrder` entry (never `ALL`), no name twice, and the list fits the
  * settings file's 256 KB bound; anything else is `invalid_input`.

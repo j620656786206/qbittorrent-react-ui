@@ -52,6 +52,12 @@ import type { TrackedOp } from '#/state/tracked-op'
 // focus back and closes it. Esc with the menu open is Radix's (it prevents
 // the default), so the shortcut registry leaves the panel or sheet open.
 
+/**
+ * Story 5.2: a pending move (change path) leaves 暫停/繼續 usable; whether a
+ * move disables anything is story 5.3's call.
+ */
+const MOVE_PENDING = 'move'
+
 /** The ops this menu sends; pendingOps judges only these for it. */
 const PAUSE_ACTIONS: ReadonlyArray<PauseAction> = ['stop', 'start']
 
@@ -148,7 +154,7 @@ export function MoreMenu({
         className="min-w-36"
       >
         <DropdownMenuItem
-          disabled={pending !== null || inFlight}
+          disabled={(pending !== null && pending !== MOVE_PENDING) || inFlight}
           onSelect={() =>
             sendOp(pauseOp, client, { hash: torrent.hash, op: action, flips })
           }
