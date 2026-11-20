@@ -5,7 +5,7 @@ created: '2026-11-20'
 status: 'done'
 baseline_revision: 'fc9c2c9c75e6bbc8a2e51f545a2c508f53db4272'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
 warnings: []
@@ -144,6 +144,44 @@ deferred:
   - `[false]` `[reject]` (gap, other) J2 ordering inside the unreadable group: the story orders by input inside each group; "(links, files, too large)" lists members, not an order.
   - `[low]` `[patch]` (gap, other) A bad first btih: same fix as above.
 
+### 2026-11-20: Review pass (follow-up)
+- verdicts: 34 findings: high 0, medium 0, low 29, false 4, maybe-false 1
+- findings:
+  - `[low]` `[patch]` (edge) Non-ASCII letters pass the base32 check after `toUpperCase` (`ß` gives a hash over 40 hex): ASCII alphabet checked first; tested.
+  - `[low]` `[patch]` (edge) `piece length` above 2^31 − 1 accepted: refused; T5 row; `parseTorrent` doc narrowed.
+  - `[low]` `[patch]` (edge) Both `files` and `length` judged unreadable, though libtorrent takes `files`: `files` wins and `length` is ignored; rows now expect readable multi-file sizes.
+  - `[low]` `[reject]` (edge) A rejecting `yieldToMain`: carried, rejected in the first pass.
+  - `[maybe-false]` `[reject]` (edge) Uppercase `XT=` or `DN=` keys: unverified whether qBittorrent accepts them; if true it is low (hand-written links only).
+  - `[low]` `[reject]` (edge) Quadratic rescan of a long open-`dn` line: needs thousands of tokens after one magnet on one line; the fix adds parser state.
+  - `[low]` `[patch]` (edge) One magnet larger than the budget still makes an oversized batch: a magnet over 64 KiB is 看不懂這個連結, so every addable entry fits a batch; tested at 64 KiB and one byte more.
+  - `[low]` `[patch]` (edge) The batch guarantee claim: same fix; `addBatches` doc explains why every entry fits.
+  - `[false]` `[reject]` (edge) Signature differs from the spec text: carried.
+  - `[low]` `[patch]` (blind) The `judgeEntries` doc implies a sub-order: reworded (input order).
+  - `[low]` `[patch]` (blind) A URL after an open `dn=` is swallowed: tokens starting with a URI scheme are never joined; tested.
+  - `[low]` `[reject]` (blind) Chat and markdown wrappers around links: not in the story; unwrapping heuristics are more than a direct fix.
+  - `[low]` `[patch]` (blind) `addBatches` cannot keep its guarantee for a huge magnet: same fix as the edge row.
+  - `[false]` `[reject]` (blind) 以前下載過，已整理好 for torrents still downloading: the PRD assumption uses the same text for any state.
+  - `[low]` `[reject]` (blind) Merged duplicates are silent: carried.
+  - `[low]` `[reject]` (blind) The lowercase hash contract is only a comment: carried.
+  - `[low]` `[patch]` (blind) `parseTorrent` claims more than it checks (piece length bound): same fix as the edge row.
+  - `[low]` `[reject]` (blind) Phone slices and repeated `dictValue` walks: the measured slice is 61.7 ms against 200 ms; the phone gap is a recorded residual risk and the browser measurement is deferred.
+  - `[low]` `[patch]` (blind) The second `TOO_LARGE` branch untested: test added.
+  - `[low]` `[patch]` (blind) Missing bencode strictness tests: huge string length and integer past 2^53 in bencode.test.ts, `pieces` as integer or list in info-hash.test.ts.
+  - `[low]` `[reject]` (blind) The measurement helper's comment and index: carried.
+  - `[low]` `[reject]` (blind) 「檔案超過 10 MB」 hardcoded: carried.
+  - `[low]` `[reject]` (blind) The test encoder sits in `src/lib`: the repo keeps test helpers beside their modules (`src/lib/testing.ts`, `src/state/entrance-testing.ts`).
+  - `[low]` `[patch]` (gap) Batch sizes after a byte split unchecked: exact sizes `[4, 4, 4, 4, 4, 4, 4, 2]` asserted.
+  - `[low]` `[patch]` (gap) Chunked hashing of an `info` over 1 MiB unchecked: T7 asserts the hash equals SHA-1 of the raw `info` span (over 9 MiB).
+  - `[low]` `[patch]` (gap) Empty `dn=` giving `name: null` untested: test added.
+  - `[low]` `[defer]` (intent) The 200 ms bound measured in Node: carried, deferred in the first pass.
+  - `[low]` `[reject]` (intent) No automated check against `crypto` use: `sha1.ts` imports nothing; a lint rule is more than this story needs.
+  - `[false]` `[reject]` (intent) The archived-included comparison is untested here: carried.
+  - `[low]` `[reject]` (intent) The batch allowance is checked against itself: 4.7's server test measures the real multipart body.
+  - `[low]` `[patch]` (intent) The join rule absorbs an `https://` token: same fix as the blind row.
+  - `[low]` `[reject]` (intent) Merging across files and magnets: carried.
+  - `[false]` `[reject]` (intent) More inputs are unreadable than the T rows list: the libtorrent checks were patched in on purpose in the first pass.
+  - `[low]` `[reject]` (intent) The test helper location: same as the blind row.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -160,14 +198,14 @@ Claude 代決 during implementation (Alex can veto):
 - `readTorrentFile` also yields once between checking the whole file and reading the `info` fields. `readTorrentFiles(files, options)` reads the files in order and yields between them.
 - Bytes after the top dictionary, a trailing newline included, make the file unreadable (T5, strict).
 - `contentBytes` leaves out BEP 47 padding files (`attr` contains `p`). When both `name.utf-8` and `name` exist, `name.utf-8` wins.
-- The form allowance is 64 KiB per request plus 64 KiB per entry, about 1.3 MB for 20 entries. A magnet's UTF-8 length counts toward the batch budget on top of its allowance, so a long tracker list cannot push a batch over 50 MB.
-- A .torrent is readable only when libtorrent would accept it. That means a non-empty `name.utf-8` or `name`, a positive `piece length`, and exactly ceil(total / piece length) piece hashes. The size must be a valid single-file `length` with no `files`, or a non-empty `files` with no `length`, where each file has a valid `length` and a `path` list of byte strings. A total past 2^53 is unreadable.
-- `splitPaste` splits by line first. Inside a line, a token that follows a magnet whose last parameter is `dn=` joins that magnet with a space, unless the token starts another magnet. Zero-width characters (U+200B to U+200D, U+2060, U+FEFF) split like spaces.
-- `parseMagnet` reads every `xt` and `xt.N` parameter and uses the first btih that converts.
+- The form allowance is 64 KiB per request plus 64 KiB per entry, about 1.3 MB for 20 entries. A magnet's UTF-8 length counts toward the batch budget on top of its allowance. `parseMagnet` refuses a link longer than 64 KiB (看不懂這個連結), so every addable entry fits a batch alone and no batch goes over 50 MB.
+- A .torrent is readable only when it passes these checks, which libtorrent also applies: a non-empty `name.utf-8` or `name`, a `piece length` from 1 to 2^31 - 1, and exactly ceil(total / piece length) piece hashes. When `files` is present the info is multi-file and the reader ignores `length`, as libtorrent does. `files` must then be non-empty, and each file needs a valid `length` and a `path` list of byte strings. Without `files`, the info needs a valid single-file `length`. A total past 2^53 is unreadable.
+- `splitPaste` splits by line first. Inside a line, a token that follows a magnet whose last parameter is `dn=` joins that magnet with a space, unless the token starts with a URI scheme (another magnet, an https link). Zero-width characters (U+200B to U+200D, U+2060, U+FEFF) split like spaces.
+- `parseMagnet` reads every `xt` and `xt.N` parameter and uses the first btih that converts. A base32 btih must be 32 ASCII characters from A-Z (any case) and 2-7.
 
 Measurement (AC 1) on the Apple Silicon dev Mac, Node 26.13.1, vitest:
 - 20 generated torrents. Ten are one `pieces` string at exactly 10,485,760 bytes, the most bytes to hash. Ten are about 9.4 MB of 150,000 file entries, the most to parse. 230 slices in all.
-- The test file alone: longest slice 42.3 to 44.4 ms of thread CPU (46.1 to 47.3 ms wall), total about 1.25 s. The stricter .torrent check walks each file's `path` as well, which raised the parse slice from about 30 ms.
+- The test file alone: longest slice 42.3 to 44.4 ms of thread CPU (46.1 to 47.3 ms wall), total about 1.25 s. The stricter .torrent check walks each file's `path` as well, which raised the parse slice from about 30 ms. After the second review pass (2026-11-20, test file alone): longest slice 61.7 ms thread CPU (65.3 ms wall), total about 1.44 s over 230 slices.
 - Inside the full suite (143 test files at once), measured before the stricter check: longest slice 58 to 68 ms of thread CPU, 83 to 118 ms wall, total about 2.2 s. After the stricter check the full suite (3526 tests, 2026-11-20) still passes the 200 ms CPU assertion; vitest hides the test's log line in a full run, so no new number is recorded.
 - The test asserts that the longest slice's thread CPU time (`process.threadCpuUsage()`) stays under 200 ms. It logs wall clock without asserting it, because in the full suite wall clock also counts the time other workers held the CPU.
 - Hashing one 1 MiB chunk takes about 2.5 ms. The longest slice is the 150,000-entry parse.
@@ -212,3 +250,15 @@ Status: done (first pass; a follow-up review pass is recommended).
 - `check.sh`: every line ok.
 
 **Residual risks.** Phones may run slices several times longer than the Mac. Strict parsing rejects a .torrent with bytes after the top dictionary (T5).
+
+### Follow-up pass 1 (2026-11-20)
+
+Status: done. Follow-up review: false (no high patched; converged).
+
+**Review.** 34 findings. Patched: low 10 entries (ASCII base32, piece length bound, `files` wins over `length`, 64 KiB magnet cap, URI tokens not joined, doc fixes, five test gaps). Deferred: 0 new (1 carried). Rejected: 4 false, 1 maybe-false, 13 low with reasons in the triage log.
+
+**Verification (after the patches).**
+- `npm run lint`, `npm run typecheck`: exit 0.
+- `npm test`: 143 files, 3542 tests pass.
+- Measurement alone: longest slice 61.7 ms thread CPU (65.3 ms wall), total about 1.44 s.
+- `check.sh`: every line ok.

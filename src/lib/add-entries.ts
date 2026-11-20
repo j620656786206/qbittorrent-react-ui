@@ -21,7 +21,7 @@ const OPEN_DN = /^magnet:\?(?:.*&)?dn=[^&]*$/i
  * Pasted text, one entry per line, and within a line one per token between
  * spaces or tabs. A token after a magnet that ends in `dn=…` joins it with a
  * space (an unencoded space in the name, as chat apps copy it), unless the
- * token starts another magnet.
+ * token starts with a URI scheme (another magnet, an https link).
  */
 export function splitPaste(text: string): Array<string> {
   const entries: Array<string> = []
@@ -29,7 +29,11 @@ export function splitPaste(text: string): Array<string> {
     let last: string | null = null
     for (const token of line.split(PASTE_SPACE)) {
       if (token === '') continue
-      if (last !== null && OPEN_DN.test(last) && !/^magnet:/i.test(token)) {
+      if (
+        last !== null &&
+        OPEN_DN.test(last) &&
+        !/^[a-z][a-z0-9+.-]*:/i.test(token)
+      ) {
         last = `${last} ${token}`
         entries[entries.length - 1] = last
         continue
@@ -72,9 +76,9 @@ const STATUS_ORDER: ReadonlyArray<EntryStatus> = [
 ]
 
 /**
- * Labels and orders the entries: unreadable first (links, files, too
- * large), then already in qBittorrent, then addable, input order inside each
- * group. Two entries with one hash (a magnet's hex and base32, or a magnet
+ * Labels and orders the entries: unreadable first, then already in
+ * qBittorrent, then addable, input order inside each group (unreadable
+ * links, files and too-large files are not sorted by reason). Two entries with one hash (a magnet's hex and base32, or a magnet
  * and its .torrent) become one row, the first. `existingHashes` is every
  * maindata hash, lowercase hex, archived included.
  */
@@ -120,7 +124,10 @@ function formBytes(entry: AddEntry): number {
  * at most `MAX_ADD_ENTRIES` each (magnets and files together), and the
  * .torrent bytes, the magnet links' UTF-8 bytes and the form allowance
  * together never over `MAX_ADD_REQUEST_BYTES`.
- * A new batch starts before the entry that would cross either limit.
+ * A new batch starts before the entry that would cross either limit. Every
+ * addable entry fits a batch alone: a .torrent is at most
+ * `MAX_TORRENT_FILE_BYTES` and `parseMagnet` refuses links longer than
+ * `ADD_FORM_ENTRY_ALLOWANCE`.
  */
 export function addBatches<TEntry extends AddEntry>(
   addable: ReadonlyArray<TEntry>,

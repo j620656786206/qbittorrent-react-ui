@@ -8,6 +8,7 @@ import {
 } from '#/lib/info-hash'
 import type { TorrentFileSource } from '#/lib/info-hash'
 import { sha1Hex } from '#/lib/sha1'
+import { decodeBencode, dictEntries } from '#/lib/bencode'
 import {
   bencode,
   concat,
@@ -18,7 +19,10 @@ import {
   torrentOfSize,
 } from '#/lib/bencode-testing'
 import type { Bencodable } from '#/lib/bencode-testing'
-import { MAX_TORRENT_FILE_BYTES } from '#/shared/torrent-add'
+import {
+  ADD_FORM_ENTRY_ALLOWANCE,
+  MAX_TORRENT_FILE_BYTES,
+} from '#/shared/torrent-add'
 
 // Spec 4.5 T1 to T9 and M1 to M4, plus the hashing measurement (AC 1).
 // Torrents are generated here with the test encoder; no real files.
@@ -200,12 +204,13 @@ describe('readTorrentFile', () => {
       torrentBytes(singleFileInfo({ pieces: fakePieces(6) })),
     ],
     [
-      'both length and files',
-      torrentBytes({ ...multiFileInfo(ONE_FILE), length: 100 }),
+      'piece length above 2^31 - 1',
+      torrentBytes(singleFileInfo({ 'piece length': 2 ** 31 })),
     ],
+    ['pieces as an integer', torrentBytes(singleFileInfo({ pieces: 20 }))],
     [
-      'an invalid length next to valid files',
-      torrentBytes({ ...multiFileInfo(ONE_FILE), length: -1 }),
+      'pieces as a list',
+      torrentBytes(singleFileInfo({ pieces: [fakePieces(5)] })),
     ],
     ['an empty files list', torrentBytes(multiFileInfo([]))],
     ['a file without path', torrentBytes(multiFileInfo([{ length: 100 }]))],
@@ -232,6 +237,24 @@ describe('readTorrentFile', () => {
     ['a file without length', torrentBytes(multiFileInfo([{ path: ['a'] }]))],
   ])('T5 %s: unreadable file', async (_, bytes) => {
     expect(await read(bytes)).toEqual(UNREADABLE_FILE)
+  })
+
+  it.each([
+    ['a valid length', 100],
+    ['an invalid length', -1],
+  ])('files next to %s: multi-file, length ignored', async (_, length) => {
+    const info = { ...multiFileInfo(ONE_FILE), length }
+    expect(await read(torrentBytes(info))).toMatchObject({
+      kind: 'file',
+      hash: sha1Hex(bencode(info)),
+      contentBytes: 100,
+    })
+  })
+
+  it('piece length 2^31 - 1 is readable', async () => {
+    expect(
+      await read(torrentBytes(singleFileInfo({ 'piece length': 0x7fffffff }))),
+    ).toMatchObject({ kind: 'file' })
   })
 
   it('the T5 fixtures start from a readable multi-file info', async () => {
@@ -289,13 +312,31 @@ describe('readTorrentFile', () => {
     expect(arrayBuffer).not.toHaveBeenCalled()
   })
 
-  it('T7 exactly 10 MB: readable', async () => {
+  it('T7 exactly 10 MB: readable, every 1 MiB chunk in the hash', async () => {
     const file = torrentOfSize(MAX_TORRENT_FILE_BYTES)
     expect(file.length).toBe(MAX_TORRENT_FILE_BYTES)
-    expect(await read(file)).toMatchObject({
+    const decoded = decodeBencode(file)
+    if (!decoded.ok) throw new Error('parse failed')
+    const info = dictEntries(file, decoded.root)!.get('info')!
+    expect(info.end - info.start).toBeGreaterThan(9 * HASH_CHUNK_BYTES)
+    expect(await read(file)).toEqual({
       kind: 'file',
+      hash: sha1Hex(file.subarray(info.start, info.end)),
+      name: 'Fake.Show.S01',
+      contentBytes: expect.any(Number),
       fileBytes: MAX_TORRENT_FILE_BYTES,
     })
+  })
+
+  it('T6 bytes longer than 10 MB when size said less: too large', async () => {
+    const result = await readTorrentFile(
+      {
+        size: 10,
+        arrayBuffer: async () => new ArrayBuffer(MAX_TORRENT_FILE_BYTES + 1),
+      },
+      options,
+    )
+    expect(result).toEqual({ kind: 'unreadable', reason: 'too-large' })
   })
 
   it('T8 unsorted info keys: hash of the raw bytes as given', async () => {
@@ -398,6 +439,26 @@ describe('parseMagnet', () => {
     })
   })
 
+  it('M1 an empty dn: name is null', () => {
+    expect(parseMagnet(`magnet:?xt=urn:btih:${HEX}&dn=`)).toMatchObject({
+      kind: 'magnet',
+      name: null,
+    })
+  })
+
+  it('a link up to the per-entry allowance is readable, one byte more is not', () => {
+    const head = `magnet:?xt=urn:btih:${HEX}&tr=`
+    const at = head + 'x'.repeat(ADD_FORM_ENTRY_ALLOWANCE - head.length)
+    expect(parseMagnet(at)).toMatchObject({
+      kind: 'magnet',
+      linkBytes: ADD_FORM_ENTRY_ALLOWANCE,
+    })
+    expect(parseMagnet(at + 'x')).toEqual({
+      kind: 'unreadable',
+      reason: 'link',
+    })
+  })
+
   it('linkBytes is the UTF-8 length of the trimmed link', () => {
     const link = `magnet:?xt=urn:btih:${HEX}&dn=中文`
     expect(parseMagnet(`  ${link}\n`)).toMatchObject({
@@ -443,6 +504,10 @@ describe('parseMagnet', () => {
     ['non-hex 40 chars', `magnet:?xt=urn:btih:${'g'.repeat(40)}`],
     ['31 base32', `magnet:?xt=urn:btih:${BASE32.slice(1)}`],
     ['bad base32 char', `magnet:?xt=urn:btih:${BASE32.slice(1)}1`],
+    ...['ſ', 'ı', 'ß'].map((letter) => [
+      `non-ASCII base32 letter ${letter}`,
+      `magnet:?xt=urn:btih:${letter}${BASE32.slice(1)}`,
+    ]),
     [
       'only bad btihs',
       `magnet:?xt=urn:btih:abc&xt.1=urn:btih:${'z'.repeat(39)}`,
@@ -457,6 +522,9 @@ describe('parseMagnet', () => {
 })
 
 describe('btihToHex', () => {
+  it.each(['ſ', 'ı', 'ß'])('non-ASCII %s is not base32', (letter) => {
+    expect(btihToHex(letter + BASE32.slice(1))).toBeNull()
+  })
   it('all-A base32 is all zero', () => {
     expect(btihToHex('A'.repeat(32))).toBe('0'.repeat(40))
   })

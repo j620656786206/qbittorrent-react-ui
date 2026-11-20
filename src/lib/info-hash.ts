@@ -9,7 +9,10 @@ import {
 } from '#/lib/bencode'
 import type { BSpan } from '#/lib/bencode'
 import { createSha1 } from '#/lib/sha1'
-import { MAX_TORRENT_FILE_BYTES } from '#/shared/torrent-add'
+import {
+  ADD_FORM_ENTRY_ALLOWANCE,
+  MAX_TORRENT_FILE_BYTES,
+} from '#/shared/torrent-add'
 
 // AR-41, story 4.5: the only place info hashes are worked out. A .torrent's
 // hash is the SHA-1 of the exact raw bytes of its top-level `info` value
@@ -141,11 +144,14 @@ interface ParsedTorrent {
   contentBytes: number
 }
 
+/** libtorrent keeps `piece length` in a signed 32-bit int. */
+const MAX_PIECE_LENGTH = 0x7fffffff
+
 /**
  * The `info` span, name and content size of a v1 or hybrid torrent, or
- * `null` for anything qBittorrent (libtorrent) would refuse: no usable name,
- * no positive `piece length`, `pieces` that do not match the size, or a
- * size that is neither a valid single-file `length` nor a valid `files`.
+ * `null` for these cases libtorrent also refuses: no usable name, a `piece
+ * length` outside 1 to 2^31 - 1, `pieces` that do not match the size, or a
+ * size that is neither a valid `files` nor a valid single-file `length`.
  */
 function parseTorrent(bytes: Uint8Array, root: BSpan): ParsedTorrent | null {
   const infoSpan = dictEntries(bytes, root)?.get('info')
@@ -159,7 +165,8 @@ function parseTorrent(bytes: Uint8Array, root: BSpan): ParsedTorrent | null {
   if (
     pieceLength === null ||
     !Number.isSafeInteger(pieceLength) ||
-    pieceLength <= 0
+    pieceLength <= 0 ||
+    pieceLength > MAX_PIECE_LENGTH
   ) {
     return null
   }
@@ -203,22 +210,20 @@ interface V1Sizes {
 }
 
 /**
- * A single-file info has a valid `length` and no `files`; a multi-file info
- * has a non-empty `files` (each with a valid `length` and a `path` of byte
- * strings) and no `length`. Anything else, or a total past 2^53, is `null`.
+ * With `files` (libtorrent then ignores `length`), a multi-file info: a
+ * non-empty list, each file with a valid `length` and a `path` of byte
+ * strings. Without `files`, a single-file info with a valid `length`.
+ * Anything else, or a total past 2^53, is `null`.
  */
 function v1Sizes(
   bytes: Uint8Array,
   info: ReadonlyMap<string, BSpan>,
 ): V1Sizes | null {
-  const lengthSpan = info.get('length')
   const filesSpan = info.get('files')
-  if (lengthSpan !== undefined) {
-    if (filesSpan !== undefined) return null
-    const length = lengthOf(bytes, lengthSpan)
+  if (filesSpan === undefined) {
+    const length = lengthOf(bytes, info.get('length'))
     return length === null ? null : { total: length, content: length }
   }
-  if (filesSpan === undefined) return null
   const files = listItems(bytes, filesSpan)
   if (files === null || files.length === 0) return null
   let total = 0
@@ -249,12 +254,15 @@ function nameOf(
 /**
  * A magnet link's btih as lowercase hex, plus its `dn` and byte length.
  * Anything else (http links, plain words, `btmh` only, no btih that
- * converts) is 看不懂這個連結.
+ * converts, a link longer than `ADD_FORM_ENTRY_ALLOWANCE` bytes, which could
+ * not fit an add request alone) is 看不懂這個連結.
  * Never fetches anything.
  */
 export function parseMagnet(text: string): MagnetInfo | Unreadable {
   const trimmed = text.trim()
   if (!/^magnet:\?/i.test(trimmed)) return UNREADABLE_LINK
+  const linkBytes = utf8Encoder.encode(trimmed).length
+  if (linkBytes > ADD_FORM_ENTRY_ALLOWANCE) return UNREADABLE_LINK
   const params = new URLSearchParams(trimmed.slice('magnet:?'.length))
   let hash: string | null = null
   // `xt`, or numbered `xt.1`, `xt.2` (BEP 9); the first btih that converts.
@@ -270,7 +278,7 @@ export function parseMagnet(text: string): MagnetInfo | Unreadable {
     kind: 'magnet',
     hash,
     name: dn === null || dn === '' ? null : dn,
-    linkBytes: utf8Encoder.encode(trimmed).length,
+    linkBytes,
   }
 }
 
@@ -279,7 +287,8 @@ const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 /** 40 hex or 32 base32 (RFC 4648, any case) to lowercase hex, else null. */
 export function btihToHex(btih: string): string | null {
   if (/^[0-9a-f]{40}$/i.test(btih)) return btih.toLowerCase()
-  if (btih.length !== 32) return null
+  // ASCII only: `toUpperCase()` maps letters like ſ, ı and ß into A-Z.
+  if (!/^[A-Za-z2-7]{32}$/.test(btih)) return null
   let hex = ''
   let bits = 0
   let value = 0

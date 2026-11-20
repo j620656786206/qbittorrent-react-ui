@@ -117,6 +117,7 @@ describe('strictness: every case is ok: false', () => {
     ['non-digit in integer', 'i1x2e'],
     ['leading zero string length', '03:abc'],
     ['string longer than input', '5:abc'],
+    ['string length with huge digits', '99999999999999999999:a'],
     ['string without colon', '3abc'],
     ['unterminated list', 'li1e'],
     ['unterminated dictionary', 'd1:ai1e'],
@@ -128,6 +129,14 @@ describe('strictness: every case is ok: false', () => {
     ['trailing newline', 'de\n'],
   ])('%s', (_, input) => {
     expect(decodeBencode(encode(input))).toEqual({ ok: false })
+  })
+
+  it('an integer past 2^53 parses but is not a safe integer', () => {
+    // Callers that need an exact count (lengths) check Number.isSafeInteger.
+    const bytes = encode('i99999999999999999999e')
+    const value = readInteger(bytes, root(bytes))
+    expect(value).not.toBeNull()
+    expect(Number.isSafeInteger(value)).toBe(false)
   })
 
   it('nesting deeper than the limit fails instead of overflowing', () => {

@@ -64,6 +64,17 @@ describe('splitPaste', () => {
     })
   })
 
+  it('P1 a link after an open dn is its own entry', () => {
+    expect(
+      splitPaste(
+        'magnet:?xt=urn:btih:x&dn=Fake https://example.invalid/x.torrent',
+      ),
+    ).toEqual([
+      'magnet:?xt=urn:btih:x&dn=Fake',
+      'https://example.invalid/x.torrent',
+    ])
+  })
+
   it('P1 the dn join never crosses a line', () => {
     expect(splitPaste('magnet:?xt=urn:btih:x&dn=Fake\nShow')).toEqual([
       'magnet:?xt=urn:btih:x&dn=Fake',
@@ -225,16 +236,19 @@ describe('addBatches', () => {
     ).toEqual([5, 1])
   })
 
-  it('B3 long magnet links count their bytes and split the batch', () => {
-    // Each link is just over a fifth of what is left after the allowance.
-    const room = MAX_ADD_REQUEST_BYTES - addFormAllowance(5)
-    const long = Math.floor(room / 5) + 1
-    const batches = addBatches(
-      Array.from({ length: 5 }, (_, i) =>
-        magnet(`m${i}`, fakeHash(i + 1), long),
-      ),
+  it('B3 a magnet link counts its bytes and can split the batch', () => {
+    // Four files leave 1000 bytes of room for a fifth entry.
+    const room = MAX_ADD_REQUEST_BYTES - addFormAllowance(5) - 1000
+    const quarter = Math.floor(room / 4)
+    const files = [0, 1, 2, 3].map((i) =>
+      file(`f${i}`, fakeHash(i + 1), i < 3 ? quarter : room - 3 * quarter),
     )
-    expect(batches.map((b) => b.length)).toEqual([4, 1])
+    const sizes = (linkBytes: number) =>
+      addBatches([...files, magnet('m', fakeHash(9), linkBytes)]).map(
+        (b) => b.length,
+      )
+    expect(sizes(1000)).toEqual([5])
+    expect(sizes(1001)).toEqual([4, 1])
   })
 
   it('every batch fits the request limit with its allowance', () => {
@@ -252,6 +266,7 @@ describe('addBatches', () => {
         MAX_ADD_REQUEST_BYTES,
       )
     }
-    expect(batches.flat()).toHaveLength(30)
+    // Four ~10 MB files fit 50 MB with their allowance, five do not.
+    expect(batches.map((b) => b.length)).toEqual([4, 4, 4, 4, 4, 4, 4, 2])
   })
 })
