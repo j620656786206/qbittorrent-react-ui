@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { detailPosition } from '#/lib/detail-position'
 import { BOARD_COLUMN_NAMES } from '#/lib/torrent-status'
 import { boardColumnOf } from '#/lib/visible-torrents'
+import { useOutsideHash } from '#/state/detail-outside'
 import { useListView } from '#/state/list-view'
 import { useLeavingHashes } from '#/state/leaving'
 import { useBoardColumns, useShownTorrents } from '#/state/maindata'
@@ -20,6 +21,9 @@ import type { DetailTarget } from '#/features/detail/detail-view'
 // Story 4.4: a torrent this tab deleted is still there while its card
 // fades (leaving, src/state/leaving.ts): the detail keeps the last target
 // it showed, from the snapshot, and closes when the card leaves (L9).
+// Story 4.6: a torrent opened from outside (the add screen's 「打開」) that
+// no column holds (archived on the phone, another category, filtered out)
+// stays open without a position or column name instead of closing.
 
 export function useBoardDetailTarget({
   phone,
@@ -33,14 +37,20 @@ export function useBoardDetailTarget({
   const { data: columns } = useBoardColumns(view.category, view.query)
   const torrents = useShownTorrents()
   const leaving = useLeavingHashes()
+  const outside = useOutsideHash()
   /** The last target shown, for a deleted torrent still fading. */
   const lastRef = useRef<{ hash: string; target: DetailTarget } | null>(null)
 
   const found = hash !== null && columns ? boardColumnOf(columns, hash) : null
   const column = phone && found === 'archived' ? null : found
   const fading = hash !== null && column === null && leaving.has(hash)
+  const fromOutside = hash !== null && column === null && outside === hash
   const gone =
-    hash !== null && columns !== undefined && column === null && !fading
+    hash !== null &&
+    columns !== undefined &&
+    column === null &&
+    !fading &&
+    !fromOutside
 
   useEffect(() => {
     if (gone) setHash(null)
@@ -49,6 +59,9 @@ export function useBoardDetailTarget({
   if (fading) {
     const last = lastRef.current
     return last !== null && last.hash === hash ? last.target : null
+  }
+  if (fromOutside && torrents && Object.hasOwn(torrents, hash)) {
+    return { torrent: torrents[hash], position: null, columnName: null }
   }
   if (hash === null || column === null || !columns || !torrents) return null
   if (!Object.hasOwn(torrents, hash)) return null

@@ -284,7 +284,7 @@ for (const scheme of ['light', 'dark'] as const) {
     })
 
     // The selected category empties on screen: its tab stays with 0 and
-    // 「這個分類沒有種子」 with the disabled 「新增種子」.
+    // 「這個分類沒有種子」 with 「新增種子」 (it opens the add screen, story 4.6).
     await tab(page, 'mteam-X').click()
     await expect(tab(page, 'mteam-X')).toHaveAttribute('aria-pressed', 'true')
     await setModes(request, { data: 'categories-emptied' })
@@ -292,7 +292,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(main.getByText('這個分類沒有種子')).toBeVisible({
       timeout: 15_000,
     })
-    await expect(main.getByRole('button', { name: '新增種子' })).toBeDisabled()
+    await expect(main.getByRole('button', { name: '新增種子' })).toBeEnabled()
     await expect(tab(page, 'mteam-X')).toHaveText('mteam-X0')
     await settle(page)
     await page.screenshot({

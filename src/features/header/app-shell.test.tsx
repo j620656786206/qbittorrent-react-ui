@@ -123,17 +123,26 @@ describe('the shell markup', () => {
   })
 
   it.each(Object.entries(CASES))(
-    '%s: every placeholder is disabled with its label (設定 is not since story 3.3, the phone category button since 3.4, search since 3.5, 快捷鍵 since 3.7); tooltips only on the sort pill and the shortcut keys',
+    '%s: no button is disabled (設定 since story 3.3, the phone category button since 3.4, search since 3.5, 快捷鍵 since 3.7, both 新增 since 4.6); tooltips only on the sort pill and the shortcut keys',
     (_name, make) => {
       const html = make()
       const disabled = openTags(html, 'button').filter((tag) =>
         /\sdisabled=""/.test(tag),
       )
-      // Story 3.5: both magnifiers open the search box.
-      expect(disabled.map((tag) => attr(tag, 'aria-label') ?? null)).toEqual([
-        null, // desktop 新增 has its text
-        '新增種子',
-      ])
+      // Story 4.6: both 新增 buttons open the add screen.
+      expect(disabled).toEqual([])
+      const adds = openTags(html, 'button').filter((tag) =>
+        /aria-haspopup="dialog"/.test(tag),
+      )
+      expect(adds.some((tag) => attr(tag, 'aria-label') === '新增種子')).toBe(
+        true,
+      )
+      // The desktop 新增 (named by its text) is one of them.
+      const desktopAdd = openTags(desktopHeader(html), 'button').find(
+        (tag) =>
+          attr(tag, 'aria-label') === undefined && /bg-primary/.test(tag),
+      )
+      expect(desktopAdd).toContain('aria-haspopup="dialog"')
       // The desktop sort pill (story 2.1); story 3.7: the desktop
       // magnifier and 快捷鍵 name their key (the phone magnifier does not).
       expect(html.match(/\stitle="[^"]*"/g)).toEqual([

@@ -1,4 +1,5 @@
 import { detailPosition } from '#/lib/detail-position'
+import { useOutsideHash } from '#/state/detail-outside'
 import { useShownTorrents } from '#/state/maindata'
 import { useShownList } from '#/state/shown-order'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -13,25 +14,31 @@ import {
 // row the list marks as viewed (published with the order it shows, so N of
 // M and ‹ › follow exactly the rows on screen, frozen or not). The header
 // and tabs stay; the overview scrolls by itself.
+// Story 4.6: a torrent opened from outside the list (the add screen's
+// 「打開」) that no row holds shows here without a position.
 
 export function ListDetailPanel() {
   const { order, viewed } = useShownList()
   const { setHash } = useViewedHash()
   // Story 4.4: a deleted row still fading keeps its detail (snapshot).
   const torrents = useShownTorrents()
+  const outside = useOutsideHash()
+  const shown = viewed ?? outside
   const torrent =
-    viewed !== null && torrents && Object.hasOwn(torrents, viewed)
-      ? torrents[viewed]
+    shown !== null && torrents && Object.hasOwn(torrents, shown)
+      ? torrents[shown]
       : undefined
   const position = order ? detailPosition(order, viewed) : null
-  const tabs = useDetailTabs(torrent !== undefined && position !== null)
+  const showing =
+    torrent !== undefined && (position !== null || shown === outside)
+  const tabs = useDetailTabs(showing)
 
   return (
     <aside
       aria-label="詳情"
       className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-panel bg-surface"
     >
-      {torrent && position && (
+      {torrent && showing && (
         <>
           <DetailTop
             layout="row"

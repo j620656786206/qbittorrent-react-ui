@@ -177,6 +177,8 @@ export interface Modes {
   ops?: 'normal' | 'reject' | 'slow' | 'reject-files'
   /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
   files?: 'normal' | 'slow' | 'fail'
+  /** Story 4.6: `default-path` adds X-default, whose savePath is ''. */
+  cats?: 'normal' | 'default-path'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -186,6 +188,7 @@ export const DEFAULT_MODES: Required<Modes> = {
   grow: '0',
   ops: 'normal',
   files: 'normal',
+  cats: 'normal',
 }
 
 /** A filePrio call as fake-qbit logs it (story 2.7). */

@@ -439,6 +439,14 @@ export function setShortcutAction(
   }
 }
 
+/**
+ * Story 4.6: a `dialog`-rank layer (a dialog or bottom sheet) is open. The
+ * drop overlay reads it so a file drop never opens add over another one.
+ */
+export function dialogLayerOpen(): boolean {
+  return layers.some((layer) => layer.rank >= DIALOG_RANK)
+}
+
 /** How many layers are open (tests). */
 export function openLayerCount(): number {
   return layers.length

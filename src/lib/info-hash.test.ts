@@ -390,6 +390,28 @@ describe('readTorrentFile', () => {
     // the yield between checking the file and reading its fields.
     expect(yields).toHaveBeenCalledTimes(1 + 4)
   })
+
+  it('checks a files list longer than 5000 entries in parts, yielding between them (80d1c42)', async () => {
+    const filesOf = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        length: 1,
+        path: [`f${index}.bin`],
+      }))
+    const yieldsFor = async (count: number) => {
+      const yields = vi.fn(yieldToMain)
+      const info = { ...multiFileInfo(filesOf(count)), pieces: fakePieces(1) }
+      const result = await readTorrentFile(source(torrentBytes(info)), {
+        yieldToMain: yields,
+      })
+      expect(result.kind).toBe('file')
+      return yields.mock.calls.length
+    }
+    // After the parse, plus one per hashing chunk (under 1 MiB here: one).
+    expect(await yieldsFor(5000)).toBe(1 + 1)
+    // Each further 5000 files adds one yield while the list is checked.
+    expect(await yieldsFor(5001)).toBe(1 + 1 + 1)
+    expect(await yieldsFor(12_001)).toBe(1 + 2 + 1)
+  })
 })
 
 describe('readTorrentFiles', () => {

@@ -77,7 +77,7 @@ development_status:
   4-3-刪除確認和刪除: done # PR #46：刪除確認和刪除
   4-4-刪除淡出: done # PR #48：刪除後先淡出 0.2 秒，再補位
   4-5-info-hash-和貼上內容的判斷: done # PR #51：算 info hash，判斷貼上的內容，再拆成好幾批
-  4-6-新增畫面-貼上-選檔案-拖檔: backlog
+  4-6-新增畫面-貼上-選檔案-拖檔: done # PR #52：新增畫面，可以貼上、選檔案、拖檔
   4-7-送出新增和結果: backlog
   epic-4-retrospective: optional
 

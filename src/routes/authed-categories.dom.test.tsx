@@ -27,6 +27,7 @@ import type { SortFieldId } from '#/shared/sort-fields'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
 import { entranceStore, resetEntrance } from '#/state/entrance'
+import { addOpenStore, resetAddOpen } from '#/state/add-open'
 import { clearLoginRequired } from '#/state/login-required'
 import { createQueryClient } from '#/state/query-client'
 
@@ -48,6 +49,17 @@ vi.mock('#/server/functions/set-category-sort', () => ({
 vi.mock('#/lib/toast', () => ({
   toast: { failure: () => {}, dismissFor: () => {} },
 }))
+// Story 4.6: a stand-in for the add screen, shown while add is open. The
+// real one (a Radix Dialog) spins happy-dom when it closes or unmounts
+// inside the whole route tree, like the sort menu above; it is tested in
+// src/features/add/add-screen.dom.test.tsx and in Chromium (e2e/add.spec.ts).
+vi.mock('#/features/add/add-screen', async () => {
+  const { useAddOpen } = await import('#/state/add-open')
+  return {
+    AddScreen: () =>
+      useAddOpen() ? <div role="dialog" aria-label="新增種子" /> : null,
+  }
+})
 // The real shell, plus a probe that hands the test the layout's `pickView`
 // (the sort menu's own clicks are tested in sort-menu.dom.test.tsx and in
 // Chromium: closing the Radix menu spins in happy-dom, see
@@ -236,6 +248,7 @@ afterEach(async () => {
   focusManager.setFocused(undefined)
   clearLoginRequired()
   clearConnectionErrors()
+  resetAddOpen()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
   vi.restoreAllMocks()
@@ -519,9 +532,28 @@ describe('the selected category emptied while selected', () => {
     const add = [...main().querySelectorAll('button')].find(
       (button) => button.textContent === '新增種子',
     )
-    expect(add?.disabled).toBe(true)
+    // Story 4.6: it opens the add screen.
+    expect(add?.disabled).toBe(false)
+    expect(add?.getAttribute('aria-haspopup')).toBe('dialog')
     await click(tab('全部'))
     expect(tabs().some((text) => text.startsWith('X'))).toBe(false)
+  })
+
+  it('the empty state 「新增種子」 opens the add screen (story 4.6)', async () => {
+    await mount('/?category=X&sort=added_on')
+    await poll(
+      fakeResponse({
+        changed: torrents().filter((torrent) => torrent.category !== 'X'),
+      }),
+    )
+    const add = [...main().querySelectorAll('button')].find(
+      (button) => button.textContent === '新增種子',
+    ) as HTMLElement
+    await click(add)
+    expect(addOpenStore.state.open).toBe(true)
+    expect(
+      document.querySelector('[role="dialog"][aria-label="新增種子"]'),
+    ).not.toBeNull()
   })
 
   it('the board shows the same empty block', async () => {

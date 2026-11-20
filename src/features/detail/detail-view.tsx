@@ -21,7 +21,11 @@ import { Overview } from '#/features/detail/overview'
 
 export interface DetailTarget {
   torrent: SlimTorrent
-  position: DetailPosition
+  /**
+   * Where it stands in the list or column; `null` for a torrent opened from
+   * outside them (story 4.6, the add screen's 「打開」): no 「第 N 個」, no ‹ ›.
+   */
+  position: DetailPosition | null
   columnName?: string | null
 }
 
