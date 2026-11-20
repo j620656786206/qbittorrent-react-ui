@@ -380,6 +380,54 @@ describe('callFn timeout (row 7)', () => {
   })
 
   it.each([
+    ['fetch never settles', () => new Promise<Response>(() => {})],
+    [
+      'fetch rejects on the abort',
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          )
+        }),
+    ],
+  ])(
+    'spec 4.7: timeoutCode is what its own timeout throws (%s)',
+    async (_name, respond) => {
+      vi.useFakeTimers()
+      vi.stubGlobal('fetch', vi.fn(respond))
+      let settled = false
+      const promise = callFn(
+        fakeServerFn('rt-test', 'POST'),
+        { a: 1 },
+        { timeoutMs: 60_000, timeoutCode: 'timeout' },
+      )
+      const outcome = settle(promise).finally(() => (settled = true))
+      await vi.advanceTimersByTimeAsync(59_999)
+      expect(settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await outcome).toEqual({ code: 'timeout' })
+    },
+  )
+
+  it('spec 4.7: with timeoutCode, a network failure is still home_unreachable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    )
+    expect(
+      await settle(
+        callFn(
+          fakeServerFn('rt-test', 'POST'),
+          { a: 1 },
+          {
+            timeoutCode: 'timeout',
+          },
+        ),
+      ),
+    ).toEqual({ code: 'home_unreachable' })
+  })
+
+  it.each([
     ['success', async () => json({ ok: true, data: 1 })],
     ['failure', async () => html(502)],
   ])('clears the timer after %s', async (_name, respond) => {

@@ -2,7 +2,7 @@ import { getEnv } from '#/server/env'
 import { createQbitClient } from '#/server/qbit/client'
 import type { QbitClient } from '#/server/qbit/client'
 
-export { QBIT_PATHS } from '#/server/qbit/client'
+export { AddRefused, QBIT_PATHS } from '#/server/qbit/client'
 export { QBIT_DEADLINE_MS } from '#/server/qbit/session'
 export type { AddTorrentEntry, QbitClient } from '#/server/qbit/client'
 

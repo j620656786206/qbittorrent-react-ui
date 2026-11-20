@@ -1,6 +1,7 @@
 import { ServerFailure } from '#/server/errors/server-failure'
 import { SERVER_FN_TIMEOUT_MS } from '#/server/functions/_define'
 import { log } from '#/server/log'
+import { AddRefused } from '#/server/qbit'
 import type { AddTorrentEntry, QbitClient } from '#/server/qbit'
 import { fail } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
@@ -13,19 +14,17 @@ import type { BatchItem } from '#/shared/torrent-ops'
 /** Every entry is answered before the factory's own timeout. */
 export const ADD_DEADLINE_MS = SERVER_FN_TIMEOUT_MS - 3000
 
-/** Codes that stop the sending: qBittorrent cannot be reached at all. */
-const STOP_CODES: ReadonlyArray<ErrorCode> = [
-  'qbit_unreachable',
-  'qbit_auth_failed',
-]
+/** qBittorrent refused this entry (`AddRefused`): the next one is sent. */
+const REFUSED = 'refused'
 
 function failedItem(key: string, code: ErrorCode): BatchItem {
   return { key, ok: false, ...fail(code).error }
 }
 
-function codeOf(error: unknown): ErrorCode {
+function codeOf(error: unknown): ErrorCode | typeof REFUSED {
+  if (error instanceof AddRefused) return REFUSED
   if (error instanceof ServerFailure) return error.code
-  // AD-9: a bug fails this entry, never reaches the client as text.
+  // AD-9: a bug never reaches the client as text.
   log.error('server_fn_exception', { fn: 'addTorrents', error })
   return 'qbit_rejected'
 }
@@ -36,7 +35,7 @@ async function addWithin(
   entry: AddTorrentEntry,
   category: string,
   ms: number,
-): Promise<ErrorCode | null> {
+): Promise<ErrorCode | typeof REFUSED | null> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const late = new Promise<'late'>((resolve) => {
     timer = setTimeout(() => resolve('late'), ms)
@@ -56,8 +55,11 @@ async function addWithin(
 /**
  * Sends `entries` one at a time, in order, and answers one item per entry
  * keyed by its index. `left` is the time left before `ADD_DEADLINE_MS`.
- * Throws a `ServerFailure` (the whole request fails) only when qBittorrent
- * cannot be reached before any entry was added.
+ * Only qBittorrent refusing an entry (`AddRefused`) fails that entry alone;
+ * any other failure (unreachable, login refused, a proxy error, a redirect,
+ * the re-login cooldown, an unreadable answer) stops the sending: a
+ * `ServerFailure` (the whole request fails) when nothing was added yet,
+ * else it and every entry after it are failed items with that code.
  */
 export async function sendEntries(
   client: QbitClient,
@@ -67,7 +69,7 @@ export async function sendEntries(
 ): Promise<Array<BatchItem>> {
   const items: Array<BatchItem> = []
   let added = 0
-  /** Set once the rest can only fail with it (deadline, unreachable). */
+  /** Set once the rest can only fail with it (deadline, a stop). */
   let rest: ErrorCode | null = null
   for (const [index, entry] of entries.entries()) {
     const key = String(index)
@@ -83,11 +85,15 @@ export async function sendEntries(
       items.push({ key, ok: true })
       continue
     }
-    if (STOP_CODES.includes(code)) {
-      if (added === 0) throw new ServerFailure(code, 'add: no entry sent')
-      rest = code
+    if (code === REFUSED) {
+      items.push(failedItem(key, 'qbit_rejected'))
+      continue
     }
-    if (code === 'timeout') rest = 'timeout'
+    // qBittorrent may still add the entry waiting at the deadline.
+    if (code !== 'timeout' && added === 0) {
+      throw new ServerFailure(code, 'add: no entry sent')
+    }
+    rest = code
     items.push(failedItem(key, code))
   }
   return items

@@ -236,7 +236,7 @@ Claude 代決 (Alex can veto):
 Alex's decisions (2026-11-20, relayed by the review session): no categories shows 「qBittorrent 還沒有分類」 and keeps the category required; hybrid hash matching deferred (frontmatter `deferred`).
 
 AD-11 docs:
-- TanStack Start server functions with FormData (1.169.5): https://tanstack.com/start/v0/docs/framework/react/server-functions and the installed `start-client-core/skills/start-core/server-functions/SKILL.md`
+- TanStack Start server functions with FormData (1.169.5): https://tanstack.com/start/latest/docs/framework/react/guide/server-functions and the installed `node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md` (the version-true source)
 - qBittorrent WebUI API `torrents/add`: https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#add-new-torrent
 - `FormData` and `fetch` multipart: https://developer.mozilla.org/en-US/docs/Web/API/FormData
 - zod 4: https://zod.dev/api

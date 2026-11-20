@@ -315,7 +315,7 @@ describe('addTorrents server function (spec 4.7)', () => {
       () =>
         jsonResponse({ success_count: 0, failure_count: 1, pending_count: 0 }),
     ],
-    ['a 409', () => new Response('Conflict', { status: 409 })],
+    ['a 415', () => new Response('Torrent file is not valid', { status: 415 })],
   ])('an answer of %s is a rejected item', async (_name, answer) => {
     addAnswer = answer
     const result = await run(form({ magnets: [MAGNET_A] }))
@@ -332,6 +332,78 @@ describe('addTorrents server function (spec 4.7)', () => {
         ],
       },
     })
+  })
+
+  it('Fails. on entry 1 of 3: only entry 1 fails and entry 2 is still sent', async () => {
+    let n = 0
+    addAnswer = () => {
+      n += 1
+      return new Response(n === 2 ? 'Fails.' : 'Ok.')
+    }
+    const result = await run(form({ magnets: [MAGNET_A, MAGNET_B, MAGNET_A] }))
+    expect(result.ok && result.data.items).toEqual([
+      { key: '0', ok: true },
+      {
+        key: '1',
+        ok: false,
+        code: 'qbit_rejected',
+        message: ERROR_MESSAGES.qbit_rejected,
+      },
+      { key: '2', ok: true },
+    ])
+    expect(addCalls()).toHaveLength(3)
+  })
+
+  it.each([
+    ['a 502', () => new Response('Bad Gateway', { status: 502 })],
+    ['a 409', () => new Response('Conflict', { status: 409 })],
+    ['a redirect', () => new Response(null, { status: 302 })],
+    ['an HTML page', () => new Response('<html>proxy</html>')],
+  ])(
+    '%s on entry 0: the whole request is qbit_rejected, nothing more is sent',
+    async (_name, answer) => {
+      addAnswer = answer
+      expect(
+        await run(form({ magnets: [MAGNET_A, MAGNET_B, MAGNET_A] })),
+      ).toMatchObject({ ok: false, error: { code: 'qbit_rejected' } })
+      expect(addCalls()).toHaveLength(1)
+    },
+  )
+
+  it('a 502 after one was added: entry 0 ok, it and the rest failed, nothing more is sent', async () => {
+    let n = 0
+    addAnswer = () => {
+      n += 1
+      return n === 1
+        ? new Response('Ok.')
+        : new Response('Bad Gateway', { status: 502 })
+    }
+    const result = await run(form({ magnets: [MAGNET_A, MAGNET_B, MAGNET_A] }))
+    const rejected = {
+      ok: false,
+      code: 'qbit_rejected',
+      message: ERROR_MESSAGES.qbit_rejected,
+    }
+    expect(result.ok && result.data.items).toEqual([
+      { key: '0', ok: true },
+      { key: '1', ...rejected },
+      { key: '2', ...rejected },
+    ])
+    expect(addCalls()).toHaveLength(2)
+  })
+
+  it('a 403 after a fresh login on entry 0 (the cooldown starts): the whole request is qbit_rejected, nothing more is sent', async () => {
+    // Entry 0: a 403, a fresh login, the one resend, a 403 again: that
+    // starts the cooldown, in which every later entry would be refused
+    // without a call.
+    addAnswer = () => new Response('Forbidden', { status: 403 })
+    expect(
+      await run(form({ magnets: [MAGNET_A, MAGNET_B, MAGNET_A] })),
+    ).toMatchObject({ ok: false, error: { code: 'qbit_rejected' } })
+    expect(addCalls().map((call) => call.form?.get('urls'))).toEqual([
+      MAGNET_A,
+      MAGNET_A,
+    ])
   })
 
   it('S10 no session: not_logged_in, no qBittorrent call at all', async () => {

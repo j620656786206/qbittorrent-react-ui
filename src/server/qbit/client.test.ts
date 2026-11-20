@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetEnvCache } from '#/server/env'
 import { BadMaindata } from '#/server/qbit/bad-maindata'
-import { QBIT_PATHS, createQbitClient } from '#/server/qbit/client'
+import { AddRefused, QBIT_PATHS, createQbitClient } from '#/server/qbit/client'
 import {
   FAKE_PASSWORD,
   FAKE_QBIT_ORIGIN,
@@ -306,7 +306,6 @@ describe('qBittorrent client', () => {
             pending_count: 1,
           }),
       ],
-      ['JSON that does not parse', () => new Response('{oops')],
       [
         'JSON with nothing added',
         () =>
@@ -316,16 +315,55 @@ describe('qBittorrent client', () => {
             pending_count: 0,
           }),
       ],
-    ])('%s is qbit_rejected', async (_name, add) => {
+    ])('%s is AddRefused (this entry, qbit_rejected)', async (_name, add) => {
       const { client } = setup({ add })
+      const sent = client.addTorrent(
+        { kind: 'magnet', url: 'magnet:?x' },
+        'movies',
+      )
+      await expect(sent).rejects.toBeInstanceOf(AddRefused)
+      await expect(sent).rejects.toEqual(failure('qbit_rejected'))
+    })
+
+    it.each([
+      ['JSON that does not parse', () => new Response('{oops')],
+      ['an empty body', () => new Response('')],
+      ['an HTML page', () => new Response('<html><body>hi</body></html>')],
+      ['other text', () => new Response('Something else')],
+      ['a JSON array body', () => new Response('[1]')],
+      ['a 502', () => new Response('Bad Gateway', { status: 502 })],
+      ['a 409', () => new Response('Conflict', { status: 409 })],
+    ])(
+      '%s is a plain qbit_rejected, not about this entry',
+      async (_name, add) => {
+        const { client } = setup({ add })
+        const sent = client.addTorrent(
+          { kind: 'magnet', url: 'magnet:?x' },
+          'movies',
+        )
+        await expect(sent).rejects.toEqual(failure('qbit_rejected'))
+        await expect(sent).rejects.not.toBeInstanceOf(AddRefused)
+      },
+    )
+
+    it('a 200 body that is not an answer logs qbit_bad_response, without the body', async () => {
+      const { client } = setup({
+        add: () => new Response('<html>LEAK_BODY</html>'),
+      })
       await expect(
         client.addTorrent({ kind: 'magnet', url: 'magnet:?x' }, 'movies'),
       ).rejects.toEqual(failure('qbit_rejected'))
+      expect(out.events('qbit_bad_response')).toEqual([
+        expect.objectContaining({
+          path: '/api/v2/torrents/add',
+          reason: 'unexpected_body',
+        }),
+      ])
+      expect(out.lines.join('')).not.toContain('LEAK_BODY')
     })
 
     it.each([
       ['Ok.', () => new Response('Ok.')],
-      ['an empty body', () => new Response('')],
       [
         'JSON with only success_count 1',
         () => jsonResponse({ success_count: 1 }),

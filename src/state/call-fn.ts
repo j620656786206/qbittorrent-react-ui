@@ -1,5 +1,6 @@
 import { AppError, classifyResponse, isAppError } from '#/lib/app-error'
 import { isErrorCode } from '#/shared/errors'
+import type { ErrorCode } from '#/shared/errors'
 
 // AD-9 / AR-34: the browser's only way to call a server function. It adds
 // `X-Requested-With`, a 35 s timeout, and turns every failure into an
@@ -42,6 +43,11 @@ export interface CallFnOptions {
    * upload, whose time on the wire comes before the server's deadline).
    */
   timeoutMs?: number
+  /**
+   * Story 4.7: the code this call's own timeout throws instead of
+   * `home_unreachable` (the add: a slow upload is not a lost NAS).
+   */
+  timeoutCode?: ErrorCode
 }
 
 function unexpected(what: string, raw: unknown): AppError {
@@ -118,6 +124,7 @@ export async function callFn<TFn extends AnyServerFn>(
     ? AbortSignal.any([caller, timeout.signal])
     : timeout.signal
   const aborted = rejectOnAbort(signal)
+  const timedOut = () => new AppError(options.timeoutCode ?? 'home_unreachable')
 
   // Called by Start's client instead of the global fetch; looked up at call
   // time so tests can stub it. Errors thrown here reach callFn unchanged.
@@ -129,7 +136,8 @@ export async function callFn<TFn extends AnyServerFn>(
       response = await globalThis.fetch(url, { ...init, redirect: 'manual' })
     } catch (error) {
       if (caller?.aborted) throw caller.reason
-      // Network failure or our own timeout.
+      if (timeout.signal.aborted) throw timedOut()
+      // Network failure.
       throw new AppError('home_unreachable')
     }
     const code = classifyResponse(response)
@@ -166,7 +174,7 @@ export async function callFn<TFn extends AnyServerFn>(
     // The caller cancelled (e.g. Query cancelled the fetch): no classification.
     if (caller?.aborted) throw caller.reason
     if (isAppError(error)) throw error
-    if (timeout.signal.aborted) throw new AppError('home_unreachable')
+    if (timeout.signal.aborted) throw timedOut()
     throw unexpected('server function call failed', error)
   } finally {
     clearTimeout(timer)
