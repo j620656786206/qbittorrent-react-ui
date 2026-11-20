@@ -82,7 +82,7 @@ development_status:
   epic-4-retrospective: optional
 
   epic-5: in-progress
-  5-1-位置標籤和媒體庫: review
+  5-1-位置標籤和媒體庫: done # PR #56：位置標籤顯示常用路徑的名字，媒體庫變紫色
   5-2-改一個種子的路徑: backlog
   5-3-搬移中和搬完: backlog
   5-4-管理常用路徑和-加到常用: backlog
