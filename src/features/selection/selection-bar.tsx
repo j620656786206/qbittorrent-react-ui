@@ -4,6 +4,10 @@ import { toast } from '#/lib/toast'
 import { cn } from '#/shared/ui/cn'
 import { getMain } from '#/shared/ui/main-scroll'
 import {
+  BAR_HIDDEN_CLASS,
+  PHONE_BAR_HIDDEN_CLASS,
+} from '#/shared/ui/selection-bar-geometry'
+import {
   selectStateBeforeMove,
   selectTorrents,
   useMaindata,
@@ -44,19 +48,12 @@ import { DeleteConfirm } from '#/features/selection/delete-confirm'
 const BAR_CLASS =
   'fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3.5 rounded-full bg-selection-bar py-2 pr-2 pl-[22px] text-body whitespace-nowrap text-selection-bar-foreground tabular-nums shadow-float transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none'
 
-/** Below the viewport: its own height, the 24px gap and the shadow. */
-export const BAR_HIDDEN_CLASS = 'translate-y-[calc(100%+72px)]'
-
 /**
  * Story 4.2: the phone panel, 16px from the sides and from the bottom plus
  * the safe area, 8/12/12/18px padding, its two rows 8px apart.
  */
 const PHONE_BAR_CLASS =
   'fixed right-4 bottom-[calc(16px+env(safe-area-inset-bottom))] left-4 z-40 flex flex-col gap-2 rounded-panel bg-selection-bar pt-2 pr-3 pb-3 pl-[18px] text-body text-selection-bar-foreground tabular-nums shadow-float transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none'
-
-/** Below the viewport: its height, the 16px gap, the safe area and the shadow. */
-export const PHONE_BAR_HIDDEN_CLASS =
-  'translate-y-[calc(100%+64px+env(safe-area-inset-bottom))]'
 
 const FOCUS_CLASS = 'focus-visible:outline-selection-bar-foreground'
 
@@ -102,6 +99,63 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
     return () => toast.setLift(false)
   }, [lift])
 
+  // One set of controls, placed by each layout (改路徑 comes with Epic 5).
+  const region = {
+    role: 'region',
+    'aria-label': '選取的種子',
+    'aria-hidden': visible ? undefined : true,
+    inert: !visible,
+    'data-selection-bar': '',
+  } as const
+  const status = (className: string, sizeClass: string) => (
+    // Announced when the count or size changes.
+    <span role="status" className={className}>
+      <b className="font-bold">{text.count}</b>
+      <span className="sr-only">，</span>
+      <span className={cn('text-[12px] opacity-70', sizeClass)}>
+        {text.size}
+      </span>
+    </span>
+  )
+  const cancelButton = (className: string) => (
+    <button
+      type="button"
+      onClick={clearSelection}
+      className={cn(className, 'font-semibold', FOCUS_CLASS)}
+    >
+      取消
+    </button>
+  )
+  const moveButton = (className: string) => (
+    <button
+      type="button"
+      disabled
+      className={cn(
+        className,
+        'rounded-full border border-selection-bar-foreground font-semibold',
+        FOCUS_CLASS,
+        DISABLED_CLASS,
+      )}
+    >
+      改路徑
+    </button>
+  )
+  const deleteButton = (className: string) => (
+    <button
+      ref={deleteRef}
+      type="button"
+      aria-haspopup="dialog"
+      onClick={openConfirm}
+      className={cn(
+        className,
+        'rounded-full bg-delete font-bold text-delete-foreground',
+        FOCUS_CLASS,
+      )}
+    >
+      刪除（含檔案）
+    </button>
+  )
+
   // Each layout is its own element (`key`): crossing 1024px swaps them
   // in place, with no slide between the two.
   if (!desktop) {
@@ -109,58 +163,17 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
       <>
         <div
           key="phone"
-          role="region"
-          aria-label="選取的種子"
-          aria-hidden={visible ? undefined : true}
-          inert={!visible}
-          data-selection-bar=""
+          {...region}
           className={cn(PHONE_BAR_CLASS, !visible && PHONE_BAR_HIDDEN_CLASS)}
         >
           <div className="flex items-center gap-3">
-            <span
-              role="status"
-              className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"
-            >
-              <b className="font-bold">{text.count}</b>
-              <span className="sr-only">，</span>
-              <span className="ml-3 text-[12px] opacity-70">{text.size}</span>
-            </span>
-            <button
-              type="button"
-              onClick={clearSelection}
-              className={cn(
-                'h-11 min-w-11 flex-none px-2 font-semibold',
-                FOCUS_CLASS,
-              )}
-            >
-              取消
-            </button>
+            {status('min-w-0 flex-1 overflow-hidden whitespace-nowrap', 'ml-3')}
+            {cancelButton('h-11 min-w-11 flex-none px-2')}
           </div>
           {/* 6px back left, so both buttons sit 12px from the sides (S07). */}
           <div className="-ml-1.5 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled
-              className={cn(
-                'h-11 rounded-full border border-selection-bar-foreground font-semibold',
-                FOCUS_CLASS,
-                DISABLED_CLASS,
-              )}
-            >
-              改路徑
-            </button>
-            <button
-              ref={deleteRef}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={openConfirm}
-              className={cn(
-                'h-11 rounded-full bg-delete font-bold text-delete-foreground',
-                FOCUS_CLASS,
-              )}
-            >
-              刪除（含檔案）
-            </button>
+            {moveButton('h-11')}
+            {deleteButton('h-11')}
           </div>
         </div>
         {confirm}
@@ -172,49 +185,13 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
     <>
       <div
         key="desktop"
-        role="region"
-        aria-label="選取的種子"
-        aria-hidden={visible ? undefined : true}
-        inert={!visible}
-        data-selection-bar=""
+        {...region}
         className={cn(BAR_CLASS, !visible && BAR_HIDDEN_CLASS)}
       >
-        {/* Announced when the count or size changes. */}
-        <span role="status" className="contents">
-          <b className="font-bold">{text.count}</b>
-          <span className="sr-only">，</span>
-          <span className="text-[12px] opacity-70">{text.size}</span>
-        </span>
-        <button
-          type="button"
-          onClick={clearSelection}
-          className={cn('h-9 px-2 font-semibold', FOCUS_CLASS)}
-        >
-          取消
-        </button>
-        <button
-          type="button"
-          disabled
-          className={cn(
-            'h-9 rounded-full border border-selection-bar-foreground px-4 font-semibold',
-            FOCUS_CLASS,
-            DISABLED_CLASS,
-          )}
-        >
-          改路徑
-        </button>
-        <button
-          ref={deleteRef}
-          type="button"
-          aria-haspopup="dialog"
-          onClick={openConfirm}
-          className={cn(
-            'h-9 rounded-full bg-delete px-[18px] font-bold text-delete-foreground',
-            FOCUS_CLASS,
-          )}
-        >
-          刪除（含檔案）
-        </button>
+        {status('contents', '')}
+        {cancelButton('h-9 px-2')}
+        {moveButton('h-9 px-4')}
+        {deleteButton('h-9 px-[18px]')}
       </div>
       {confirm}
     </>

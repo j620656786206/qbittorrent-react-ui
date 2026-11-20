@@ -62,12 +62,15 @@ export interface TrackedOp<
   onFailure?: (variables: TVariables) => void
 }
 
-/** Sends one call of `op`, whether or not the screen is still mounted. */
+/**
+ * Sends one call of `op`, whether or not the screen is still mounted. The
+ * promise settles (never rejects) once the call and its callbacks are done.
+ */
 export function sendOp<TVariables, TCode extends ErrorCode, TData>(
   op: TrackedOp<TVariables, TCode, TData>,
   client: QueryClient,
   variables: TVariables,
-): void {
+): Promise<void> {
   const codes: ReadonlyArray<ErrorCode> = op.failureCodes
   const isFailureCode = (code: ErrorCode): code is TCode => codes.includes(code)
   const observer = new MutationObserver<TData, Error, TVariables>(client, {
@@ -85,14 +88,17 @@ export function sendOp<TVariables, TCode extends ErrorCode, TData>(
       if (!isAppError(error) || !isFailureCode(error.code)) return
       toast.failure(op.failureText(sent, error.code), {
         keys: op.keysOf(sent),
-        onRetry: () => sendOp(op, client, sent),
+        onRetry: () => void sendOp(op, client, sent),
       })
     },
   })
   // The failure path already ran in onError.
-  observer
+  return observer
     .mutate(variables)
-    .catch(() => undefined)
+    .then(
+      () => undefined,
+      () => undefined,
+    )
     .finally(() => observer.reset())
 }
 

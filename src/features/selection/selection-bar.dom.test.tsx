@@ -14,11 +14,11 @@ import {
   selectionStore,
   toggleSelected,
 } from '#/state/selection'
+import { SelectionBar } from '#/features/selection/selection-bar'
 import {
   BAR_HIDDEN_CLASS,
   PHONE_BAR_HIDDEN_CLASS,
-  SelectionBar,
-} from '#/features/selection/selection-bar'
+} from '#/shared/ui/selection-bar-geometry'
 
 // Spec 4.1: the desktop selection bar. Its texts and buttons, the total
 // without 已整理 and 找不到檔案, 取消, the slide (transform only, kept

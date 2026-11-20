@@ -267,10 +267,10 @@ export function DeleteConfirm({
   }
 
   // Set on press, before the in-flight state shows (the same tick): blocks
-  // a second send and every close path; cleared when that press's call
-  // settles (a token, so an older call's late 重試 never clears it).
+  // a second send and every close path until every call of that press has
+  // settled (`sendOp`'s promise). A 重試 from a failure toast never touches
+  // it: its call locks the dialog through `inFlight` only.
   const pressedRef = useRef(false)
-  const pressTokenRef = useRef(0)
   const [pressed, setPressed] = useState(false)
 
   // Every open: an old failure toast's 重試 must not skip this dialog.
@@ -312,45 +312,39 @@ export function DeleteConfirm({
   const send = () => {
     if (pressedRef.current || sendable.length === 0) return
     pressedRef.current = true
-    pressTokenRef.current += 1
-    const token = pressTokenRef.current
     setPressed(true)
+    setSentHashes(new Set(sendable.map((row) => row.hash)))
     const plan = deletePlan(sendable, deleteFiles)
+    // Which success toast shows, per call (see the comment at the top).
     let left = plan.batches.length
     let failed = false
-    /** One call of this press settled (a later 重試 never counts). */
-    const settleOne = (ok: boolean) => {
-      left -= 1
-      if (!ok) failed = true
-      if (left > 0 || pressTokenRef.current !== token) return
-      pressedRef.current = false
-      setPressed(false)
-    }
-    setSentHashes(new Set(sendable.map((row) => row.hash)))
-    for (const batch of plan.batches) {
+    const calls = plan.batches.map((batch) => {
       let first = true
-      sendOp(
+      /** This press's answer for `batch`; a later 重試 is not one. */
+      const answered = (ok: boolean) => {
+        if (!first) return false
+        first = false
+        left -= 1
+        if (!ok) failed = true
+        return true
+      }
+      return sendOp(
         {
           ...deleteOp,
-          onSuccess: async (sentClient, sent, data) => {
+          onSuccess: (sentClient, sent, data) => {
             let successText: string | null = sent.successText
-            if (first) {
-              first = false
-              settleOne(true)
+            if (answered(true)) {
               if (failed) successText = null
               else if (left === 0) successText = plan.successText
             }
-            await deleteOp.onSuccess?.(
+            return deleteOp.onSuccess?.(
               sentClient,
               { ...sent, successText },
               data,
             )
           },
           onFailure: (sent) => {
-            if (first) {
-              first = false
-              settleOne(false)
-            }
+            answered(false)
             deleteOp.onFailure?.(sent)
             // A timeout may still have deleted them: show what qBittorrent has.
             void refreshMaindata(client)
@@ -359,7 +353,11 @@ export function DeleteConfirm({
         client,
         batch,
       )
-    }
+    })
+    void Promise.all(calls).then(() => {
+      pressedRef.current = false
+      setPressed(false)
+    })
   }
 
   // The list shrank to 5 or fewer while expanded: fold it, and if the
