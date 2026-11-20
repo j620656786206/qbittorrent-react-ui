@@ -172,8 +172,9 @@ export interface Modes {
    * Story 2.6: `reject` answers torrents/stop and /start with HTTP 400
    * (story 2.7: torrents/filePrio too; story 4.3: torrents/delete too).
    * Story 4.3: `slow` answers stop, start and delete after 12 s.
+   * `reject-files` rejects only a delete with deleteFiles=true.
    */
-  ops?: 'normal' | 'reject' | 'slow'
+  ops?: 'normal' | 'reject' | 'slow' | 'reject-files'
   /** Story 2.7: torrents/files delayed 25 s, or answered HTTP 500. */
   files?: 'normal' | 'slow' | 'fail'
 }

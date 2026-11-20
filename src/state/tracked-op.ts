@@ -19,7 +19,11 @@ import type { ErrorCode } from '#/shared/errors'
 //   run even after the screen that sent it closed; it is detached once
 //   settled, so the cache can collect the finished mutation;
 // - `useOpsInFlight` lists the calls still running (`onSuccess` is awaited,
-//   so a call counts until what it awaits settles).
+//   so a call counts until what it awaits settles);
+// - `networkMode: 'always'`, like every query: offline, the call fails
+//   through `callFn` instead of pausing and firing on reconnect (a delete
+//   Alex could no longer back out of, behind a dialog locked meanwhile).
+// https://tanstack.com/query/v5/docs/framework/react/guides/network-mode
 // query-core 5.107.1: `mutate` builds a mutation from the observer's
 // options and returns its promise.
 // https://github.com/TanStack/query/blob/@tanstack/query-core@5.107.1/packages/query-core/src/mutationObserver.ts
@@ -69,6 +73,7 @@ export function sendOp<TVariables, TCode extends ErrorCode, TData>(
   const observer = new MutationObserver<TData, Error, TVariables>(client, {
     mutationKey: [op.name],
     mutationFn: op.call,
+    networkMode: 'always',
     ...(op.scopeOf ? { scope: { id: op.scopeOf(variables) } } : {}),
     onMutate: (sent) => {
       for (const key of op.keysOf(sent)) toast.dismissFor(key)

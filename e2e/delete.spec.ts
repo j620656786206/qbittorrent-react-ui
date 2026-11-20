@@ -313,6 +313,84 @@ test.describe('desktop', () => {
     await expect(primary(page)).toHaveText('刪除 2 個種子（檔案已經不在）')
   })
 
+  test('找不到檔案 with files there: two calls, the 找不到檔案 one never deletes files; one toast for both', async ({
+    page,
+    request,
+  }) => {
+    await page.setViewportSize(DESKTOP)
+    await login(page)
+    await openList(page)
+    await tick(page, 4)
+    await tick(page, 1)
+    await openConfirm(page)
+    await primary(page).click()
+    await expect(confirm(page)).toHaveCount(0)
+    await expect(toastCard(page)).toContainText('已刪除 2 個種子和檔案（4 GB）')
+    const calls = await opCalls(request)
+    expect(calls).toHaveLength(2)
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { op: 'delete', hashes: [hashOf(1)], deleteFiles: true },
+        { op: 'delete', hashes: [hashOf(4)], deleteFiles: false },
+      ]),
+    )
+    for (const n of [1, 4]) await expect(item(page, n)).toHaveCount(0)
+  })
+
+  test('one call of two fails (ops=reject-files): the 找不到檔案 one goes, the failed one stays with 重試 and goes on the next press', async ({
+    page,
+    request,
+  }) => {
+    await setModes(request, { ops: 'reject-files' })
+    await page.setViewportSize(DESKTOP)
+    await login(page)
+    await openList(page)
+    await tick(page, 4)
+    await tick(page, 1)
+    await openConfirm(page)
+    await primary(page).click()
+    await expect(toastCard(page)).toContainText(FAILURE)
+    await expect(confirm(page)).toBeVisible()
+    await expect(confirm(page).getByRole('heading')).toHaveText(
+      '刪除 1 個種子？',
+    )
+    expect(await rowTexts(page)).toEqual([[nameOf(1), '4 GB']])
+    await expect(primary(page)).toHaveText('刪除 1 個種子和檔案（4 GB）')
+    await expect(bar(page)).toContainText('已選 1 個')
+    const rejected = {
+      op: 'delete',
+      hashes: [hashOf(1)],
+      deleteFiles: true,
+      rejected: true,
+    }
+    const calls = await opCalls(request)
+    expect(calls).toHaveLength(2)
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        rejected,
+        { op: 'delete', hashes: [hashOf(4)], deleteFiles: false },
+      ]),
+    )
+    await expect(item(page, 4)).toHaveCount(0)
+
+    await toastCard(page).getByRole('button', { name: '重試' }).click()
+    await expect.poll(async () => (await opCalls(request)).at(-1)).toEqual(
+      rejected,
+    )
+    await expect(toastCard(page)).toContainText(FAILURE)
+
+    await setModes(request, { ops: 'normal' })
+    await primary(page).click()
+    await expect(confirm(page)).toHaveCount(0)
+    await expect(toastCard(page)).toContainText('已刪除 1 個種子和檔案（4 GB）')
+    expect((await opCalls(request)).at(-1)).toEqual({
+      op: 'delete',
+      hashes: [hashOf(1)],
+      deleteFiles: true,
+    })
+    await expect(item(page, 1)).toHaveCount(0)
+  })
+
   test('300 selected: 5 rows, 「還有 295 個」 expands a list at most 320px tall that scrolls itself with under 60 rows in the DOM', async ({
     page,
     request,

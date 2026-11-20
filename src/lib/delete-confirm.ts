@@ -1,13 +1,13 @@
 import { formatCount, formatSize } from '#/lib/format'
-import { goneKindOf, selectionTotal } from '#/lib/selection-total'
+import { goneKindOf } from '#/lib/selection-total'
 import type { GoneKind } from '#/lib/selection-total'
 import type { SlimTorrent } from '#/shared/maindata'
 
 // Story 4.3 (DESIGN and EXPERIENCE delete-confirm): every text the delete
 // confirmation shows, and its rows. The rows follow the selection order
 // (earliest tick first, never by size). The size counts only torrents whose
-// files exist (`selectionTotal`): 已整理 and 找不到檔案 rows read their
-// word in the size slot and add nothing.
+// files exist (the same rule as the bar's `selectionTotal`): 已整理 and
+// 找不到檔案 rows read their word in the size slot and add nothing.
 
 export interface DeleteRow {
   hash: string
@@ -57,16 +57,7 @@ export function deleteSummary(
   hashes: ReadonlyArray<string>,
   stateBeforeMove: StateBeforeMove,
 ): DeleteSummary {
-  const { count, bytes } = selectionTotal(torrents, hashes, stateBeforeMove)
-  let missing = 0
-  let archived = 0
-  for (const hash of hashes) {
-    if (!Object.hasOwn(torrents, hash)) continue
-    const gone = goneKindOf(torrents[hash], stateBeforeMove)
-    if (gone === 'missing') missing += 1
-    else if (gone === 'archived') archived += 1
-  }
-  return { count, bytes, missing, archived }
+  return rowsSummary(deleteRows(torrents, hashes, stateBeforeMove))
 }
 
 /**
@@ -78,6 +69,65 @@ export function filesAllGone(summary: DeleteSummary): boolean {
   return (
     summary.count > 0 && summary.missing + summary.archived === summary.count
   )
+}
+
+/** One `deleteTorrents` call of a press. */
+export interface DeleteBatch {
+  hashes: Array<string>
+  deleteFiles: boolean
+  /** The plain toast when this call alone went through. */
+  successText: string
+}
+
+/** A press: its calls, and the toast when every one went through. */
+export interface DeletePlan {
+  batches: Array<DeleteBatch>
+  successText: string
+}
+
+function rowsSummary(rows: ReadonlyArray<DeleteRow>): DeleteSummary {
+  const summary = { count: rows.length, bytes: 0, missing: 0, archived: 0 }
+  for (const row of rows) {
+    if (row.gone === 'missing') summary.missing += 1
+    else if (row.gone === 'archived') summary.archived += 1
+    else summary.bytes += row.size
+  }
+  return summary
+}
+
+/**
+ * What a press sends. With 「連檔案一起刪」 ticked and a selection that
+ * mixes torrents whose files are there with ones whose files are gone
+ * (`goneKindOf`), two calls: the first with `deleteFiles: true`, the gone
+ * ones always with `false` (a stale `missingFiles`, the NAS mount back, must
+ * not lose real files the dialog said were not there). Otherwise one call;
+ * when every file is already gone it never asks to delete files.
+ */
+export function deletePlan(
+  rows: ReadonlyArray<DeleteRow>,
+  deleteFiles: boolean,
+): DeletePlan {
+  const whole = rowsSummary(rows)
+  const successText = deleteSuccessText(whole, deleteFiles)
+  const present = rows.filter((row) => row.gone === null)
+  const gone = rows.filter((row) => row.gone !== null)
+  const batch = (
+    part: ReadonlyArray<DeleteRow>,
+    files: boolean,
+  ): DeleteBatch => ({
+    hashes: part.map((row) => row.hash),
+    deleteFiles: files,
+    successText: deleteSuccessText(rowsSummary(part), deleteFiles),
+  })
+  if (!deleteFiles || present.length === 0 || gone.length === 0) {
+    return {
+      batches: [
+        { ...batch(rows, deleteFiles && present.length > 0), successText },
+      ],
+      successText,
+    }
+  }
+  return { batches: [batch(present, true), batch(gone, false)], successText }
 }
 
 /** 「刪除 3,626 個種子？」 */

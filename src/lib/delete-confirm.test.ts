@@ -4,6 +4,7 @@ import {
   deleteButtonText,
   deleteGoneNotes,
   deleteMoreText,
+  deletePlan,
   deleteRows,
   deleteSuccessText,
   deleteSummary,
@@ -133,6 +134,54 @@ describe('deleteSummary and deleteRows', () => {
     expect(
       deleteSummary({ [A]: moving }, [A], { [A]: 'uploading' }).bytes,
     ).toBe(7 * GB)
+  })
+})
+
+describe('deletePlan', () => {
+  const rowsOf = (...hashes: Array<string>) => deleteRows(torrents, hashes, {})
+
+  it('files on, some gone: two calls, the gone ones never delete files', () => {
+    const plan = deletePlan(rowsOf(A, B, C, D), true)
+    expect(plan.batches).toEqual([
+      {
+        hashes: [A, D],
+        deleteFiles: true,
+        successText: '已刪除 2 個種子和檔案（301.2 GB）',
+      },
+      { hashes: [B, C], deleteFiles: false, successText: '已刪除 2 個種子' },
+    ])
+    expect(plan.successText).toBe('已刪除 4 個種子和檔案（301.2 GB）')
+  })
+
+  it('files off: one call without files', () => {
+    expect(deletePlan(rowsOf(A, C), false)).toEqual({
+      batches: [
+        {
+          hashes: [A, C],
+          deleteFiles: false,
+          successText: '已刪除 2 個種子，檔案留著',
+        },
+      ],
+      successText: '已刪除 2 個種子，檔案留著',
+    })
+  })
+
+  it('every file there: one call with files', () => {
+    const plan = deletePlan(rowsOf(A, D), true)
+    expect(plan.batches).toEqual([
+      {
+        hashes: [A, D],
+        deleteFiles: true,
+        successText: '已刪除 2 個種子和檔案（301.2 GB）',
+      },
+    ])
+  })
+
+  it('every file gone: one call that never deletes files', () => {
+    const plan = deletePlan(rowsOf(B, C), true)
+    expect(plan.batches).toEqual([
+      { hashes: [B, C], deleteFiles: false, successText: '已刪除 2 個種子' },
+    ])
   })
 })
 
