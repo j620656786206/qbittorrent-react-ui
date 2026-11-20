@@ -6,16 +6,22 @@ import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse } from '#/shared/maindata'
+import { MOVING_TO_EXPIRY_MS } from '#/shared/maindata'
 import { MAINDATA_KEY } from '#/state/maindata'
 import {
+  MOVE_PENDING_OP,
   PENDING_TIMEOUT_MS,
   clearPending,
   clearPendingAll,
   markPending,
   markPendingAll,
+  moveRecordOf,
+  moveRecordStore,
   pendingStore,
+  recordMoves,
+  dropMoveRecords,
+  updateMoveRecords,
   pendingOpOf,
-  pendingTargetOf,
   prunePending,
   resetPendingOps,
   usePendingOp,
@@ -43,24 +49,108 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('the pending store', () => {
-  it('spec 5.2: a move keeps its target per hash, gone with the entry', () => {
-    markPendingAll([A, B], 'move', '/data/media/tv')
-    expect(pendingOpOf(A)).toBe('move')
-    expect(pendingTargetOf(A)).toBe('/data/media/tv')
-    expect(pendingTargetOf(B)).toBe('/data/media/tv')
-    clearPending(A)
-    expect(pendingTargetOf(A)).toBeNull()
-    expect(pendingTargetOf(B)).toBe('/data/media/tv')
-    // Marked again without a target: the old one goes.
-    markPending(B, 'stop')
-    expect(pendingTargetOf(B)).toBeNull()
-    markPendingAll([A], 'move', '/data/media/movies')
+describe('spec 5.3 the move records', () => {
+  const TV = '/data/media/tv'
+  const fromOld = () => '/data/torrents/tv/'
+
+  it('a record per hash with target, normalized from, start and seen; apart from the 30 s ops', () => {
+    vi.setSystemTime(5000)
+    markPendingAll([A, B], MOVE_PENDING_OP)
+    recordMoves([A, B], TV, fromOld)
+    expect(moveRecordOf(A)).toEqual({
+      target: TV,
+      from: '/data/torrents/tv',
+      startedAt: 5000,
+      seen: false,
+    })
+    expect(moveRecordOf(B)).toEqual({
+      target: TV,
+      from: '/data/torrents/tv',
+      startedAt: 5000,
+      seen: false,
+    })
+    // O6: the 30 s timer clears the op, never the record.
     vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
     expect(pendingOpOf(A)).toBeNull()
-    expect(pendingTargetOf(A)).toBeNull()
+    expect(moveRecordOf(A)?.target).toBe(TV)
   })
 
+  it('O6 another op on the same hash (a pause) and clearing it leave the record', () => {
+    recordMoves([A], TV, fromOld)
+    markPending(A, 'stop')
+    clearPending(A)
+    clearPendingAll([A])
+    prunePending(() => false)
+    expect(moveRecordOf(A)?.target).toBe(TV)
+  })
+
+  it('a newer move of the same hash replaces the record', () => {
+    vi.setSystemTime(1000)
+    recordMoves([A], TV, fromOld)
+    updateMoveRecords({
+      [A]: { target: TV, from: '', startedAt: 1000, seen: true },
+    })
+    vi.setSystemTime(2000)
+    recordMoves([A], '/data/media/movies', fromOld)
+    expect(moveRecordOf(A)).toEqual({
+      target: '/data/media/movies',
+      from: '/data/torrents/tv',
+      startedAt: 2000,
+      seen: false,
+    })
+  })
+
+  it('O7 a record never seen goes after 10 minutes; a seen one stays', () => {
+    recordMoves([A, B], TV, fromOld)
+    updateMoveRecords({ [B]: { ...moveRecordOf(B)!, seen: true } })
+    vi.advanceTimersByTime(MOVING_TO_EXPIRY_MS - 1)
+    expect(moveRecordOf(A)).not.toBeNull()
+    vi.advanceTimersByTime(1)
+    expect(moveRecordOf(A)).toBeNull()
+    expect(moveRecordOf(B)?.seen).toBe(true)
+  })
+
+  it('O7 an older timer leaves a newer record of the same hash alone', () => {
+    recordMoves([A], TV, fromOld)
+    vi.advanceTimersByTime(MOVING_TO_EXPIRY_MS / 2)
+    recordMoves([A], '/data/media/movies', fromOld)
+    vi.advanceTimersByTime(MOVING_TO_EXPIRY_MS / 2)
+    expect(moveRecordOf(A)?.target).toBe('/data/media/movies')
+    vi.advanceTimersByTime(MOVING_TO_EXPIRY_MS / 2)
+    expect(moveRecordOf(A)).toBeNull()
+  })
+
+  it('drop removes only the named hashes, one update; nothing to drop: no update', () => {
+    recordMoves([A, B], TV, fromOld)
+    const updates = vi.fn()
+    const subscription = moveRecordStore.subscribe(updates)
+    dropMoveRecords([A])
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(moveRecordOf(A)).toBeNull()
+    expect(moveRecordOf(B)).not.toBeNull()
+    dropMoveRecords([A])
+    updateMoveRecords({
+      [A]: { target: TV, from: '', startedAt: 0, seen: true },
+    })
+    expect(updates).toHaveBeenCalledTimes(1)
+    expect(moveRecordOf(A)).toBeNull()
+    subscription.unsubscribe()
+  })
+
+  it('an unknown save_path records an empty from', () => {
+    recordMoves([A], TV, () => '')
+    expect(moveRecordOf(A)?.from).toBe('')
+  })
+
+  it('reset clears records and their timers', () => {
+    recordMoves([A], TV, fromOld)
+    resetPendingOps()
+    expect(moveRecordOf(A)).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('the pending store', () => {
   it('marks, reads and clears per hash', () => {
     markPending(A, 'stop')
     expect(pendingOpOf(A)).toBe('stop')

@@ -21,6 +21,7 @@ import {
   useChangePathOpen,
 } from '#/state/change-path-open'
 import { refreshMaindata, selectTorrents, useMaindata } from '#/state/maindata'
+import { moveToastKey } from '#/state/pending-ops'
 import { useSettings } from '#/state/settings'
 import { useSheetLayer } from '#/state/sheet-layer'
 import { useEscapeLayer } from '#/state/shortcuts'
@@ -39,7 +40,6 @@ import {
   addCommonPathInput,
   changePathView,
 } from '#/features/path/change-path-model'
-import { moveToastKey } from '#/features/path/set-location-op'
 import type { MoveOp, MoveVariables } from '#/features/path/set-location-op'
 
 // Story 5.2 (DESIGN change-path and text-input, EXPERIENCE change-path,

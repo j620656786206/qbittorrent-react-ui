@@ -210,6 +210,12 @@ export interface Modes {
    * E04 /data/media/movies).
    */
   paths?: 'normal' | 'varied' | 'library'
+  /**
+   * Story 5.3, how a move ends (torrents/setLocation and moveElsewhere):
+   * `hold` keeps it `moving` until releaseMoves lands it at its target,
+   * `fail` reads `moving` for 3 s, then the torrent is back at its old path.
+   */
+  move?: 'normal' | 'hold' | 'fail'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -221,6 +227,7 @@ export const DEFAULT_MODES: Required<Modes> = {
   files: 'normal',
   cats: 'normal',
   paths: 'normal',
+  move: 'normal',
 }
 
 /** A filePrio call as fake-qbit logs it (story 2.7). */
@@ -294,6 +301,27 @@ export async function addElsewhere(
 ) {
   const query = new URLSearchParams({ hash, name, category }).toString()
   const response = await request.post(`/__fake/added?${query}`)
+  expect(response.ok(), await response.text()).toBe(true)
+}
+
+/**
+ * Story 5.3: another client moves this torrent (no call logged, so the
+ * container records no `movingTo`: the app sees qBittorrent's `moving`
+ * alone). It ends as the `move` mode says.
+ */
+export async function moveElsewhere(
+  request: APIRequestContext,
+  hash: string,
+  location: string,
+) {
+  const query = new URLSearchParams({ hash, location }).toString()
+  const response = await request.post(`/__fake/move?${query}`)
+  expect(response.ok(), await response.text()).toBe(true)
+}
+
+/** Story 5.3: every move held by `move=hold` lands at its target now. */
+export async function releaseMoves(request: APIRequestContext) {
+  const response = await request.post('/__fake/move?release=1')
   expect(response.ok(), await response.text()).toBe(true)
 }
 

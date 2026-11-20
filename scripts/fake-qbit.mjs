@@ -75,6 +75,10 @@
 //          no subfolder: sample's E01 is in /data/torrents/tv (下載區（影集）
 //          with seed=library), E02 /data/torrent/mteam-seed, E03
 //          /data/downloads, E04 /data/media/movies
+//   move:  normal | hold | fail (story 5.3, for torrents/setLocation and
+//          /__fake/move: hold keeps a move `moving` until
+//          POST /__fake/move?release=1 lands it at its target; fail reads
+//          `moving` for MOVE_MS, then the torrent is back at its old path)
 //   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
 //   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
 //   Any `data` parameter (even the current one) also clears the deleted
@@ -112,6 +116,12 @@
 // watched. `ops=reject` answers 400 (logged with `rejected: true`),
 // `ops=slow` answers and applies after 12 s (409 and nothing applied when a
 // `data` parameter came meanwhile). A `data` parameter clears the moves.
+// Story 5.3: `move=hold` and `move=fail` (above) change how a move ends.
+// Another client moving a torrent (not logged, no `movingTo` in the
+// container, so the app shows `moving` alone), loopback only:
+//   curl -X POST 'http://localhost:3100/__fake/move?hash=<h>&location=/data/media/tv'
+// and every held move lands at its target:
+//   curl -X POST 'http://localhost:3100/__fake/move?release=1'
 // Story 2.7: GET /api/v2/torrents/files?hash= (cookie required) answers
 // deterministic fake files for every torrent of the data set (fake names
 // under the torrent's own name, so only code-name paths); sample E03 has
@@ -219,6 +229,7 @@ const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files', 'drop'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const CATS_MODES = new Set(['normal', 'default-path', 'none'])
 const PATHS_MODES = new Set(['normal', 'varied', 'library'])
+const MOVE_MODES = new Set(['normal', 'hold', 'fail'])
 /** Story 5.2 `paths=library`: the n-th torrent sits right in one of these. */
 const LIBRARY_FOLDERS = [
   '/data/torrents/tv',
@@ -249,6 +260,7 @@ const mode = {
   files: 'normal',
   cats: 'normal',
   paths: 'normal',
+  move: 'normal',
 }
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
@@ -821,22 +833,46 @@ function withLibraryPaths(torrents) {
   return placed
 }
 
-/** Story 5.2: setLocation calls applied, by hash: `{ location, doneAt }`. */
+/**
+ * Story 5.2: setLocation calls applied, by hash: `{ location, doneAt,
+ * fails, from }`. Story 5.3: `doneAt` is Infinity while held (`move=hold`),
+ * a move started in `move=fail` ends at `from` (where it was when the move
+ * started, so a second move starts where the first one landed).
+ */
 const moves = new Map()
 
-/** A moved torrent reads `moving` until `doneAt`, then sits in `location`. */
+/**
+ * A moved torrent reads `moving` until `doneAt`, then sits in `location`
+ * (or, when it fails, where it was).
+ */
 function withMoves(torrents) {
   if (moves.size === 0) return torrents
   const now = Date.now()
   const out = { ...torrents }
   for (const [key, move] of moves) {
     if (!out[key]) continue
-    out[key] =
-      now < move.doneAt
-        ? { ...out[key], state: 'moving' }
-        : { ...out[key], save_path: move.location }
+    if (now < move.doneAt) {
+      out[key] = { ...out[key], state: 'moving', save_path: move.from }
+    } else {
+      out[key] = {
+        ...out[key],
+        save_path: move.fails ? move.from : move.location,
+      }
+    }
   }
   return out
+}
+
+/** Story 5.3: starts a move of a known torrent under the current `move` mode. */
+function startMove(key, location) {
+  const torrent = currentTorrents(rid)[key]
+  if (!torrent) return
+  moves.set(key, {
+    location,
+    doneAt: mode.move === 'hold' ? Infinity : Date.now() + MOVE_MS,
+    fails: mode.move === 'fail',
+    from: torrent.save_path,
+  })
 }
 
 function currentTorrents(tick) {
@@ -1047,11 +1083,7 @@ function applyDelete(hashes, deleteFiles) {
 /** Story 5.2: setLocation: record the call and start each known move. */
 function applySetLocation(hashes, location) {
   opLog.push({ op: 'setLocation', hashes, location })
-  const torrents = currentTorrents(rid)
-  for (const key of hashes) {
-    if (torrents[key])
-      moves.set(key, { location, doneAt: Date.now() + MOVE_MS })
-  }
+  for (const key of hashes) startMove(key, location)
 }
 
 /** stop/start: record the call and override the states it names. */
@@ -1445,6 +1477,7 @@ function controlMode(req, res, url) {
       files: FILES_MODES,
       cats: CATS_MODES,
       paths: PATHS_MODES,
+      move: MOVE_MODES,
     }
     const next = {}
     for (const [name, values] of Object.entries(allowed)) {
@@ -1474,7 +1507,7 @@ function controlMode(req, res, url) {
     }
     Object.assign(mode, next)
     console.log(
-      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files} cats=${mode.cats} paths=${mode.paths}`,
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files} cats=${mode.cats} paths=${mode.paths} move=${mode.move}`,
     )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
@@ -1517,6 +1550,38 @@ function controlAdded(req, res, url) {
     url.searchParams.get('category') ?? 'X',
   )
   send(res, 200, `${JSON.stringify({ added: ok })}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
+/**
+ * Story 5.3 (loopback only, POST): `hash` and `location` start a move as
+ * another client would (not logged, so the container records no
+ * `movingTo`); `release=1` lands every held move at its target now.
+ */
+function controlMove(req, res, url) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'POST') return send(res, 405, 'POST\n')
+  if (url.searchParams.get('release') === '1') {
+    const now = Date.now()
+    const released = []
+    for (const [key, move] of moves) {
+      if (move.doneAt !== Infinity) continue
+      move.doneAt = now
+      released.push(key)
+    }
+    return send(res, 200, `${JSON.stringify({ released })}\n`, {
+      'content-type': 'application/json',
+    })
+  }
+  const key = (url.searchParams.get('hash') ?? '').toLowerCase()
+  const location = url.searchParams.get('location') ?? ''
+  if (!/^[0-9a-f]{40}$/.test(key) || location === '')
+    return send(res, 400, 'hash and location\n')
+  if (!currentTorrents(rid)[key]) return send(res, 404, 'unknown hash\n')
+  startMove(key, location)
+  send(res, 200, `${JSON.stringify({ moving: key })}\n`, {
     'content-type': 'application/json',
   })
 }
@@ -1597,6 +1662,7 @@ function frontHandler(appPort) {
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
     if (url.pathname === '/__fake/remove') return controlRemove(req, res, url)
     if (url.pathname === '/__fake/added') return controlAdded(req, res, url)
+    if (url.pathname === '/__fake/move') return controlMove(req, res, url)
     if (url.pathname === '/__fake/files') return controlFiles(req, res)
     if (url.pathname === '/__fake/log') return controlLog(req, res)
     if (url.pathname === '/__fake/settings') {
@@ -1754,7 +1820,7 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal&cats=normal&paths=normal'
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal&cats=normal&paths=normal&move=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states | categories | categories-emptied
@@ -1762,7 +1828,8 @@ switch modes:
   ops:   normal | reject | slow | reject-files | drop
   files: normal | slow | fail
   cats:  normal | default-path | none
-  paths: normal | varied
+  paths: normal | varied | library
+  move:  normal | hold | fail
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'
 reset settings.json: curl -X POST '${origin}/__fake/settings?reset=1'

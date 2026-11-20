@@ -5,6 +5,8 @@ import {
   KNOWN_STATE_CODES,
   PAUSE_ACTION_WORDS,
   heroKindOf,
+  isMovingTorrent,
+  isQbitMoving,
   pauseActionFlips,
   pauseActionOf,
   statusOf,
@@ -222,6 +224,115 @@ describe('C3 moving', () => {
       })
     },
   )
+})
+
+describe('spec 5.3 moving from movingTo or the state', () => {
+  const hash = fakeHash(8)
+
+  it('isMovingTorrent: movingTo or moving; isQbitMoving: the state alone', () => {
+    const recorded = t({
+      hash,
+      state: 'downloading',
+      movingTo: '/data/media/tv',
+    })
+    const qbit = t({ hash, state: 'moving' })
+    const neither = t({ hash, state: 'downloading' })
+    expect([recorded, qbit, neither].map(isMovingTorrent)).toEqual([
+      true,
+      true,
+      false,
+    ])
+    expect([recorded, qbit, neither].map(isQbitMoving)).toEqual([
+      false,
+      true,
+      false,
+    ])
+  })
+
+  it('M1 movingTo with a non-moving state: 搬移中, the column stays its own', () => {
+    const torrent = t({
+      hash,
+      state: 'downloading',
+      progress: 0.5,
+      dlspeed: 1024,
+      eta: 60,
+      movingTo: '/data/media/tv',
+    })
+    expect(classify(torrent, OPTIONS)).toEqual({
+      status: 'downloading',
+      word: '下載中',
+      column: 'downloading',
+      detail: '搬移中',
+      moving: true,
+      showsProgress: true,
+    })
+  })
+
+  it('M1 movingTo on a finished torrent keeps 做種中', () => {
+    const torrent = t({
+      hash,
+      state: 'uploading',
+      progress: 1,
+      movingTo: '/data/media/tv',
+    })
+    expect(classify(torrent, OPTIONS)).toMatchObject({
+      column: 'seeding',
+      detail: '搬移中',
+      moving: true,
+    })
+  })
+
+  it('M2 moving with no movingTo keeps the remembered kind', () => {
+    const torrent = t({ hash, state: 'moving', progress: 1 })
+    expect(
+      classify(torrent, {
+        ...OPTIONS,
+        stateBeforeMove: { [hash]: 'uploading' },
+      }),
+    ).toMatchObject({ column: 'seeding', detail: '搬移中', moving: true })
+  })
+
+  it('M3 neither: not moving, the usual line', () => {
+    const torrent = t({ hash, state: 'pausedDL', progress: 0.5 })
+    expect(classify(torrent, OPTIONS)).toMatchObject({
+      detail: '手動暫停',
+      moving: false,
+    })
+  })
+
+  it.each([
+    ['error', false, 'qBittorrent 回報錯誤', 'attention'],
+    ['missingFiles', true, '找不到檔案，做不了種', 'attention'],
+    ['missingFiles', false, '已整理', 'archived'],
+  ] as const)(
+    'movingTo on a %s torrent (private %s) keeps its own line, not 搬移中',
+    (state, isPrivate, detail, column) => {
+      const torrent = t({
+        hash,
+        state,
+        progress: 1,
+        private: isPrivate,
+        movingTo: '/data/media/tv',
+      })
+      expect(classify(torrent, OPTIONS)).toMatchObject({
+        detail,
+        column,
+        moving: false,
+      })
+    },
+  )
+
+  it('qBittorrent moving with a remembered error still says 搬移中', () => {
+    const torrent = t({ hash, state: 'moving', movingTo: '/data/media/tv' })
+    expect(
+      classify(torrent, { ...OPTIONS, stateBeforeMove: { [hash]: 'error' } }),
+    ).toMatchObject({ detail: '搬移中', moving: true })
+  })
+
+  it('pauseActionFlips reads the state alone: movingTo before moving still flips', () => {
+    const torrent = t({ state: 'pausedDL', movingTo: '/data/media/tv' })
+    expect(pauseActionFlips(torrent, {})).toBe(true)
+  })
 })
 
 describe('C4 unlisted codes', () => {

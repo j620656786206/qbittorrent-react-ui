@@ -1,11 +1,12 @@
 import { isErroredTorrent } from '#/lib/error-reason'
 import { isTorrentHash } from '#/lib/is-torrent-hash'
-import { isMovingTorrent } from '#/lib/torrent-status'
+import { isQbitMoving } from '#/lib/torrent-status'
 import { log as defaultLog } from '#/server/log'
 import type { Logger } from '#/server/log'
 import { BadMaindata, issuePaths } from '#/server/qbit/bad-maindata'
 import type { RawMaindata } from '#/server/qbit/maindata-schema'
 import {
+  MOVING_TO_EXPIRY_MS,
   TORRENT_FIELDS,
   categorySchema,
   serverStateSchema,
@@ -22,12 +23,6 @@ import { normalizeSavePath } from '#/shared/save-path'
 // gets the full table. Everything handed out is a copy, never a row.
 
 export const TOMBSTONE_MS = 600_000
-
-/**
- * Story 5.2: a `movingTo` with no `moving` seen and the same `save_path`
- * this long after it was set is dropped (qBittorrent never started it).
- */
-export const MOVING_TO_EXPIRY_MS = 600_000
 
 /**
  * `seeding_time` is stored floored to whole minutes. qBittorrent moves it
@@ -218,7 +213,7 @@ export function createTorrentTable(
             existing && appliedAt !== null ? Math.floor(appliedAt / 1000) : 0
           errorStarts.set(hash, before)
         }
-      } else if (!isMovingTorrent(torrent)) errorStarts.delete(hash)
+      } else if (!isQbitMoving(torrent)) errorStarts.delete(hash)
       rows.set(hash, {
         torrent,
         changedAt: changed || !existing ? version : existing.changedAt,
@@ -263,7 +258,7 @@ export function createTorrentTable(
         continue
       }
       const savePath = normalizeSavePath(row.torrent.save_path)
-      const movingNow = isMovingTorrent(row.torrent)
+      const movingNow = isQbitMoving(row.torrent)
       if (movingNow) move.seenMoving = true
       if (
         savePath === move.target ||

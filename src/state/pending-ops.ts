@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
+import type { MoveRecord } from '#/lib/move-outcome'
+import { MOVING_TO_EXPIRY_MS } from '#/shared/maindata'
+import { normalizeSavePath } from '#/shared/save-path'
 import { selectTorrents, useMaindata } from '#/state/maindata'
 
 // AD-7 / AD-13, story 2.6: the only record of "sent, qBittorrent has not
@@ -13,8 +16,14 @@ import { selectTorrents, useMaindata } from '#/state/maindata'
 //   no longer the op sent, judged only for the ops that reader sends), or
 //   the torrent is gone from maindata.
 // While a hash has an entry, the control that sent it is disabled.
-// Story 5.2: a move (`move`) also records its target per hash (`targets`,
-// normalized), which story 5.3 reads; it goes with the entry.
+// Story 5.3: beside these, the moves this tab started (`moveRecordStore`,
+// one per hash: target, start, seen), which decide the done or failed
+// toast (src/state/move-outcomes.ts). A record outlives the 30 s entry: it
+// is written when setLocation answers ok for that hash (with the
+// `save_path` it is leaving), replaced by a newer move of the same hash,
+// and goes when the outcome is decided, when the torrent leaves maindata,
+// or MOVING_TO_EXPIRY_MS after it started without the move ever showing. The 30 s timer and other ops never touch it. Per tab:
+// a reload loses it (the move still shows as moving, with no toast).
 
 export const PENDING_TIMEOUT_MS = 30_000
 
@@ -24,13 +33,20 @@ export const PENDING_TIMEOUT_MS = 30_000
  */
 export const MOVE_PENDING_OP = 'move'
 
-interface PendingState {
-  ops: Readonly<Record<string, string>>
-  /** Story 5.2: a move's target per hash, only while its entry is there. */
-  targets: Readonly<Record<string, string>>
+/**
+ * Story 5.2: a move's failure toast key: not the bare hash, which pause and
+ * delete toasts of the same torrent use, so the change-path screen closing
+ * its own toast never closes theirs. Story 5.3's 「沒有搬到 …」 uses it too.
+ */
+export function moveToastKey(hash: string): string {
+  return `move:${hash}`
 }
 
-export const pendingStore = createStore<PendingState>({ ops: {}, targets: {} })
+interface PendingState {
+  ops: Readonly<Record<string, string>>
+}
+
+export const pendingStore = createStore<PendingState>({ ops: {} })
 
 /**
  * One 30 s timer per mark (a single hash, or a whole batch such as a
@@ -47,17 +63,11 @@ interface Mark {
 const owners = new Map<string, Mark>()
 const marks = new Set<Mark>()
 
-function setOps(
-  update: (
-    ops: Record<string, string>,
-    targets: Record<string, string>,
-  ) => void,
-): void {
+function setOps(update: (ops: Record<string, string>) => void): void {
   pendingStore.setState((state) => {
     const ops = { ...state.ops }
-    const targets = { ...state.targets }
-    update(ops, targets)
-    return { ops, targets }
+    update(ops)
+    return { ops }
   })
 }
 
@@ -94,23 +104,17 @@ export function markPending(hash: string, op: string): void {
 
 /**
  * Story 4.3: marks many hashes at once (a delete of 3,626 torrents): one
- * store update and one timer. Story 5.2: `target` is a move's destination,
- * kept per hash with the entry (none: an older target goes).
+ * store update and one timer.
  */
 export function markPendingAll(
   hashes: ReadonlyArray<string>,
   op: string,
-  target?: string,
 ): void {
   // A module-level store on the server would leak across requests.
   if (typeof window === 'undefined' || hashes.length === 0) return
   arm(hashes)
-  setOps((ops, targets) => {
-    for (const hash of hashes) {
-      ops[hash] = op
-      if (target === undefined) delete targets[hash]
-      else targets[hash] = target
-    }
+  setOps((ops) => {
+    for (const hash of hashes) ops[hash] = op
   })
 }
 
@@ -123,11 +127,8 @@ export function clearPendingAll(hashes: ReadonlyArray<string>): void {
     if (Object.hasOwn(ops, hash)) changed = true
   }
   if (!changed) return
-  setOps((next, targets) => {
-    for (const hash of hashes) {
-      delete next[hash]
-      delete targets[hash]
-    }
+  setOps((next) => {
+    for (const hash of hashes) delete next[hash]
   })
 }
 
@@ -141,12 +142,6 @@ export function pendingOpOf(hash: string): string | null {
   return Object.hasOwn(ops, hash) ? ops[hash] : null
 }
 
-/** Story 5.2: where a pending move of `hash` goes, or `null`. */
-export function pendingTargetOf(hash: string): string | null {
-  const { targets } = pendingStore.state
-  return Object.hasOwn(targets, hash) ? targets[hash] : null
-}
-
 /** Drops the entries of torrents `exists` no longer knows, in one update. */
 export function prunePending(exists: (hash: string) => boolean): void {
   const gone = Object.keys(pendingStore.state.ops).filter(
@@ -155,12 +150,100 @@ export function prunePending(exists: (hash: string) => boolean): void {
   if (gone.length > 0) clearPendingAll(gone)
 }
 
-/** Tests: no entries, no timers. */
+/** Story 5.3: the moves this tab started, by hash. */
+export const moveRecordStore = createStore<
+  Readonly<Record<string, MoveRecord>>
+>({})
+
+const moveTimers = new Set<ReturnType<typeof setTimeout>>()
+
+/** Drops the records that never showed within MOVING_TO_EXPIRY_MS. */
+function expireMoveRecords(): void {
+  const at = Date.now()
+  const stale = Object.entries(moveRecordStore.state)
+    .filter(
+      ([, record]) =>
+        !record.seen && at - record.startedAt >= MOVING_TO_EXPIRY_MS,
+    )
+    .map(([hash]) => hash)
+  dropMoveRecords(stale)
+}
+
+/**
+ * Story 5.3: setLocation answered ok for `hashes`, going to `target`
+ * (normalized), each leaving `fromOf(hash)` (its `save_path` now, '' when
+ * unknown): one record each, replacing an older move of the same hash.
+ */
+export function recordMoves(
+  hashes: ReadonlyArray<string>,
+  target: string,
+  fromOf: (hash: string) => string,
+): void {
+  if (typeof window === 'undefined' || hashes.length === 0) return
+  const startedAt = Date.now()
+  moveRecordStore.setState((records) => {
+    const next = { ...records }
+    for (const hash of hashes) {
+      const from = fromOf(hash)
+      next[hash] = {
+        target,
+        from: from === '' ? '' : normalizeSavePath(from),
+        startedAt,
+        seen: false,
+      }
+    }
+    return next
+  })
+  const timer = setTimeout(() => {
+    moveTimers.delete(timer)
+    expireMoveRecords()
+  }, MOVING_TO_EXPIRY_MS)
+  moveTimers.add(timer)
+}
+
+/** Story 5.3: the move this tab started for `hash`, or `null`. */
+export function moveRecordOf(hash: string): MoveRecord | null {
+  const records = moveRecordStore.state
+  return Object.hasOwn(records, hash) ? records[hash] : null
+}
+
+/** Story 5.3: writes back records the outcome left waiting (`seen` set). */
+export function updateMoveRecords(
+  updates: Readonly<Record<string, MoveRecord>>,
+): void {
+  const hashes = Object.keys(updates).filter((hash) =>
+    Object.hasOwn(moveRecordStore.state, hash),
+  )
+  if (hashes.length === 0) return
+  moveRecordStore.setState((records) => {
+    const next = { ...records }
+    for (const hash of hashes) next[hash] = updates[hash]
+    return next
+  })
+}
+
+/** Story 5.3: drops these records (decided, or the torrent is gone). */
+export function dropMoveRecords(hashes: ReadonlyArray<string>): void {
+  const present = hashes.filter((hash) =>
+    Object.hasOwn(moveRecordStore.state, hash),
+  )
+  if (present.length === 0) return
+  moveRecordStore.setState((records) => {
+    const next = { ...records }
+    for (const hash of present) delete next[hash]
+    return next
+  })
+}
+
+/** Tests: no entries, no records, no timers. */
 export function resetPendingOps(): void {
   for (const mark of marks) clearTimeout(mark.timer)
   marks.clear()
   owners.clear()
-  pendingStore.setState(() => ({ ops: {}, targets: {} }))
+  pendingStore.setState(() => ({ ops: {} }))
+  for (const timer of moveTimers) clearTimeout(timer)
+  moveTimers.clear()
+  moveRecordStore.setState(() => ({}))
 }
 
 /**

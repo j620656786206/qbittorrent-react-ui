@@ -10,13 +10,12 @@ import {
   rawTorrent,
 } from '#/server/qbit/testing'
 import {
-  MOVING_TO_EXPIRY_MS,
   SEEDING_TIME_STEP_S,
   TOMBSTONE_MS,
   createTorrentTable,
 } from '#/server/sync/torrent-table'
 import type { TorrentTable } from '#/server/sync/torrent-table'
-import { TORRENT_FIELDS } from '#/shared/maindata'
+import { MOVING_TO_EXPIRY_MS, TORRENT_FIELDS } from '#/shared/maindata'
 
 // Spec 1.5 rows S1 to S7, S11 and the G1 to G6 rules at table level.
 
