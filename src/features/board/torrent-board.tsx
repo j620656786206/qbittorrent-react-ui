@@ -13,10 +13,10 @@ import { Skeleton } from '#/shared/ui/skeleton'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import {
   selectStateBeforeMove,
-  selectTorrents,
   useBoardColumns,
   useMaindata,
   useMatchCount,
+  useShownTorrents,
 } from '#/state/maindata'
 import { useAutoCollapse } from '#/state/auto-collapse'
 import { useEmptyEntrance } from '#/state/entrance'
@@ -72,6 +72,11 @@ import { useBoardCollapse } from '#/features/board/use-board-collapse'
 // category only, so a keyword that matches nothing for a moment keeps the
 // open 已整理 column, the collapse and the scroll. A category with no
 // torrent at all still says 「這個分類沒有種子」.
+// Story 4.4: cards this tab deleted stay in their column
+// (useBoardShownColumns) and draw from their snapshot (`useShownTorrents`)
+// while each column runs their exit (card-list.tsx); they count, so the
+// empty block waits for them. The collapse FLIP owns the wrappers while it
+// runs: then deleted cards drop without a fade (`exitDisabled`).
 
 const GRID_CLASS = 'grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-board-gap'
 /** The 已整理 strip is 64px; expanded it is as wide as the others. */
@@ -86,7 +91,7 @@ export function TorrentBoard() {
     liveColumns,
     JSON.stringify([view.category, view.query]),
   )
-  const { data: torrents } = useMaindata(selectTorrents)
+  const torrents = useShownTorrents()
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   // Sticky: Query clears its own `error` each time a fetch starts.
   const failure = useMaindataFailure()
@@ -240,6 +245,7 @@ function DesktopBoard({
             today={today}
             empty={emptyText(column, columns, searching)}
             bodyRef={controller.scrollerRef(column)}
+            exitDisabled={controller.isBusy}
             {...wide(column)}
           />
         ),
@@ -256,6 +262,7 @@ function DesktopBoard({
           expanded={archivedOpen}
           onExpandedChange={onArchivedChange}
           bodyRef={controller.scrollerRef('archived')}
+          exitDisabled={controller.isBusy}
           {...wide('archived')}
         />
       )}

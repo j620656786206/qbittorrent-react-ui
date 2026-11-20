@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { detailPosition } from '#/lib/detail-position'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
-import { selectTorrents, useMaindata } from '#/state/maindata'
+import { useShownTorrents } from '#/state/maindata'
 import { useSheetLayer } from '#/state/sheet-layer'
 import { useShownList } from '#/state/shown-order'
 import { useViewedHash } from '#/state/viewed-hash'
@@ -26,7 +26,8 @@ import type { DetailTarget } from '#/features/detail/detail-view'
 
 function useListDetailTarget(): DetailTarget | null {
   const { order, viewed } = useShownList()
-  const { data: torrents } = useMaindata(selectTorrents)
+  // Story 4.4: a deleted row still fading keeps its sheet (snapshot).
+  const torrents = useShownTorrents()
   if (!order || viewed === null || !torrents) return null
   if (!Object.hasOwn(torrents, viewed)) return null
   const position = detailPosition(order, viewed)

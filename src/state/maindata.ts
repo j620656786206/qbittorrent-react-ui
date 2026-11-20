@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, QueryFunctionContext } from '@tanstack/react-query'
 import { createStore, useSelector } from '@tanstack/react-store'
@@ -20,8 +20,10 @@ import type {
   GetMaindataInput,
   MaindataResponse,
   MaindataVersion,
+  SlimTorrent,
 } from '#/shared/maindata'
 import { callFn } from '#/state/call-fn'
+import { captureLeaving, useLeavingSnapshots } from '#/state/leaving'
 import { isLoginRequired, unlessLoginRequired } from '#/state/login-required'
 import { pollInterval } from '#/state/polling'
 
@@ -121,7 +123,10 @@ export function maindataQueryDefaults(fetchMaindata: FetchMaindata) {
         const response = await fetchMaindata(previous?.version, signal, {
           fresh,
         })
-        return mergeMaindata(previous, response)
+        const merged = mergeMaindata(previous, response)
+        // Story 4.4: expected deletes that just left become leaving.
+        captureLeaving(previous?.torrents, merged.torrents)
+        return merged
       } finally {
         done()
       }
@@ -182,6 +187,38 @@ export const selectCategories = (data: Maindata) => data.categories
 /** Every torrent by hash, archived ones included. */
 export const selectTorrents = (data: Maindata) => data.torrents
 export const selectStateBeforeMove = (data: Maindata) => data.stateBeforeMove
+
+/**
+ * Story 4.4: `torrents` plus the last torrent of each leaving hash
+ * maindata no longer has (`snapshots`); the same record when none is
+ * missing. Pure.
+ */
+export function withLeavingSnapshots(
+  torrents: Readonly<Record<string, SlimTorrent>> | undefined,
+  snapshots: Readonly<Record<string, SlimTorrent>>,
+): Readonly<Record<string, SlimTorrent>> | undefined {
+  if (torrents === undefined) return undefined
+  let next: Record<string, SlimTorrent> | null = null
+  for (const hash of Object.keys(snapshots)) {
+    if (Object.hasOwn(torrents, hash)) continue
+    next ??= { ...torrents }
+    next[hash] = snapshots[hash]
+  }
+  return next ?? torrents
+}
+
+/**
+ * Story 4.4: what the list, the board and their details draw from: every
+ * torrent by hash (`selectTorrents`), plus the snapshots of the deleted
+ * ones still fading out (src/state/leaving.ts). Keeps its reference while
+ * neither changes.
+ */
+export function useShownTorrents():
+  Readonly<Record<string, SlimTorrent>> | undefined {
+  const { data } = useMaindata(selectTorrents)
+  const snapshots = useLeavingSnapshots()
+  return useMemo(() => withLeavingSnapshots(data, snapshots), [data, snapshots])
+}
 
 /**
  * The visible hashes in order (AR-41). `view` must be stable too (the

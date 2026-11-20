@@ -19,6 +19,7 @@ import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
+import { expectLeaving, leavingStore, resetLeaving } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import {
@@ -315,6 +316,7 @@ beforeEach(() => {
   resetOrderFreeze()
   resetSelection()
   resetEntrance()
+  resetLeaving()
   mountMain()
 })
 
@@ -1014,6 +1016,152 @@ describe('the entrance (spec 2.9)', () => {
     await render(fakeResponse({ changed: many(30) }))
     expect(stub.calls).toHaveLength(0)
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+describe('the delete exit (story 4.4)', () => {
+  let stub: AnimateStub
+  let reduced: boolean
+
+  beforeEach(() => {
+    stub = stubElementAnimate()
+    reduced = false
+    stubReducedMotion(() => reduced)
+    // The scroller is the window's top 600px; a row wrapper sits at its
+    // translateY, inner elements get their wrapper's box.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: Element) {
+        if (this.id === LIST_SCROLL_ID) return new DOMRect(0, 0, 1000, VIEWPORT)
+        const wrapper = this.closest<HTMLElement>('[role="listitem"]')
+        if (!wrapper) return new DOMRect(0, 0, 0, 0)
+        const y = Number(
+          /translateY\((-?[\d.]+)px\)/.exec(wrapper.style.transform)?.[1] ??
+            NaN,
+        )
+        return new DOMRect(0, y, 1000, 59)
+      },
+    )
+  })
+
+  afterEach(() => {
+    stub.restore()
+    resetLeaving()
+  })
+
+  const removed = (...hashes: Array<string>) =>
+    fakeResponse({
+      version: `v${Math.random()}`,
+      full: false,
+      changed: [],
+      removed: hashes,
+    })
+
+  /** The first load's entrance ends and is forgotten. */
+  async function settleEntrance() {
+    await finish()
+  }
+
+  async function finish() {
+    const calls = [...stub.calls]
+    stub.calls.length = 0
+    await act(async () => {
+      for (const call of calls) call.finish()
+      for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    })
+  }
+
+  const animated = (property: string) =>
+    stub.calls
+      .filter((call) => property in call.keyframes[0])
+      .map((call) => (call.element as HTMLElement).dataset.hash)
+
+  /** Delete `hashes` from this tab: expected, then the refresh lacks them. */
+  async function deleteAndRefresh(...hashes: Array<string>) {
+    expectLeaving(hashes)
+    await poll(removed(...hashes))
+  }
+
+  it('L1: the deleted rows fade, then leave, and the rows below slide up; the order holds throughout', async () => {
+    await render(fakeResponse({ changed: many(5) }))
+    await settleEntrance()
+    // Newest first: T4 T3 T2 T1 T0. Delete T3 and T1.
+    await deleteAndRefresh(fakeHash(4), fakeHash(2))
+    expect(animated('opacity').sort()).toEqual(
+      [fakeHash(4), fakeHash(2)].sort(),
+    )
+    expect(shownNames()).toEqual(['T4', 'T3', 'T2', 'T1', 'T0'])
+    expect(freezeStore.state.animation).toBe(true)
+    // New data mid-fade waits (L7).
+    await poll(delta([torrent(9)]))
+    expect(shownNames()).toEqual(['T4', 'T3', 'T2', 'T1', 'T0'])
+
+    await finish()
+    expect(shownNames()).toEqual(['T4', 'T2', 'T0'])
+    const shift = (hash: string) =>
+      stub.calls.find(
+        (call) => (call.element as HTMLElement).dataset.hash === hash,
+      )?.keyframes[0].translate
+    expect(shift(fakeHash(3))).toBe('0px 61px')
+    expect(shift(fakeHash(1))).toBe('0px 122px')
+    expect(shift(fakeHash(5))).toBeUndefined()
+    expect(freezeStore.state.animation).toBe(true)
+
+    await finish()
+    expect(freezeStore.state.animation).toBe(false)
+    expect(shownNames()).toEqual(['T9', 'T4', 'T2', 'T0'])
+  })
+
+  it('L4: a removal this tab did not ask for drops at once, no fade', async () => {
+    await render(fakeResponse({ changed: many(3) }))
+    await settleEntrance()
+    await poll(removed(fakeHash(2)))
+    expect(stub.calls).toHaveLength(0)
+    expect(shownNames()).toEqual(['T2', 'T0'])
+  })
+
+  it('L11: reduced motion drops the rows with the refresh, nothing holds', async () => {
+    reduced = true
+    await render(fakeResponse({ changed: many(3) }))
+    await deleteAndRefresh(fakeHash(2))
+    expect(stub.calls).toHaveLength(0)
+    expect(freezeStore.state.animation).toBe(false)
+    expect(shownNames()).toEqual(['T2', 'T0'])
+    expect(leavingStore.state.hashes.size).toBe(0)
+  })
+
+  it('L10: the last rows fade first; 「這個分類沒有種子」 shows after the fade', async () => {
+    await render(fakeResponse({ changed: many(2) }))
+    await settleEntrance()
+    await deleteAndRefresh(fakeHash(1), fakeHash(2))
+    expect(shownNames()).toEqual(['T1', 'T0'])
+    expect(main.textContent).not.toContain('這個分類沒有種子')
+    await finish()
+    expect(main.textContent).toContain('這個分類沒有種子')
+    expect(freezeStore.state.animation).toBe(false)
+  })
+
+  it('L8: the detail keeps a deleted viewed row until its fade ends, then its successor', async () => {
+    withPanel = true
+    viewedHash = fakeHash(2)
+    await render(fakeResponse({ changed: many(3) }))
+    await settleEntrance()
+    await deleteAndRefresh(fakeHash(2))
+    expect(ringed()).toEqual(['T1'])
+    expect(shownListStore.state.viewed).toBe(fakeHash(2))
+    expect(setHash).not.toHaveBeenCalledWith(fakeHash(1))
+    await finish()
+    expect(setHash).toHaveBeenLastCalledWith(fakeHash(1))
+    expect(ringed()).toEqual(['T0'])
+  })
+
+  it('L9 phone: the sheet (hash) closes at the fade end, not before', async () => {
+    viewedHash = fakeHash(2)
+    await render(fakeResponse({ changed: many(3) }))
+    await settleEntrance()
+    await deleteAndRefresh(fakeHash(2))
+    expect(setHash).not.toHaveBeenCalledWith(null)
+    await finish()
+    expect(setHash).toHaveBeenLastCalledWith(null)
   })
 })
 

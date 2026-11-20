@@ -13,6 +13,7 @@ import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { SlimTorrent } from '#/shared/maindata'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { STILL_WAITING_TEXT } from '#/shared/ui/confirm-shell'
+import { leavingStore, resetLeaving } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { resetOrderFreeze } from '#/state/order-freeze'
 import { pendingOpOf, resetPendingOps } from '#/state/pending-ops'
@@ -236,6 +237,7 @@ beforeEach(() => {
   resetSelection()
   resetOrderFreeze()
   resetPendingOps()
+  resetLeaving()
   for (const fn of Object.values(toastCalls)) fn.mockClear()
   resetShortcuts()
 })
@@ -247,6 +249,7 @@ afterEach(async () => {
   resetSelection()
   resetOrderFreeze()
   resetPendingOps()
+  resetLeaving()
   for (const fn of Object.values(toastCalls)) fn.mockClear()
   resetShortcuts()
   vi.restoreAllMocks()
@@ -1051,5 +1054,62 @@ describe('while open', () => {
     await rerender(false)
     await settle()
     expect(dialog()?.dataset.slot).toBe('bottom-sheet')
+  })
+})
+
+describe('the fade-out hand-off (story 4.4)', () => {
+  const leaving = () => [...leavingStore.state.hashes].sort()
+
+  it('a success expects its hashes before the refresh: the refresh that lacks them makes them leaving', async () => {
+    await render()
+    await select(A, B)
+    await openConfirm()
+    await act(async () => checkbox().click())
+    torrents = baseTorrents().filter((each) => each.hash === C)
+    await act(async () => primary().click())
+    await settle()
+    expect(leaving()).toEqual([A, B].sort())
+    expect(leavingStore.state.snapshots[A].name).toBe('Alpha.Show')
+  })
+
+  it('L5: a refresh that still has them makes nothing leaving', async () => {
+    await render()
+    await select(A)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(leaving()).toEqual([])
+  })
+
+  it('a failed call expects nothing: its hashes never fade, even if they go later', async () => {
+    deleteCalls.answer = () =>
+      Promise.resolve({
+        ok: false,
+        error: { code: 'qbit_rejected', message: 'x' },
+      })
+    await render()
+    await select(A)
+    await openConfirm()
+    torrents = []
+    await act(async () => primary().click())
+    await settle()
+    expect(leaving()).toEqual([])
+  })
+
+  it('two batches: each success expects only its own hashes', async () => {
+    deleteCalls.answer = (data) =>
+      Promise.resolve(
+        data.deleteFiles
+          ? { ok: false, error: { code: 'qbit_rejected', message: 'x' } }
+          : { ok: true, data: { items: [] } },
+      )
+    await render()
+    await select(A, B, C)
+    await openConfirm()
+    torrents = []
+    await act(async () => primary().click())
+    await settle()
+    // The files call (A) failed; the gone call (B, C) went through.
+    expect(leaving()).toEqual([B, C].sort())
   })
 })

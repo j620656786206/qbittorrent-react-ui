@@ -109,6 +109,8 @@ export interface BoardColumnViewProps {
   pin?: CardPin | null
   hereHash?: string | null
   hereMs?: number
+  /** Story 4.4: `true` while the delete exit must not animate (FLIP busy). */
+  exitDisabled?: () => boolean
 }
 
 export function BoardColumnView({
@@ -125,6 +127,7 @@ export function BoardColumnView({
   pin,
   hereHash,
   hereMs,
+  exitDisabled,
 }: BoardColumnViewProps) {
   const meta = COLUMN_META[column]
   return (
@@ -166,6 +169,7 @@ export function BoardColumnView({
         pin={pin}
         hereHash={hereHash}
         hereMs={hereMs}
+        exitDisabled={exitDisabled}
       />
     </ColumnShell>
   )

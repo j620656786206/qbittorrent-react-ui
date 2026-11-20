@@ -25,6 +25,7 @@ import {
   bindFetchMaindata,
   getMaindataFetchStartedAt,
   refreshMaindata,
+  withLeavingSnapshots,
 } from '#/state/maindata'
 import type { FetchMaindata } from '#/state/maindata'
 import { createQueryClient } from '#/state/query-client'
@@ -674,5 +675,43 @@ describe('bindFetchMaindata (the production binding)', () => {
     expect(sentInput(requests[3].url)).toContain(`${ID}.2`)
     expect(sentInput(requests[3].url)).toContain('fresh')
     expect(observer.getCurrentResult().data?.version).toBe(`${ID}.3`)
+  })
+})
+
+describe('withLeavingSnapshots (story 4.4)', () => {
+  const A = fakeHash(0xa1)
+  const B = fakeHash(0xb1)
+
+  it('keeps the same record when no snapshot is missing from it', () => {
+    const torrents = { [A]: t({ hash: A }) }
+    expect(withLeavingSnapshots(torrents, {})).toBe(torrents)
+    expect(
+      withLeavingSnapshots(torrents, { [A]: t({ hash: A, name: 'Old' }) }),
+    ).toBe(torrents)
+  })
+
+  it('live data wins over a snapshot', () => {
+    const live = t({ hash: A, name: 'Live' })
+    const shown = withLeavingSnapshots(
+      { [A]: live },
+      { [A]: t({ hash: A, name: 'Old' }), [B]: t({ hash: B }) },
+    )
+    expect(shown?.[A]).toBe(live)
+  })
+
+  it('fills a missing hash from its snapshot', () => {
+    const torrents = { [A]: t({ hash: A }) }
+    const snapshot = t({ hash: B, name: 'Gone' })
+    const shown = withLeavingSnapshots(torrents, { [B]: snapshot })
+    expect(shown).toEqual({ [A]: torrents[A], [B]: snapshot })
+    expect(shown?.[B]).toBe(snapshot)
+    // The input is never changed.
+    expect(Object.keys(torrents)).toEqual([A])
+  })
+
+  it('no data: undefined', () => {
+    expect(withLeavingSnapshots(undefined, { [A]: t({ hash: A }) })).toBe(
+      undefined,
+    )
   })
 })

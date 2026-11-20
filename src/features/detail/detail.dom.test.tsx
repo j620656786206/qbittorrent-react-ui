@@ -17,6 +17,12 @@ import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
+import {
+  expectLeaving,
+  finishLeaving,
+  leavingStore,
+  resetLeaving,
+} from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
@@ -584,6 +590,46 @@ describe('the board panel (desktop board mode)', () => {
     expect(hashNow).toBeNull()
   })
 
+  it('4.4 L9: a deleted torrent still fading keeps the panel until it leaves', async () => {
+    resetLeaving()
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    // This tab deleted it; the refresh lacks it (captureLeaving runs in the
+    // maindata query function).
+    expectLeaving([h(1)])
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [],
+        removed: [h(1)],
+      }),
+    )
+    expect([...leavingStore.state.hashes]).toEqual([h(1)])
+    expect(q('aside')).not.toBeNull()
+    expect(q('h2')?.textContent).toBe('Down1')
+    expect(hashNow).toBe(h(1))
+    // The card's fade ended: it leaves, the panel closes.
+    await act(async () => finishLeaving([h(1)]))
+    expect(q('aside')).toBeNull()
+    expect(hashNow).toBeNull()
+    resetLeaving()
+  })
+
+  it('4.4 a removal this tab did not ask for still closes at once', async () => {
+    resetLeaving()
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [],
+        removed: [h(1)],
+      }),
+    )
+    expect(q('aside')).toBeNull()
+    expect(hashNow).toBeNull()
+  })
+
   it('D12 a reloaded hash the board does not have closes', async () => {
     await render(<BoardDetailPanel />, { hash: h(99) })
     expect(q('aside')).toBeNull()
@@ -671,6 +717,30 @@ describe('the phone sheet', () => {
     expect(positionLine()).toBe('第 2 個／共 2 個')
     await act(async () => byLabel('上一個').click())
     expect(writes).toEqual([h(1)])
+  })
+
+  it('4.4 list: a deleted row still fading keeps the sheet until it leaves', async () => {
+    resetLeaving()
+    await render(<ListDetailSheet />)
+    // The list keeps a leaving row in the order it publishes.
+    await act(async () =>
+      publishShownList({ order: [h(1), h(2)], viewed: h(2) }),
+    )
+    expectLeaving([h(2)])
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [],
+        removed: [h(2)],
+      }),
+    )
+    expect(q('[role="dialog"]')).not.toBeNull()
+    expect(q('[role="dialog"] h2')?.textContent).toBe('Down2')
+    // The row's fade ended: it leaves, the sheet closes.
+    await act(async () => finishLeaving([h(2)]))
+    expect(q('[role="dialog"]')).toBeNull()
+    resetLeaving()
   })
 })
 

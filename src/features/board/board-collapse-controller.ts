@@ -307,6 +307,9 @@ export class BoardCollapseController {
     ) => void,
   ) {}
 
+  /** Story 4.4: a transition runs (the FLIP owns the card wrappers). */
+  readonly isBusy = (): boolean => this.busy
+
   /** The board grid's callback ref: wheel, touch and keys on the board. */
   readonly setRoot = (element: HTMLElement | null): void => {
     this.detachRoot?.()

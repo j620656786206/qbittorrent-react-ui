@@ -75,7 +75,7 @@ development_status:
   4-1-電腦勾選和選取列: done # PR #44：電腦勾選和選取列
   4-2-手機選取模式: done # PR #45：手機長按進入選取
   4-3-刪除確認和刪除: done # PR #46：刪除確認和刪除
-  4-4-刪除淡出: backlog
+  4-4-刪除淡出: done # PR #48：刪除後先淡出 0.2 秒，再補位
   4-5-info-hash-和貼上內容的判斷: backlog
   4-6-新增畫面-貼上-選檔案-拖檔: backlog
   4-7-送出新增和結果: backlog

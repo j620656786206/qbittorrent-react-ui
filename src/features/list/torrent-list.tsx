@@ -20,13 +20,14 @@ import { cn } from '#/shared/ui/cn'
 import { LIST_SCROLL_ID } from '#/shared/ui/main-scroll'
 import { useEmptyEntrance, useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
+import { useLeavingExit } from '#/state/leaving-exit'
 import { useListView, viewKeyOf } from '#/state/list-view'
 import { useListViewed } from '#/state/list-viewed'
 import {
   selectStateBeforeMove,
-  selectTorrents,
   useMaindata,
   useMatchCount,
+  useShownTorrents,
   useVisibleTorrents,
 } from '#/state/maindata'
 import { useMaindataFailure } from '#/state/maindata-failure'
@@ -114,8 +115,15 @@ import { useArrowStepping } from '#/features/list/use-arrow-stepping'
 // already in place. The leaving checkbox slides out too. Each phone row
 // clips its own overflow, so nothing ever scrolls sideways. Phone rows
 // keep the system callout and text selection away from a long press.
+//
+// Story 4.4: rows this tab deleted stay in the order (order-freeze) and
+// draw from their snapshot (`useShownTorrents`) until their exit ends
+// (`useLeavingExit`: the visible ones fade, then the rows below slide up).
+// Until then they count as shown, so a category emptied this way shows
+// 「這個分類沒有種子」 only after the fade, and the detail moves on then.
 
 const estimateSize = () => ROW_HEIGHT
+const rowSize = () => ROW_HEIGHT
 
 /**
  * Story 4.2: the scroller while selecting on the phone, 140px under the
@@ -274,7 +282,7 @@ function TorrentRows({
   viewed: string | null
 }) {
   const { setHash } = useViewedHash()
-  const { data: torrents } = useMaindata(selectTorrents)
+  const torrents = useShownTorrents()
   const { data: stateBeforeMove } = useMaindata(selectStateBeforeMove)
   const selectedHashes = useSelectedHashes()
   const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
@@ -370,6 +378,8 @@ function TorrentRows({
   // commit cover the view); after the virtualizer, so its layout effect ran
   // first. https://unpkg.com/@tanstack/virtual-core@3.19.11/src/index.ts
   useEntrance(scrollRef, { ready: virtualizer.scrollRect !== null })
+  // Story 4.4: the delete exit, after the virtualizer like the entrance.
+  useLeavingExit(scrollRef, { order: shown, sizeOf: rowSize, gap: ROW_GAP })
 
   const total = shown.length
   return (

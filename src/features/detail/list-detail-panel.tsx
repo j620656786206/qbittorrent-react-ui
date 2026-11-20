@@ -1,5 +1,5 @@
 import { detailPosition } from '#/lib/detail-position'
-import { selectTorrents, useMaindata } from '#/state/maindata'
+import { useShownTorrents } from '#/state/maindata'
 import { useShownList } from '#/state/shown-order'
 import { useViewedHash } from '#/state/viewed-hash'
 import {
@@ -17,7 +17,8 @@ import {
 export function ListDetailPanel() {
   const { order, viewed } = useShownList()
   const { setHash } = useViewedHash()
-  const { data: torrents } = useMaindata(selectTorrents)
+  // Story 4.4: a deleted row still fading keeps its detail (snapshot).
+  const torrents = useShownTorrents()
   const torrent =
     viewed !== null && torrents && Object.hasOwn(torrents, viewed)
       ? torrents[viewed]

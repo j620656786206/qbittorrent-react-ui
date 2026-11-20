@@ -1,0 +1,227 @@
+{
+  "recordedAt": "2026-11-20T02:23:07.465Z",
+  "data": "fake-qbit many (4165 visible torrents)",
+  "viewport": "1440x3400, headless Chromium",
+  "rowsDeleted": 50,
+  "rowsVisibleBeforeDelete": 54,
+  "fadeAnimations": 50,
+  "slideAnimations": 64,
+  "phaseStartMs": 50,
+  "gapBetweenPhasesMs": 241,
+  "windows": [
+    {
+      "window": "fade",
+      "durationMs": 200,
+      "Layout": {
+        "atPhaseStart": 2,
+        "duringAnimation": 0,
+        "atMs": [
+          24,
+          30
+        ]
+      },
+      "Paint": {
+        "atPhaseStart": 53,
+        "duringAnimation": 0,
+        "atMs": [
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          19,
+          30,
+          30
+        ]
+      },
+      "UpdateLayoutTree": {
+        "atPhaseStart": 3,
+        "duringAnimation": 3,
+        "atMs": [
+          17,
+          24,
+          30,
+          164,
+          181,
+          198
+        ]
+      }
+    },
+    {
+      "window": "removal",
+      "durationMs": 41,
+      "Layout": {
+        "atPhaseStart": 1,
+        "duringAnimation": 0,
+        "atMs": [
+          39
+        ]
+      },
+      "Paint": {
+        "atPhaseStart": 2,
+        "duringAnimation": 0,
+        "atMs": [
+          14,
+          14
+        ]
+      },
+      "UpdateLayoutTree": {
+        "atPhaseStart": 3,
+        "duringAnimation": 0,
+        "atMs": [
+          13,
+          32,
+          38
+        ]
+      }
+    },
+    {
+      "window": "slide",
+      "durationMs": 200,
+      "Layout": {
+        "atPhaseStart": 2,
+        "duringAnimation": 0,
+        "atMs": [
+          7,
+          25
+        ]
+      },
+      "Paint": {
+        "atPhaseStart": 68,
+        "duringAnimation": 0,
+        "atMs": [
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          25,
+          25
+        ]
+      },
+      "UpdateLayoutTree": {
+        "atPhaseStart": 5,
+        "duringAnimation": 6,
+        "atMs": [
+          6,
+          11,
+          11,
+          24,
+          37,
+          58,
+          124,
+          140,
+          156,
+          174,
+          190
+        ]
+      }
+    }
+  ]
+}
