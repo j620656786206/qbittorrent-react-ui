@@ -169,7 +169,18 @@ describe('the card', () => {
   it('tags: the category only when there is one, the last two path segments', () => {
     expect(card({ category: 'mteam-tv' }).category).toBe('mteam-tv')
     expect(card({ category: '' }).category).toBeNull()
-    expect(card({ save_path: '/data/media/tv/' }).location).toBe('media/tv')
+    expect(card({ save_path: '/data/media/tv/' }).location).toEqual({
+      name: 'media/tv',
+      mediaLibrary: false,
+    })
+  })
+
+  it('story 5.1 the location given (the common path name, media library)', () => {
+    const location = { name: '影集媒體庫', mediaLibrary: true }
+    expect(
+      cardModel(t({ save_path: '/data/media/tv/A' }), { ...OPTIONS, location })
+        .location,
+    ).toBe(location)
   })
 
   it('names stay plain text', () => {

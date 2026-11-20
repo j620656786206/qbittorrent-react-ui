@@ -1,0 +1,121 @@
+{
+  "recordedAt": "2026-11-20T20:00:11.599Z",
+  "data": "fake-qbit many + paths=varied (4165 visible torrents, 4165 distinct save paths under 50 parents), seeds fifty and fifty-renamed (50 common paths, all renamed and every 媒體庫 flipped each round)",
+  "browser": "headless Chromium, 1440 x 900",
+  "method": "in-page: performance.now() when fetch() resolves with the settings answer (init-script wrapper); commit = a MutationObserver sees the first visible tag with the new name; frame = requestAnimationFrame then a MessageChannel task (after the first frame with the new tags is painted)",
+  "budgetMs": 100,
+  "runs": [
+    {
+      "mode": "list",
+      "rounds": [
+        {
+          "marker": "改名",
+          "commitMs": 3.9000000059604645,
+          "frameMs": 6.300000011920929,
+          "visibleTags": 24,
+          "changedTags": 24
+        },
+        {
+          "marker": "常用",
+          "commitMs": 3.9000000059604645,
+          "frameMs": 6,
+          "visibleTags": 24,
+          "changedTags": 24
+        },
+        {
+          "marker": "改名",
+          "commitMs": 3.5999999940395355,
+          "frameMs": 5.5,
+          "visibleTags": 24,
+          "changedTags": 24
+        },
+        {
+          "marker": "常用",
+          "commitMs": 3.699999988079071,
+          "frameMs": 5.5999999940395355,
+          "visibleTags": 24,
+          "changedTags": 24
+        },
+        {
+          "marker": "改名",
+          "commitMs": 3.2999999821186066,
+          "frameMs": 5.199999988079071,
+          "visibleTags": 24,
+          "changedTags": 24
+        },
+        {
+          "marker": "常用",
+          "commitMs": 3.4000000059604645,
+          "frameMs": 5.4000000059604645,
+          "visibleTags": 24,
+          "changedTags": 24
+        }
+      ],
+      "frame": {
+        "median": 5.5,
+        "max": 6.3
+      },
+      "commit": {
+        "median": 3.6,
+        "max": 3.9
+      }
+    },
+    {
+      "mode": "board",
+      "rounds": [
+        {
+          "marker": "改名",
+          "commitMs": 5.5,
+          "frameMs": 8.599999994039536,
+          "visibleTags": 39,
+          "changedTags": 39
+        },
+        {
+          "marker": "常用",
+          "commitMs": 4.299999982118607,
+          "frameMs": 6.5999999940395355,
+          "visibleTags": 39,
+          "changedTags": 39
+        },
+        {
+          "marker": "改名",
+          "commitMs": 4,
+          "frameMs": 6.4000000059604645,
+          "visibleTags": 39,
+          "changedTags": 39
+        },
+        {
+          "marker": "常用",
+          "commitMs": 4.5,
+          "frameMs": 6.800000011920929,
+          "visibleTags": 39,
+          "changedTags": 39
+        },
+        {
+          "marker": "改名",
+          "commitMs": 4,
+          "frameMs": 6.299999982118607,
+          "visibleTags": 39,
+          "changedTags": 39
+        },
+        {
+          "marker": "常用",
+          "commitMs": 3.699999988079071,
+          "frameMs": 6,
+          "visibleTags": 39,
+          "changedTags": 39
+        }
+      ],
+      "frame": {
+        "median": 6.4,
+        "max": 8.6
+      },
+      "commit": {
+        "median": 4,
+        "max": 5.5
+      }
+    }
+  ],
+  "allTagsChanged": true,
+  "ok": true
+}

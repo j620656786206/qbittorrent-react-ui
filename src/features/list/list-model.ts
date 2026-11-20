@@ -9,7 +9,8 @@ import {
   hasNoSortValue,
   isGoodRatio,
 } from '#/lib/format'
-import { locationLabel } from '#/lib/paths'
+import { NO_COMMON_PATHS_RESOLVER } from '#/lib/paths'
+import type { LocationResolver, TagLocation } from '#/lib/paths'
 import { slimSortValue } from '#/lib/sort-values'
 import { circleOf, classify } from '#/lib/torrent-status'
 import type { Maindata } from '#/lib/maindata-merge'
@@ -26,7 +27,8 @@ import type { SortValue } from '#/shared/sort-keys'
 // Spec 1.8 rows R1 to R6, C1 to C3, V1 to V4, M1: everything a list row and
 // the list's state show, pure, so the rows are tested in node. Status, word,
 // ring and error text come only from classify(); numbers only from
-// format.ts; the location only from locationLabel(). All text is plain text.
+// format.ts; the location only from src/lib/paths.ts (story 5.1: the common
+// path's name, else the last two folders). All text is plain text.
 // Story 2.1: the big number on the right follows the sort (EXPERIENCE 列表
 // 右邊的大數字), and the 分享率 column hides while sorting by ratio.
 
@@ -100,8 +102,8 @@ export interface BigValue {
 export interface RowModel {
   circle: StatusCircleModel
   name: string
-  /** The location tag: the last two path segments. */
-  tag: string
+  /** The location tag (story 5.1): the common path's name, media library. */
+  tag: TagLocation
   size: string
   /** Under 100%: ↓ download speed, otherwise ↑ upload; `null` at 0. */
   speed: RowSpeed | null
@@ -132,6 +134,11 @@ export interface RowModelOptions {
   sortValue?: SortValue
   /** Story 2.10: this torrent's reason from getErrorReasons, if any. */
   errorReason?: string
+  /**
+   * Story 5.1: this torrent's location (useLocationResolver); as with no
+   * common paths when left out (tests).
+   */
+  location?: TagLocation
 }
 
 const TEXT_STYLES: Readonly<Partial<Record<string, BigValueStyle>>> = {
@@ -144,6 +151,7 @@ const TEXT_STYLES: Readonly<Partial<Record<string, BigValueStyle>>> = {
 function bigValue(
   torrent: SlimTorrent,
   status: TorrentClassification,
+  location: TagLocation,
   { now, timeZone, stateBeforeMove, sort, sortValue }: RowModelOptions,
 ): BigValue {
   const field = sortField(sort ?? FALLBACK_SORT)
@@ -172,7 +180,7 @@ function bigValue(
   if (field.kind === 'location' && !hasNoSortValue(id, value)) {
     return {
       ...base,
-      text: locationLabel(torrent.save_path),
+      text: location.name,
       // The sort compares the full path; the tooltip shows it.
       title: torrent.save_path,
       style,
@@ -202,6 +210,8 @@ export function rowModel(
     stateBeforeMove,
     errorReason,
   })
+  const location =
+    options.location ?? NO_COMMON_PATHS_RESOLVER(torrent.save_path)
   const downloading = torrent.progress < 1
   const speedText = formatRowSpeed(
     downloading ? torrent.dlspeed : torrent.upspeed,
@@ -209,7 +219,7 @@ export function rowModel(
   return {
     circle: circleOf(status, torrent.progress),
     name: torrent.name,
-    tag: locationLabel(torrent.save_path),
+    tag: location,
     size: formatSize(torrent.size),
     speed:
       speedText === null
@@ -220,7 +230,7 @@ export function rowModel(
       good: isGoodRatio(torrent.ratio),
     },
     showRatio: (options.sort ?? FALLBACK_SORT) !== 'ratio',
-    value: bigValue(torrent, status, options),
+    value: bigValue(torrent, status, location, options),
     // A move keeps the status but replaces the line with 「搬移中」 (once).
     errorDetail:
       status.status === 'error' && !status.moving ? status.detail : null,
@@ -259,6 +269,12 @@ export interface RowProps {
    * only when its own reason changes); `undefined` for none.
    */
   errorReason: string | undefined
+  /**
+   * Story 5.1: the resolver's object for this torrent's `save_path`: the
+   * same object while the path and the common paths stay, a new one when
+   * either changes (the row re-renders with the new tag).
+   */
+  location: TagLocation
 }
 
 export interface RowPropsOptions {
@@ -271,6 +287,8 @@ export interface RowPropsOptions {
   keysFailed?: boolean
   /** Story 2.10: useErrorReasons' map; `undefined` for none. */
   errorReasons?: Readonly<Record<string, string>>
+  /** Story 5.1: useLocationResolver(); as with no common paths when left out. */
+  locate?: LocationResolver
 }
 
 /**
@@ -286,6 +304,7 @@ export function rowProps(
     sortKeys,
     keysFailed = false,
     errorReasons,
+    locate = NO_COMMON_PATHS_RESOLVER,
   }: RowPropsOptions,
 ): RowProps | null {
   if (!Object.hasOwn(maindata.torrents, hash)) return null
@@ -298,11 +317,13 @@ export function rowProps(
     if (sortKeys && Object.hasOwn(sortKeys, hash)) sortValue = sortKeys[hash]
     else if (keysFailed) sortValue = null
   }
+  const torrent = maindata.torrents[hash]
   return {
     sort,
     sortValue,
     errorReason: reasonOf(errorReasons, hash),
-    torrent: maindata.torrents[hash],
+    location: locate(torrent.save_path),
+    torrent,
     stateBeforeMove: Object.hasOwn(maindata.stateBeforeMove, hash)
       ? maindata.stateBeforeMove[hash]
       : undefined,

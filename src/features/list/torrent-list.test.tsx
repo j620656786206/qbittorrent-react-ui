@@ -156,7 +156,30 @@ describe('the big value cell (story 2.1)', () => {
   })
 })
 
+const PLAIN = { name: 'X/incompleted', mediaLibrary: false }
+
 describe('TorrentRow (the memoized row)', () => {
+  it('story 5.1 draws the location it is given, purple for a media library', () => {
+    const torrent = t({ hash: fakeHash(8), save_path: '/data/media/tv/Show' })
+    const html = renderToStaticMarkup(
+      <TorrentRow
+        torrent={torrent}
+        stateBeforeMove={undefined}
+        today={NOW}
+        sort="added_on"
+        sortValue={undefined}
+        errorReason={undefined}
+        location={{ name: '影集媒體庫', mediaLibrary: true }}
+        viewing={false}
+        selected={false}
+        onOpen={() => {}}
+      />,
+    )
+    expect(html).toContain('>影集媒體庫</span>')
+    expect(html).toContain('data-media-library=""')
+    expect(html).toContain('text-media-library')
+  })
+
   it('a move remembered as pausedUP keeps 已完成 and says 搬移中', () => {
     const torrent = t({ hash: fakeHash(5), state: 'moving', progress: 1 })
     const html = renderToStaticMarkup(
@@ -167,6 +190,7 @@ describe('TorrentRow (the memoized row)', () => {
         sort="added_on"
         sortValue={undefined}
         errorReason={undefined}
+        location={PLAIN}
         viewing={false}
         selected={false}
         onOpen={() => {}}
@@ -191,6 +215,7 @@ describe('TorrentRow (the memoized row)', () => {
           sort="added_on"
           sortValue={undefined}
           errorReason={errorReason}
+          location={PLAIN}
           viewing={false}
           selected={false}
           onOpen={() => {}}
@@ -210,6 +235,7 @@ describe('TorrentRow (the memoized row)', () => {
         sort="added_on"
         sortValue={undefined}
         errorReason="<b>x</b>"
+        location={PLAIN}
         viewing={false}
         selected={false}
         onOpen={() => {}}

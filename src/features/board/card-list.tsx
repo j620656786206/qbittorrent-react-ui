@@ -10,6 +10,7 @@ import { BAR_SCROLL_PADDING_END } from '#/shared/ui/selection-bar-geometry'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
 import { useLeavingExit } from '#/state/leaving-exit'
+import { useLocationResolver } from '#/state/locations'
 import { toggleSelected, useSelectedHashes } from '#/state/selection'
 import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
@@ -174,6 +175,7 @@ export function CardList({
   // Story 2.10: polled only while maindata has an errored torrent; every
   // column observes the same `['error-reasons']` query.
   const errorReasons = useErrorReasons()
+  const locate = useLocationResolver()
   const selectedHashes = useSelectedHashes()
   const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
   const selecting = selected.size > 0
@@ -407,6 +409,7 @@ export function CardList({
                       }
                       today={today}
                       errorReason={reasonOf(errorReasons, hash)}
+                      location={locate(torrent.save_path)}
                       selected={isSelected}
                       onOpen={phoneSelecting ? toggleSelected : setHash}
                       longPress={selectable && phone && !selecting}

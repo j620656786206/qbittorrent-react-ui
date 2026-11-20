@@ -3,7 +3,6 @@ import type { RefObject } from 'react'
 import { detailHero } from '#/lib/detail-hero'
 import { reasonOf } from '#/lib/error-reason'
 import type { DetailHero } from '#/lib/detail-hero'
-import { locationLabel } from '#/lib/paths'
 import { getTorrentDetail } from '#/server/functions/get-torrent-detail'
 import type { SlimTorrent } from '#/shared/maindata'
 import type { TorrentDetail } from '#/shared/torrent-detail'
@@ -14,6 +13,7 @@ import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
+import { useLocationResolver } from '#/state/locations'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import { useDayClock } from '#/state/now'
 import {
@@ -213,7 +213,8 @@ const PILL = 'flex-none rounded-full border px-3.5 whitespace-nowrap'
 const PILL_OUTLINE = 'border-border bg-surface text-text hover-outline'
 
 /**
- * DESIGN save-path-block: 「儲存位置」 with the location tag, the full path
+ * DESIGN save-path-block: 「儲存位置」 with the location tag (story 5.1: the
+ * common path's name, purple for a media library), the full path
  * on one line cut at the front (an RTL box around an LTR isolate keeps
  * 「…media/tv/牧神記」 in order, https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdi),
  * then 複製, 「☆ 加到常用」, 改路徑 (the only solid one) and 改檔名. The
@@ -225,6 +226,7 @@ function SavePathBlock({ path, phone }: { path: string; phone: boolean }) {
   const sectionRef = useRef<HTMLElement>(null)
   const [expanded, setExpanded] = useState(false)
   const { label, copy } = useCopyButton(path, sectionRef)
+  const location = useLocationResolver()(path)
   const size = phone ? 'h-11 text-[13px]' : 'h-[34px] text-[12px]'
   const cut = (
     <span
@@ -246,8 +248,9 @@ function SavePathBlock({ path, phone }: { path: string; phone: boolean }) {
       <div className="flex min-w-0 items-center gap-2">
         <span className="flex-none text-meta font-semibold">儲存位置</span>
         <LocationTag
-          label={locationLabel(path)}
-          className="rounded-full border px-2 py-px text-tag whitespace-nowrap text-text-muted"
+          label={location.name}
+          mediaLibrary={location.mediaLibrary}
+          className="rounded-full px-2 py-px text-tag whitespace-nowrap"
         />
       </div>
       {phone ? (

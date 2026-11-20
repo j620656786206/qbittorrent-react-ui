@@ -150,6 +150,9 @@ function Url({
 
 async function render(ui: ReactNode, hash: string | null = null) {
   client = createQueryClient({
+    // Story 5.1: the tags read ['settings']; never answered here, so they
+    // show the last two folders (tests that need common paths set them).
+    fetchSettings: () => new Promise(() => {}),
     fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => Promise.resolve(fakeResponse({ changed: torrents() })),
     currentPath: () => '/',

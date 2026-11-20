@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import type { TagLocation } from '#/lib/paths'
 import type { SlimTorrent } from '#/shared/maindata'
 import { cn } from '#/shared/ui/cn'
 import { Skeleton } from '#/shared/ui/skeleton'
@@ -46,8 +47,14 @@ const CARD_BUTTON_CLASS = `${CARD_CLASS} w-full text-left text-text hover-ring`
 /** Story 4.1: the ticked card's background. */
 const CARD_SELECTED_CLASS = cn(CARD_BUTTON_CLASS, 'bg-selection-row')
 
-const TAG_CLASS =
-  'inline-flex h-5 min-w-0 items-center gap-1 rounded-full border px-2 text-tag leading-4 whitespace-nowrap text-text-muted'
+/** The box both tags share; the category tag adds its outline and colour. */
+const TAG_BOX_CLASS =
+  'inline-flex h-5 min-w-0 items-center gap-1 rounded-full px-2 text-tag leading-4 whitespace-nowrap'
+
+const CATEGORY_TAG_CLASS = cn(
+  TAG_BOX_CLASS,
+  'max-w-1/2 flex-none border text-text-muted',
+)
 
 export interface BoardCardProps {
   /** The merged object: unchanged torrents keep their reference. */
@@ -61,6 +68,11 @@ export interface BoardCardProps {
    * only when its own reason changes); `undefined` for none.
    */
   errorReason?: string
+  /**
+   * Story 5.1: the resolver's object for this torrent's `save_path`; a new
+   * one (a changed path or common paths) re-renders the card.
+   */
+  location: TagLocation
   /** Story 4.1: the card is ticked (the `selection-row` background). */
   selected?: boolean
   /** Stable: opens this card's torrent in the detail (phone selecting: toggles it). */
@@ -79,6 +91,7 @@ export const BoardCard = memo(function Card({
   stateBeforeMove,
   today,
   errorReason,
+  location,
   selected = false,
   onOpen,
   longPress = false,
@@ -93,6 +106,7 @@ export const BoardCard = memo(function Card({
     stateBeforeMove:
       stateBeforeMove !== undefined ? { [torrent.hash]: stateBeforeMove } : {},
     errorReason,
+    location,
   })
   return (
     <CardContent
@@ -167,13 +181,14 @@ export function CardContent({
       )}
       <span className="flex h-5 w-full min-w-0 flex-none gap-1.5 overflow-hidden">
         {model.category !== null && (
-          <span className={cn(TAG_CLASS, 'max-w-1/2 flex-none')}>
+          <span className={CATEGORY_TAG_CLASS}>
             <span className="min-w-0 truncate">{model.category}</span>
           </span>
         )}
         <LocationTag
-          label={model.location}
-          className={cn(TAG_CLASS, 'flex-initial')}
+          label={model.location.name}
+          mediaLibrary={model.location.mediaLibrary}
+          className={cn(TAG_BOX_CLASS, 'flex-initial')}
         />
       </span>
     </button>

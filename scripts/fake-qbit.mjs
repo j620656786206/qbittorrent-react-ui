@@ -64,6 +64,13 @@
 //          X-default, a category whose savePath is '', for the add screen's
 //          「會存到 qBittorrent 的預設位置」; story 4.7: none answers no
 //          categories at all)
+//   paths: normal | varied (story 5.1: varied gives the n-th torrent of
+//          any data set its own folder `Fake.Folder.<n+1>` under one of
+//          the 50 VARIED_PARENTS (scripts/fake-settings-seeds.mjs) in turn: the media-library /data/media/tv,
+//          /data/torrent/mteam-seed, /data/downloads (no common path in
+//          any seed), /data/media/movies, ...; so `many` has 4165 distinct
+//          save paths and sample's E01 to E04 land in 影集媒體庫, PT 做種,
+//          no match and 電影媒體庫 with seed=library)
 //   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
 //   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
 //   Any `data` parameter (even the current one) also clears the deleted
@@ -125,14 +132,30 @@
 // reset removes it (and any kept broken copy), so the next read writes the
 // defaults (the e2e fixtures reset before every test):
 //   curl -X POST 'http://localhost:3100/__fake/settings?reset=1'
+// Story 5.1: a seed writes settings.json with fake common paths
+// (library | library-long | library-renamed | fifty | fifty-renamed, see
+// SETTINGS_SEEDS in scripts/fake-settings-seeds.mjs):
+//   curl -X POST 'http://localhost:3100/__fake/settings?seed=library'
 import { spawn } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { createServer, request } from 'node:http'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  SETTINGS_SEEDS,
+  VARIED_PARENTS,
+  seedFile,
+} from './fake-settings-seeds.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const ENTRY = join(ROOT, '.output/server/index.mjs')
@@ -183,6 +206,7 @@ const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files', 'drop'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const CATS_MODES = new Set(['normal', 'default-path', 'none'])
+const PATHS_MODES = new Set(['normal', 'varied'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -201,6 +225,7 @@ const mode = {
   ops: 'normal',
   files: 'normal',
   cats: 'normal',
+  paths: 'normal',
 }
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
@@ -734,8 +759,29 @@ function withOverrides(torrents) {
 const added = {}
 let addedCount = 0
 
+/** Each data set's varied copy, built once so its objects stay the same. */
+const variedCache = new Map()
+
+function withVariedPaths(torrents) {
+  let varied = variedCache.get(torrents)
+  if (!varied) {
+    varied = Object.fromEntries(
+      Object.entries(torrents).map(([key, value], index) => [
+        key,
+        {
+          ...value,
+          save_path: `${VARIED_PARENTS[index % VARIED_PARENTS.length]}/Fake.Folder.${index + 1}`,
+        },
+      ]),
+    )
+    variedCache.set(torrents, varied)
+  }
+  return varied
+}
+
 function currentTorrents(tick) {
-  const base = DATA[mode.data]
+  const data = DATA[mode.data]
+  const base = mode.paths === 'varied' ? withVariedPaths(data) : data
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
   const extra = growCount > 0 || addedCount > 0
   return withoutRemoved(
@@ -1297,6 +1343,7 @@ function controlMode(req, res, url) {
       ops: OPS_MODES,
       files: FILES_MODES,
       cats: CATS_MODES,
+      paths: PATHS_MODES,
     }
     const next = {}
     for (const [name, values] of Object.entries(allowed)) {
@@ -1325,7 +1372,7 @@ function controlMode(req, res, url) {
     }
     Object.assign(mode, next)
     console.log(
-      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files} cats=${mode.cats}`,
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files} cats=${mode.cats} paths=${mode.paths}`,
     )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
@@ -1402,13 +1449,36 @@ function controlLog(req, res) {
   })
 }
 
-/** Story 3.1: removes the app's settings files (loopback only, POST). */
+/** Writes settings.json with a seed's common paths (temp file, rename). */
+function seedSettings(commonPaths) {
+  const text = `${JSON.stringify(seedFile(commonPaths), null, 2)}\n`
+  const temp = join(
+    configDir,
+    `.settings.json.${randomBytes(6).toString('hex')}.tmp`,
+  )
+  writeFileSync(temp, text, { mode: 0o600 })
+  renameSync(temp, join(configDir, 'settings.json'))
+}
+
+/**
+ * Story 3.1: removes the app's settings files (loopback only, POST,
+ * `reset=1`). Story 5.1: `seed=<name>` writes one of SETTINGS_SEEDS.
+ */
 function controlSettings(req, res, url) {
   if (!isLoopback(req.socket.remoteAddress))
     return send(res, 403, 'loopback only\n')
   if (req.method !== 'POST') return send(res, 405, 'POST\n')
-  if (url.searchParams.get('reset') !== '1' || !configDir) {
-    return send(res, 400, 'reset=1\n')
+  if (!configDir) return send(res, 400, 'no CONFIG_DIR\n')
+  const seed = url.searchParams.get('seed')
+  if (seed !== null) {
+    if (!Object.hasOwn(SETTINGS_SEEDS, seed)) {
+      return send(res, 400, `unknown seed: ${seed}\n`)
+    }
+    seedSettings(SETTINGS_SEEDS[seed])
+    return send(res, 200, 'ok\n')
+  }
+  if (url.searchParams.get('reset') !== '1') {
+    return send(res, 400, 'reset=1 or seed=<name>\n')
   }
   for (const name of readdirSync(configDir)) {
     if (name.startsWith('settings.json') || name.startsWith('.settings.json')) {
@@ -1582,7 +1652,7 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal&cats=normal'
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal&cats=normal&paths=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states | categories | categories-emptied
@@ -1590,9 +1660,11 @@ switch modes:
   ops:   normal | reject | slow | reject-files | drop
   files: normal | slow | fail
   cats:  normal | default-path | none
+  paths: normal | varied
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'
 reset settings.json: curl -X POST '${origin}/__fake/settings?reset=1'
+seed common paths: curl -X POST '${origin}/__fake/settings?seed=library'
 Ctrl+C stops everything.`)
 }
 
