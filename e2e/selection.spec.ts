@@ -128,14 +128,17 @@ test('list: hover shows one checkbox; ticking 3 shows the bar and the total with
   await expectShown(checkbox(page, 2), true)
   await expectShown(checkbox(page, 1), false)
   // No row shifts: the name starts where it did.
-  const before = await rowButton(page, 2).locator('[title]').boundingBox()
+  const before = await rowButton(page, 2)
+    .locator('[title]')
+    .first()
+    .boundingBox()
 
   await tick(page, 2)
   await tick(page, 1)
   await tick(page, 4)
-  expect(await rowButton(page, 2).locator('[title]').boundingBox()).toEqual(
-    before,
-  )
+  expect(
+    await rowButton(page, 2).locator('[title]').first().boundingBox(),
+  ).toEqual(before)
   // After the first tick every row shows its checkbox.
   await page.mouse.move(0, 0)
   await expectShown(checkbox(page, 3), true)
@@ -499,7 +502,7 @@ test.describe('phone selection mode (story 4.2)', () => {
     await openList(page)
     await expect(page.locator('button[role="checkbox"]')).toHaveCount(0)
     await expectPhoneBarHidden(page)
-    const name = rowButton(page, 2).locator('[title]')
+    const name = rowButton(page, 2).locator('[title]').first()
     const before = await name.boundingBox()
 
     await longPress(page, rowButton(page, 2))
