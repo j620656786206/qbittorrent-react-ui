@@ -1,12 +1,12 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { addBatches, judgeEntries } from '#/lib/add-entries'
-import { AppError, isAppError } from '#/lib/app-error'
+import { AppError, isAppError, isConnectionCode } from '#/lib/app-error'
 import { OPERATION_FAILURE_CODES, addFailureText } from '#/lib/error-text'
 import type { Maindata } from '#/lib/maindata-merge'
 import { toast } from '#/lib/toast'
 import { addTorrents } from '#/server/functions/add-torrents'
-import { closeAdd } from '#/state/add-open'
+import { addOpenStore, closeAdd } from '#/state/add-open'
 import { callFn } from '#/state/call-fn'
 import { MAINDATA_KEY, refreshMaindata } from '#/state/maindata'
 import { cancelOpenWhenAdded, openWhenAdded } from '#/state/open-when-added'
@@ -44,11 +44,15 @@ import type { AddEntries } from '#/features/add/use-add-entries'
 //   `timeout` and `invalid_input` show 「新增失敗：…」 with 「重試」
 //   (sendOp), connection codes are the global handler's; the list and the
 //   category stay either way. `not_logged_in` discards the list (AD-9).
-//   A whole `invalid_input` or `timeout` refreshes maindata too (a deleted
-//   category leaves the menu; a timeout may have added some). A later
-//   request failing as a whole only fails its own entries, with that code,
-//   since the earlier ones were added; `not_logged_in` there still shows
-//   what was added before the list goes.
+//   Every whole failure but `not_logged_in` refreshes maindata too (a
+//   deleted category leaves the menu; a timeout or a lost connection may
+//   still have added some). A later request failing as a whole only fails
+//   its own entries, with that code (`not_sent` when the browser failed
+//   before any answer), since the earlier ones were added; a connection
+//   code or `not_logged_in` there fails the rest unsent, and
+//   `not_logged_in` still shows what was added before the list goes.
+//   重試 uses the screen's current category, and does nothing (closing
+//   the toast) when 新增 would be disabled.
 // While the add is out (the press, or a 重試) the screen is `sending`: it
 // ignores every close path and every change to the list or the category.
 // Closing it, adding or removing a row or changing the category closes
@@ -91,14 +95,15 @@ async function sendAdd({ entries, category }: AddVariables) {
       outcome.failed.push(...part.failed)
     } catch (error) {
       if (index === 0) throw error
-      const code = isAppError(error) ? error.code : 'qbit_rejected'
-      if (code === 'not_logged_in') {
-        for (const item of batches.slice(index).flat()) {
-          outcome.failed.push({ item, code })
-        }
-        throw new AddInterrupted(outcome)
-      }
-      for (const item of batch) outcome.failed.push({ item, code })
+      const code = isAppError(error) ? error.code : 'not_sent'
+      const stop =
+        code !== 'not_sent' &&
+        (code === 'not_logged_in' || isConnectionCode(code))
+      // Logged out or unreachable: the rest is not sent either.
+      const failing = stop ? batches.slice(index).flat() : batch
+      for (const item of failing) outcome.failed.push({ item, code })
+      if (code === 'not_logged_in') throw new AddInterrupted(outcome)
+      if (stop) break
     }
   }
   return outcome
@@ -119,8 +124,8 @@ export const addTorrentsOp: TrackedOp<
 const NO_FAILURES: ReadonlyMap<number, string> = new Map()
 
 export interface AddResultSummary {
+  /** How many the last partial failure added (the failed are counted live). */
   added: number
-  failed: number
 }
 
 export interface AddSubmit {
@@ -139,6 +144,8 @@ export function useAddSubmit(
   open: boolean,
   entries: AddEntries,
   selectCategory: (category: string) => void,
+  /** The screen's category now and whether 新增 is disabled (for 重試). */
+  screen: { category: string; disabled: boolean },
 ): AddSubmit {
   const client = useQueryClient()
   const { items, reading, removeAdded } = entries
@@ -174,6 +181,7 @@ export function useAddSubmit(
     reading,
     removeAdded,
     selectCategory,
+    screen,
     submit: (_category: string) => {},
   })
 
@@ -210,7 +218,16 @@ export function useAddSubmit(
 
     const op: typeof addTorrentsOp = {
       ...addTorrentsOp,
-      retry: (sent) => latestRef.current.submit(sent.category),
+      // A press again, with the screen's category now: a deleted one is
+      // gone from the menu, so 新增 is disabled and 重試 does nothing.
+      retry: () => {
+        const latest = latestRef.current
+        if (latest.screen.category === '' || latest.screen.disabled) {
+          dismissAddFailure()
+          return
+        }
+        latest.submit(latest.screen.category)
+      },
       onSuccess: (sentClient, sent, outcome) => {
         void refreshMaindata(sentClient)
         if (!live()) return
@@ -220,6 +237,7 @@ export function useAddSubmit(
           showAdded(outcome.added, sent.category)
           const unchanged =
             latest.reading === 0 &&
+            addOpenStore.state.queued.length === 0 &&
             latest.items.every((item) => seen.has(item.id))
           if (unchanged) closeAdd()
           return
@@ -232,14 +250,10 @@ export function useAddSubmit(
             ]),
           ),
         )
-        setSummary({
-          added: outcome.added.length,
-          failed: outcome.failed.length,
-        })
+        setSummary({ added: outcome.added.length })
       },
       onFailure: (_sent, code, error) => {
         if (error instanceof AddInterrupted) {
-          void refreshMaindata(client)
           if (!live()) return
           latestRef.current.removeAdded(
             error.outcome.added.map((item) => item.id),
@@ -254,11 +268,10 @@ export function useAddSubmit(
           if (live()) closeAdd()
           return
         }
-        // A deleted category leaves the menu; a timeout may still have
-        // added some. Any other whole failure did nothing.
-        if (code === 'timeout' || code === 'invalid_input') {
-          void refreshMaindata(client)
-        }
+        // A deleted category leaves the menu; a timeout or a lost
+        // connection (the browser's own timeout included) may still have
+        // added some.
+        void refreshMaindata(client)
       },
     }
     void sendOp(op, client, { entries: addable, category }).then(() => {
@@ -269,7 +282,14 @@ export function useAddSubmit(
 
   useLayoutEffect(() => {
     sendingRef.current = sending
-    latestRef.current = { items, reading, removeAdded, selectCategory, submit }
+    latestRef.current = {
+      items,
+      reading,
+      removeAdded,
+      selectCategory,
+      screen,
+      submit,
+    }
   })
 
   return { sending, isSending, failures, summary, submit }

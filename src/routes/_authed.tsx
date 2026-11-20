@@ -49,6 +49,7 @@ import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
+import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { useResumeLastPlace } from '#/state/resume-last-place'
 import { useSearchOpen } from '#/state/search-open'
@@ -520,6 +521,8 @@ function AuthedLayout() {
     [hash, setHash, followHash],
   )
   useDetailOutsideUpkeep(hash ?? null)
+  // Story 4.7: 「去看」 outlives the add screen.
+  useOpenWhenAddedUpkeep(category, hash ?? null, setHash)
 
   return (
     <ListViewContext value={control}>

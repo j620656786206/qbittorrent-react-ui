@@ -499,6 +499,15 @@ describe('parseMagnet', () => {
     })
   })
 
+  it('spec 4.7: a C0 control character or DEL inside the link is unreadable', () => {
+    for (const char of ['\x01', '\x1f', '\x7f', '\t']) {
+      expect(parseMagnet(`magnet:?xt=urn:btih:${HEX}&dn=a${char}b`)).toEqual({
+        kind: 'unreadable',
+        reason: 'link',
+      })
+    }
+  })
+
   it('linkBytes is the UTF-8 length of the trimmed link', () => {
     const link = `magnet:?xt=urn:btih:${HEX}&dn=中文`
     expect(parseMagnet(`  ${link}\n`)).toMatchObject({

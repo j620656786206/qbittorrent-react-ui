@@ -112,6 +112,12 @@ export const ADD_FILE_REJECTED = 'qBittorrent 讀不了這個檔案'
 export const ADD_LINK_REJECTED = 'qBittorrent 拒絕這個連結'
 
 /**
+ * Story 4.7 (Claude 代決): a row whose request failed in the browser before
+ * qBittorrent answered anything (never a qBittorrent refusal).
+ */
+export const ADD_NOT_SENT = '沒有送出，請再試一次'
+
+/**
  * Story 4.7: why one entry of an add failed, shown under its row. A
  * rejection names what qBittorrent refused (the file or the link); any
  * other code is its fixed text (`timeout`: 「qBittorrent 沒有回應，請再試

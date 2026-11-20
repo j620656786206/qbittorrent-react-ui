@@ -5,7 +5,7 @@ created: '2026-11-20'
 status: 'done'
 baseline_revision: '1441bcd19d6b1d32cd5bc540ab8b0f819eeefb51'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
 warnings: ['oversized']
@@ -17,6 +17,31 @@ deferred:
       hybrid torrent by its v1 hash, so the match holds; a v2-only or btmh-only entry stays unreadable (4.5).
     location: >-
       src/lib/info-hash.ts
+    severity: low
+  - summary: >-
+      With autoTMM on, a category whose savePath is empty may save under <default save path>/<category>, not the default folder 4.6's line promises (unverified).
+    evidence: |-
+      4.7 always sends autoTMM=true. qBittorrent's automatic mode can derive an empty category path from the default save path
+      plus the category name. Settle it on the NAS by adding to a category with no path; if so, change savePathLine's empty
+      case text.
+    location: >-
+      src/features/add/add-model.ts
+    severity: medium (unverified)
+  - summary: >-
+      The 50 MB multipart ceiling applies to any verified multipart request, not only addTorrents.
+    evidence: |-
+      The gate cannot see the server function id; a logged-in multipart POST to another function is read and parsed before
+      guard() refuses it on bodyLimit. Authenticated only, single user. Fix by matching the addTorrents function path in the gate.
+    location: >-
+      src/server/gate/body-limit.ts
+    severity: low
+  - summary: >-
+      The deadline passing before the first send (slow category read) has no test.
+    evidence: |-
+      add-torrents.ts returns a whole timeout when left() <= 0 before sendEntries; needs a fake-timer test on a category read
+      slower than ADD_DEADLINE_MS.
+    location: >-
+      src/server/functions/add-torrents.ts
     severity: low
 ---
 
@@ -163,6 +188,42 @@ deferred:
   - `[low]` `[patch]` (gap) A new press cancelling a pending 去看 is untested: tested through `submit`.
   - `[low]` `[patch]` (gap) `removeAdded` dropping merged copies is untested: tested with hex and base32 of one hash.
 
+### 2026-11-20: Review pass (follow-up)
+- verdicts: 32 findings: high 0, medium 8, low 18, false 5, maybe-false 1
+- findings:
+  - `[low]` `[reject]` (intent) Magnets are sent before files within a batch: keys map back through the send order; the on-screen result is right.
+  - `[low]` `[reject]` (intent) A hang on entry 0 shows per-row timeouts, not the whole toast: the rows stay with their reason and 新增 resends them.
+  - `[false]` `[reject]` (intent) 重試 re-judges instead of resending bytes: the contract's goal (same content) holds when nothing changed; tested.
+  - `[false]` `[reject]` (intent) The ceiling depends on content type: narrower than the contract, which is the safer reading.
+  - `[false]` `[reject]` (intent) Re-judging uses the cache: the spec's recorded choice.
+  - `[false]` `[reject]` (intent) The lock covers inputs too: needed so no entry is lost (first pass).
+  - `[false]` `[reject]` (intent) A whole qbit_rejected is unreachable from the server: per-entry rejections are items (AD-14).
+  - `[medium]` `[patch]` (intent) Later batch failures: connection codes now stop the remaining batches (see blind row).
+  - `[low]` `[reject]` (intent) 4.5 and 4.6 gating changed (`%20` measurement, `reading > 0`): both were review fixes, outside the judging order and labels.
+  - `[medium]` `[patch]` (gap, other) A client abort gets no refresh: every whole failure except not_logged_in refreshes; tested.
+  - `[low]` `[patch]` (gap) The timeout refresh is untested: tested without a manual refetch.
+  - `[low]` `[patch]` (gap) qbit_auth_failed stopping the add is untested: tested (whole failure, 0 add calls).
+  - `[low]` `[defer]` (gap) The pre-send deadline is untested: deferred as filed.
+  - `[medium]` `[patch]` (blind) A browser timeout gets no "may have added" handling: same fix as the gap row.
+  - `[medium]` `[patch]` (blind) 重試 resends a deleted category: retries with the screen's category; sends nothing and closes the toast when it is empty or 新增 is disabled; tested.
+  - `[medium]` `[patch]` (blind) A later batch's connection failure keeps sending: remaining batches fail with that code unsent; tested.
+  - `[low]` `[patch]` (blind) Unknown errors read as qBittorrent refusals: `not_sent`, 「沒有送出，請再試一次」.
+  - `[low]` `[patch]` (blind) Client and server magnet limits differ: the server counts UTF-8 bytes, requires `magnet:?`, refuses control characters; shared `hasControlCharacter`; tested.
+  - `[low]` `[defer]` (blind) Any verified multipart request gets 50 MB: deferred (the gate cannot see the function id; single authenticated user).
+  - `[low]` `[patch]` (blind) `AddResultSummary.failed` unused: removed.
+  - `[low]` `[reject]` (blind) The `unchanged` guard can never be false: kept as a guard against future inputs during a send.
+  - `[low]` `[patch]` (blind) Files dropped during a send are lost: they wait in the queue and join after the send; tested.
+  - `[maybe-false]` `[defer]` (blind) autoTMM may put an empty-path category under <default>/<category>: deferred, NAS check.
+  - `[low]` `[patch]` (blind) The 去看 upkeep lives in the add screen: mounted in the route.
+  - `[low]` `[patch]` (blind) Untested generation guard: a late answer after close and reopen is dropped; tested.
+  - `[low]` `[reject]` (blind) Small cleanups in `addFormOf` and the toast helpers: no behavior change.
+  - `[medium]` `[patch]` (edge) 重試 with a deleted category: same fix as the blind row.
+  - `[medium]` `[patch]` (edge) Later batches after a connection failure: same fix.
+  - `[low]` `[patch]` (edge) A C0 control character in a magnet is addable on the client: unreadable now; tested.
+  - `[low]` `[reject]` (edge) A picked file changed on disk before the send: rare; the browser reports it as a failed request.
+  - `[medium]` `[patch]` (edge) A JSON answer with failure_count but no success_count counts as added: counted as rejected unless success_count > 0; tested.
+  - `[low]` `[defer]` (edge) Multipart ceiling for other functions: same as the blind row.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -205,3 +266,9 @@ Status: done (first pass; a follow-up review pass is recommended).
 - `npm test`: 153 files, 3735 tests pass.
 - `npm run build && npx playwright test`: 182 passed, 1 skipped (opt-in recording), 24.2 min; screenshots retaken.
 - `check.sh`: every line ok.
+
+### Follow-up pass 1 (2026-11-20)
+
+Status: done. Follow-up review: false (no high patched; converged).
+
+**Review.** 32 findings. Patched: medium 5 entries (JSON answer counting, 重試 category, stop on connection codes, refresh after every whole failure, plus duplicates), low 9 rows. Deferred: 3 (autoTMM empty-path location, multipart ceiling scope, pre-send deadline test). Rejected: 5 false, 6 low.

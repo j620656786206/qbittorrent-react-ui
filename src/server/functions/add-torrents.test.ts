@@ -19,6 +19,7 @@ import { resetSyncerForTests } from '#/server/sync'
 import { ERROR_MESSAGES } from '#/shared/errors'
 import type { Result } from '#/shared/errors'
 import {
+  ADD_FORM_ENTRY_ALLOWANCE,
   MAX_ADD_ENTRIES,
   MAX_TORRENT_FILE_BYTES,
   addTorrentsFormSchema,
@@ -54,6 +55,13 @@ function run(
 function torrentFile(name: string): File {
   const text = `d4:infod6:lengthi1e4:name${name.length}:${name}ee`
   return new File([new TextEncoder().encode(text)], `${name}.torrent`)
+}
+
+/** A magnet of exactly `bytes` UTF-8 bytes: 中 is 3 bytes, the rest ASCII. */
+function cjkMagnet(bytes: number): string {
+  const head = `magnet:?xt=urn:btih:${'c'.repeat(40)}&dn=`
+  const left = bytes - head.length
+  return head + '中'.repeat(Math.floor(left / 3)) + 'x'.repeat(left % 3)
 }
 
 function form(
@@ -159,6 +167,15 @@ describe('addTorrents server function (spec 4.7)', () => {
       'S2 a magnet with a carriage return',
       form({ magnets: [`${MAGNET_A}\rx`] }),
     ],
+    ['a magnet with \\x01', form({ magnets: [`${MAGNET_A}\x01b`] })],
+    [
+      'magnet: without ?',
+      form({ magnets: [`magnet:xt=urn:btih:${'a'.repeat(40)}`] }),
+    ],
+    [
+      'a CJK magnet one UTF-8 byte over the allowance',
+      form({ magnets: [cjkMagnet(ADD_FORM_ENTRY_ALLOWANCE + 1)] }),
+    ],
     [
       'S2 a file sent as a magnet',
       form({ magnets: [] }, [['magnet', 'notmagnet']]),
@@ -199,6 +216,24 @@ describe('addTorrents server function (spec 4.7)', () => {
     ['nothing', undefined],
   ])('%s: invalid_input with no qBittorrent call', async (_name, value) => {
     expect(await run(value)).toEqual(invalid)
+    expect(addCalls()).toHaveLength(0)
+  })
+
+  it('a CJK magnet of exactly the allowance in UTF-8 bytes is accepted', async () => {
+    const link = cjkMagnet(ADD_FORM_ENTRY_ALLOWANCE)
+    // Far fewer UTF-16 units than bytes: the byte count is what is checked.
+    expect(link.length).toBeLessThan(ADD_FORM_ENTRY_ALLOWANCE / 2)
+    expect((await run(form({ magnets: [link] }))).ok).toBe(true)
+    expect(addCalls()).toHaveLength(1)
+  })
+
+  it('a refusing qBittorrent login: the whole request is qbit_auth_failed, no add call', async () => {
+    qbit = fakeQbit({ login: () => new Response('Fails.') })
+    vi.stubGlobal('fetch', qbit.fetch)
+    expect(await run(form({ magnets: [MAGNET_A, MAGNET_B] }))).toMatchObject({
+      ok: false,
+      error: { code: 'qbit_auth_failed' },
+    })
     expect(addCalls()).toHaveLength(0)
   })
 

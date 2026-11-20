@@ -14,7 +14,6 @@ import {
 import { openDetailOutside } from '#/state/detail-outside'
 import { useListView } from '#/state/list-view'
 import { selectCategories, useMaindata } from '#/state/maindata'
-import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useSettings } from '#/state/settings'
 import { useSheetLayer } from '#/state/sheet-layer'
 import { useEscapeLayer } from '#/state/shortcuts'
@@ -63,8 +62,8 @@ import { dismissAddFailure, useAddSubmit } from '#/features/add/use-add-submit'
 // qBittorrent category at all, a line under the menu says so). Story 4.7
 // submits (use-add-submit.ts): 「新增中…」 on the button, after 10 s
 // 「還在等 NAS 回應」 under it, and every close path (取消, ✕, Esc, a drag
-// down, 打開) and every change (paste, 選檔案, a drop, 拿掉, the category)
-// does nothing until the send ends; 新增 also waits for files still being
+// down, 打開) and every change (paste, 選檔案, 拿掉, the category) does
+// nothing until the send ends (a drop waits and joins after it); 新增 also waits for files still being
 // read. A failed row shows its
 // reason, and the list frame's top line counts what went and what failed.
 // 「打開」 closes the screen and
@@ -87,15 +86,37 @@ export function AddScreen() {
   const queued = useQueuedFiles()
   const { setHash } = useViewedHash()
   const { view, selectCategory } = useListView()
+  const { settings } = useSettings()
+  const { data: categories } = useMaindata(selectCategories)
+
+  const options = categoryOptions(categories, settings?.categoryOrder ?? [])
+  // `null`: untouched, the preset applies. Reset on every open.
+  const [picked, setPicked] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) {
+      setPicked(null)
+      setDraft('')
+    }
+  }
+  const chosen = picked ?? defaultCategory(view.category, options)
+  const category = options.some((option) => option.value === chosen)
+    ? chosen
+    : ''
+  const { addable, skipped } = addCounts(rows)
+  // Before maindata loads every entry looks addable, and a file still being
+  // read is not in the list yet: wait for both.
+  const disabled = !ready || reading > 0 || addDisabled(addable, category)
+
   const { sending, isSending, failures, summary, submit } = useAddSubmit(
     open,
     entries,
     selectCategory,
+    { category, disabled },
   )
   const waiting = useStillWaiting(sending)
-  useOpenWhenAddedUpkeep()
-  const { settings } = useSettings()
-  const { data: categories } = useMaindata(selectCategories)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -115,29 +136,12 @@ export function AddScreen() {
     [isSending, addFiles],
   )
 
-  // Dropped files (opened by a drop, or appended while open); a drop while
-  // the add is out is dropped like any other input.
+  // Dropped files (opened by a drop, or appended while open). A drop while
+  // the add is out waits in the queue and joins once the send ended.
   useEffect(() => {
-    if (!open || queued.length === 0) return
+    if (!open || sending || queued.length === 0) return
     onFiles(takeQueuedFiles())
-  }, [open, queued, onFiles])
-
-  const options = categoryOptions(categories, settings?.categoryOrder ?? [])
-  // `null`: untouched, the preset applies. Reset on every open.
-  const [picked, setPicked] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
-  const [wasOpen, setWasOpen] = useState(open)
-  if (wasOpen !== open) {
-    setWasOpen(open)
-    if (open) {
-      setPicked(null)
-      setDraft('')
-    }
-  }
-  const chosen = picked ?? defaultCategory(view.category, options)
-  const category = options.some((option) => option.value === chosen)
-    ? chosen
-    : ''
+  }, [open, sending, queued, onFiles])
 
   /** Every close path; never while the add is out. */
   const close = useCallback(() => {
@@ -206,10 +210,6 @@ export function AddScreen() {
     reading: reading > 0,
     locked: sending,
   }
-  const { addable, skipped } = addCounts(rows)
-  // Before maindata loads every entry looks addable, and a file still being
-  // read is not in the list yet: wait for both.
-  const disabled = !ready || reading > 0 || addDisabled(addable, category)
   const noCategories = categories !== undefined && options.length === 0
   // Failed rows still shown: one removed, or now in maindata, leaves the count.
   const failedShown = rows.filter(

@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { fakeHash, t } from '#/lib/testing'
 import { STILL_WAITING_TEXT } from '#/shared/ui/confirm-shell'
 import { addCallTimeoutMs } from '#/shared/torrent-add'
-import { addOpenStore, openAdd } from '#/state/add-open'
+import { addOpenStore, closeAdd, openAdd } from '#/state/add-open'
 import { callFn } from '#/state/call-fn'
 import type * as CallFnModule from '#/state/call-fn'
-import { getConnectionErrors } from '#/state/connection'
+import { connectionStore } from '#/state/connection'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { openWhenAdded, openWhenAddedStore } from '#/state/open-when-added'
 import {
@@ -476,10 +476,18 @@ describe('C8 connection codes', () => {
   it('only the global handler; the list stays and the button works again', async () => {
     await start(() => Promise.resolve(failed('qbit_unreachable')))
     await paste(magnet(NEW_A))
+    // The refresh that follows may clear it again: watch every change.
+    const marked: Array<ReadonlyArray<string>> = []
+    const watch = connectionStore.subscribe(() =>
+      marked.push(connectionStore.state.errors),
+    )
     await click(submit())
     await settle()
+    watch.unsubscribe()
     expect(toastCalls.failure).not.toHaveBeenCalled()
-    expect(getConnectionErrors()).toContain('qbit_unreachable')
+    expect(marked.some((errors) => errors.includes('qbit_unreachable'))).toBe(
+      true,
+    )
     expect(rows()).toHaveLength(1)
     expect(submit().hasAttribute('aria-disabled')).toBe(false)
     addCalls.answer = null
@@ -534,7 +542,7 @@ describe('review fixes (spec 4.7)', () => {
       },
     })
 
-  it('while sending, paste, 選檔案, a drop, 拿掉 and the category change nothing', async () => {
+  it('while sending, paste, 選檔案, 拿掉 and the category change nothing; a drop waits and joins after', async () => {
     const answer = deferred<unknown>()
     await start(() => answer.promise)
     await paste(magnet(NEW_A, 'A'))
@@ -550,10 +558,12 @@ describe('review fixes (spec 4.7)', () => {
       select().dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(rowNames()).toEqual(['A'])
-    expect(addOpenStore.state.queued).toEqual([])
+    expect(addOpenStore.state.queued).toHaveLength(1)
     await act(async () => answer.resolve(failed('qbit_unreachable')))
     await settle()
-    expect(rowNames()).toEqual(['A'])
+    await settleReads()
+    expect(addOpenStore.state.queued).toEqual([])
+    expect(rowNames()).toEqual(['A', 'Fake.Dropped'])
     expect(select().disabled).toBe(false)
     expect(select().value).toBe('X')
   })
@@ -630,23 +640,77 @@ describe('review fixes (spec 4.7)', () => {
     expect(addOpenStore.state.open).toBe(false)
   })
 
-  it('batch 2 throwing something else after batch 1 went: its rows stay failed, the first 20 leave', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    await start((sent, call) =>
-      call === 1
-        ? Promise.reject(new Error('boom'))
-        : Promise.resolve(allOk(sent)),
-    )
+  it('batch 2 failing in the browser before any answer: its rows say 沒有送出, not a refusal', async () => {
+    await start()
+    const real = vi.mocked(callFn).getMockImplementation()
+    if (!real) throw new Error('callFn is not wrapped')
+    vi.mocked(callFn)
+      .mockImplementationOnce(real)
+      .mockImplementationOnce(() => Promise.reject(new Error('boom')))
     const hashes = Array.from({ length: 22 }, (_, i) => fakeHash(0x400 + i))
     await paste(hashes.map((hash) => magnet(hash)).join('\n'))
     await click(submit())
     await settle()
     expect(rows()).toHaveLength(2)
     expect(resultLine()).toBe('20 個加好了，2 個失敗')
-    expect(reasons()).toEqual([
-      'qBittorrent 拒絕這個連結',
-      'qBittorrent 拒絕這個連結',
-    ])
+    expect(reasons()).toEqual(['沒有送出，請再試一次', '沒有送出，請再試一次'])
+  })
+
+  it('3 batches, batch 2 unreachable: batch 3 is not sent, its rows fail with that code', async () => {
+    await start((sent, call) =>
+      Promise.resolve(call === 1 ? failed('qbit_unreachable') : allOk(sent)),
+    )
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x500 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    await click(submit())
+    await settle()
+    expect(addCalls.sent).toHaveLength(2)
+    expect(rows()).toHaveLength(25)
+    expect(resultLine()).toBe('20 個加好了，25 個失敗')
+    expect(new Set(reasons())).toEqual(new Set(['家裡的 qBittorrent 沒有回應']))
+  })
+
+  it.each(['home_unreachable', 'timeout'])(
+    'a whole %s refreshes maindata by itself',
+    async (code) => {
+      await start(() => Promise.resolve(failed(code)))
+      await paste(magnet(NEW_A))
+      const before = env.maindataFetches
+      await click(submit())
+      await settle()
+      expect(env.maindataFetches).toBeGreaterThan(before)
+    },
+  )
+
+  it('重試 after a deleted category: the refresh empties the menu, 重試 sends nothing and closes the toast', async () => {
+    await start(() => Promise.resolve(failed('invalid_input')))
+    await paste(magnet(NEW_A))
+    env.categories = { 'mteam-X': { name: 'mteam-X', savePath: '/data/x' } }
+    await click(submit())
+    await settle()
+    expect(select().value).toBe('')
+    const [, options] = toastCalls.failure.mock.calls[0]
+    toastCalls.dismissFor.mockClear()
+    await act(async () => options.onRetry())
+    await settle()
+    expect(addCalls.sent).toHaveLength(1)
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith('add-torrents')
+  })
+
+  it('an answer that arrives after the screen closed and opened again is dropped', async () => {
+    const answer = deferred<unknown>()
+    await start(() => answer.promise)
+    await paste(magnet(NEW_A))
+    await click(submit())
+    await act(async () => closeAdd())
+    await open()
+    await act(async () =>
+      answer.resolve(allOk({ magnets: ['x'], files: [], category: 'X' })),
+    )
+    await settle()
+    expect(toastCalls.action).not.toHaveBeenCalled()
+    expect(addOpenStore.state.open).toBe(true)
+    expect(rows()).toHaveLength(0)
   })
 
   it('a whole invalid_input refreshes maindata (a deleted category leaves the menu)', async () => {

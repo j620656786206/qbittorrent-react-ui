@@ -1,5 +1,5 @@
 import type { AddEntry, EntryStatus, JudgedEntry } from '#/lib/add-entries'
-import { addItemFailureText } from '#/lib/error-text'
+import { ADD_NOT_SENT, addItemFailureText } from '#/lib/error-text'
 import { categoryLabel, orderCategoryKeys } from '#/lib/category-tabs'
 import { formatCount } from '#/lib/format'
 import { ALL, UNCATEGORIZED } from '#/shared/categories'
@@ -233,7 +233,11 @@ export function addFormOf(
 
 export interface AddFailure {
   item: AddItem
-  code: ErrorCode
+  /**
+   * The answer's code; `not_sent` when the browser failed before any
+   * answer (never shown as a qBittorrent refusal).
+   */
+  code: ErrorCode | 'not_sent'
 }
 
 /** What a send did, entry by entry, in list order per batch. */
@@ -266,6 +270,7 @@ export function outcomeOf(
 
 /** A failed entry's reason under its row. */
 export function addFailureReason({ item, code }: AddFailure): string {
+  if (code === 'not_sent') return ADD_NOT_SENT
   return addItemFailureText(
     code,
     item.result.kind === 'file' ? 'file' : 'magnet',

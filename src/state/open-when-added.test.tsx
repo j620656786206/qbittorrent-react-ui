@@ -9,8 +9,6 @@ import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import { ALL } from '#/shared/categories'
 import type { MaindataResponse } from '#/shared/maindata'
 import { detailOutsideStore, resetDetailOutside } from '#/state/detail-outside'
-import { ListViewContext } from '#/state/list-view'
-import type { ListViewControl } from '#/state/list-view'
 import { MAINDATA_KEY } from '#/state/maindata'
 import {
   OPEN_WHEN_ADDED_MS,
@@ -21,7 +19,6 @@ import {
   useOpenWhenAddedUpkeep,
 } from '#/state/open-when-added'
 import { createQueryClient } from '#/state/query-client'
-import { ViewedHashContext } from '#/state/viewed-hash'
 
 // Spec 4.7 C5: 「去看」 with one torrent added opens its detail once it is
 // in maindata, after the category switch reached the screen; 30 s cap;
@@ -39,41 +36,16 @@ let client: QueryClient
 let answer: MaindataResponse
 let setHash: ReturnType<typeof vi.fn<(hash: string | null) => void>>
 
-function Probe() {
-  useOpenWhenAddedUpkeep()
+function Probe({ category, hash }: { category: string; hash: string | null }) {
+  useOpenWhenAddedUpkeep(category, hash, setHash)
   return null
-}
-
-function control(category: string): ListViewControl {
-  return {
-    view: { sort: 'state', dir: 'desc', category, query: '' },
-    viewReady: true,
-    setView: () => {},
-    pickView: () => {},
-    selectCategory: () => {},
-    rememberedHint: false,
-    openSettings: () => {},
-    settingsOpen: false,
-    searchOpen: false,
-    openSearch: () => {},
-    setQuery: () => {},
-    closeSearch: () => {},
-  }
 }
 
 function tree(category: string, hash: string | null) {
   return createElement(
     QueryClientProvider,
     { client },
-    createElement(
-      ListViewContext,
-      { value: control(category) },
-      createElement(
-        ViewedHashContext,
-        { value: { hash, setHash, followHash: () => {} } },
-        createElement(Probe),
-      ),
-    ),
+    createElement(Probe, { category, hash }),
   )
 }
 

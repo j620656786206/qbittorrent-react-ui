@@ -2,9 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
 import type { Maindata } from '#/lib/maindata-merge'
 import { openDetailOutside } from '#/state/detail-outside'
-import { useListView } from '#/state/list-view'
 import { useMaindata } from '#/state/maindata'
-import { useViewedHash } from '#/state/viewed-hash'
 
 // Story 4.7 (EXPERIENCE add results, Claude 代決): 「去看」 after adding
 // exactly one torrent switches to the add category and opens that
@@ -13,9 +11,10 @@ import { useViewedHash } from '#/state/viewed-hash'
 // ends when Alex makes another choice once the category is on screen (another
 // category, another row, the detail closed), or when a new add is sent.
 // The add screen calls `openWhenAdded` right after `selectCategory`; the
-// upkeep (mounted once, by the add screen) waits for the category to be
-// on screen, then writes the URL's `hash` once the torrent exists, through
-// detail-outside so a search that hides it still shows the detail.
+// upkeep (mounted once, by the `_authed` layout, which owns the URL's
+// category and `hash`) waits for the category to be on screen, then writes
+// the URL's `hash` once the torrent exists, through detail-outside so a
+// search that hides it still shows the detail.
 
 export const OPEN_WHEN_ADDED_MS = 30_000
 
@@ -60,15 +59,20 @@ function useHas(hash: string | null): boolean | undefined {
   return useMaindata(select).data
 }
 
-/** Mounted once: carries out the wish (see the top of the file). */
-export function useOpenWhenAddedUpkeep(): void {
+/**
+ * Mounted once by the `_authed` layout with the category on screen, the
+ * URL's `hash` and its setter: carries out the wish (see the top).
+ */
+export function useOpenWhenAddedUpkeep(
+  category: string,
+  viewed: string | null,
+  setHash: (hash: string) => void,
+): void {
   const pending = useSelector(openWhenAddedStore, (state) => state)
-  const { hash: viewed, setHash } = useViewedHash()
-  const { view } = useListView()
   const has = useHas(pending?.hash ?? null)
   useEffect(() => {
     if (pending === null) return
-    const here = view.category === pending.category
+    const here = category === pending.category
     if (!pending.reached) {
       if (!here) return
       openWhenAddedStore.setState((current) =>
@@ -86,7 +90,7 @@ export function useOpenWhenAddedUpkeep(): void {
     cancelOpenWhenAdded()
     openDetailOutside(pending.hash)
     setHash(pending.hash)
-  }, [pending, view.category, viewed, has, setHash])
+  }, [pending, category, viewed, has, setHash])
 }
 
 /** Tests: no wish, no timer. */

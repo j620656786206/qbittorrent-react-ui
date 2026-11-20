@@ -294,6 +294,20 @@ describe('qBittorrent client', () => {
       ['415', () => new Response('Torrent file is not valid', { status: 415 })],
       ['Fails.', () => new Response('Fails.')],
       [
+        'JSON with only failure_count',
+        () => jsonResponse({ failure_count: 1 }),
+      ],
+      [
+        'JSON with only a pending count',
+        () =>
+          jsonResponse({
+            success_count: 0,
+            failure_count: 0,
+            pending_count: 1,
+          }),
+      ],
+      ['JSON that does not parse', () => new Response('{oops')],
+      [
         'JSON with nothing added',
         () =>
           jsonResponse({
@@ -312,6 +326,10 @@ describe('qBittorrent client', () => {
     it.each([
       ['Ok.', () => new Response('Ok.')],
       ['an empty body', () => new Response('')],
+      [
+        'JSON with only success_count 1',
+        () => jsonResponse({ success_count: 1 }),
+      ],
       [
         'JSON with one added',
         () =>

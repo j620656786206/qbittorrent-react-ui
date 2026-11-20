@@ -64,8 +64,12 @@ export const ADD_FIELDS = Object.freeze({
   category: 'category',
 } as const)
 
-/** A C0 control character or DEL anywhere in `text`. */
-function hasControlCharacter(text: string): boolean {
+/**
+ * A C0 control character or DEL anywhere in `text`. Story 4.7: a magnet
+ * with one is unreadable on the client (`parseMagnet`) and refused by the
+ * server, the same rule on both sides.
+ */
+export function hasControlCharacter(text: string): boolean {
   for (let index = 0; index < text.length; index += 1) {
     const code = text.charCodeAt(index)
     if (code < 0x20 || code === 0x7f) return true
@@ -73,15 +77,23 @@ function hasControlCharacter(text: string): boolean {
   return false
 }
 
+const utf8 = new TextEncoder()
+
 /**
- * A magnet link and nothing else: it starts with `magnet:` and has no line
- * break or other control character (qBittorrent splits `urls` on new
- * lines, so one would smuggle in a second URL, an http one included).
+ * A magnet link and nothing else, by the client's own rules
+ * (`parseMagnet`): it starts with `magnet:?`, is at most
+ * `ADD_FORM_ENTRY_ALLOWANCE` bytes in UTF-8, and has no line break or
+ * other control character (qBittorrent splits `urls` on new lines, so one
+ * would smuggle in a second URL, an http one included).
  */
 const magnetField = z
   .string()
-  .max(ADD_FORM_ENTRY_ALLOWANCE)
-  .refine((text) => /^magnet:/i.test(text) && !hasControlCharacter(text))
+  .refine(
+    (text) =>
+      /^magnet:\?/i.test(text) &&
+      !hasControlCharacter(text) &&
+      utf8.encode(text).length <= ADD_FORM_ENTRY_ALLOWANCE,
+  )
 
 /** A .torrent file of at most 10 MB; its first byte is checked on read. */
 const torrentField = z

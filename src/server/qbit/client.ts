@@ -76,9 +76,10 @@ export type AddTorrentEntry =
 
 /**
  * qBittorrent 5.0 answers `Ok.` or `Fails.` with 200; newer versions may
- * answer JSON with counts. Anything that says nothing was added is a
- * rejection; an answer it cannot read counts as accepted (the next
- * maindata tells).
+ * answer JSON with counts. `Fails.` is a rejection, and so is any JSON
+ * answer that does not say at least one was added (`success_count` above
+ * 0). Other text (`Ok.`, empty) counts as accepted (the next maindata
+ * tells).
  */
 function addRejected(body: string): boolean {
   const text = body.trim()
@@ -86,13 +87,9 @@ function addRejected(body: string): boolean {
   if (!text.startsWith('{')) return false
   try {
     const json = JSON.parse(text) as Record<string, unknown>
-    return (
-      typeof json.failure_count === 'number' &&
-      json.failure_count > 0 &&
-      json.success_count === 0
-    )
+    return !(typeof json.success_count === 'number' && json.success_count > 0)
   } catch {
-    return false
+    return true
   }
 }
 

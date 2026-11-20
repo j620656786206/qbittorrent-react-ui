@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ADD_FILE_REJECTED,
   ADD_LINK_REJECTED,
+  ADD_NOT_SENT,
   ERROR_TEXT,
   FILES_LOAD_FAILED,
   LIST_LOAD_FAILED,
@@ -143,6 +144,7 @@ describe('add failure text (spec 4.7)', () => {
   it('a row reason names the rejected file or link; other codes keep their text', () => {
     expect(ADD_FILE_REJECTED).toBe('qBittorrent 讀不了這個檔案')
     expect(ADD_LINK_REJECTED).toBe('qBittorrent 拒絕這個連結')
+    expect(ADD_NOT_SENT).toBe('沒有送出，請再試一次')
     expect(addItemFailureText('qbit_rejected', 'file')).toBe(ADD_FILE_REJECTED)
     expect(addItemFailureText('qbit_rejected', 'magnet')).toBe(
       ADD_LINK_REJECTED,
