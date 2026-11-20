@@ -35,6 +35,12 @@ export const NO_CATEGORY_TEXT = '選分類'
 /** The longest link text drawn; CSS cuts it to one line with 「…」 anyway. */
 const LINK_SHOWN_MAX = 300
 
+/** The first `max` code units, never ending on half of an emoji. */
+export function cutText(text: string, max: number): string {
+  const cut = text.slice(0, max)
+  return /[\ud800-\udbff]$/.test(cut) ? cut.slice(0, -1) : cut
+}
+
 export interface RowView {
   /** Plain text: the torrent's name, else the link's start or the file name. */
   name: string
@@ -49,7 +55,7 @@ export interface RowView {
 export function rowView({ entry, status, label }: JudgedItem): RowView {
   const { result, source } = entry
   const sourceName =
-    source.kind === 'file' ? source.name : source.text.slice(0, LINK_SHOWN_MAX)
+    source.kind === 'file' ? source.name : cutText(source.text, LINK_SHOWN_MAX)
   let name = sourceName
   if (result.kind === 'file') name = result.name
   if (result.kind === 'magnet' && result.name !== null) name = result.name

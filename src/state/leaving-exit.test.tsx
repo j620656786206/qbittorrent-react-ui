@@ -219,12 +219,11 @@ describe('useLeavingExit', () => {
     // Rows E (top 610) and past the box are not visible.
     const order = [A, B, C, D, E, fakeHash(0xf1), fakeHash(0xf2)]
     const below = order.slice(5)
-    const view = await mount({
-      live: order,
-      // A at -61: above the box. B 0, C 61, ... E 183 visible.
-      offset: -STEP,
-    })
-    await deleteAndRefresh(view, order, [A, B, D], { offset: -STEP })
+    // Scrolled one row down: A at -61 is above the box. B 0, C 61, ...
+    const props = { offset: -STEP, scrollFor: { 7: STEP } }
+    const view = await mount({ live: order, ...props })
+    const scroller = view.container.querySelector<HTMLElement>('[data-surface]')
+    await deleteAndRefresh(view, order, [A, B, D], props)
     // B and D fade. A is not visible: it stays, unanimated, so nothing
     // visible moves during the fade.
     expect(
@@ -237,13 +236,15 @@ describe('useLeavingExit', () => {
     const fades = [...stub.calls]
     stub.calls.length = 0
     await finishAll(fades)
-    // All three leave together; the slide counts A too.
+    // All three leave together. A was above the view: anchoring takes its
+    // row out of `scrollTop`, so each row slides only by what left in view.
     expect(rendered(view.container)).toEqual([C, E, ...below])
+    expect(scroller?.scrollTop).toBe(0)
     const shiftOf = (hash: string) =>
       on(stub.calls, hash)[0]?.keyframes[0].translate
-    expect(shiftOf(C)).toBe(`0px ${2 * STEP}px`)
-    expect(shiftOf(E)).toBe(`0px ${3 * STEP}px`)
-    expect(shiftOf(below[1])).toBe(`0px ${3 * STEP}px`)
+    expect(shiftOf(C)).toBe(`0px ${STEP}px`)
+    expect(shiftOf(E)).toBe(`0px ${2 * STEP}px`)
+    expect(shiftOf(below[1])).toBe(`0px ${2 * STEP}px`)
     await finishAll([...stub.calls])
     expect(held()).toBe(false)
     expect(leavingStore.state.hashes.size).toBe(0)
@@ -482,5 +483,60 @@ describe('useLeavingExit', () => {
     await finishAll([...stub.calls])
     expect(rendered(view.container)).toEqual(later)
     expect(held()).toBe(false)
+  })
+})
+
+describe('useLeavingExit scroll anchoring', () => {
+  // Scrolled two rows down: A at -122 and B at -61 are above the box.
+  const order = [A, B, C, D, E]
+  const props = { offset: -2 * STEP, scrollFor: { 5: 2 * STEP } }
+  const scrollerOf = (view: Awaited<ReturnType<typeof mount>>) =>
+    view.container.querySelector<HTMLElement>('[data-surface]') as HTMLElement
+
+  it('rows deleted only above the view: scrollTop takes their height in the removal commit, with a scroll event, no animation, no hold', async () => {
+    const view = await mount({ live: order, ...props })
+    const scroller = scrollerOf(view)
+    let scrolls = 0
+    scroller.addEventListener('scroll', () => (scrolls += 1))
+    const freezes: Array<boolean> = []
+    const subscription = freezeStore.subscribe(() =>
+      freezes.push(freezeStore.state.animation),
+    )
+    await deleteAndRefresh(view, order, [A, B], props)
+    subscription.unsubscribe()
+    expect(rendered(view.container)).toEqual([C, D, E])
+    expect(scroller.scrollTop).toBe(0)
+    expect(scrolls).toBe(1)
+    expect(stub.calls).toHaveLength(0)
+    expect(freezes).not.toContain(true)
+    expect(leavingStore.state.hashes.size).toBe(0)
+  })
+
+  it('reduced motion: still anchored, nothing animates', async () => {
+    reduced = true
+    const view = await mount({ live: order, ...props })
+    await deleteAndRefresh(view, order, [A, C], props)
+    expect(rendered(view.container)).toEqual([B, D, E])
+    expect(scrollerOf(view).scrollTop).toBe(STEP)
+    expect(stub.calls).toHaveLength(0)
+    expect(held()).toBe(false)
+  })
+
+  it('disabled (the collapse FLIP owns the scroll): not anchored', async () => {
+    const disabled = () => true
+    const view = await mount({ live: order, ...props, disabled })
+    await deleteAndRefresh(view, order, [A], { ...props, disabled })
+    expect(rendered(view.container)).toEqual([B, C, D, E])
+    expect(scrollerOf(view).scrollTop).toBe(2 * STEP)
+  })
+
+  it('the grid layout (slide off): not anchored', async () => {
+    const view = await mount({ live: order, ...props, slide: false })
+    await deleteAndRefresh(view, order, [A, C], { ...props, slide: false })
+    const fades = [...stub.calls]
+    expect(on(fades, C)).toHaveLength(1)
+    await finishAll(fades)
+    expect(rendered(view.container)).toEqual([B, D, E])
+    expect(scrollerOf(view).scrollTop).toBe(2 * STEP)
   })
 })

@@ -4,6 +4,7 @@ import { parseMagnet } from '#/lib/info-hash'
 import { fakeCategories, fakeHash } from '#/lib/testing'
 import { ALL, UNCATEGORIZED } from '#/shared/categories'
 import {
+  cutText,
   addButtonText,
   addCounts,
   addDisabled,
@@ -32,6 +33,15 @@ function link(text: string): AddItem {
 function file(name: string, result: AddItem['result']): AddItem {
   return { id: nextId++, source: { kind: 'file', name }, result }
 }
+
+describe('cutText', () => {
+  it('cuts by code units but never leaves half an emoji', () => {
+    expect(cutText('abc', 2)).toBe('ab')
+    expect(cutText('a😀b', 2)).toBe('a')
+    expect(cutText('a😀b', 3)).toBe('a😀')
+    expect(cutText('ab', 5)).toBe('ab')
+  })
+})
 
 describe('rowView', () => {
   it('names a magnet by dn, else by the link start in mono', () => {
