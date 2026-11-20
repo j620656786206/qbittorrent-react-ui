@@ -8,6 +8,7 @@ import { Checkbox } from '#/shared/ui/checkbox'
 import { cn } from '#/shared/ui/cn'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
+import { useLeavingExit } from '#/state/leaving-exit'
 import { toggleSelected, useSelectedHashes } from '#/state/selection'
 import { useViewedHash } from '#/state/viewed-hash'
 import { BoardCard } from '#/features/board/board-card'
@@ -63,6 +64,12 @@ import {
 // nothing is selected) ticks it and starts selection mode; while
 // selecting, a tap toggles the card instead of opening the sheet. Phone
 // cards keep the system callout and text selection away from a long press.
+//
+// Story 4.4: the delete exit runs per column (`useLeavingExit`): visible
+// deleted cards fade, then the cards below slide up by what left above
+// them. In the grid layout (rows of several cards) they only fade and the
+// rest reflow at once (L14); while the collapse FLIP runs (`exitDisabled`)
+// they drop without a fade (L13).
 
 /**
  * Story 4.1: 6px out of the card's top-left corner, its own `surface`
@@ -143,6 +150,8 @@ export interface CardListProps {
   selectable?: boolean
   /** Story 4.2: the phone's way of selecting (long press, tap toggles). */
   phone?: boolean
+  /** Story 4.4: `true` while the delete exit must not animate (FLIP busy). */
+  exitDisabled?: () => boolean
 }
 
 export function CardList({
@@ -163,6 +172,7 @@ export function CardList({
   hereMs = 0,
   selectable = false,
   phone = false,
+  exitDisabled,
 }: CardListProps) {
   // Story 2.4: a card opens its torrent in the detail.
   const { setHash } = useViewedHash()
@@ -291,6 +301,18 @@ export function CardList({
   // column staggers from its own top; the phone's off-screen panels show
   // nothing, so they animate nothing.
   useEntrance(scrollRef, { ready: virtualizer.scrollRect !== null })
+  // Story 4.4: the delete exit, after the virtualizer like the entrance.
+  const cardSize = useCallback(
+    (hash: string) => cardHeightOf(torrents[hash], stateBeforeMove),
+    [torrents, stateBeforeMove],
+  )
+  useLeavingExit(scrollRef, {
+    order: hashes,
+    sizeOf: cardSize,
+    gap: CARD_GAP,
+    disabled: exitDisabled,
+    slide: layout.kind !== 'grid',
+  })
 
   // The pin's scroll, in a layout effect: before paint and before the
   // board's own layout effect measures where the cards went. Applied again

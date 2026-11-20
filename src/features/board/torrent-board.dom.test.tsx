@@ -20,6 +20,7 @@ import type { AnimateStub } from '#/state/entrance-testing'
 import { clearLoginRequired } from '#/state/login-required'
 import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
+import { expectLeaving, leavingStore, resetLeaving } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import {
@@ -867,6 +868,169 @@ describe('the entrance (spec 2.9)', () => {
     await render(fakeResponse({ changed: sample() }))
     expect(stub.calls).toHaveLength(0)
     expect(freezeStore.state.animation).toBe(false)
+  })
+})
+
+describe('the delete exit (story 4.4)', () => {
+  let stub: AnimateStub
+
+  const BODY = '[role="group"], [role="tabpanel"]'
+
+  /** Body `i` of the phone track sits `i - selected` windows to the side. */
+  function bodyRect(body: Element): DOMRect {
+    if (body.getAttribute('role') !== 'tabpanel')
+      return new DOMRect(0, 0, 300, 600)
+    const all = [...main.querySelectorAll('[role="tabpanel"]')]
+    const shown = all.findIndex((panel) => !panel.hasAttribute('inert'))
+    const x = (all.indexOf(body) - shown) * window.innerWidth
+    return new DOMRect(x, 0, window.innerWidth, 600)
+  }
+
+  beforeEach(() => {
+    stub = stubElementAnimate()
+    resetLeaving()
+    // A card wrapper sits at its translateY inside its body; inner
+    // elements get their wrapper's box.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: Element) {
+        if (this.matches(BODY)) return bodyRect(this)
+        const wrapper = this.closest<HTMLElement>('[data-hash]')
+        const body = this.closest(BODY)
+        if (!wrapper || !body) return new DOMRect(0, 0, 0, 0)
+        const y = Number(
+          /(?:translateY\(|, )(-?[\d.]+)px\)/.exec(
+            wrapper.style.transform,
+          )?.[1] ?? NaN,
+        )
+        const box = bodyRect(body)
+        return new DOMRect(
+          box.x,
+          y,
+          box.width,
+          Number.parseFloat(wrapper.style.height || '0'),
+        )
+      },
+    )
+  })
+
+  afterEach(() => {
+    stub.restore()
+    resetLeaving()
+  })
+
+  async function finish() {
+    const calls = [...stub.calls]
+    stub.calls.length = 0
+    await act(async () => {
+      for (const call of calls) call.finish()
+      for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    })
+  }
+
+  async function deleteAndRefresh(...hashes: Array<string>) {
+    expectLeaving(hashes)
+    await poll(
+      fakeResponse({
+        version: `v${Math.random()}`,
+        full: false,
+        changed: [],
+        removed: hashes,
+      }),
+    )
+  }
+
+  const wrapperOf = (hash: string) =>
+    main.querySelector<HTMLElement>(`[data-hash="${hash}"]`)
+
+  it('desktop: the deleted card fades, then leaves its column, and the cards below slide up by its height', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await finish()
+    // 要處理: Stalled (with its bar) above Error.
+    const height = Number.parseFloat(wrapperOf(h(3))?.style.height ?? '0')
+    expect(height).toBe(CARD_HEIGHT_WITH_BAR)
+    await deleteAndRefresh(h(3))
+    expect(stub.calls.map((call) => call.keyframes)).toEqual([
+      [{ opacity: 1 }, { opacity: 0 }],
+    ])
+    expect(stub.calls[0].element).toBe(wrapperOf(h(3)))
+    expect(names(section('要處理，2 個'))).toEqual(['Stalled', 'Error'])
+    expect(freezeStore.state.animation).toBe(true)
+
+    await finish()
+    expect(names(section('要處理，1 個'))).toEqual(['Error'])
+    expect(stub.calls).toHaveLength(1)
+    expect(stub.calls[0].element).toBe(wrapperOf(h(4)))
+    expect(stub.calls[0].keyframes).toEqual([
+      { translate: `0px ${CARD_HEIGHT_WITH_BAR + CARD_GAP}px` },
+      { translate: '0px 0px' },
+    ])
+    await finish()
+    expect(freezeStore.state.animation).toBe(false)
+  })
+
+  it('phone: a card on a panel out of view leaves at once; one on the visible panel fades', async () => {
+    desktop = false
+    await render(fakeResponse({ changed: sample() }))
+    await finish()
+    // The phone starts on 要處理; 下載中 (Down) is off to the side.
+    await deleteAndRefresh(h(1), h(4))
+    expect(stub.calls.map((call) => call.element)).toEqual([wrapperOf(h(4))])
+    expect(wrapperOf(h(1))).toBeNull()
+    await finish()
+    expect(wrapperOf(h(4))).toBeNull()
+  })
+
+  it('L10: a category emptied this way shows 「這個分類沒有種子」 after the fade', async () => {
+    await render(
+      fakeResponse({
+        changed: [t({ hash: h(1), name: 'Down', state: 'downloading' })],
+      }),
+    )
+    await finish()
+    await deleteAndRefresh(h(1))
+    expect(main.textContent).not.toContain('這個分類沒有種子')
+    expect(wrapperOf(h(1))).not.toBeNull()
+    await finish()
+    expect(main.textContent).toContain('這個分類沒有種子')
+  })
+
+  it('L4: a card removed elsewhere drops at once', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await finish()
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [],
+        removed: [h(3)],
+      }),
+    )
+    expect(stub.calls).toHaveLength(0)
+    expect(names(section('要處理，1 個'))).toEqual(['Error'])
+  })
+
+  it("another keyword while a card fades: exactly the new filter's columns, the exit cut", async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await finish()
+    // Stalled fades in 要處理.
+    await deleteAndRefresh(h(3))
+    const [fade] = stub.calls
+    expect(names(section('要處理，2 個'))).toEqual(['Stalled', 'Error'])
+    // A keyword keeps the board mounted (its key is the category only):
+    // the new filter's columns apply at once, the fading card is not kept.
+    searchQuery = 'Error'
+    await act(async () => root.render(boardTree()))
+    expect(sections()).toEqual([
+      '要處理，1 個',
+      '下載中，0 個',
+      '做種中，0 個',
+      '完成，0 個',
+      '已整理欄',
+    ])
+    expect(names(section('要處理，1 個'))).toEqual(['Error'])
+    expect(fade.cancel).toHaveBeenCalled()
+    expect(freezeStore.state.animation).toBe(false)
+    expect(leavingStore.state.hashes.size).toBe(0)
   })
 })
 

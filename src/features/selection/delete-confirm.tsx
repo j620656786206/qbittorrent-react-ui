@@ -23,6 +23,7 @@ import { Checkbox } from '#/shared/ui/checkbox'
 import { cn } from '#/shared/ui/cn'
 import { ConfirmShell } from '#/shared/ui/confirm-shell'
 import { callFn } from '#/state/call-fn'
+import { expectLeaving } from '#/state/leaving'
 import {
   refreshMaindata,
   selectStateBeforeMove,
@@ -69,6 +70,9 @@ import type { TrackedOp } from '#/state/tracked-op'
 // left; after a failure it stays with what failed, and the button can be
 // pressed again. Changing 「連檔案一起刪」 closes the failure toast, so its
 // 重試 can never send the old choice. qBittorrent answers for a whole call.
+// Story 4.4: a call that went through hands its hashes to src/state/leaving
+// as expected before the refresh, so the list and the board fade those rows
+// out once the refreshed maindata lacks them (they own the animation).
 
 /** A row's fixed height: 8px padding around the 13px/1.4 line. */
 const ROW_HEIGHT = 34
@@ -98,6 +102,7 @@ export const deleteOp: TrackedOp<DeleteVariables> = {
     const sent = new Set(hashes)
     pruneSelection((hash) => !sent.has(hash))
     if (successText !== null) toast.plain(successText)
+    expectLeaving(hashes)
     void refreshMaindata(client)
   },
   onFailure: ({ hashes }) => clearPendingAll(hashes),

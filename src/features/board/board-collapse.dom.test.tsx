@@ -12,6 +12,7 @@ import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { setAutoCollapse } from '#/state/auto-collapse'
 import { clearConnectionErrors } from '#/state/connection'
+import { expectLeaving, leavingStore, resetLeaving } from '#/state/leaving'
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { clearMaindataFailure } from '#/state/maindata-failure'
@@ -263,6 +264,7 @@ beforeEach(() => {
   clearConnectionErrors()
   clearMaindataFailure()
   resetOrderFreeze()
+  resetLeaving()
   main = document.createElement('main')
   main.id = MAIN_ID
   document.body.append(main)
@@ -343,6 +345,43 @@ describe('C1 R1 collapse (reduced motion: at once)', () => {
       rowOf.set(y, (rowOf.get(y) ?? 0) + 1)
     }
     expect(Math.max(...rowOf.values())).toBe(3)
+  })
+
+  it('4.4 L14: in the grid layout a deleted card only fades; the rest reflow, no slide', async () => {
+    restores.at(-1)?.()
+    stubPrototype('clientWidth', 900)
+    await render(fakeResponse({ changed: data(1000) }))
+    await scroll(body('做種中'), 5000)
+    expect(collapsedBoard()).toBe(true)
+    // The collapse is over (reduced motion ends it after the commit); the
+    // delete itself runs with motion.
+    expect(freezeStore.state.animation).toBe(false)
+    reduced = false
+    animate.mockClear()
+    // happy-dom has no real scroll: put the first drawn card row at the
+    // top of the box (no scroll event, so nothing else reacts).
+    const [card] = items(body('做種中'))
+    body('做種中').scrollTop = Number(TRANSLATE.exec(card.style.transform)?.[2])
+    const hash = card.dataset.hash ?? ''
+    expect(hash).not.toBe('')
+    expectLeaving([hash])
+    await poll(
+      fakeResponse({
+        version: 'v-deleted',
+        full: false,
+        changed: [],
+        removed: [hash],
+      }),
+    )
+    await wait(50)
+    const keyframes = animate.mock.calls.map(
+      (call) => (call as Array<unknown>)[0] as Array<Record<string, unknown>>,
+    )
+    expect(keyframes).toEqual([[{ opacity: 1 }, { opacity: 0 }]])
+    expect(main.querySelector(`[data-hash="${hash}"]`)).toBeNull()
+    expect(freezeStore.state.animation).toBe(false)
+    expect(leavingStore.state.hashes.size).toBe(0)
+    resetLeaving()
   })
 })
 

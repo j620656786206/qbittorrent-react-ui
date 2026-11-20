@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { createStore, useSelector } from '@tanstack/react-store'
 import { ALL } from '#/shared/categories'
+import { useLeavingHashes } from '#/state/leaving'
 
 // AR-50, AD-13: the one owner of "do not reorder right now" (EXPERIENCE
 // 「資料一直更新時先不重排」). While frozen, values keep updating but the shown
@@ -16,6 +17,10 @@ import { ALL } from '#/shared/categories'
 // running board animation (AD-7 「動畫進行中」; the auto-collapse FLIP holds
 // it from its first measure to its end). Story 4.1: a selection (any hash
 // ticked, src/state/selection.ts) holds the list, never the board.
+// Story 4.4: a torrent this tab deleted (leaving, src/state/leaving.ts)
+// stays where it is shown, live or not, until its exit lets it go; while
+// the order shown holds one, the order holds as if frozen. The exit itself
+// holds the order with `holdOrderForAnimation` (AD-7).
 
 /** Quiet time after the last scroll before a touch scroll counts as over. */
 export const TOUCH_SETTLE_MS = 300
@@ -67,19 +72,33 @@ export function touchFrozen({
   return lastScrollAt !== null && now - lastScrollAt < TOUCH_SETTLE_MS
 }
 
+const NOT_LEAVING: ReadonlySet<string> = new Set()
+
+/** The order shown holds a leaving hash (story 4.4). */
+function holdsLeaving(
+  shown: ReadonlyArray<string>,
+  leaving: ReadonlySet<string>,
+): boolean {
+  return leaving.size > 0 && shown.some((hash) => leaving.has(hash))
+}
+
 /**
  * Spec 1.8 rows F1 to F5. Not frozen: the live order. Frozen: the order last
  * shown, minus hashes no longer live; the same array when nothing left.
+ * Story 4.4: a `leaving` hash counts as live, and an order shown that holds
+ * one keeps it in place as if frozen.
  */
 export function nextShownOrder(
   shown: ReadonlyArray<string> | null,
   live: ReadonlyArray<string>,
   frozen: boolean,
+  leaving: ReadonlySet<string> = NOT_LEAVING,
 ): ReadonlyArray<string> {
-  if (!frozen || shown === null) return live
+  if (shown === null) return live
+  if (!frozen && !holdsLeaving(shown, leaving)) return live
   if (shown === live) return shown
   const alive = new Set(live)
-  const kept = shown.filter((hash) => alive.has(hash))
+  const kept = shown.filter((hash) => alive.has(hash) || leaving.has(hash))
   return kept.length === shown.length ? shown : kept
 }
 
@@ -111,18 +130,21 @@ export interface ShownOrderInput {
    * for the pointer or touch freeze.
    */
   holdAddsNew?: boolean
+  /** Story 4.4: hashes on their way out, kept where they are shown. */
+  leaving?: ReadonlySet<string>
 }
 
 /** The order shown minus gone hashes, with new ones on top in live order. */
 export function keepWithNewOnTop(
   shown: ReadonlyArray<string> | null,
   live: ReadonlyArray<string>,
+  leaving: ReadonlySet<string> = NOT_LEAVING,
 ): ReadonlyArray<string> {
   if (shown === null || shown === live) return live
   const alive = new Set(live)
   const known = new Set(shown)
   const fresh = live.filter((hash) => !known.has(hash))
-  const kept = shown.filter((hash) => alive.has(hash))
+  const kept = shown.filter((hash) => alive.has(hash) || leaving.has(hash))
   if (fresh.length === 0 && kept.length === shown.length) return shown
   return [...fresh, ...kept]
 }
@@ -140,17 +162,18 @@ export function shownOrderReducer(
     filterChanged = false,
     hold = false,
     holdAddsNew = false,
+    leaving = NOT_LEAVING,
   }: ShownOrderInput,
 ): ShownOrder {
   if (live === undefined) return null
   if (filterChanged) return live
   if (hold) {
     return holdAddsNew
-      ? keepWithNewOnTop(shown, live)
-      : nextShownOrder(shown, live, true)
+      ? keepWithNewOnTop(shown, live, leaving)
+      : nextShownOrder(shown, live, true, leaving)
   }
   if (viewChanged) return live
-  return nextShownOrder(shown, live, frozen)
+  return nextShownOrder(shown, live, frozen, leaving)
 }
 
 // Browser only, like the other stores in src/state.
@@ -303,21 +326,28 @@ export function useOrderFrozen(): boolean {
   return useSelector(freezeStore, isOrderFrozen)
 }
 
-/** One step of a board column order through the board freeze, pure. */
+/**
+ * One step of a board column order through the board freeze, pure. Story
+ * 4.4: a leaving hash stays in the column it is shown in.
+ */
 export function nextBoardColumns<TKey extends string>(
   shown: Readonly<Record<TKey, ReadonlyArray<string>>> | null,
   live: Readonly<Record<TKey, ReadonlyArray<string>>> | undefined,
   frozen: boolean,
+  leaving: ReadonlySet<string> = NOT_LEAVING,
 ): Readonly<Record<TKey, ReadonlyArray<string>>> | undefined {
   if (live === undefined) return undefined
-  if (!frozen || shown === null) return live
+  if (shown === null || (!frozen && leaving.size === 0)) return live
   let same = true
+  let isLive = true
   const next = {} as Record<TKey, ReadonlyArray<string>>
   for (const key of Object.keys(live) as Array<TKey>) {
-    next[key] = nextShownOrder(shown[key], live[key], true)
+    next[key] = nextShownOrder(shown[key], live[key], frozen, leaving)
     if (next[key] !== shown[key]) same = false
+    if (next[key] !== live[key]) isLive = false
   }
-  return same ? shown : next
+  if (same) return shown
+  return isLive ? live : next
 }
 
 /**
@@ -335,19 +365,20 @@ export function useBoardShownColumns<TKey extends string>(
   viewKey: string = ALL,
 ): Readonly<Record<TKey, ReadonlyArray<string>>> | undefined {
   const frozen = useSelector(freezeStore, isBoardFrozen)
+  const leaving = useLeavingHashes()
   const shownRef = useRef<Readonly<Record<TKey, ReadonlyArray<string>>> | null>(
     null,
   )
   const appliedKeyRef = useRef(viewKey)
-  const shown = useMemo(
-    () =>
-      nextBoardColumns(
-        shownRef.current,
-        live,
-        frozen && appliedKeyRef.current === viewKey,
-      ),
-    [live, frozen, viewKey],
-  )
+  const shown = useMemo(() => {
+    const sameView = appliedKeyRef.current === viewKey
+    return nextBoardColumns(
+      sameView ? shownRef.current : null,
+      live,
+      frozen && sameView,
+      leaving,
+    )
+  }, [live, frozen, viewKey, leaving])
   useLayoutEffect(() => {
     shownRef.current = shown ?? null
     if (shown !== undefined) appliedKeyRef.current = viewKey
@@ -384,6 +415,7 @@ export function useFrozenOrder(
   }: FrozenOrderOptions = {},
 ): ReadonlyArray<string> | undefined {
   const frozen = useOrderFrozen()
+  const leaving = useLeavingHashes()
   const shownRef = useRef<ShownOrder>(null)
   // The view the order shown last was sorted by; `null` until one was (a
   // first load that waits for an extra sort's keys must still apply them).
@@ -397,12 +429,13 @@ export function useFrozenOrder(
         frozen,
         hold,
         holdAddsNew,
+        leaving,
         viewChanged: appliedKeyRef.current !== viewKey,
         filterChanged:
           appliedFilterRef.current !== null &&
           appliedFilterRef.current !== filterKey,
       }),
-    [live, frozen, hold, holdAddsNew, viewKey, filterKey],
+    [live, frozen, hold, holdAddsNew, viewKey, filterKey, leaving],
   )
   // Only a committed order counts as "shown".
   useLayoutEffect(() => {

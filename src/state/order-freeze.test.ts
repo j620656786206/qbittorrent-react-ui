@@ -377,3 +377,74 @@ describe('F1 the animation reason (spec 2.8)', () => {
     expect(nextBoardColumns(null, undefined, true)).toBeUndefined()
   })
 })
+
+describe('leaving hashes (story 4.4)', () => {
+  const leaving = new Set(['b'])
+
+  it('frozen: a leaving hash keeps its place though no longer live', () => {
+    const shown = ['a', 'b', 'c']
+    expect(nextShownOrder(shown, ['a', 'c'], true, leaving)).toBe(shown)
+  })
+
+  it('not frozen: an order shown with a leaving hash holds like a freeze', () => {
+    const shown = ['a', 'b', 'c']
+    // c moved up and d is new: both wait while b is on its way out.
+    expect(nextShownOrder(shown, ['d', 'c', 'a'], false, leaving)).toBe(shown)
+  })
+
+  it('other gone hashes still leave at once (L4)', () => {
+    expect(nextShownOrder(['a', 'b', 'c'], ['a'], false, leaving)).toEqual([
+      'a',
+      'b',
+    ])
+  })
+
+  it('without a leaving hash in the order shown, nothing changes', () => {
+    const live = ['c', 'a']
+    expect(nextShownOrder(['a', 'c'], live, false, leaving)).toBe(live)
+  })
+
+  it('once finished, the hash leaves and the live order applies', () => {
+    const live = ['c', 'a']
+    expect(nextShownOrder(['a', 'b', 'c'], live, false, new Set())).toBe(live)
+  })
+
+  it('a filter or sort change drops leaving hashes at once (L15)', () => {
+    const live = ['a', 'c']
+    const input = { live, frozen: true, leaving }
+    expect(
+      shownOrderReducer(['a', 'b', 'c'], { ...input, filterChanged: true }),
+    ).toBe(live)
+    expect(
+      shownOrderReducer(['a', 'b', 'c'], { ...input, viewChanged: true }),
+    ).toBe(live)
+  })
+
+  it('holding with new on top keeps leaving hashes too', () => {
+    expect(keepWithNewOnTop(['a', 'b'], ['n', 'a'], leaving)).toEqual([
+      'n',
+      'a',
+      'b',
+    ])
+  })
+
+  it('board: a leaving card stays in its column, the others go live', () => {
+    const shown = { downloading: ['a', 'b'], seeding: ['x'] }
+    const live = { downloading: ['a'], seeding: ['y', 'x'] }
+    const next = nextBoardColumns(shown, live, false, leaving)
+    expect(next?.downloading).toBe(shown.downloading)
+    expect(next?.seeding).toBe(live.seeding)
+  })
+
+  it('board: with nothing leaving shown, the live columns object applies', () => {
+    const live = { downloading: ['a'], seeding: ['x'] }
+    expect(
+      nextBoardColumns(
+        { downloading: ['a'], seeding: [] },
+        live,
+        false,
+        leaving,
+      ),
+    ).toBe(live)
+  })
+})

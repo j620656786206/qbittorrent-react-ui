@@ -36,6 +36,8 @@ export interface ArchivedColumnProps {
   pin?: CardPin | null
   hereHash?: string | null
   hereMs?: number
+  /** Story 4.4: `true` while the delete exit must not animate (FLIP busy). */
+  exitDisabled?: () => boolean
 }
 
 export function ArchivedColumn({
@@ -50,6 +52,7 @@ export function ArchivedColumn({
   pin,
   hereHash,
   hereMs,
+  exitDisabled,
 }: ArchivedColumnProps) {
   const toggleRef = useRef<HTMLButtonElement>(null)
   const toggled = useRef(false)
@@ -81,6 +84,7 @@ export function ArchivedColumn({
         pin={pin}
         hereHash={hereHash}
         hereMs={hereMs}
+        exitDisabled={exitDisabled}
         header={
           <h2 data-column-head="" className="relative z-[1] m-0 flex flex-none">
             <button
