@@ -18,7 +18,7 @@ import {
   jsonResponse,
   rawFile,
 } from '#/server/qbit/testing'
-import type { FakeQbitRoutes } from '#/server/qbit/testing'
+import type { FakeCall, FakeQbitRoutes } from '#/server/qbit/testing'
 
 // Spec 1.5 rows Q10 and Q11: the named-method client.
 
@@ -213,6 +213,7 @@ describe('qBittorrent client', () => {
       'stopTorrents',
       'startTorrents',
       'deleteTorrents',
+      'addTorrent',
       'torrentFiles',
       'setFilePriority',
       'logMain',
@@ -220,11 +221,12 @@ describe('qBittorrent client', () => {
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, files, filePrio and log/main', () => {
+  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, add, files, filePrio and log/main', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
       '/api/v2/auth/login',
       '/api/v2/log/main',
       '/api/v2/sync/maindata',
+      '/api/v2/torrents/add',
       '/api/v2/torrents/delete',
       '/api/v2/torrents/filePrio',
       '/api/v2/torrents/files',
@@ -232,6 +234,117 @@ describe('qBittorrent client', () => {
       '/api/v2/torrents/stop',
     ])
     expect(Object.isFrozen(QBIT_PATHS)).toBe(true)
+  })
+
+  describe('addTorrent (spec 4.7)', () => {
+    const ADD = '/api/v2/torrents/add'
+    const addCalls = (calls: ReadonlyArray<FakeCall>) =>
+      calls.filter((call) => call.path === ADD)
+
+    it('a magnet: one multipart POST with urls, category and autoTMM=true only', async () => {
+      const { client, calls } = setup()
+      await client.addTorrent(
+        { kind: 'magnet', url: 'magnet:?xt=urn:btih:x' },
+        'movies',
+      )
+      const [call] = addCalls(calls)
+      expect(call.method).toBe('POST')
+      expect(call.body).toBe('')
+      expect([...(call.form?.entries() ?? [])]).toEqual([
+        ['urls', 'magnet:?xt=urn:btih:x'],
+        ['category', 'movies'],
+        ['autoTMM', 'true'],
+      ])
+    })
+
+    it('a file: torrents with the bytes and the name', async () => {
+      const { client, calls } = setup()
+      const bytes = new TextEncoder().encode('d4:infod4:name1:aee')
+      await client.addTorrent({ kind: 'file', bytes, name: 'a.torrent' }, 'tv')
+      const [call] = addCalls(calls)
+      expect([...(call.form?.keys() ?? [])]).toEqual([
+        'torrents',
+        'category',
+        'autoTMM',
+      ])
+      const file = call.form?.get('torrents') as File
+      expect(file.name).toBe('a.torrent')
+      expect(new Uint8Array(await file.arrayBuffer())).toEqual(bytes)
+    })
+
+    it('a 403 logs in again and resends the same multipart form', async () => {
+      let n = 0
+      const { client, calls } = setup({
+        add: () => {
+          n += 1
+          return n === 1
+            ? new Response('Forbidden', { status: 403 })
+            : new Response('Ok.')
+        },
+      })
+      // Logged in once already, so the 403 reads as an expired session.
+      await client.syncMaindata(0)
+      await client.addTorrent({ kind: 'magnet', url: 'magnet:?x' }, 'movies')
+      const sent = addCalls(calls)
+      expect(sent).toHaveLength(2)
+      expect(sent[1].form?.get('urls')).toBe('magnet:?x')
+    })
+
+    it.each([
+      ['415', () => new Response('Torrent file is not valid', { status: 415 })],
+      ['Fails.', () => new Response('Fails.')],
+      [
+        'JSON with only failure_count',
+        () => jsonResponse({ failure_count: 1 }),
+      ],
+      [
+        'JSON with only a pending count',
+        () =>
+          jsonResponse({
+            success_count: 0,
+            failure_count: 0,
+            pending_count: 1,
+          }),
+      ],
+      ['JSON that does not parse', () => new Response('{oops')],
+      [
+        'JSON with nothing added',
+        () =>
+          jsonResponse({
+            success_count: 0,
+            failure_count: 2,
+            pending_count: 0,
+          }),
+      ],
+    ])('%s is qbit_rejected', async (_name, add) => {
+      const { client } = setup({ add })
+      await expect(
+        client.addTorrent({ kind: 'magnet', url: 'magnet:?x' }, 'movies'),
+      ).rejects.toEqual(failure('qbit_rejected'))
+    })
+
+    it.each([
+      ['Ok.', () => new Response('Ok.')],
+      ['an empty body', () => new Response('')],
+      [
+        'JSON with only success_count 1',
+        () => jsonResponse({ success_count: 1 }),
+      ],
+      [
+        'JSON with one added',
+        () =>
+          jsonResponse({
+            success_count: 1,
+            failure_count: 0,
+            pending_count: 0,
+          }),
+      ],
+    ])('%s counts as accepted', async (_name, add) => {
+      const { client } = setup({ add })
+      await expect(
+        client.addTorrent({ kind: 'magnet', url: 'magnet:?x' }, 'movies'),
+      ).resolves.toBeUndefined()
+    })
   })
 
   it.each([

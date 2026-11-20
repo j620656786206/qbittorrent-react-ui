@@ -482,3 +482,32 @@ describe('readTorrentDetail pull reuse', () => {
     expect(syncMaindata).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('readCategoryNames (spec 4.7)', () => {
+  it('pulls on first use and answers every category name', async () => {
+    const { syncer, syncMaindata } = setup([raw(fullMaindata({ rid: 2 }))])
+    expect(await syncer.readCategoryNames()).toEqual(['movies', 'tv'])
+    expect(syncMaindata).toHaveBeenCalledTimes(1)
+  })
+
+  it('reuses a pull younger than DETAIL_PULL_REUSE_MS, then pulls again', async () => {
+    const { syncer, syncMaindata, advance } = setup([
+      raw(fullMaindata({ rid: 2 })),
+      raw({ rid: 3, categories_removed: ['tv'] }),
+    ])
+    await syncer.read()
+    advance(DETAIL_PULL_REUSE_MS - 1)
+    expect(await syncer.readCategoryNames()).toEqual(['movies', 'tv'])
+    expect(syncMaindata).toHaveBeenCalledTimes(1)
+    advance(1)
+    expect(await syncer.readCategoryNames()).toEqual(['movies'])
+    expect(syncMaindata).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed pull rejects with its failure', async () => {
+    const { syncer } = setup([new ServerFailure('qbit_unreachable', 'x')])
+    await expect(syncer.readCategoryNames()).rejects.toEqual(
+      failure('qbit_unreachable'),
+    )
+  })
+})

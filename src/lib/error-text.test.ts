@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  ADD_FILE_REJECTED,
+  ADD_LINK_REJECTED,
+  ADD_NOT_SENT,
   ERROR_TEXT,
   FILES_LOAD_FAILED,
   LIST_LOAD_FAILED,
   OPERATION_FAILURE_CODES,
   SETTINGS_WRITE_FAILURE_CODES,
+  addFailureText,
+  addItemFailureText,
   errorText,
   fileActionFailureText,
   orderSaveFailureText,
@@ -122,5 +127,35 @@ describe('order save failure text (story 3.3)', () => {
   ] as const)('%s', (code, text) => {
     expect(orderSaveFailureText(code)).toBe(text)
     expect(text).not.toContain(EM_DASH)
+  })
+})
+
+describe('add failure text (spec 4.7)', () => {
+  it('the whole-request toast reads 新增失敗：<reason>', () => {
+    expect(addFailureText('qbit_rejected')).toBe(
+      '新增失敗：qBittorrent 拒絕這個操作',
+    )
+    expect(addFailureText('timeout')).toBe(
+      '新增失敗：qBittorrent 沒有回應，請再試一次',
+    )
+    expect(addFailureText('invalid_input')).toBe('新增失敗：送出的資料格式不對')
+  })
+
+  it('a row reason names the rejected file or link; other codes keep their text', () => {
+    expect(ADD_FILE_REJECTED).toBe('qBittorrent 讀不了這個檔案')
+    expect(ADD_LINK_REJECTED).toBe('qBittorrent 拒絕這個連結')
+    expect(ADD_NOT_SENT).toBe('沒有送出，請再試一次')
+    expect(addItemFailureText('qbit_rejected', 'file')).toBe(ADD_FILE_REJECTED)
+    expect(addItemFailureText('qbit_rejected', 'magnet')).toBe(
+      ADD_LINK_REJECTED,
+    )
+    for (const kind of ['file', 'magnet'] as const) {
+      expect(addItemFailureText('timeout', kind)).toBe(
+        'qBittorrent 沒有回應，請再試一次',
+      )
+      expect(addItemFailureText('qbit_unreachable', kind)).toBe(
+        '家裡的 qBittorrent 沒有回應',
+      )
+    }
   })
 })

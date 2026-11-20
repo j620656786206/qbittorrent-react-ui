@@ -154,7 +154,10 @@ export interface FakeCall {
   method: string
   query: URLSearchParams
   headers: Headers
+  /** A URL-encoded body as text; '' for a multipart one. */
   body: string
+  /** Story 4.7: a multipart body's fields as sent; `null` otherwise. */
+  form: FormData | null
   signal: AbortSignal | null
   redirect: RequestRedirect
 }
@@ -174,6 +177,8 @@ export interface FakeQbitRoutes {
   filePrio?: Handler
   /** Story 2.10: `log/main`; an empty list by default. */
   log?: Handler
+  /** Story 4.7: `torrents/add`; 200 `Ok.` by default. */
+  add?: Handler
 }
 
 /** Story 2.7: a raw `torrents/files` entry with qBittorrent's extra fields. */
@@ -210,6 +215,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
         ])),
     '/api/v2/torrents/filePrio': routes.filePrio ?? (() => new Response('')),
     '/api/v2/log/main': routes.log ?? (() => jsonResponse([])),
+    '/api/v2/torrents/add': routes.add ?? (() => new Response('Ok.')),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -221,6 +227,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
         query: url.searchParams,
         headers: new Headers(init?.headers),
         body: body instanceof URLSearchParams ? body.toString() : '',
+        form: body instanceof FormData ? body : null,
         signal: init?.signal ?? null,
         redirect: init?.redirect ?? 'follow',
       }

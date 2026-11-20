@@ -240,9 +240,7 @@ test.describe('desktop', () => {
     await expect(submit(page)).toHaveAttribute('aria-disabled', 'true')
     await categoryMenu(page).selectOption('X')
     await expect(submit(page)).not.toHaveAttribute('aria-disabled', 'true')
-    // Pressing it sends nothing yet (4.7): the screen stays.
-    await submit(page).click()
-    await expect(addScreen(page)).toBeVisible()
+    // Sending is covered by e2e/add-submit.spec.ts (story 4.7).
   })
 
   test('the list scrolls inside its frame and the footer stays on screen', async ({

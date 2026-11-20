@@ -4,6 +4,14 @@ import { parseMagnet } from '#/lib/info-hash'
 import { fakeCategories, fakeHash } from '#/lib/testing'
 import { ALL, UNCATEGORIZED } from '#/shared/categories'
 import {
+  ADD_SENDING_TEXT,
+  GO_SEE_LABEL,
+  NO_CATEGORIES_TEXT,
+  addFailureReason,
+  addFormOf,
+  addResultText,
+  addedToastText,
+  outcomeOf,
   cutText,
   addButtonText,
   addCounts,
@@ -31,7 +39,11 @@ function link(text: string): AddItem {
   }
 }
 function file(name: string, result: AddItem['result']): AddItem {
-  return { id: nextId++, source: { kind: 'file', name }, result }
+  return {
+    id: nextId++,
+    source: { kind: 'file', name, file: new File(['d'], name) },
+    result,
+  }
 }
 
 describe('cutText', () => {
@@ -166,5 +178,91 @@ describe('the category menu', () => {
     expect(savePathLine('X-default', categories)).toEqual({ kind: 'default' })
     expect(savePathLine('', categories)).toEqual({ kind: 'none' })
     expect(savePathLine('gone', categories)).toEqual({ kind: 'none' })
+  })
+})
+
+describe('submit text (spec 4.7)', () => {
+  it('the labels and the toast', () => {
+    expect(ADD_SENDING_TEXT).toBe('新增中…')
+    expect(NO_CATEGORIES_TEXT).toBe('qBittorrent 還沒有分類')
+    expect(GO_SEE_LABEL).toBe('去看')
+    expect(addedToastText(1)).toBe('已新增 1 個種子')
+    expect(addedToastText(1200)).toBe('已新增 1,200 個種子')
+  })
+
+  it('the partial-failure line; with nothing added only the failures', () => {
+    expect(addResultText(5, 2)).toBe('5 個加好了，2 個失敗')
+    expect(addResultText(0, 3)).toBe('3 個失敗')
+  })
+})
+
+describe('addFormOf and outcomeOf (spec 4.7)', () => {
+  const fileItem = (name: string) =>
+    file(`${name}.torrent`, {
+      kind: 'file',
+      hash: fakeHash(name),
+      name,
+      contentBytes: 1,
+      fileBytes: 1,
+    })
+
+  it('magnets first, then files, each in list order, then the category', () => {
+    const f1 = fileItem('1')
+    const m1 = link(`magnet:?xt=urn:btih:${HEX}&dn=Re Zero`)
+    const f2 = fileItem('2')
+    const m2 = link(`magnet:?xt=urn:btih:${OTHER}`)
+    const { form, order } = addFormOf([f1, m1, f2, m2], 'X')
+    expect(order).toEqual([m1, m2, f1, f2])
+    expect([...form.keys()]).toEqual([
+      'magnet',
+      'magnet',
+      'torrent',
+      'torrent',
+      'category',
+    ])
+    expect(form.getAll('magnet')).toEqual([
+      `magnet:?xt=urn:btih:${HEX}&dn=Re%20Zero`,
+      `magnet:?xt=urn:btih:${OTHER}`,
+    ])
+    expect((form.getAll('torrent') as Array<File>).map((f) => f.name)).toEqual([
+      '1.torrent',
+      '2.torrent',
+    ])
+    expect(form.get('category')).toBe('X')
+  })
+
+  it('bytes: the allowance plus each entry as sent', () => {
+    const m = link(`magnet:?xt=urn:btih:${HEX}&dn=Re Zero`)
+    const f = fileItem('5')
+    const { bytes } = addFormOf([m, f], 'X')
+    const linkBytes = m.result.kind === 'magnet' ? m.result.linkBytes : 0
+    expect(linkBytes).toBe(`magnet:?xt=urn:btih:${HEX}&dn=Re%20Zero`.length)
+    expect(bytes).toBe(64 * 1024 + 2 * 64 * 1024 + linkBytes + 1)
+  })
+
+  it('maps items back by key; a missing item counts as rejected', () => {
+    const a = link(`magnet:?xt=urn:btih:${HEX}`)
+    const b = fileItem('3')
+    const c = fileItem('4')
+    const outcome = outcomeOf([a, b, c], {
+      items: [
+        { key: '0', ok: true },
+        { key: '1', ok: false, code: 'timeout', message: 'x' },
+      ],
+    })
+    expect(outcome.added).toEqual([a])
+    expect(outcome.failed).toEqual([
+      { item: b, code: 'timeout' },
+      { item: c, code: 'qbit_rejected' },
+    ])
+    expect(addFailureReason(outcome.failed[1])).toBe(
+      'qBittorrent 讀不了這個檔案',
+    )
+    expect(addFailureReason({ item: a, code: 'qbit_rejected' })).toBe(
+      'qBittorrent 拒絕這個連結',
+    )
+    expect(addFailureReason(outcome.failed[0])).toBe(
+      'qBittorrent 沒有回應，請再試一次',
+    )
   })
 })

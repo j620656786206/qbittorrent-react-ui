@@ -42,6 +42,8 @@ import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 // state or moving whose name no other torrent has (the log names torrents
 // by name only), with the same pull reuse as the detail. The browser shows
 // a reason only where classify says `error`, a move from error included.
+// `readCategoryNames` (story 4.7) answers the categories an add may name,
+// with the same reuse.
 
 export const MIN_PULL_INTERVAL_MS = 1000
 /** The detail read reuses a pull this recent: a little over one 5 s poll. */
@@ -75,6 +77,11 @@ export interface Syncer {
   readTorrentDetail: (hash: string) => Promise<TorrentDetailResponse>
   /** Errored or moving torrents with a name no other torrent has. */
   readErrorCandidates: () => Promise<Array<ErrorCandidate>>
+  /**
+   * Story 4.7: every qBittorrent category's name, for validating an add
+   * (the same pull reuse as the detail).
+   */
+  readCategoryNames: () => Promise<Array<string>>
 }
 
 /** Story 2.10: a torrent whose log line may be matched by name. */
@@ -228,11 +235,17 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return errored.filter((candidate) => names.get(candidate.name) === 1)
   }
 
+  async function readCategoryNames(): Promise<Array<string>> {
+    await pull(DETAIL_PULL_REUSE_MS)
+    return Object.keys(table.categories)
+  }
+
   return {
     instanceId,
     read,
     readSortKeys,
     readTorrentDetail,
     readErrorCandidates,
+    readCategoryNames,
   }
 }

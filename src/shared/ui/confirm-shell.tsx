@@ -65,7 +65,7 @@ export interface ConfirmShellProps {
 }
 
 /** `true` once `sending` has lasted `STILL_WAITING_MS`; reset when it ends. */
-function useStillWaiting(sending: boolean): boolean {
+export function useStillWaiting(sending: boolean): boolean {
   const [waiting, setWaiting] = useState(false)
   if (!sending && waiting) setWaiting(false)
   useEffect(() => {

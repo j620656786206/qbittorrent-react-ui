@@ -54,6 +54,40 @@ export function input<TSchema extends z.ZodType>(schema: TSchema) {
   }
 }
 
+/** Every field of a form, each name's values in the order sent. */
+export type FormFields = Record<string, Array<FormDataEntryValue>>
+
+/** A `FormData` as a plain object; `null` for anything that is not one. */
+export function formFields(data: unknown): FormFields | null {
+  if (!(data instanceof FormData)) return null
+  const fields: FormFields = Object.create(null) as FormFields
+  for (const [name, value] of data.entries()) {
+    const values = Object.hasOwn(fields, name) ? fields[name] : []
+    values.push(value)
+    fields[name] = values
+  }
+  return fields
+}
+
+/**
+ * Story 4.7: the validator of a POST that takes `FormData` (Start sends it
+ * as is and the server hands over `request.formData()`). The form becomes
+ * `FormFields` (each name's values as a list, in order), then `schema`
+ * parses that; the schema must refuse `null`, which is what anything that
+ * is not a `FormData` becomes. Like `input()` it never throws: a failed
+ * parse is `guard()`'s `invalid_input`.
+ * https://tanstack.com/start/latest/docs/framework/react/guide/server-functions
+ * and the installed start-client-core/skills/start-core/server-functions/SKILL.md
+ */
+export function formInput<TSchema extends z.ZodType>(schema: TSchema) {
+  return (data: FormData): ParsedInput<z.output<TSchema>> => {
+    const handle = Object.freeze({}) as ParsedInput<z.output<TSchema>>
+    // Not a form: `null`, which an object schema refuses.
+    parsedResults.set(handle, schema.safeParse(formFields(data)))
+    return handle
+  }
+}
+
 function readParsed(data: unknown): z.ZodSafeParseResult<unknown> | undefined {
   return typeof data === 'object' && data !== null
     ? parsedResults.get(data)

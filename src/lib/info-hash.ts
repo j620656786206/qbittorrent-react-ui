@@ -12,6 +12,8 @@ import { createSha1 } from '#/lib/sha1'
 import {
   ADD_FORM_ENTRY_ALLOWANCE,
   MAX_TORRENT_FILE_BYTES,
+  hasControlCharacter,
+  magnetSendText,
 } from '#/shared/torrent-add'
 
 // AR-41, story 4.5: the only place info hashes are worked out. A .torrent's
@@ -266,13 +268,16 @@ function nameOf(
  * A magnet link's btih as lowercase hex, plus its `dn` and byte length.
  * Anything else (http links, plain words, `btmh` only, no btih that
  * converts, a link longer than `ADD_FORM_ENTRY_ALLOWANCE` bytes, which could
- * not fit an add request alone) is 看不懂這個連結.
+ * not fit an add request alone, a control character inside) is 看不懂這個連結.
  * Never fetches anything.
  */
 export function parseMagnet(text: string): MagnetInfo | Unreadable {
   const trimmed = text.trim()
   if (!/^magnet:\?/i.test(trimmed)) return UNREADABLE_LINK
-  const linkBytes = utf8Encoder.encode(trimmed).length
+  // Story 4.7: the server refuses a control character inside the link.
+  if (hasControlCharacter(trimmed)) return UNREADABLE_LINK
+  // Story 4.7: measured as sent (spaces as `%20`), so the cap holds there.
+  const linkBytes = utf8Encoder.encode(magnetSendText(trimmed)).length
   if (linkBytes > ADD_FORM_ENTRY_ALLOWANCE) return UNREADABLE_LINK
   const params = new URLSearchParams(trimmed.slice('magnet:?'.length))
   let hash: string | null = null

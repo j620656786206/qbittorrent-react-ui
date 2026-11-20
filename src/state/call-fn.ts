@@ -37,6 +37,11 @@ type DataOf<TFn extends AnyServerFn> =
 export interface CallFnOptions {
   /** Usually the `signal` TanStack Query passes to `queryFn`. */
   signal?: AbortSignal
+  /**
+   * Story 4.7: this call's own timeout instead of `CALL_TIMEOUT_MS` (an
+   * upload, whose time on the wire comes before the server's deadline).
+   */
+  timeoutMs?: number
 }
 
 function unexpected(what: string, raw: unknown): AppError {
@@ -105,7 +110,10 @@ export async function callFn<TFn extends AnyServerFn>(
 
   const timeout = new AbortController()
   // A plain timer (not AbortSignal.timeout) so fake timers drive it in tests.
-  const timer = setTimeout(() => timeout.abort(), CALL_TIMEOUT_MS)
+  const timer = setTimeout(
+    () => timeout.abort(),
+    options.timeoutMs ?? CALL_TIMEOUT_MS,
+  )
   const signal = caller
     ? AbortSignal.any([caller, timeout.signal])
     : timeout.signal

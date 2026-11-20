@@ -5,8 +5,10 @@ import {
   DEFAULT_BODY_LIMIT,
   HASH_LIST_BODY_LIMIT,
   MAX_REQUEST_BODY,
+  UPLOAD_BODY_LIMIT,
   bodyLimit,
 } from './body-limit'
+import { MAX_ADD_REQUEST_BYTES } from '#/shared/torrent-add'
 import { runMiddleware, serverFnRequest } from './testing'
 
 function trackedStream(chunkSize: number, chunks: number) {
@@ -39,11 +41,14 @@ async function expectTooLarge(response: Response) {
 }
 
 describe('body limit (AR-27)', () => {
-  it('uses 64 KB as default and anonymous ceiling, 400 KB as request ceiling', () => {
+  it('uses 64 KB as default and anonymous ceiling, the 50 MB upload as the multipart ceiling', () => {
     expect(DEFAULT_BODY_LIMIT).toBe(65_536)
-    // AD-12 (raised 2026-11-18): the hash-list limit is the ceiling.
+    // AD-12 (raised 2026-11-18): the hash-list limit.
     expect(HASH_LIST_BODY_LIMIT).toBe(409_600)
-    expect(MAX_REQUEST_BODY).toBe(HASH_LIST_BODY_LIMIT)
+    // Story 4.7: addTorrents' upload is the largest per-function limit.
+    expect(UPLOAD_BODY_LIMIT).toBe(MAX_ADD_REQUEST_BYTES)
+    expect(UPLOAD_BODY_LIMIT).toBe(52_428_800)
+    expect(MAX_REQUEST_BODY).toBe(UPLOAD_BODY_LIMIT)
     // Never raise this with MAX_REQUEST_BODY: it is what a caller without a
     // session can make the container read and parse.
     expect(ANONYMOUS_BODY_LIMIT).toBe(65_536)
@@ -58,7 +63,7 @@ describe('body limit (AR-27)', () => {
     expect(next).toHaveBeenCalledWith({ context: { bodyBytes: 1000 } })
   })
 
-  it('story 2.6: a logged-in body of exactly 393 216 bytes reaches next', async () => {
+  it('story 2.6: a logged-in body of exactly 409 600 bytes reaches next', async () => {
     const request = serverFnRequest({
       method: 'POST',
       body: 'z'.repeat(HASH_LIST_BODY_LIMIT),
@@ -72,14 +77,121 @@ describe('body limit (AR-27)', () => {
     })
   })
 
-  it('story 2.6: a logged-in body of 393 217 bytes gets 413', async () => {
+  it('story 2.6: a logged-in non-multipart body of 409 601 bytes gets 413', async () => {
     const request = serverFnRequest({
       method: 'POST',
       body: 'z'.repeat(HASH_LIST_BODY_LIMIT + 1),
+      headers: { 'content-type': 'application/json' },
     })
     const { next, response } = await runMiddleware(bodyLimit, {
       request,
       context: { session: testSession() },
+    })
+    expect(next).not.toHaveBeenCalled()
+    await expectTooLarge(response)
+  })
+
+  const MULTIPART = 'multipart/form-data; boundary=----fake'
+
+  it('spec 4.7: a logged-in multipart body over 400 KB and under 50 MB reaches next', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'z'.repeat(HASH_LIST_BODY_LIMIT + 1),
+      headers: { 'content-type': MULTIPART },
+    })
+    const { next } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).toHaveBeenCalledWith({
+      context: { bodyBytes: HASH_LIST_BODY_LIMIT + 1 },
+    })
+  })
+
+  it('spec 4.7 S8: a logged-in multipart Content-Length of exactly 50 MB reaches next', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'x',
+      headers: {
+        'content-type': MULTIPART,
+        'content-length': String(MAX_ADD_REQUEST_BYTES),
+      },
+    })
+    const { next } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).toHaveBeenCalledWith({
+      context: { bodyBytes: MAX_ADD_REQUEST_BYTES },
+    })
+  })
+
+  it('spec 4.7 S8: a logged-in multipart Content-Length over 50 MB gets 413 without reading the body', async () => {
+    const { stream, state } = trackedStream(1000, 10)
+    const request = serverFnRequest({
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+      headers: {
+        'content-type': MULTIPART,
+        'content-length': String(MAX_ADD_REQUEST_BYTES + 1),
+      },
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).not.toHaveBeenCalled()
+    expect(state.pulls).toBe(0)
+    await expectTooLarge(response)
+  })
+
+  it('spec 4.7 S8: a logged-in multipart stream without Content-Length stops once it passes 50 MB', async () => {
+    // 1 MB chunks: the count passes 50 MB at chunk 51.
+    const { stream, state } = trackedStream(1024 * 1024, 60)
+    const request = serverFnRequest({
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+      headers: { 'content-type': MULTIPART },
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: testSession() },
+    })
+    expect(next).not.toHaveBeenCalled()
+    expect(state.pulls).toBeGreaterThanOrEqual(51)
+    expect(state.pulls).toBeLessThan(60)
+    expect(state.cancelled).toBe(true)
+    await expectTooLarge(response)
+  })
+
+  it('spec 4.7 S11: without a session a multipart body over 64 KB still gets 413', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'x',
+      headers: {
+        'content-type': MULTIPART,
+        'content-length': String(ANONYMOUS_BODY_LIMIT + 1),
+      },
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: null },
+    })
+    expect(next).not.toHaveBeenCalled()
+    await expectTooLarge(response)
+  })
+
+  it('spec 4.7 S11: without a session a 64 KB + 1 body still gets 413', async () => {
+    const request = serverFnRequest({
+      method: 'POST',
+      body: 'x',
+      headers: { 'content-length': String(ANONYMOUS_BODY_LIMIT + 1) },
+    })
+    const { next, response } = await runMiddleware(bodyLimit, {
+      request,
+      context: { session: null },
     })
     expect(next).not.toHaveBeenCalled()
     await expectTooLarge(response)

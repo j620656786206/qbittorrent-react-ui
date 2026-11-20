@@ -40,7 +40,8 @@ import {
 } from '#/features/add/add-screen-testing'
 
 // Spec 4.6: the add screen in a DOM, A1 to A10, C1, C2 and R1 (the harness
-// is add-screen-testing.tsx; the rest is in add-screen-more.dom.test.tsx).
+// is add-screen-testing.tsx; the rest is in add-screen-more.dom.test.tsx;
+// submitting, spec 4.7, in add-submit.dom.test.tsx).
 
 describe('A1 open', () => {
   it('opens the 640px dialog empty, focus in the paste box, 新增 disabled', async () => {
@@ -61,15 +62,6 @@ describe('A1 open', () => {
     const input = screen().querySelector<HTMLInputElement>('input[type="file"]')
     expect(input?.multiple).toBe(true)
     expect(input?.accept).toBe('.torrent,application/x-bittorrent')
-  })
-
-  it('a press on 新增 does nothing yet (story 4.7)', async () => {
-    await render()
-    await open()
-    await paste(`magnet:?xt=urn:btih:${NEW_A}`)
-    await click(submit())
-    expect(screen()).not.toBeNull()
-    expect(rows()).toHaveLength(1)
   })
 })
 

@@ -4,7 +4,7 @@ import type { QbitClient } from '#/server/qbit/client'
 
 export { QBIT_PATHS } from '#/server/qbit/client'
 export { QBIT_DEADLINE_MS } from '#/server/qbit/session'
-export type { QbitClient } from '#/server/qbit/client'
+export type { AddTorrentEntry, QbitClient } from '#/server/qbit/client'
 
 // One client, hence one qBittorrent session, per container. Built on first
 // use so importing a server function module reads no env (the discovery test

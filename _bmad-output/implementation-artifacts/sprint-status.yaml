@@ -71,14 +71,14 @@ development_status:
   3-7-快捷鍵和說明視窗: done # PR #41：電腦快捷鍵和快捷鍵說明視窗
   epic-3-retrospective: optional
 
-  epic-4: in-progress
+  epic-4: done
   4-1-電腦勾選和選取列: done # PR #44：電腦勾選和選取列
   4-2-手機選取模式: done # PR #45：手機長按進入選取
   4-3-刪除確認和刪除: done # PR #46：刪除確認和刪除
   4-4-刪除淡出: done # PR #48：刪除後先淡出 0.2 秒，再補位
   4-5-info-hash-和貼上內容的判斷: done # PR #51：算 info hash，判斷貼上的內容，再拆成好幾批
   4-6-新增畫面-貼上-選檔案-拖檔: done # PR #52：新增畫面，可以貼上、選檔案、拖檔
-  4-7-送出新增和結果: backlog
+  4-7-送出新增和結果: done # PR #54：按新增會真的送出，並顯示結果
   epic-4-retrospective: optional
 
   epic-5: backlog

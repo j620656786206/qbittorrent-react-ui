@@ -10,6 +10,9 @@ export const QBIT_PATHS = Object.freeze({
   // Story 4.3: delete, with or without the files (same wiki page).
   // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#delete-torrents
   torrentsDelete: '/api/v2/torrents/delete',
+  // Story 4.7: add one magnet link or one .torrent file (multipart).
+  // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#add-new-torrent
+  torrentsAdd: '/api/v2/torrents/add',
   // Story 2.7: a torrent's files and their priority (same wiki page).
   torrentsFiles: '/api/v2/torrents/files',
   torrentsFilePrio: '/api/v2/torrents/filePrio',

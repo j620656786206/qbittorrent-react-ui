@@ -80,6 +80,46 @@ describe('plain (spec 4.3)', () => {
   })
 })
 
+describe('action (spec 4.7)', () => {
+  it('shows text with one button and closes itself after 8 s', () => {
+    const run = vi.fn()
+    toast.action('已新增 2 個種子', { label: '去看', run })
+    expect(shown()).toMatchObject({
+      kind: 'action',
+      text: '已新增 2 個種子',
+      label: '去看',
+    })
+    vi.advanceTimersByTime(7999)
+    expect(shown()?.text).toBe('已新增 2 個種子')
+    const action = shown()
+    if (action?.kind === 'action') action.run()
+    expect(run).toHaveBeenCalledOnce()
+    vi.advanceTimersByTime(1)
+    expect(shown()).toBeNull()
+  })
+
+  it('a plain toast after it gets its own 4 s; its timer never closes a newer toast', () => {
+    toast.action('a', { label: '去看', run: vi.fn() })
+    vi.advanceTimersByTime(5000)
+    toast.plain('p')
+    vi.advanceTimersByTime(3999)
+    expect(shown()?.text).toBe('p')
+    vi.advanceTimersByTime(1)
+    expect(shown()).toBeNull()
+    toast.action('b', { label: '去看', run: vi.fn() })
+    vi.advanceTimersByTime(1000)
+    toast.failure('f', { keys: ['k'], onRetry: vi.fn() })
+    vi.advanceTimersByTime(20_000)
+    expect(shown()?.text).toBe('f')
+  })
+
+  it('shows nothing on the server', () => {
+    vi.unstubAllGlobals()
+    toast.action('a', { label: '去看', run: vi.fn() })
+    expect(shown()).toBeNull()
+  })
+})
+
 describe('dismissFor', () => {
   it('closes the toast about that key', () => {
     toast.failure('f', { keys: ['file:a:1', 'file:a:2'], onRetry: vi.fn() })

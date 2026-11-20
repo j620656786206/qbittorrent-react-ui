@@ -60,9 +60,10 @@
 //   files: normal | slow | fail (story 2.7: slow delays torrents/files
 //          25 s, fail answers it with HTTP 500, which the container maps
 //          to qbit_rejected; for the loading and failure screenshots)
-//   cats:  normal | default-path (story 4.6: default-path adds X-default,
-//          a category whose savePath is '', for the add screen's
-//          「會存到 qBittorrent 的預設位置」)
+//   cats:  normal | default-path | none (story 4.6: default-path adds
+//          X-default, a category whose savePath is '', for the add screen's
+//          「會存到 qBittorrent 的預設位置」; story 4.7: none answers no
+//          categories at all)
 //   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
 //   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
 //   Any `data` parameter (even the current one) also clears the deleted
@@ -80,6 +81,18 @@
 // selection emptying under an open dialog) is a loopback-only control
 // that drops torrents without logging a call:
 //   curl -X POST 'http://localhost:3100/__fake/remove?hashes=<a>|<b>'
+// Story 4.7: POST /api/v2/torrents/add (cookie required, multipart: `urls`
+// or `torrents`, `category`, `autoTMM`) logs `{ op: 'add', urls | file,
+// category, autoTMM }` and adds a downloading torrent with the newest
+// `added_on` (first in 下載中), keyed by the magnet's btih (hex or base32)
+// or the file's info hash, named from `dn` or the file's info.name (else
+// Fake.Added.N), in that category, until the next `data` change (another
+// device's add, not logged: POST /__fake/added?hash=&name=&category=). A hash
+// already there answers `Fails.` like qBittorrent. `ops=reject` rejects
+// every add (`Fails.` for a link, 415 for a file), `ops=reject-files` only
+// files (415), `ops=slow` answers after 12 s, `ops=drop` closes the
+// connection (the container reads qbit_unreachable). Rejected calls are
+// logged with `rejected: true`.
 // Story 2.7: GET /api/v2/torrents/files?hash= (cookie required) answers
 // deterministic fake files for every torrent of the data set (fake names
 // under the torrent's own name, so only code-name paths); sample E03 has
@@ -113,7 +126,7 @@
 // defaults (the e2e fixtures reset before every test):
 //   curl -X POST 'http://localhost:3100/__fake/settings?reset=1'
 import { spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { createServer, request } from 'node:http'
 import { createServer as createNetServer } from 'node:net'
@@ -167,9 +180,9 @@ const DATA_MODES = new Set([
   'categories-emptied',
 ])
 const GROW_MODES = new Set(['0', '1'])
-const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files'])
+const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files', 'drop'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
-const CATS_MODES = new Set(['normal', 'default-path'])
+const CATS_MODES = new Set(['normal', 'default-path', 'none'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -717,12 +730,184 @@ function withOverrides(torrents) {
   return out
 }
 
+/** Story 4.7: torrents added through torrents/add, by hash. */
+const added = {}
+let addedCount = 0
+
 function currentTorrents(tick) {
   const base = DATA[mode.data]
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
+  const extra = growCount > 0 || addedCount > 0
   return withoutRemoved(
-    withOverrides(growCount > 0 ? { ...torrents, ...grown } : torrents),
+    withOverrides(extra ? { ...torrents, ...grown, ...added } : torrents),
   )
+}
+
+// Story 4.7: what torrents/add needs from a .torrent: the raw span of a
+// bencode value (to hash `info` as is) and the dictionary's byte strings.
+
+/** End offset of the bencode value starting at `at`. */
+function bencodeEnd(bytes, at) {
+  const c = bytes[at]
+  if (c === 0x69) {
+    const end = bytes.indexOf(0x65, at)
+    if (end < 0) throw new Error('truncated')
+    return end + 1
+  }
+  if (c === 0x6c || c === 0x64) {
+    let next = at + 1
+    while (bytes[next] !== 0x65) {
+      if (next >= bytes.length) throw new Error('truncated')
+      next = bencodeEnd(bytes, next)
+    }
+    return next + 1
+  }
+  const colon = bytes.indexOf(0x3a, at)
+  if (colon < 0) throw new Error('not bencode')
+  const digits = bytes.subarray(at, colon).toString('latin1')
+  // Anything but a plain length (NaN would loop forever): not bencode.
+  if (!/^\d+$/.test(digits)) throw new Error('not bencode')
+  const end = colon + 1 + Number(digits)
+  if (end > bytes.length) throw new Error('truncated')
+  return end
+}
+
+/** A dictionary's entries as [key, start, end] (key latin1). */
+function bencodeDict(bytes, at) {
+  if (bytes[at] !== 0x64) throw new Error('not a dictionary')
+  const entries = []
+  let next = at + 1
+  while (bytes[next] !== 0x65) {
+    const keyEnd = bencodeEnd(bytes, next)
+    const colon = bytes.indexOf(0x3a, next)
+    const key = bytes.subarray(colon + 1, keyEnd).toString('latin1')
+    const valueEnd = bencodeEnd(bytes, keyEnd)
+    entries.push([key, keyEnd, valueEnd])
+    next = valueEnd
+  }
+  return entries
+}
+
+/** `{ hash, name }` of a .torrent's bytes, or null when unreadable. */
+function torrentInfo(bytes) {
+  try {
+    const info = bencodeDict(bytes, 0).find(([key]) => key === 'info')
+    if (!info) return null
+    const [, start, end] = info
+    const hash = createHash('sha1')
+      .update(bytes.subarray(start, end))
+      .digest('hex')
+    const nameEntry = bencodeDict(bytes, start).find(([key]) => key === 'name')
+    let name = null
+    if (nameEntry) {
+      const [, valueStart, valueEnd] = nameEntry
+      const colon = bytes.indexOf(0x3a, valueStart)
+      name = bytes.subarray(colon + 1, valueEnd).toString('utf8')
+    }
+    return { hash, name }
+  } catch {
+    return null
+  }
+}
+
+const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+/** `{ hash, name }` of a magnet link, or null without a btih. */
+function magnetInfo(url) {
+  const query = url.slice(url.indexOf('?') + 1)
+  const params = new URLSearchParams(query)
+  const xt = params
+    .getAll('xt')
+    .find((value) => /^urn:btih:/i.test(value))
+    ?.slice('urn:btih:'.length)
+  if (!xt) return null
+  let hash = null
+  if (/^[0-9a-f]{40}$/i.test(xt)) hash = xt.toLowerCase()
+  if (/^[A-Z2-7]{32}$/i.test(xt)) {
+    let bits = ''
+    for (const char of xt.toUpperCase()) {
+      bits += BASE32.indexOf(char).toString(2).padStart(5, '0')
+    }
+    hash = ''
+    for (let i = 0; i < 160; i += 4) {
+      hash += Number.parseInt(bits.slice(i, i + 4), 2).toString(16)
+    }
+  }
+  if (hash === null) return null
+  return { hash, name: params.get('dn') }
+}
+
+/** Adds one torrent for torrents/add; false when it is already there. */
+function applyAdd(hashValue, name, category) {
+  if (Object.hasOwn(currentTorrents(rid), hashValue)) return false
+  addedCount += 1
+  const categories =
+    mode.cats === 'default-path' ? CATEGORIES_DEFAULT_PATH : CATEGORIES
+  const [, value] = torrent(30_000 + addedCount, {
+    name: name || `Fake.Added.${addedCount}`,
+    category,
+    progress: 0,
+    dlspeed: 1_000_000,
+    eta: 3600,
+    added_on: MANY_NEWEST + DAY + addedCount * 60,
+    save_path: categories[category]?.savePath || '/data/media/X/incompleted',
+  })
+  added[hashValue] = value
+  return true
+}
+
+/** Story 4.7: torrents/add, one call (see the top of the file). */
+async function handleAdd(req, res) {
+  if (mode.ops === 'drop') {
+    req.socket.destroy()
+    return
+  }
+  const body = await readRawBody(req)
+  let form
+  try {
+    form = await new Response(body, {
+      headers: { 'content-type': req.headers['content-type'] ?? '' },
+    }).formData()
+  } catch {
+    return send(res, 400, 'Bad Request')
+  }
+  const urls = form.get('urls')
+  const file = form.get('torrents')
+  const category = String(form.get('category') ?? '')
+  const autoTMM = form.get('autoTMM') === 'true'
+  const call =
+    typeof urls === 'string'
+      ? { op: 'add', urls, category, autoTMM }
+      : { op: 'add', file: file?.name ?? '', category, autoTMM }
+  const isFile = typeof urls !== 'string'
+  if (mode.ops === 'reject' || (mode.ops === 'reject-files' && isFile)) {
+    opLog.push({ ...call, rejected: true })
+    return isFile
+      ? send(res, 415, 'Torrent file is not valid')
+      : send(res, 200, 'Fails.')
+  }
+  if (mode.ops === 'slow') {
+    const epoch = dataEpoch
+    await new Promise((resolve) => setTimeout(resolve, OPS_SLOW_MS))
+    if (epoch !== dataEpoch) return send(res, 200, 'Ok.')
+  }
+  const info = isFile
+    ? file && typeof file !== 'string'
+      ? torrentInfo(Buffer.from(await file.arrayBuffer()))
+      : null
+    : magnetInfo(urls)
+  if (info === null) {
+    opLog.push({ ...call, rejected: true })
+    return isFile
+      ? send(res, 415, 'Torrent file is not valid')
+      : send(res, 200, 'Fails.')
+  }
+  if (!applyAdd(info.hash, info.name, category)) {
+    opLog.push({ ...call, rejected: true })
+    return send(res, 200, 'Fails.')
+  }
+  opLog.push(call)
+  return send(res, 200, 'Ok.')
 }
 
 const OP_PATHS = {
@@ -973,6 +1158,14 @@ function send(res, status, body, headers = {}) {
   res.end(body)
 }
 
+function readRawBody(req) {
+  return new Promise((resolve) => {
+    const chunks = []
+    req.on('data', (chunk) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+  })
+}
+
 function readBody(req) {
   return new Promise((resolve) => {
     let body = ''
@@ -994,6 +1187,11 @@ const fakeQbit = createServer(async (req, res) => {
     return send(res, 200, 'Ok.', {
       'set-cookie': 'SID=fake; HttpOnly; path=/',
     })
+  }
+  if (req.method === 'POST' && url.pathname === '/api/v2/torrents/add') {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    return handleAdd(req, res)
   }
   if (req.method === 'POST' && Object.hasOwn(OP_PATHS, url.pathname)) {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
@@ -1066,7 +1264,11 @@ const fakeQbit = createServer(async (req, res) => {
         full_update: true,
         torrents: currentTorrents(rid),
         categories:
-          mode.cats === 'default-path' ? CATEGORIES_DEFAULT_PATH : CATEGORIES,
+          mode.cats === 'none'
+            ? {}
+            : mode.cats === 'default-path'
+              ? CATEGORIES_DEFAULT_PATH
+              : CATEGORIES,
         server_state: serverState(),
       }),
       { 'content-type': 'application/json' },
@@ -1111,6 +1313,8 @@ function controlMode(req, res, url) {
     }
     // Any data parameter starts from the data set as written.
     if (next.data) {
+      for (const key of Object.keys(added)) delete added[key]
+      addedCount = 0
       dataEpoch += 1
       removed.clear()
       stateOverrides.clear()
@@ -1144,6 +1348,26 @@ function controlRemove(req, res, url) {
     .filter(Boolean)
   for (const key of hashes) removed.add(key)
   send(res, 200, `${JSON.stringify({ removed: hashes })}\n`, {
+    'content-type': 'application/json',
+  })
+}
+
+/**
+ * Story 4.7: another device adds a torrent (loopback only, POST, `hash`,
+ * `name`, `category`); not logged as a call.
+ */
+function controlAdded(req, res, url) {
+  if (!isLoopback(req.socket.remoteAddress))
+    return send(res, 403, 'loopback only\n')
+  if (req.method !== 'POST') return send(res, 405, 'POST\n')
+  const key = (url.searchParams.get('hash') ?? '').toLowerCase()
+  if (!/^[0-9a-f]{40}$/.test(key)) return send(res, 400, 'hash\n')
+  const ok = applyAdd(
+    key,
+    url.searchParams.get('name') ?? '',
+    url.searchParams.get('category') ?? 'X',
+  )
+  send(res, 200, `${JSON.stringify({ added: ok })}\n`, {
     'content-type': 'application/json',
   })
 }
@@ -1200,6 +1424,7 @@ function frontHandler(appPort) {
     if (url.pathname === '/__fake/mode') return controlMode(req, res, url)
     if (url.pathname === '/__fake/ops') return controlOps(req, res)
     if (url.pathname === '/__fake/remove') return controlRemove(req, res, url)
+    if (url.pathname === '/__fake/added') return controlAdded(req, res, url)
     if (url.pathname === '/__fake/files') return controlFiles(req, res)
     if (url.pathname === '/__fake/log') return controlLog(req, res)
     if (url.pathname === '/__fake/settings') {
@@ -1362,9 +1587,9 @@ switch modes:
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states | categories | categories-emptied
   grow:  0 | 1
-  ops:   normal | reject | slow | reject-files
+  ops:   normal | reject | slow | reject-files | drop
   files: normal | slow | fail
-  cats:  normal | default-path
+  cats:  normal | default-path | none
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'
 reset settings.json: curl -X POST '${origin}/__fake/settings?reset=1'
