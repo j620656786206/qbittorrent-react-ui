@@ -1,21 +1,48 @@
 {
-  "recordedAt": "2026-11-20T05:02:20.996Z",
+  "recordedAt": "2026-11-20T06:29:59.979Z",
   "browser": "headless Chromium 156.0.8078.4",
-  "files": 20,
-  "bytesEach": 10485248,
-  "rowsShown": 20,
-  "rowsAddable": 20,
-  "secondsUntilAllRows": 3.2,
-  "longTasksOver50Ms": 0,
-  "longestLongTaskMs": 0,
-  "longestRunTaskMs": 18,
-  "topRunTasksMs": [
-    18,
-    15,
-    15,
-    15,
-    14
-  ],
   "limitMs": 200,
+  "sets": [
+    {
+      "set": "single",
+      "description": "20 single-file torrents just under 10 MB",
+      "largestFileBytes": 10484989,
+      "rowsShown": 20,
+      "rowsAddable": 20,
+      "secondsUntilAllRows": 3.3,
+      "longTasksOver50Ms": 0,
+      "longestLongTaskMs": 0,
+      "longestRunTaskMs": 19,
+      "topRunTasksMs": [
+        19,
+        16,
+        15,
+        15,
+        15
+      ],
+      "complete": true,
+      "pass": true
+    },
+    {
+      "set": "many-files",
+      "description": "20 multi-file torrents of 150000 files each",
+      "largestFileBytes": 5711851,
+      "rowsShown": 20,
+      "rowsAddable": 20,
+      "secondsUntilAllRows": 5.7,
+      "longTasksOver50Ms": 0,
+      "longestLongTaskMs": 0,
+      "longestRunTaskMs": 21,
+      "topRunTasksMs": [
+        21,
+        20,
+        20,
+        20,
+        20
+      ],
+      "complete": true,
+      "pass": true
+    }
+  ],
   "pass": true
 }

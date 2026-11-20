@@ -133,8 +133,10 @@ function PasteTextarea({
       const element = event.currentTarget
       const start = element.selectionStart
       const end = element.selectionEnd
+      const next = draft.slice(0, start) + text + draft.slice(end)
+      if (next === draft) return
       caretRef.current = start + text.length
-      setDraft(draft.slice(0, start) + text + draft.slice(end))
+      setDraft(next)
       return
     }
     if (text.trim() !== '') onText(text)

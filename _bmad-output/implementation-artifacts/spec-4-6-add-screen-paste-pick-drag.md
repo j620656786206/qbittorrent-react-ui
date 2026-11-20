@@ -5,7 +5,7 @@ created: '2026-11-20'
 status: 'done'
 baseline_revision: 'e334504e423530d2634d4c227b0b72df20a3e14e'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
 warnings: ['oversized']
@@ -180,6 +180,39 @@ deferred:
   - `[low]` `[patch]` (edge) No unit test for detail-outside: `src/state/detail-outside.test.ts` added.
   - `[false]` `[reject]` (edge) `readTorrentFiles` unused: the per-file loop is the same reader with a session token, as the spec allows.
 
+### 2026-11-20: Review pass (follow-up)
+- verdicts: 29 findings: high 0, medium 1, low 21, false 7, maybe-false 0
+- findings:
+  - `[low]` `[patch]` (edge) A paste that leaves the draft unchanged still moves the caret ref: set only when the draft changes; tested.
+  - `[low]` `[patch]` (edge) Opened before maindata loads, existing torrents look addable: 「新增 N 個」 waits for `ready`, rows re-judged on load; tested.
+  - `[false]` `[reject]` (edge) An outside torrent deleted in this tab loses its fade: it cannot be selected (not in the list), so this tab cannot delete it.
+  - `[false]` `[reject]` (edge) A live torrent shows 以前下載過，已整理好: the PRD assumption uses one text for any state; flagged for Alex.
+  - `[low]` `[reject]` (edge) A paste of tens of thousands of tokens freezes the UI: not a realistic paste; a cap adds a new rule.
+  - `[low]` `[patch]` (edge) A files-heavy 10 MB torrent is not measured in a browser: the trace now runs a 150,000-file set (longest task 21 ms).
+  - `[false]` `[reject]` (edge) `readTorrentFiles` unused: carried.
+  - `[false]` `[reject]` (blind) The existing label on live torrents: same as the edge row.
+  - `[medium]` `[patch]` (blind) After Esc the overlay can stay dismissed for the rest of the session in a real drag: a new `dragenter` from depth 0 starts a fresh drag and clears it; tested.
+  - `[low]` `[patch]` (blind) The read chain has no catch: each read is guarded; a throwing file becomes 看不懂這個檔案 and the queue continues; tested.
+  - `[low]` `[reject]` (blind) Duplicate accessible names on 拿掉 and ✕: carried.
+  - `[low]` `[patch]` (blind) The trace overwrites the committed JSON on failure, hides fake-qbit output, fixed port: writes only on a complete run, stderr passed through, free port.
+  - `[low]` `[patch]` (blind) The trace does not exercise the 5000-file slicing: same fix as the edge row.
+  - `[low]` `[patch]` (blind) The IME Enter guard is untested: tested for `isComposing` and keyCode 229.
+  - `[low]` `[patch]` (blind) A chosen category removed while open is untested: tested (menu empty, path cleared, 新增 disabled).
+  - `[low]` `[defer]` (blind) iPhone picker `accept`: carried, deferred.
+  - `[low]` `[patch]` (blind) The `hashKey` comment overstates: corrected.
+  - `[false]` `[reject]` (blind) Esc and ✕ discard without asking while outside presses are blocked: the AC discards on every close; the outside press is blocked because it is the easiest accident.
+  - `[low]` `[patch]` (blind) `role="status"` with `aria-live="assertive"`: `aria-live` removed; asserted.
+  - `[low]` `[reject]` (blind) The screenshot name says ten for nine rows; duplicate setModes: carried; cosmetic.
+  - `[low]` `[patch]` (gap) The phone A6 e2e would pass a sheet that closes at once: URL and settled visibility asserted.
+  - `[false]` `[reject]` (intent) The phone sheet title stays 新增種子: D4 means the box text; the AC titles the screen 新增種子.
+  - `[low]` `[reject]` (intent) Phone drag-down close is not in e2e: the sheet's drag close is covered by its own tests (2.2).
+  - `[low]` `[reject]` (intent) Desktop board 打開 not in e2e: covered by DOM tests.
+  - `[low]` `[reject]` (intent) Paste and drag through synthetic events: carried; manual NAS check.
+  - `[low]` `[reject]` (intent) 選檔案 opening the picker not tested: browsers do not let tests open a native picker; the input's attributes are asserted.
+  - `[low]` `[reject]` (intent) C2 and R1 only in DOM tests: their timing needs stubbed reads.
+  - `[low]` `[reject]` (intent) 新增 uses `aria-disabled`: it stays focusable and inert, as the delete confirm does.
+  - `[false]` `[reject]` (intent) 4.5's info-hash.ts changed: carried.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -204,11 +237,10 @@ Implementation notes (Claude 代決, Alex can veto):
 - For A8 in e2e, fake-qbit's new `cats=default-path` mode adds `X-default` with `savePath: ''`. Other modes are unchanged.
 - Known gap: desktop list mode in an empty category has no detail panel (story 2.4), so 「打開」 there writes the URL but shows no detail until a row exists.
 
-Measurement (closes 4.5's deferred browser check), `node scripts/trace-add-files.mjs` on 2026-11-20 in headless Chromium 156 with 20 generated torrents of 10,485,248 bytes picked at once:
-- no long task over 50 ms
-- longest main-thread task 18 ms
-- all 20 rows shown after 3.2 s
-- summary in `screenshots/4-6/trace-add-files.json`
+Measurement (closes 4.5's deferred browser check), `node scripts/trace-add-files.mjs` on 2026-11-20 in headless Chromium 156. Each set is 20 generated torrents picked at once on a freshly opened screen:
+- single-file torrents just under 10 MB (largest 10,484,989 bytes): no long task over 50 ms, longest main-thread task 19 ms, all 20 rows after 3.3 s
+- multi-file torrents with 150,000 `files` entries each (largest 5,711,851 bytes), which exercises the 5000-entry slicing from 80d1c42: no long task over 50 ms, longest main-thread task 21 ms, all 20 rows after 5.7 s
+- the summary in `screenshots/4-6/trace-add-files.json` is written only when both sets show all 20 rows
 
 AD-11 docs:
 - `paste` event and `ClipboardEvent.clipboardData`: https://developer.mozilla.org/en-US/docs/Web/API/Element/paste_event
@@ -245,4 +277,17 @@ Status: done (first pass; a follow-up review pass is recommended).
 - `npm test`: 149 files, 3614 tests pass.
 - `npm run build && npx playwright test`: 169 passed, 1 skipped (the opt-in recording), 20.5 min.
 - `node scripts/trace-add-files.mjs` (before the patches): 20 files of 10 MB, longest main-thread task 18 ms, none over 50 ms.
+- `check.sh`: every line ok.
+
+### Follow-up pass 1 (2026-11-20)
+
+Status: done. Follow-up review: false (no high patched; converged).
+
+**Review.** 29 findings. Patched: medium 1 (overlay dismissed after Esc), low 11 rows. Deferred: 0 new (1 carried). Rejected: 7 false, 10 low with reasons in the triage log.
+
+**Verification (after the patches).**
+- `npm run lint`, `npm run typecheck`: exit 0.
+- `npm test`: 149 files, 3620 tests pass.
+- `npx playwright test` on add, category-tabs, detail, delete, shortcuts: 58 passed (the full suite, 169 passed, ran after the first pass).
+- `node scripts/trace-add-files.mjs`: single-file set longest task 19 ms, 150,000-file set 21 ms, none over 50 ms.
 - `check.sh`: every line ok.

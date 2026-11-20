@@ -106,14 +106,24 @@ function tree() {
   )
 }
 
-async function render() {
+/** Resolves the first maindata answer of a `render({ loaded: false })`. */
+let loadMaindata: () => void = () => {}
+
+async function render({ loaded = true } = {}) {
+  let first = true
   client = createQueryClient({
-    fetchMaindata: () =>
-      Promise.resolve(fakeResponse({ changed: torrents, categories })),
+    fetchMaindata: () => {
+      const answer = fakeResponse({ changed: torrents, categories })
+      if (loaded || !first) return Promise.resolve(answer)
+      first = false
+      return new Promise((resolve) => {
+        loadMaindata = () => resolve(answer)
+      })
+    },
     fetchSettings: () => Promise.resolve(settings),
     currentPath: () => '/',
   })
-  await client.prefetchQuery({ queryKey: MAINDATA_KEY })
+  if (loaded) await client.prefetchQuery({ queryKey: MAINDATA_KEY })
   await client.prefetchQuery({ queryKey: ['settings'] })
   const host = document.createElement('div')
   document.body.append(host)
@@ -902,5 +912,107 @@ describe('the submit button', () => {
     await render()
     await open()
     expect(submit().className).toContain('hover-solid')
+  })
+})
+
+describe('more edge cases (review)', () => {
+  it('a read that throws counts as 看不懂這個檔案 and the queue keeps going', async () => {
+    const throwing = {
+      name: 'broken.torrent',
+      get size(): number {
+        throw new Error('gone')
+      },
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    } as unknown as File
+    await render()
+    await open()
+    await pick([
+      torrentFile('Fake.A').file,
+      throwing,
+      torrentFile('Fake.B').file,
+    ])
+    await settleReads()
+    expect(rowNames()).toEqual(['broken.torrent', 'Fake.A', 'Fake.B'])
+    expect(rows()[0].querySelector('[data-add-label]')?.textContent).toBe(
+      '看不懂這個檔案',
+    )
+    expect(
+      screen().querySelector('[data-add-strip]')?.textContent,
+    ).not.toContain('讀取中…')
+    // Later picks are still read.
+    await pick([torrentFile('Fake.C').file])
+    await settleReads()
+    expect(rowNames()).toContain('Fake.C')
+  })
+
+  it('before maindata loads 新增 stays disabled; once loaded the rows are judged again', async () => {
+    viewCategory = 'X'
+    await render({ loaded: false })
+    await open()
+    await paste(`magnet:?xt=urn:btih:${ARCHIVED}\nmagnet:?xt=urn:btih:${NEW_A}`)
+    expect(submit().getAttribute('aria-disabled')).toBe('true')
+    await act(async () => {
+      loadMaindata()
+    })
+    await settle()
+    expect(rowStatuses()).toEqual(['existing', 'addable'])
+    expect(submit().textContent).toBe('新增 1 個')
+    expect(submit().hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('Enter while an IME composes does not judge the draft; Enter after it does', async () => {
+    await render()
+    await open()
+    await type(`magnet:?xt=urn:btih:${NEW_A}`)
+    const composingEnter = (init: KeyboardEventInit) =>
+      act(async () => {
+        textarea().dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+            ...init,
+          }),
+        )
+      })
+    await composingEnter({ isComposing: true })
+    await composingEnter({ keyCode: 229 })
+    expect(rows()).toHaveLength(0)
+    expect(textarea().value).toBe(`magnet:?xt=urn:btih:${NEW_A}`)
+    await press('Enter', textarea())
+    await settle()
+    expect(rowStatuses()).toEqual(['addable'])
+  })
+
+  it('a paste that leaves the draft unchanged never moves the caret later', async () => {
+    await render()
+    await open()
+    await type('abc')
+    textarea().setSelectionRange(1, 1)
+    await paste('', [], textarea())
+    expect(textarea().value).toBe('abc')
+    await type('abcd')
+    expect(textarea().selectionStart).toBe(4)
+  })
+
+  it('a chosen category that leaves qBittorrent clears the menu, the path and 新增', async () => {
+    await render()
+    await open()
+    await paste(`magnet:?xt=urn:btih:${NEW_A}`)
+    await act(async () => {
+      select().value = 'X'
+      select().dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(pathLine()).toBe('會存到 /data/media/X')
+    expect(submit().hasAttribute('aria-disabled')).toBe(false)
+    const { X: _gone, ...rest } = categories
+    categories = rest
+    await act(async () => {
+      await client.refetchQueries({ queryKey: MAINDATA_KEY })
+    })
+    await settle()
+    expect(select().value).toBe('')
+    expect(pathLine()).toBe('')
+    expect(submit().getAttribute('aria-disabled')).toBe('true')
   })
 })

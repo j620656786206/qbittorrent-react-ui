@@ -70,7 +70,7 @@ export function AddScreen() {
   const open = useAddOpen()
   const desktop = useIsDesktop()
   const entries = useAddEntries(open)
-  const { rows, reading, addText, addFiles, remove } = entries
+  const { rows, ready, reading, addText, addFiles, remove } = entries
   const queued = useQueuedFiles()
   const { setHash } = useViewedHash()
   const { view } = useListView()
@@ -154,7 +154,8 @@ export function AddScreen() {
     reading: reading > 0,
   }
   const { addable, skipped } = addCounts(rows)
-  const disabled = addDisabled(addable, category)
+  // Before maindata loads every entry looks addable: wait for it.
+  const disabled = !ready || addDisabled(addable, category)
 
   const fileInput = (
     <input

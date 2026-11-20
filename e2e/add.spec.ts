@@ -503,10 +503,17 @@ test.describe('phone', () => {
     await addScreen(page)
       .getByRole('button', { name: `打開 ${nameOf(5)}` })
       .click()
+    await expect(addScreen(page)).toHaveCount(0)
+    await expect(page).toHaveURL(new RegExp(`hash=${hashOf(5)}`))
     const detail = page.getByRole('dialog', { name: nameOf(5) })
     await expect(detail).toBeVisible()
     await expect(detail).not.toContainText('個／共')
     await expect(detail.getByRole('button', { name: '上一個' })).toHaveCount(0)
+    // Still open once things settle (a sheet that closed itself would fail).
+    await settled(page)
+    await page.waitForTimeout(1500)
+    await expect(detail).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`hash=${hashOf(5)}`))
   })
 })
 

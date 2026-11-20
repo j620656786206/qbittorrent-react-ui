@@ -82,6 +82,8 @@ describe('drop overlay', () => {
     expect(enter.defaultPrevented).toBe(true)
     expect(overlay()?.textContent).toBe(DROP_TEXT)
     expect(overlay()?.querySelector('[role="status"]')).not.toBeNull()
+    // `status` is polite; no contradicting `aria-live`.
+    expect(overlay()?.querySelector('[aria-live]')).toBeNull()
     const over = drag('dragover')
     await fire(over)
     expect(over.defaultPrevented).toBe(true)
@@ -186,6 +188,23 @@ describe('drop overlay', () => {
     )
     await fire(drag('dragenter'))
     expect(overlay()).not.toBeNull()
+  })
+
+  it('after Esc a fresh drag shows it even when no dragleave came', async () => {
+    await render()
+    await fire(drag('dragenter'))
+    await fire(drag('dragenter'))
+    await fire(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      window,
+    )
+    expect(overlay()).toBeNull()
+    // The OS drag was cancelled without dragleave or dragend; a new one:
+    await fire(drag('dragenter'))
+    expect(overlay()).not.toBeNull()
+    // Its count starts again at 1: one dragleave ends it.
+    await fire(drag('dragleave'))
+    expect(overlay()).toBeNull()
   })
 
   it('after Esc it stays hidden until that drag ends', async () => {

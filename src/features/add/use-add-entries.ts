@@ -13,7 +13,10 @@ import type { AddItem, JudgedItem } from '#/features/add/add-model'
 // added elsewhere turns 以前下載過). Every open starts empty; reads started
 // before a close (or the previous open) are dropped when they finish, and
 // each open gets its own read queue, so a new pick never waits behind them.
-// The hash set is rebuilt only when hashes come or go, not on every poll.
+// The hash set is rebuilt only when its key (the sorted hashes joined)
+// changes; the sort and join still run on every poll. Until maindata has
+// loaded nothing can be judged as already downloaded, so `ready` is false.
+// A read that throws counts as 看不懂這個檔案 and never stalls the queue.
 // Removing a row removes the copies of its hash that judging merged into it.
 
 /** Gives the main thread back (src/lib has no timers). */
@@ -24,6 +27,8 @@ const NO_ITEMS: ReadonlyArray<AddItem> = []
 
 export interface AddEntries {
   rows: ReadonlyArray<JudgedItem>
+  /** Maindata has loaded, so the judging is final. */
+  ready: boolean
   /** Files given and not read yet. */
   reading: number
   addText: (text: string) => void
@@ -77,8 +82,13 @@ export function useAddEntries(open: boolean): AddEntries {
     chainRef.current = chainRef.current.then(async () => {
       for (const [index, file] of files.entries()) {
         if (!live()) return
-        if (index > 0) await yieldToMain()
-        const result = await readTorrentFile(file, { yieldToMain })
+        let result: AddItem['result']
+        try {
+          if (index > 0) await yieldToMain()
+          result = await readTorrentFile(file, { yieldToMain })
+        } catch {
+          result = { kind: 'unreadable', reason: 'file' }
+        }
         if (!live()) return
         const item: AddItem = {
           id: nextIdRef.current++,
@@ -109,7 +119,8 @@ export function useAddEntries(open: boolean): AddEntries {
   }, [])
 
   const { data: torrents } = useMaindata(selectTorrents)
-  // Each poll brings a new torrents object; the set follows the hashes only.
+  // Each poll brings a new torrents object: the key is worked out again, the
+  // set only when the key changed.
   const hashKey = useMemo(
     () =>
       open
@@ -136,6 +147,7 @@ export function useAddEntries(open: boolean): AddEntries {
 
   return {
     rows: rows ?? shownRows,
+    ready: torrents !== undefined,
     reading,
     addText,
     addFiles,

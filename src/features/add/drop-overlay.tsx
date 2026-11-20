@@ -39,7 +39,11 @@ export function DropOverlay() {
     // dragenter and dragleave come in pairs per element crossed; the
     // count is back at 0 once the drag left the window.
     let depth = 0
-    /** Esc hid it: it stays hidden until this drag ends. */
+    /**
+     * Esc hid it: it stays hidden for the rest of this drag. The browser
+     * cancels the drag on Esc but may never send its `dragleave`, so the
+     * next `dragenter` starts a new drag (count from 1) and shows it.
+     */
     let dismissed = false
     const end = () => {
       depth = 0
@@ -55,6 +59,10 @@ export function DropOverlay() {
     const onEnter = (event: DragEvent) => {
       if (!carriesFiles(event)) return
       event.preventDefault()
+      if (dismissed) {
+        dismissed = false
+        depth = 0
+      }
       depth += 1
       show()
     }
@@ -110,7 +118,6 @@ export function DropOverlay() {
     >
       <div
         role="status"
-        aria-live="assertive"
         className="absolute inset-4 flex items-center justify-center rounded-panel border-2 border-dashed border-white"
       >
         <div className="flex animate-pop flex-col items-center gap-3 rounded-panel bg-surface px-10 py-7 text-text shadow-float">
