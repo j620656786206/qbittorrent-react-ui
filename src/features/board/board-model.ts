@@ -1,6 +1,7 @@
 import { isFirstLoadError } from '#/lib/app-error'
 import { formatPercent } from '#/lib/format'
-import { locationLabel } from '#/lib/paths'
+import { NO_COMMON_PATHS_RESOLVER } from '#/lib/paths'
+import type { TagLocation } from '#/lib/paths'
 import {
   BOARD_COLUMN_NAMES,
   circleOf,
@@ -19,7 +20,8 @@ import type { SlimTorrent } from '#/shared/maindata'
 // Story 2.3: everything the board shows, pure, so it is tested in node.
 // Column membership and order come from `selectBoardColumns`
 // (src/lib/visible-torrents.ts); status, word, ring and the second line
-// only from classify(); the location only from locationLabel(). All text
+// only from classify(); the location only from src/lib/paths.ts (story
+// 5.1: the common path's name, else the last two folders). All text
 // is plain text. Values from UX DESIGN.md (board-column, board-card,
 // status-tabs) and the mockups S01-list-desktop, S02-list-phone.
 
@@ -167,8 +169,8 @@ export interface CardModel {
   progress: number | null
   /** The category tag; `null` when the torrent has none. */
   category: string | null
-  /** The location tag: the last two path segments. */
-  location: string
+  /** The location tag (story 5.1): the common path's name, media library. */
+  location: TagLocation
 }
 
 export interface CardModelOptions {
@@ -178,11 +180,16 @@ export interface CardModelOptions {
   stateBeforeMove: Readonly<Record<string, string>>
   /** Story 2.10: this torrent's reason from getErrorReasons, if any. */
   errorReason?: string
+  /**
+   * Story 5.1: this torrent's location (useLocationResolver); as with no
+   * common paths when left out (tests).
+   */
+  location?: TagLocation
 }
 
 export function cardModel(
   torrent: SlimTorrent,
-  { now, timeZone, stateBeforeMove, errorReason }: CardModelOptions,
+  { now, timeZone, stateBeforeMove, errorReason, location }: CardModelOptions,
 ): CardModel {
   const status = classify(torrent, {
     now,
@@ -200,7 +207,7 @@ export function cardModel(
       status.status === 'error' && !status.moving ? status.detail : null,
     progress: circle.arcFraction,
     category: torrent.category === '' ? null : torrent.category,
-    location: locationLabel(torrent.save_path),
+    location: location ?? NO_COMMON_PATHS_RESOLVER(torrent.save_path),
   }
 }
 

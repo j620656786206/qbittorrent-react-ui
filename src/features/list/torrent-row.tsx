@@ -20,7 +20,9 @@ import type { BigValue, RowModel, RowProps } from '#/features/list/list-model'
 // which follows the sort (story 2.1). Phone: no slot, no visible ratio
 // column (screen readers keep it); the second line wraps inside a one-line
 // box, so the speed drops first, then the size; the location tag always
-// stays (at most half the line).
+// stays (at most half the line). Story 5.1: the tag shows the common path's
+// name (purple for a media library) and is at most half the line on desktop
+// too, so a long name is cut inside the tag.
 // Story 4.1: a selected row has the `selection-row` background, which hover
 // never changes. The desktop checkbox is not in here (no control inside the
 // row's button): torrent-list.tsx draws it in the row's `group/item`
@@ -66,6 +68,7 @@ export const TorrentRow = memo(function Row({
   sort,
   sortValue,
   errorReason,
+  location,
   viewing,
   selected,
   onOpen,
@@ -84,6 +87,7 @@ export const TorrentRow = memo(function Row({
     sort,
     sortValue,
     errorReason,
+    location,
   })
   return (
     <RowContent
@@ -222,8 +226,9 @@ function SecondLine({ model }: { model: RowModel }) {
   return (
     <span className="flex h-5 min-w-0 items-center gap-x-2 gap-y-0 overflow-hidden text-tag whitespace-nowrap text-text-muted tabular-nums max-lg:flex-wrap">
       <LocationTag
-        label={model.tag}
-        className="max-w-1/2 flex-none rounded-full border px-2 py-px lg:max-w-none"
+        label={model.tag.name}
+        mediaLibrary={model.tag.mediaLibrary}
+        className="max-w-1/2 flex-none rounded-full px-2 py-px"
       />
       {movingDetail !== null && (
         <span className="flex-none">{movingDetail}</span>

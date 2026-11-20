@@ -155,6 +155,21 @@ export async function resetSettings(request: APIRequestContext) {
   expect(response.ok(), await response.text()).toBe(true)
 }
 
+/**
+ * Story 5.1: writes settings.json with one of fake-qbit's common-path seeds
+ * (`library` is EXPERIENCE.md's example table; `library-long` gives PT 做種
+ * a name near the 50-character limit; `library-renamed` renames and
+ * unticks 影集媒體庫; `fifty`, `fifty-renamed` cover the 50 parents).
+ */
+export async function seedSettings(
+  request: APIRequestContext,
+  seed:
+    'library' | 'library-long' | 'library-renamed' | 'fifty' | 'fifty-renamed',
+) {
+  const response = await request.post(`/__fake/settings?seed=${seed}`)
+  expect(response.ok(), await response.text()).toBe(true)
+}
+
 export interface Modes {
   qbit?: 'normal' | 'down' | 'slow' | 'rejected'
   front?: 'normal' | 'down' | 'cloudflare'
@@ -185,6 +200,12 @@ export interface Modes {
    * Story 4.7: `none` answers no categories at all.
    */
   cats?: 'normal' | 'default-path' | 'none'
+  /**
+   * Story 5.1: `varied` gives every torrent its own folder under one of 50
+   * parents (sample: E01 /data/media/tv, E02 /data/torrent/mteam-seed, E03
+   * /data/downloads, E04 /data/media/movies).
+   */
+  paths?: 'normal' | 'varied'
 }
 
 export const DEFAULT_MODES: Required<Modes> = {
@@ -195,6 +216,7 @@ export const DEFAULT_MODES: Required<Modes> = {
   ops: 'normal',
   files: 'normal',
   cats: 'normal',
+  paths: 'normal',
 }
 
 /** A filePrio call as fake-qbit logs it (story 2.7). */
@@ -283,7 +305,7 @@ export async function setModes(request: APIRequestContext, modes: Modes) {
   const query = new URLSearchParams(Object.entries(modes)).toString()
   const response = await request.post(`/__fake/mode?${query}`)
   expect(response.ok(), await response.text()).toBe(true)
-  if (modes.data !== undefined) {
+  if (modes.data !== undefined || modes.paths !== undefined) {
     await new Promise((resolve) => setTimeout(resolve, PULL_REUSE_WAIT_MS))
   }
 }

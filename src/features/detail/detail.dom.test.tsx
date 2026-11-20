@@ -8,6 +8,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
+import { defaultSettings } from '#/shared/settings'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
 import { clearConnectionErrors } from '#/state/connection'
@@ -24,6 +25,7 @@ import {
   resetLeaving,
 } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
+import { SETTINGS_KEY } from '#/state/settings'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
@@ -195,6 +197,9 @@ async function render(
   answers = [fakeResponse({ changed: data })]
   fetchCount = 0
   client = createQueryClient({
+    // Story 5.1: the tags read ['settings']; never answered here, so they
+    // show the last two folders (tests that need common paths set them).
+    fetchSettings: () => new Promise(() => {}),
     fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
@@ -921,6 +926,59 @@ describe('the overview (story 2.5)', () => {
     expect(
       pills().filter((pill) => pill.className.includes('bg-primary')),
     ).toHaveLength(1)
+  })
+
+  it('story 5.1 save path: the tag shows the common path name, purple for a media library', async () => {
+    const data = board().map((torrent) =>
+      torrent.hash === h(11) ? { ...torrent, save_path: LONG_PATH } : torrent,
+    )
+    await openSeed(data)
+    const tag = () =>
+      sectionOf().querySelector('path[d="M3 7h6l2 2h10v10H3z"]')?.closest('svg')
+        ?.parentElement
+    expect(tag()?.textContent).toBe('tv/假影集.Fake.Show.S01.2160p.WEB-DL')
+    await act(async () => {
+      client.setQueryData(SETTINGS_KEY, {
+        ...defaultSettings(),
+        commonPaths: [
+          { path: '/data/media/tv', name: '影集媒體庫', mediaLibrary: true },
+        ],
+      })
+    })
+    expect(tag()?.textContent).toBe('影集媒體庫，媒體庫')
+    expect(tag()?.hasAttribute('data-media-library')).toBe(true)
+    // The full path stays as it was.
+    expect(sectionOf().querySelector('bdi')?.textContent).toBe(LONG_PATH)
+  })
+
+  it('story 5.1 R2: the tag follows a save path that changes', async () => {
+    await openSeed()
+    await act(async () => {
+      client.setQueryData(SETTINGS_KEY, {
+        ...defaultSettings(),
+        commonPaths: [
+          { path: '/data/media/tv', name: '影集媒體庫', mediaLibrary: true },
+        ],
+      })
+    })
+    const tag = () =>
+      sectionOf().querySelector('path[d="M3 7h6l2 2h10v10H3z"]')?.closest('svg')
+        ?.parentElement
+    expect(tag()?.textContent).toBe('X/incompleted')
+    const seed = board().find((torrent) => torrent.hash === h(11))
+    if (!seed) throw new Error('no seed torrent')
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [{ ...seed, save_path: '/data/media/tv/Seed' }],
+      }),
+    )
+    expect(tag()?.textContent).toBe('影集媒體庫，媒體庫')
+    expect(tag()?.hasAttribute('data-media-library')).toBe(true)
+    expect(sectionOf().querySelector('bdi')?.textContent).toBe(
+      '/data/media/tv/Seed',
+    )
   })
 
   it('C1 複製: the full path, 「已複製」 for 1.5 s, a second press restarts it', async () => {
@@ -1713,7 +1771,9 @@ describe('a torrent opened from outside the list (story 4.6, 打開)', () => {
     expect(navButtons()).toHaveLength(0)
     // Another row chosen: back to the list's rows with N of M.
     await act(async () => setHashNow(h(2)))
-    await act(async () => publishShownList({ order: [h(1), h(2)], viewed: h(2) }))
+    await act(async () =>
+      publishShownList({ order: [h(1), h(2)], viewed: h(2) }),
+    )
     expect(detailOutsideStore.state.hash).toBeNull()
     expect(aside.querySelector('h2')?.textContent).toBe('Down2')
     expect(positionLine()).toBe('第 2 個／共 2 個')

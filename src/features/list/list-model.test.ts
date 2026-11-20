@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { AppError } from '#/lib/app-error'
 import { formatSize } from '#/lib/format'
 import { mergeMaindata } from '#/lib/maindata-merge'
+import { createLocationResolver } from '#/lib/paths'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import { countAll, selectVisibleTorrents } from '#/lib/visible-torrents'
 import type { SlimTorrent } from '#/shared/maindata'
@@ -40,7 +41,10 @@ describe('R1 seeding row', () => {
   })
 
   it('tag, size, upload speed, good ratio, today', () => {
-    expect(row.tag).toBe('torrent/mteam-seed')
+    expect(row.tag).toEqual({
+      name: 'torrent/mteam-seed',
+      mediaLibrary: false,
+    })
     expect(row.size).toBe(formatSize(182.7e9))
     expect(row.size).toBe('170.2 GB')
     expect(row.speed).toEqual({ direction: 'up', text: '2.38 MB/s' })
@@ -310,6 +314,43 @@ describe('M1 memo', () => {
     ).toBe(false)
   })
 
+  it('story 5.1 the location comes from the resolver, one object per path', () => {
+    const data = mergeMaindata(
+      undefined,
+      fakeResponse({
+        changed: [
+          t({ hash: fakeHash(1), save_path: '/data/media/tv/A' }),
+          t({ hash: fakeHash(2), save_path: '/data/media/tv/A' }),
+          t({ hash: fakeHash(3), save_path: '/data/torrents/tv' }),
+        ],
+      }),
+    )
+    const locate = createLocationResolver([
+      { path: '/data/media/tv', name: '影集媒體庫', mediaLibrary: true },
+    ])
+    const options = { today: NOW, locate }
+    const one = rowProps(data, fakeHash(1), options)?.location
+    expect(one).toEqual({ name: '影集媒體庫', mediaLibrary: true })
+    expect(rowProps(data, fakeHash(2), options)?.location).toBe(one)
+    expect(rowProps(data, fakeHash(3), options)?.location).toEqual({
+      name: 'torrents/tv',
+      mediaLibrary: false,
+    })
+    // Without a resolver: as with no common paths.
+    expect(rowProps(data, fakeHash(1), { today: NOW })?.location).toEqual({
+      name: 'tv/A',
+      mediaLibrary: false,
+    })
+  })
+
+  it('story 5.1 the row model takes the location given', () => {
+    const row = rowModel(t({ save_path: '/data/media/tv/A' }), {
+      ...OPTIONS,
+      location: { name: '影集媒體庫', mediaLibrary: true },
+    })
+    expect(row.tag).toEqual({ name: '影集媒體庫', mediaLibrary: true })
+  })
+
   it('a hash without data has no props', () => {
     const data = mergeMaindata(undefined, fakeResponse())
     expect(rowProps(data, fakeHash(9), { today: NOW })).toBeNull()
@@ -384,6 +425,20 @@ describe('the big number by sort', () => {
       style: 'text',
       muted: true,
       title: '/data/media/tv/',
+    })
+  })
+
+  it('story 5.1 save path: the common path name, muted, full path as title', () => {
+    const value = rowModel(t({ save_path: '/data/media/tv/Show' }), {
+      ...OPTIONS,
+      sort: 'save_path',
+      location: { name: '影集媒體庫', mediaLibrary: true },
+    }).value
+    expect(value).toMatchObject({
+      text: '影集媒體庫',
+      style: 'text',
+      muted: true,
+      title: '/data/media/tv/Show',
     })
   })
 

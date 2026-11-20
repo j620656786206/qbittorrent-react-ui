@@ -9,6 +9,7 @@ import { ALL } from '#/shared/categories'
 import { AppError } from '#/lib/app-error'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
+import { defaultSettings } from '#/shared/settings'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { LIST_SCROLL_ID, MAIN_ID } from '#/shared/ui/main-scroll'
 import { ringOffset } from '#/shared/ui/status-circle'
@@ -21,6 +22,7 @@ import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { expectLeaving, leavingStore, resetLeaving } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
+import { SETTINGS_KEY } from '#/state/settings'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import {
   freezeStore,
@@ -219,6 +221,9 @@ async function render(first: MaindataResponse | AppError) {
   answers = [first]
   fetchCount = 0
   client = createQueryClient({
+    // Story 5.1: the tags read ['settings']; never answered here, so they
+    // show the last two folders (tests that need common paths set them).
+    fetchSettings: () => new Promise(() => {}),
     fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
@@ -382,6 +387,65 @@ describe('a poll', () => {
       ([hash, calls]) => calls !== before.get(hash),
     )
     expect(rerendered.map(([hash]) => hash)).toEqual([fakeHash(20)])
+  })
+})
+
+describe('location tags (story 5.1)', () => {
+  const TV = { path: '/data/media/tv', name: '影集媒體庫', mediaLibrary: true }
+  const setCommonPaths = async (commonPaths: Array<typeof TV>) => {
+    await act(async () => {
+      client.setQueryData(SETTINGS_KEY, { ...defaultSettings(), commonPaths })
+    })
+  }
+  const tagOf = (name: string) => {
+    const item = [...main.querySelectorAll('[role="listitem"]')].find((row) =>
+      row.querySelector(`[title="${name}"]`),
+    )
+    // The tag is the folder icon's box.
+    return (
+      item?.querySelector('path[d="M3 7h6l2 2h10v10H3z"]')?.closest('svg')
+        ?.parentElement ?? null
+    )
+  }
+
+  it('R1, R2: the common path name, media library, updating without reload', async () => {
+    await render(
+      fakeResponse({
+        changed: [
+          torrent(1, { save_path: '/data/media/tv/Show.A' }),
+          torrent(2, { save_path: '/data/torrents/tv' }),
+        ],
+      }),
+    )
+    // Settings not answered: the last two folders.
+    expect(tagOf('T1')?.textContent).toBe('tv/Show.A')
+    await setCommonPaths([TV])
+    expect(tagOf('T1')?.textContent).toBe('影集媒體庫，媒體庫')
+    expect(tagOf('T1')?.hasAttribute('data-media-library')).toBe(true)
+    expect(tagOf('T2')?.textContent).toBe('torrents/tv')
+    expect(tagOf('T2')?.hasAttribute('data-media-library')).toBe(false)
+    // R1: the common path renamed and unticked.
+    await setCommonPaths([{ ...TV, name: '影集', mediaLibrary: false }])
+    expect(tagOf('T1')?.textContent).toBe('影集')
+    expect(tagOf('T1')?.hasAttribute('data-media-library')).toBe(false)
+    // R2: a torrent moves.
+    await poll(delta([torrent(2, { save_path: '/data/media/tv/Show.B' })]))
+    expect(tagOf('T2')?.textContent).toBe('影集')
+  })
+
+  it('an equal common-path list re-renders no row; a changed one re-renders every row', async () => {
+    await render(fakeResponse({ changed: many(5) }))
+    await setCommonPaths([TV])
+    const before = new Map(modelCalls)
+    // A new object with the same list (a focus refetch answering the same).
+    await setCommonPaths([{ ...TV }])
+    expect(
+      [...modelCalls].filter(([hash, calls]) => calls !== before.get(hash)),
+    ).toEqual([])
+    await setCommonPaths([{ ...TV, name: '影集' }])
+    expect(
+      [...modelCalls].filter(([hash, calls]) => calls !== before.get(hash)),
+    ).toHaveLength(5)
   })
 })
 

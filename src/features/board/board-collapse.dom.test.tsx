@@ -128,6 +128,9 @@ async function render(first: MaindataResponse) {
   answers = [first]
   let fetches = 0
   client = createQueryClient({
+    // Story 5.1: the tags read ['settings']; never answered here, so they
+    // show the last two folders (tests that need common paths set them).
+    fetchSettings: () => new Promise(() => {}),
     fetchMaindata: () => {
       fetches += 1
       return Promise.resolve(answers[Math.min(fetches - 1, answers.length - 1)])

@@ -24,6 +24,7 @@ import { useErrorReasons } from '#/state/error-reasons'
 import { useLeavingExit } from '#/state/leaving-exit'
 import { useListView, viewKeyOf } from '#/state/list-view'
 import { useListViewed } from '#/state/list-viewed'
+import { useLocationResolver } from '#/state/locations'
 import {
   selectStateBeforeMove,
   useMaindata,
@@ -288,6 +289,7 @@ function TorrentRows({
   const selected = useMemo(() => new Set(selectedHashes), [selectedHashes])
   // Story 2.10: polled only while maindata has an errored torrent.
   const errorReasons = useErrorReasons()
+  const locate = useLocationResolver()
   const clock = useDayClock()
   // Only a sort shown as 「N 前」 makes the rows read the minute tick.
   const today = rowClock(sort, clock.today, clock.now)
@@ -420,6 +422,7 @@ function TorrentRows({
                     sortKeys,
                     keysFailed,
                     errorReasons,
+                    locate,
                   })
                 : null
             const isSelected = selected.has(hash)

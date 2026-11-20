@@ -1,0 +1,60 @@
+# Epic 5 Context: Organize files
+
+<!-- Generated from planning artifacts. Regenerate with compile-epic-context if planning docs change. -->
+
+## Goal
+
+Let Alex change the save path of one torrent from detail, or of a whole selection from the selection bar, picking the target from common paths with one tap and managing those paths (add, rename, delete, tick 「媒體庫」) right inside the change-path screen. Location tags on rows, cards and the save-path block show where each torrent lives and turn purple once it is in a media library. While files move, 「搬移中」 survives closing the dialog, reloading and switching devices, and only the tab that started a single move gets a completion toast with 「接著改檔名」. Renaming then handles a whole season in batch (show name plus season, previewed, guessed episodes and name clashes flagged) or a single video file. This epic adds `setLocation`, `renameFiles` and the common-path settings functions, and wires every button earlier epics left disabled. When it is done, all 7 core tasks work in the new app and Alex can verify them on the NAS.
+
+## Stories
+
+- Story 5.1: Location tags and media library
+- Story 5.2: Change one torrent's path
+- Story 5.3: Moving and move finished
+- Story 5.4: Manage common paths and 「☆ 加到常用」
+- Story 5.5: Move several at once and partial failure
+- Story 5.6: Rename preview plan and renameFiles
+- Story 5.7: Rename screen: whole-season batch
+- Story 5.8: Single-file rename, rename after move, 7-task acceptance
+
+## Requirements & Constraints
+
+- Change path has only the save path (no temp path field). The 「會搬到」 box defaults to the current `save_path` for one torrent and is empty for several. 「搬過去」 is disabled when the box equals the current path (or every selected torrent is already there) or fails the shared path schema; the reason shows under the box.
+- Moving several torrents skips the ones already at the target, and only torrents actually sent count in 「已開始搬 N 個」. Partial failure keeps the dialog open and lists only the failed ones with reasons. Full success clears the selection and shows no 「接著改檔名」.
+- The completion toast appears only in the tab that started the move. Other devices show 「搬移中」 but no toast. If `movingTo` disappears while `save_path` does not equal the target, show a failure-with-retry toast.
+- Rename auto-detects mode with no toggle: 2 or more video files means season batch, exactly 1 means single file. Subtitles follow their episode's video and keep language tags. `.nfo`, images and other files are left alone. Never auto-append (2) on clashes; any clash blocks 「確定」.
+- Rename target is `<劇名>/season<n>/<劇名>.S01E05.<rest>`: folder number unpadded, season and episode padded to two digits (three past 99). `<rest>` is everything after the episode token, and guessed episodes keep only the extension.
+- Mid-rename failure keeps show name, season and manual episode edits. 「重試剩下的」 waits for the next `['files', hash]`, skips files already at their new path, and resumes from the failed one.
+- Sending changes the button text (「搬移中…」, 「改名中…」), blocks a second send, shows 「還在等 NAS 回應」 after 10 s and counts as `timeout` after 30 s. Failures keep what Alex typed.
+- Torrent names, file names and paths render as plain text. Long preview lists use `@tanstack/react-virtual` (500 files must scroll smoothly). Location tags memoize per distinct `save_path`, and recomputing for 4165 torrents and 50 common paths stays under 100 ms.
+- Settings live on the NAS, are shared across devices, and concurrent edits to different paths must both survive.
+- Tests and automation never write to the real qBittorrent. Every write is verified with fake responses. Alex does the final checks on the NAS, ending with a repo checklist covering the 7 tasks, the two exceptions (pause/resume, file selection and priority) and the move-to-media-library journey.
+- Test fixtures use fictional show names. Private categories appear only as X or mteam-X.
+
+## Technical Decisions
+
+- **Path matching** comes only from `src/lib/paths.ts`, with no `startsWith` path checks in features. The tag name is the longest matching common path, bounded at folder boundaries (`/data/media/tv` does not match `/data/media/tv2`) after trailing-slash normalization. It falls back to the last two segments. The torrent counts as media library if any matching common path has 「媒體庫」 ticked.
+- **Common paths** use `{ path, name, mediaLibrary }` from the existing settings schema, with the normalized `path` as identity. Names are 1 to 50 characters after trimming, and the list holds at most 50 paths. `addCommonPath`, `updateCommonPath` and `removeCommonPath` are idempotent POSTs that return the whole new settings for `['settings']`. Adding an existing path succeeds without changing it. Removing a missing path succeeds. The 51st path returns `invalid_input`. Writes follow the existing settings file approach (temp file plus rename, a lock queue).
+- **Path validation.** The frontend checks only the shared path schema (absolute, no `..`, length). The container also requires the path to sit under `SAVE_ROOTS` and otherwise returns `invalid_input`.
+- **`setLocation`** is a POST taking `{ hashes, location }`, with hashes as 40 or 64 lowercase hex and 1 to 5000 entries. The body limit is the 400 KB hash-list limit. The container first checks each hash (torrent exists, not already moving) and fails those individually, then sends the rest to qBittorrent 5.1.4 in one call. A total rejection returns one overall error. The result uses the batch shape `{ key, ok, code?, message? }`.
+- **`movingTo`** is recorded by the container in the torrent table for each successful hash, bumps `changedAt`, and is returned by `getMaindata` (add it to `src/shared/maindata.ts`). The container deletes it after seeing `moving` and then leaving it, or when `save_path` equals the target. After 10 minutes with no `moving` and no `save_path` change, it deletes the entry and logs it.
+- **Moving status** comes from `src/lib/torrent-status.ts` (`movingTo` present or state `moving`), with no `torrent.state ===` in features. Board columns stay as `classify()` decides. A `src/lib` pure function decides move done, move failed or not ours from the `pendingOps` record plus previous and current maindata.
+- **`renameFiles`** is a POST taking `{ hash, items: [{ oldPath, newPath }] }` with a 64 KB body limit. The container fetches the torrent's current file list and rejects any `oldPath` not in it. It validates `newPath` as a multi-segment relative path: each segment has no `\`, NUL or control characters, is not `.` or `..`, is 1 to 255 bytes, has no leading `/`, and the path cannot escape the torrent folder. It calls the qBittorrent file and folder rename endpoints in order and stops at the first failure, returning done items plus the failed one. The frontend splits the plan into sequential requests and stops on any failure.
+- **The rename plan** is one `src/lib` pure function. Inputs are the file list, show name, season and manual episode overrides. Each row gets a kind (video, subtitle, untouched), episode, guessed flag, new path and clash target. It detects `E05`, `S01E05`, `第05話`, `第5集` and `[05]`, but not `1080p`, `2024`, `x264` or a lone `S02`. Undetected episodes continue from the highest detected one in natural filename order. It prefills the show name (text before the first season, episode, year or resolution token, with dots and underscores turned into spaces) and the season (`S02`, `Season 2`, `第二季`, default 1). A show name with `/` or control characters, or an empty one, makes the plan not confirmable with a short reason.
+- **After success, wait for qBittorrent.** Never edit local data. Call `refreshMaindata()` and record hash plus target in `pendingOps`. Renames also refetch `['files', hash]`. Error text comes from `src/lib/error-text.ts` by code and operation. Only the global handler shows connection codes.
+
+## UX & Interaction Patterns
+
+- **Location tag.** It has the same size as the category tag, with a folder icon, and is display only. A normal location has an outline and `text-muted` text. Media library in light mode uses a `media-library-tint` background with `media-library` text at weight 600 and no border. In dark mode it is bold `media-library-dark` text plus icon only. Purple means media library and nothing else.
+- **Change path.** The desktop dialog is 560 px, titled 「改路徑」 with the torrent name below in `meta`. For several torrents the title is 「搬 5 個種子」 with 「5 個種子現在在 2 個位置」. On phone it is a content-height sheet (max 90%) with no cancel button. The 「常用路徑」 header has a 28 px outline 「編輯」 pill on its right. Rows are 52 px (56 px on phone) with a 20 px radio, name, monospace path, media tag, and 「目前」 or 「目前 N 個」. A row is selected when the box exactly matches its path. The last row is 「加到常用」, disabled with 「框裡的路徑已經在清單裡」 (phone 「已在清單裡」) when the path is already listed. A newly added row opens its name for inline rename.
+- **Edit mode.** 「編輯」 becomes 「完成」. Radios disappear and names get a dotted underline that turns into an input (Enter or blur saves, `Esc` cancels). Each row has a 20 px 「媒體庫」 checkbox that saves at once and a 32 px ✕ (tooltip 「從常用拿掉（不動檔案）」) that deletes with no confirmation. 「加到常用」 hides. Controls on a row lock while its request is in flight.
+- **Save-path block.** 「改路徑」 is the only solid `accent` button. 「☆ 加到常用」 adds the current path named by its last two segments. It shows the toast 「已加到常用：media/tv」 with 「改名」, which opens change path in edit mode focused on that row. It is disabled with tooltip 「已經在常用路徑裡」 when the path is already listed. While moving, all four buttons are 50% and disabled, and the summary starts with 「搬移中 · 正在搬到 <路徑> · 」.
+- **Rename.** The desktop dialog is 720 px. On phone it is a full-screen sheet (no top radius, no scrim, safe area, handle kept, full-width 「確定」, no cancel). Show name (full width) and season (88 px) inputs sit above 「會放到 <路徑>/<劇名>/season1/」. Preview columns are 24 px row number, a 60 px 「E」 episode pill, then old name over 「→」 new name. Guessed episodes get a `status-stalled` exclamation icon. Clashes use `status-error` with 「跟第 N 列同名」 and a footer 「有 N 列撞名」. A guessed count shows 「N 個集數是猜的，確定前看一下」. The screen shows a 5-row skeleton while loading, 「讀不到檔案清單」 with retry, and disables confirm while metadata is still being fetched. Single-file mode has only 「新檔名」, plus 「資料夾名稱」 if there is an outer folder, and lists the subtitles that follow.
+- **Toasts.** 「已搬到 影集媒體庫」 for a single move gets 「接著改檔名」 for 8 s (no countdown on hover), which opens that torrent's detail and then rename. Other results are 「已開始搬 3 個種子」, 「已改好 12 個檔名」, and 「改好 6 個，第 7 個失敗」 with 「重試剩下的」 (does not auto-dismiss).
+
+## Cross-Story Dependencies
+
+- **From earlier epics.** The epic relies on the settings schema, file and mutation pattern (Story 3.1), `paths.ts` with the last-two-segments fallback, the shared dialog/sheet with its sending state (Story 4.3), the selection bar's disabled 「改路徑」 (Stories 4.1 and 4.2), the save-path block's disabled buttons (Story 2.5), `['files', hash]` (Story 2.7), `pendingOps`, `refreshMaindata()`, the batch types, the 400 KB hash limit, `error-text.ts` and the toast store.
+- 5.1 makes `paths.ts` the single source for tags, which 5.2 (「目前」 rows) and 5.5 (「目前 N 個」, location count) reuse.
+- 5.2 builds `setLocation`, `movingTo`, `addCommonPath` and the change-path screen. 5.3 adds moving display and the completion toast. 5.4 adds edit mode and wires 「☆ 加到常用」 using 5.2's `addCommonPath`. 5.5 opens the same screen from the selection bar.
+- 5.6 supplies the plan function and `renameFiles` for 5.7 (season screen). 5.7 keeps rename disabled for single-video torrents until 5.8 enables it. 5.8 also upgrades 5.3's toast with 「接著改檔名」, confirms no temporary disabled buttons remain anywhere (search count 0), and adds the acceptance checklist.

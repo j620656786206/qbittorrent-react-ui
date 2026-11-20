@@ -10,6 +10,7 @@ import { AppError } from '#/lib/app-error'
 import { LIST_LOAD_FAILED } from '#/lib/error-text'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
 import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
+import { defaultSettings } from '#/shared/settings'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { DEFAULT_SORT_VIEW } from '#/shared/list-search'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
@@ -22,6 +23,7 @@ import { getErrorReasons } from '#/server/functions/get-error-reasons'
 import { bindFetchErrorReasons } from '#/state/error-reasons'
 import { expectLeaving, leavingStore, resetLeaving } from '#/state/leaving'
 import { MAINDATA_KEY } from '#/state/maindata'
+import { SETTINGS_KEY } from '#/state/settings'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import {
   freezeStore,
@@ -192,6 +194,9 @@ async function render(first: MaindataResponse | AppError | 'pending') {
   answers = [first]
   fetchCount = 0
   client = createQueryClient({
+    // Story 5.1: the tags read ['settings']; never answered here, so they
+    // show the last two folders (tests that need common paths set them).
+    fetchSettings: () => new Promise(() => {}),
     fetchErrorReasons: bindFetchErrorReasons(getErrorReasons),
     fetchMaindata: () => {
       fetchCount += 1
@@ -280,6 +285,52 @@ afterEach(async () => {
   vi.restoreAllMocks()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('location tags (story 5.1)', () => {
+  it('cards show the common path name and update when the list changes', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    const tag = () =>
+      section('下載中，1 個')
+        .querySelector('path[d="M3 7h6l2 2h10v10H3z"]')
+        ?.closest('svg')?.parentElement
+    expect(tag()?.textContent).toBe('X/incompleted')
+    const set = async (name: string, mediaLibrary: boolean) => {
+      await act(async () => {
+        client.setQueryData(SETTINGS_KEY, {
+          ...defaultSettings(),
+          commonPaths: [{ path: '/data/media/X', name, mediaLibrary }],
+        })
+      })
+    }
+    await set('X 暫存', true)
+    expect(tag()?.textContent).toBe('X 暫存，媒體庫')
+    expect(tag()?.hasAttribute('data-media-library')).toBe(true)
+    await set('X 下載', false)
+    expect(tag()?.textContent).toBe('X 下載')
+    expect(tag()?.hasAttribute('data-media-library')).toBe(false)
+  })
+
+  it('R2: a torrent that moves gets its new tag', async () => {
+    await render(fakeResponse({ changed: sample() }))
+    await act(async () => {
+      client.setQueryData(SETTINGS_KEY, {
+        ...defaultSettings(),
+        commonPaths: [
+          { path: '/data/media/tv', name: '影集媒體庫', mediaLibrary: true },
+        ],
+      })
+    })
+    const tag = () =>
+      section('下載中，1 個')
+        .querySelector('path[d="M3 7h6l2 2h10v10H3z"]')
+        ?.closest('svg')?.parentElement
+    expect(tag()?.textContent).toBe('X/incompleted')
+    const down = sample()[0]
+    await poll(delta([{ ...down, save_path: '/data/media/tv/Down' }]))
+    expect(tag()?.textContent).toBe('影集媒體庫，媒體庫')
+    expect(tag()?.hasAttribute('data-media-library')).toBe(true)
+  })
 })
 
 describe('opening the detail (spec 2.4)', () => {
@@ -477,11 +528,16 @@ describe('error reasons (spec 2.10)', () => {
     const line = item?.querySelector(`[title="${long}"]`)
     expect(line?.textContent).toBe(long)
     expect(line?.className).toContain('truncate')
-    // Other cards' lines (speed, time) have no tooltip: only the name does.
+    // Other cards' lines (speed, time) have no tooltip: only the name and
+    // (story 5.1) the location tag do.
     const down = [...main.querySelectorAll('[role="listitem"]')].find((x) =>
       x.querySelector('[title="Down"]'),
     )
-    expect(down?.querySelectorAll('[title]')).toHaveLength(1)
+    expect(
+      [...(down?.querySelectorAll('[title]') ?? [])].map((x) =>
+        x.getAttribute('title'),
+      ),
+    ).toEqual(['Down', 'X/incompleted'])
   })
 
   it('the phone tabs show it too', async () => {
