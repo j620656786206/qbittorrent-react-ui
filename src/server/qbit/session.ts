@@ -62,9 +62,14 @@ export interface SendOptions {
    * a 403 sends the same form again.
    */
   form?: URLSearchParams | FormData
+  /**
+   * Non-2xx statuses that are an answer for the caller to read, not
+   * `qbit_rejected` (story 4.7: 415 from `torrents/add`). Never 403.
+   */
+  accept?: ReadonlyArray<number>
 }
 
-/** A 2xx answer, body already read inside the deadline. */
+/** A 2xx answer (or an `accept`ed status), body read inside the deadline. */
 export interface QbitResponse {
   status: number
   body: string
@@ -260,8 +265,10 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
   function expectOk(
     path: QbitPath,
     response: { status: number; body: string },
+    accept: ReadonlyArray<number> = [],
   ): QbitResponse {
-    if (response.status >= 200 && response.status <= 299) {
+    const ok = response.status >= 200 && response.status <= 299
+    if (ok || accept.includes(response.status)) {
       return { status: response.status, body: response.body }
     }
     logger.warn('qbit_bad_response', { path, status: response.status })
@@ -300,7 +307,7 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
       loggedIn = true
     }
     const first = await request(path, sendOptions, used, signal)
-    if (first.status !== 403) return expectOk(path, first)
+    if (first.status !== 403) return expectOk(path, first, sendOptions.accept)
     if (loggedIn) return rejectedAfterLogin(path, first, used)
     if (now() < reloginBlockedUntil) return expectOk(path, first)
 
@@ -313,7 +320,7 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     // Exactly one resend; a second 403 is qbit_rejected, not the breaker.
     const resent = await request(path, sendOptions, used, signal)
     if (resent.status === 403) return rejectedAfterLogin(path, resent, used)
-    return expectOk(path, resent)
+    return expectOk(path, resent, sendOptions.accept)
   }
 
   async function send(

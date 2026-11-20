@@ -21,14 +21,16 @@ import type { BatchResult } from '#/shared/torrent-ops'
 //
 // A whole-request error only when nothing was done: validation, the
 // session, a failed category read, the deadline passing before the first
-// entry, or qBittorrent unreachable (or its login refused) before any
-// entry was added. Once something was added, such a failure stops the
-// sending and it and every entry after it are failed items with that code.
-// A rejected entry (`qbit_rejected`) is a failed item and the next one is
-// still sent. Entries share a deadline under the factory's 30 s, so the
-// answer always carries what was added: an entry still waiting at the
-// deadline, and the entries after it, are `timeout` items (qBittorrent may
-// still add the waiting one; the next maindata tells).
+// entry, or any failure but qBittorrent's refusal of that entry
+// (unreachable, login refused, a proxy error, the re-login cooldown, an
+// unreadable answer) before any entry was added. Once something was added,
+// such a failure stops the sending and it and every entry after it are
+// failed items with that code. An entry qBittorrent refuses (`AddRefused`:
+// 415, `Fails.`, JSON with nothing added) is a `qbit_rejected` item and the
+// next one is still sent. Entries share a deadline under the factory's
+// 30 s, so the answer always carries what was added: an entry still waiting
+// at the deadline, and the entries after it, are `timeout` items
+// (qBittorrent may still add the waiting one; the next maindata tells).
 
 /** `d`: a bencode dictionary, which every .torrent file is. */
 const BENCODE_DICT = 0x64

@@ -8,6 +8,7 @@ import { addOpenStore, closeAdd, openAdd } from '#/state/add-open'
 import { callFn } from '#/state/call-fn'
 import type * as CallFnModule from '#/state/call-fn'
 import { connectionStore } from '#/state/connection'
+import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { openWhenAdded, openWhenAddedStore } from '#/state/open-when-added'
 import {
@@ -668,6 +669,66 @@ describe('review fixes (spec 4.7)', () => {
     expect(rows()).toHaveLength(25)
     expect(resultLine()).toBe('20 個加好了，25 個失敗')
     expect(new Set(reasons())).toEqual(new Set(['家裡的 qBittorrent 沒有回應']))
+  })
+
+  it('3 batches, batch 2 unreachable: the connection error is marked, like a first-batch failure', async () => {
+    await start((sent, call) =>
+      Promise.resolve(call === 1 ? failed('qbit_unreachable') : allOk(sent)),
+    )
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x580 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    // The refresh that follows may clear it again: watch every change.
+    const marked: Array<ReadonlyArray<string>> = []
+    const watch = connectionStore.subscribe(() =>
+      marked.push(connectionStore.state.errors),
+    )
+    await click(submit())
+    await settle()
+    watch.unsubscribe()
+    expect(addCalls.sent).toHaveLength(2)
+    expect(marked.some((errors) => errors.includes('qbit_unreachable'))).toBe(
+      true,
+    )
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+  })
+
+  it('3 batches, batch 2 qbit_auth_failed: batch 3 is not sent, the added rows leave, login is required', async () => {
+    await start((sent, call) =>
+      Promise.resolve(call === 1 ? failed('qbit_auth_failed') : allOk(sent)),
+    )
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x600 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    await click(submit())
+    await settle()
+    expect(addCalls.sent).toHaveLength(2)
+    expect(loginStore.state.loginRequired?.reason).toBe('qbit_auth_failed')
+    expect(rows()).toHaveLength(25)
+    expect(resultLine()).toBe('20 個加好了，25 個失敗')
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+  })
+
+  it("the add's own browser timeout is the add failure toast, not a lost connection", async () => {
+    await start(() => new Promise<unknown>(() => {}))
+    const real = vi.mocked(callFn).getMockImplementation()
+    if (!real) throw new Error('callFn is not wrapped')
+    // The real callFn with the options the add passes, on a short clock.
+    vi.mocked(callFn).mockImplementationOnce((fn, input, options) =>
+      real(fn, input, { ...options, timeoutMs: 1 }),
+    )
+    await paste(magnet(NEW_A))
+    const marked: Array<ReadonlyArray<string>> = []
+    const watch = connectionStore.subscribe(() =>
+      marked.push(connectionStore.state.errors),
+    )
+    await click(submit())
+    await settle()
+    watch.unsubscribe()
+    expect(marked.flat()).toEqual([])
+    expect(toastCalls.failure).toHaveBeenCalledOnce()
+    expect(toastCalls.failure.mock.calls[0][0]).toBe(
+      '新增失敗：qBittorrent 沒有回應，請再試一次',
+    )
+    expect(rows()).toHaveLength(1)
   })
 
   it.each(['home_unreachable', 'timeout'])(

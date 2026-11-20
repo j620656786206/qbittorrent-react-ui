@@ -41,8 +41,10 @@ export interface QbitClient {
    * Story 4.7: `torrents/add` for one entry, multipart: a magnet link as
    * `urls` or a .torrent file as `torrents`, with `category` and
    * `autoTMM=true` (the category's save path applies). Never `savepath`
-   * or `cookie`, never a URL fetched here. A non-2xx (415 for a file
-   * qBittorrent cannot read) or a body of `Fails.` is `qbit_rejected`.
+   * or `cookie`, never a URL fetched here. qBittorrent refusing this
+   * entry (415 for a file it cannot read, a `Fails.` body, a JSON answer
+   * with nothing added) throws `AddRefused`; any other non-2xx or body is
+   * a plain `qbit_rejected` (nothing about this entry in particular).
    */
   addTorrent: (entry: AddTorrentEntry, category: string) => Promise<void>
   /**
@@ -75,22 +77,40 @@ export type AddTorrentEntry =
   | { kind: 'file'; bytes: Uint8Array<ArrayBuffer>; name: string }
 
 /**
- * qBittorrent 5.0 answers `Ok.` or `Fails.` with 200; newer versions may
- * answer JSON with counts. `Fails.` is a rejection, and so is any JSON
- * answer that does not say at least one was added (`success_count` above
- * 0). Other text (`Ok.`, empty) counts as accepted (the next maindata
- * tells).
+ * Story 4.7: qBittorrent refused this one entry (`qbit_rejected` to every
+ * other reader). `addTorrents` fails that entry and sends the next; any
+ * other `qbit_rejected` (a proxy error, a redirect, the re-login cooldown,
+ * an answer it cannot read) means no entry can be added right now.
  */
-function addRejected(body: string): boolean {
-  const text = body.trim()
-  if (text === 'Fails.') return true
-  if (!text.startsWith('{')) return false
-  try {
-    const json = JSON.parse(text) as Record<string, unknown>
-    return !(typeof json.success_count === 'number' && json.success_count > 0)
-  } catch {
-    return true
+export class AddRefused extends ServerFailure {
+  constructor() {
+    super('qbit_rejected', 'add: refused')
   }
+}
+
+/** qBittorrent's answer to a .torrent file it cannot read. */
+const UNSUPPORTED_MEDIA_TYPE = 415
+
+/**
+ * qBittorrent 5.0 answers `Ok.` or `Fails.` with 200; newer versions may
+ * answer JSON with counts. Added: `Ok.`, an empty body, or JSON with
+ * `success_count` above 0 (the next maindata tells). Refused: `Fails.` or
+ * any other JSON object. Anything else (HTML, junk) is not an answer.
+ */
+function addAnswer(body: string): 'added' | 'refused' | 'unknown' {
+  const text = body.trim()
+  if (text === 'Ok.' || text === '') return 'added'
+  if (text === 'Fails.') return 'refused'
+  if (!text.startsWith('{')) return 'unknown'
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return 'unknown'
+  }
+  if (typeof json !== 'object' || json === null) return 'unknown'
+  const count = (json as Record<string, unknown>).success_count
+  return typeof count === 'number' && count > 0 ? 'added' : 'refused'
 }
 
 /** One `log/main` line (qBittorrent 5.1.4 `Log::Msg`). */
@@ -200,10 +220,23 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     else form.set('torrents', new Blob([entry.bytes]), entry.name)
     form.set('category', category)
     form.set('autoTMM', 'true')
-    const response = await session.send(path, { method: 'POST', form })
-    if (addRejected(response.body)) {
+    const response = await session.send(path, {
+      method: 'POST',
+      form,
+      accept: [UNSUPPORTED_MEDIA_TYPE],
+    })
+    const answer =
+      response.status === UNSUPPORTED_MEDIA_TYPE
+        ? 'refused'
+        : addAnswer(response.body)
+    if (answer === 'refused') {
       logger.warn('qbit_bad_response', { path, reason: 'add_failed' })
-      throw new ServerFailure('qbit_rejected', 'add: failed')
+      throw new AddRefused()
+    }
+    if (answer === 'unknown') {
+      // The reason only: the body may be a proxy's page.
+      logger.warn('qbit_bad_response', { path, reason: 'unexpected_body' })
+      throw new ServerFailure('qbit_rejected', 'add: unexpected body')
     }
   }
 
