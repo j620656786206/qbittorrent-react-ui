@@ -17,6 +17,8 @@ import { AddScreen } from '#/features/add/add-screen'
 import { DropOverlay } from '#/features/add/drop-overlay'
 import { AppShell } from '#/features/header/app-shell'
 import { requireSession } from '#/features/login/require-session'
+import { ChangePathScreen } from '#/features/path/change-path-screen'
+import { setLocationOp } from '#/features/path/set-location-op'
 import { sessionQueryOptions } from '#/features/login/session-query'
 import { categoryTabs, resolveCategory } from '#/lib/category-tabs'
 import type { Maindata } from '#/lib/maindata-merge'
@@ -25,7 +27,9 @@ import type { SortChange } from '#/lib/remembered-hint'
 import { nameMatches, searchNeedle } from '#/lib/name-search'
 import { rememberedSortOf, sameSort } from '#/lib/remembered-sort'
 import { inCategory } from '#/lib/visible-torrents'
+import { addCommonPath } from '#/server/functions/add-common-path'
 import { setCategorySort } from '#/server/functions/set-category-sort'
+import { setLocation } from '#/server/functions/set-location'
 import { ALL } from '#/shared/categories'
 import {
   DEFAULT_SORT_VIEW,
@@ -53,7 +57,7 @@ import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { useResumeLastPlace } from '#/state/resume-last-place'
 import { useSearchOpen } from '#/state/search-open'
-import { categorySortOp, useSettings } from '#/state/settings'
+import { addCommonPathOp, categorySortOp, useSettings } from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
 import { ViewedHashContext } from '#/state/viewed-hash'
 
@@ -115,6 +119,9 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // over every page of the layout (features/add, opened through
 // src/state/add-open.ts); a torrent its 「打開」 shows from outside the list
 // is tracked against the URL's `hash` (src/state/detail-outside.ts).
+// Story 5.2: the change-path screen is mounted here too (features/path,
+// opened through src/state/change-path-open.ts), with the bound
+// `setLocation` and `addCommonPath` calls.
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -128,6 +135,7 @@ export const Route = createFileRoute('/_authed')({
 })
 
 const saveSortOp = categorySortOp((values) => callFn(setCategorySort, values))
+const moveOp = setLocationOp((values) => callFn(setLocation, values))
 
 /** A sort change and the category it happened on (`null`: none). */
 type SortChangeOn = SortChange & { category: string | null }
@@ -523,6 +531,11 @@ function AuthedLayout() {
   useDetailOutsideUpkeep(hash ?? null)
   // Story 4.7: 「去看」 outlives the add screen.
   useOpenWhenAddedUpkeep(category, hash ?? null, setHash)
+  // The op reads how many common paths are listed for its failure text.
+  const addPathOp = useMemo(
+    () => addCommonPathOp((values) => callFn(addCommonPath, values), client),
+    [client],
+  )
 
   return (
     <ListViewContext value={control}>
@@ -532,6 +545,7 @@ function AuthedLayout() {
             <Outlet />
           </AppShell>
           <AddScreen />
+          <ChangePathScreen moveOp={moveOp} addPathOp={addPathOp} />
           <DropOverlay />
         </ViewedHashContext>
       </CategoryTabsContext>

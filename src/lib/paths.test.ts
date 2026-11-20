@@ -3,7 +3,9 @@ import {
   LOCATION_CACHE_LIMIT,
   NO_COMMON_PATHS_RESOLVER,
   createLocationResolver,
+  currentCommonPath,
   isInFolder,
+  listedCommonPath,
   locationLabel,
   locationOf,
 } from '#/lib/paths'
@@ -196,5 +198,52 @@ describe('createLocationResolver', () => {
     )
     expect(after).not.toBe(before)
     expect(after.name).toBe('影集')
+  })
+})
+
+describe('currentCommonPath (spec 5.2 「目前」)', () => {
+  const torrentsTv = {
+    path: '/data/torrents/tv',
+    name: '下載區（影集）',
+    mediaLibrary: false,
+  }
+  const data = { path: '/data/', name: 'data', mediaLibrary: false }
+  const mediaTv = {
+    path: '/data/media/tv',
+    name: '影集媒體庫',
+    mediaLibrary: true,
+  }
+  const dupe = { path: '/data/media/tv/', name: 'dupe', mediaLibrary: false }
+  const list = [data, torrentsTv, mediaTv, dupe]
+
+  it('is the longest match, the same object from the list', () => {
+    expect(currentCommonPath('/data/torrents/tv/Show.S01', list)).toBe(
+      torrentsTv,
+    )
+    expect(currentCommonPath('/data/torrents/tv/', list)).toBe(torrentsTv)
+    expect(currentCommonPath('/data/other', list)).toBe(data)
+  })
+
+  it('the first of two that normalize to the same folder', () => {
+    expect(currentCommonPath('/data/media/tv', list)).toBe(mediaTv)
+  })
+
+  it('folder boundary, `..` and no match: null', () => {
+    expect(currentCommonPath('/data/media/tv2', [mediaTv])).toBeNull()
+    expect(currentCommonPath('/data/media/tv/../x', [mediaTv])).toBeNull()
+    expect(currentCommonPath('/srv', list)).toBeNull()
+    expect(currentCommonPath('/data/x', [])).toBeNull()
+  })
+})
+
+describe('listedCommonPath (spec 5.2)', () => {
+  const a = { path: '/data/media/tv', name: 'a', mediaLibrary: true }
+  const b = { path: '/data/media/tv/', name: 'b', mediaLibrary: false }
+
+  it('equal after normalizing, the first one; a folder inside is not listed', () => {
+    expect(listedCommonPath('/data/media/tv/', [a, b])).toBe(a)
+    expect(listedCommonPath('/data//media/tv', [b, a])).toBe(b)
+    expect(listedCommonPath('/data/media/tv/x', [a])).toBeNull()
+    expect(listedCommonPath('/data/media', [a])).toBeNull()
   })
 })

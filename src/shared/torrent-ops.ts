@@ -1,4 +1,5 @@
 import { z } from '#/shared/zod'
+import { savePathSchema } from '#/shared/save-path'
 import { TORRENT_HASH_PATTERN } from '#/shared/torrent-hash'
 import type { ErrorCode } from '#/shared/errors'
 
@@ -31,6 +32,18 @@ export const deleteTorrentsInputSchema = z.strictObject({
   hashes: torrentHashListSchema,
   deleteFiles: z.boolean(),
 })
+
+/**
+ * Story 5.2: `setLocation`. `location` goes through the shared path schema
+ * (normalized, absolute, no `..`, at most 1024 characters); the container
+ * also requires it under one of `SAVE_ROOTS`.
+ */
+export const setLocationInputSchema = z.strictObject({
+  hashes: torrentHashListSchema,
+  location: savePathSchema,
+})
+
+export type SetLocationInput = z.input<typeof setLocationInputSchema>
 
 export type BatchItem =
   | { key: string; ok: true }

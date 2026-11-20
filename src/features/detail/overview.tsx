@@ -11,6 +11,7 @@ import { cn } from '#/shared/ui/cn'
 import { copyText } from '#/shared/ui/copy-text'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { openChangePath } from '#/state/change-path-open'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
 import { useLocationResolver } from '#/state/locations'
@@ -82,6 +83,7 @@ export function Overview({
           over to the next torrent. */}
       <SavePathBlock
         key={torrent.hash}
+        hash={torrent.hash}
         path={torrent.save_path}
         phone={phone}
       />
@@ -217,12 +219,22 @@ const PILL_OUTLINE = 'border-border bg-surface text-text hover-outline'
  * common path's name, purple for a media library), the full path
  * on one line cut at the front (an RTL box around an LTR isolate keeps
  * 「…media/tv/牧神記」 in order, https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdi),
- * then 複製, 「☆ 加到常用」, 改路徑 (the only solid one) and 改檔名. The
- * last three wait for Epic 5: native `disabled` (50%, not-allowed, no
- * hover, not focusable). Desktop: the path's `title` is the full path;
- * phone: tapping the path wraps it, tapping again cuts it again.
+ * then 複製, 「☆ 加到常用」, 改路徑 (the only solid `accent` one) and 改檔名.
+ * Story 5.2: 改路徑 opens the change-path screen for this torrent
+ * (src/state/change-path-open.ts). 「☆ 加到常用」 (5.4) and 改檔名 (5.6 to
+ * 5.8) still wait: native `disabled` (50%, not-allowed, no hover, not
+ * focusable). Desktop: the path's `title` is the full path; phone: tapping
+ * the path wraps it, tapping again cuts it again.
  */
-function SavePathBlock({ path, phone }: { path: string; phone: boolean }) {
+function SavePathBlock({
+  hash,
+  path,
+  phone,
+}: {
+  hash: string
+  path: string
+  phone: boolean
+}) {
   const sectionRef = useRef<HTMLElement>(null)
   const [expanded, setExpanded] = useState(false)
   const { label, copy } = useCopyButton(path, sectionRef)
@@ -291,7 +303,7 @@ function SavePathBlock({ path, phone }: { path: string; phone: boolean }) {
         </button>
         <button
           type="button"
-          disabled
+          onClick={() => openChangePath([hash])}
           className={cn(
             PILL,
             'border-primary bg-primary font-bold text-primary-foreground hover-solid',

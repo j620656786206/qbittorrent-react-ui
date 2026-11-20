@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { rawMaindataSchema } from '#/server/qbit/maindata-schema'
 import type { RawMaindata } from '#/server/qbit/maindata-schema'
 import {
@@ -10,10 +10,12 @@ import {
   rawTorrent,
 } from '#/server/qbit/testing'
 import {
+  MOVING_TO_EXPIRY_MS,
   SEEDING_TIME_STEP_S,
   TOMBSTONE_MS,
   createTorrentTable,
 } from '#/server/sync/torrent-table'
+import type { TorrentTable } from '#/server/sync/torrent-table'
 import { TORRENT_FIELDS } from '#/shared/maindata'
 
 // Spec 1.5 rows S1 to S7, S11 and the G1 to G6 rules at table level.
@@ -48,7 +50,10 @@ describe('torrent table', () => {
     expect(removed).toEqual([])
     expect(hashes(changed)).toEqual([HASH_A, HASH_B, HASH_C].sort())
     for (const torrent of changed) {
-      expect(Object.keys(torrent).sort()).toEqual([...TORRENT_FIELDS].sort())
+      expect(Object.keys(torrent).sort()).toEqual(
+        // `movingTo` is only on rows with a move this container sent.
+        TORRENT_FIELDS.filter((field) => field !== 'movingTo').sort(),
+      )
     }
     expect(changed.find((t) => t.hash === HASH_A)).toMatchObject({
       name: 'A',
@@ -476,5 +481,136 @@ describe('story 2.10 forEach and errorStartedAfter', () => {
     expect(table.errorStartedAfter(HASH_A)).toBe(10)
     table.apply(raw({ rid: 3, torrents_removed: [HASH_A] }))
     expect(table.errorStartedAfter(HASH_A)).toBe(0)
+  })
+})
+
+describe('movingTo (spec 5.2 S7)', () => {
+  function moveSetup() {
+    let clock = 0
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const table = createTorrentTable(() => clock, { logger })
+    table.apply(raw(fullMaindata()))
+    return {
+      table,
+      logger,
+      advance: (ms: number) => {
+        clock += ms
+      },
+    }
+  }
+
+  const row = (table: TorrentTable, counter: number | null, hash = HASH_A) =>
+    table.changesSince(counter).changed.find((t) => t.hash === hash)
+
+  const update = (rid: number, partial: Record<string, unknown>) =>
+    raw({ rid, torrents: { [HASH_A]: partial } })
+
+  it('set: bumps the version and that row only, unknown hashes skipped', () => {
+    const { table } = moveSetup()
+    const before = table.version
+    table.setMovingTo([HASH_A, HASH_D], '/downloads/media/tv')
+    expect(table.version).toBe(before + 1)
+    const { changed } = table.changesSince(before)
+    expect(changed.map((t) => t.hash)).toEqual([HASH_A])
+    expect(changed[0].movingTo).toBe('/downloads/media/tv')
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+    expect(table.get(HASH_B)).not.toHaveProperty('movingTo')
+    expect(table.get(HASH_D)).toBeUndefined()
+  })
+
+  it('a qBittorrent field named movingTo never reaches the table', () => {
+    const { table } = moveSetup()
+    table.apply(update(2, { movingTo: '/downloads/fake', progress: 0.9 }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+  })
+
+  it('stays while qBittorrent has not started, then goes after moving ends', () => {
+    const { table, logger } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    table.apply(update(2, { progress: 0.6 }))
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+    table.apply(update(3, { state: 'moving' }))
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+    const before = table.version
+    table.apply(update(4, { state: 'stalledUP' }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+    expect(table.version).toBeGreaterThan(before)
+    const sent = row(table, before)
+    expect(sent).toBeDefined()
+    expect(sent).not.toHaveProperty('movingTo')
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('goes once save_path reaches the target (trailing slash or not)', () => {
+    const { table } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    const before = table.version
+    // A partial answer whose slim field change is only the path.
+    table.apply(update(2, { save_path: '/downloads/media/tv/' }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+    expect(row(table, before)).not.toHaveProperty('movingTo')
+  })
+
+  it('a non-slim-only answer at the target still bumps the row', () => {
+    const { table } = moveSetup()
+    table.apply(update(2, { save_path: '/downloads/media/tv' }))
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    const before = table.version
+    table.apply(update(3, { num_seeds: 9 }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+    expect(row(table, before)?.hash).toBe(HASH_A)
+  })
+
+  it('expires after 10 minutes with no moving and the same save_path, logging a count only', () => {
+    const { table, logger, advance } = moveSetup()
+    table.setMovingTo([HASH_A, HASH_B], '/downloads/media/tv')
+    advance(MOVING_TO_EXPIRY_MS - 1)
+    table.apply(update(2, { progress: 0.6 }))
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+    advance(1)
+    const before = table.version
+    table.apply(update(3, { progress: 0.7 }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+    expect(table.get(HASH_B)).not.toHaveProperty('movingTo')
+    expect(row(table, before, HASH_B)).toBeDefined()
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(logger.warn).toHaveBeenCalledWith('moving_to_expired', { count: 2 })
+  })
+
+  it('does not expire while moving has been seen', () => {
+    const { table, advance, logger } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    table.apply(update(2, { state: 'moving' }))
+    advance(MOVING_TO_EXPIRY_MS * 2)
+    table.apply(update(3, { progress: 0.7 }))
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('goes when save_path changes elsewhere (not the target) with no moving seen', () => {
+    const { table, logger } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    const before = table.version
+    table.apply(update(2, { save_path: '/downloads/other/' }))
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
+    expect(row(table, before)).not.toHaveProperty('movingTo')
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('stays while moving even when save_path already changed', () => {
+    const { table } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    table.apply(update(2, { state: 'moving', save_path: '/downloads/other' }))
+    expect(table.get(HASH_A)?.movingTo).toBe('/downloads/media/tv')
+  })
+
+  it('goes with the torrent when it is removed', () => {
+    const { table } = moveSetup()
+    table.setMovingTo([HASH_A], '/downloads/media/tv')
+    table.apply(raw({ rid: 2, torrents_removed: [HASH_A] }))
+    table.apply(
+      raw({ rid: 3, torrents: { [HASH_A]: rawTorrent({ name: 'A' }) } }),
+    )
+    expect(table.get(HASH_A)).not.toHaveProperty('movingTo')
   })
 })

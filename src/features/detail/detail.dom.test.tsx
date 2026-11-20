@@ -11,6 +11,10 @@ import type { MaindataResponse, SlimTorrent } from '#/shared/maindata'
 import { defaultSettings } from '#/shared/settings'
 import { DESKTOP_QUERY } from '#/shared/ui/breakpoint'
 import { MAIN_ID } from '#/shared/ui/main-scroll'
+import {
+  changePathOpenStore,
+  resetChangePathOpen,
+} from '#/state/change-path-open'
 import { clearConnectionErrors } from '#/state/connection'
 import { replayEntrance, resetEntrance } from '#/state/entrance'
 import { stubElementAnimate, stubReducedMotion } from '#/state/entrance-testing'
@@ -29,7 +33,13 @@ import { SETTINGS_KEY } from '#/state/settings'
 import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
-import { clearPending, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
+import {
+  MOVE_PENDING_OP,
+  clearPending,
+  markPendingAll,
+  pendingOpOf,
+  resetPendingOps,
+} from '#/state/pending-ops'
 import {
   openLayerCount,
   pushEscapeLayer,
@@ -282,6 +292,7 @@ afterEach(async () => {
   client.clear()
   document.body.replaceChildren()
   resetShortcuts()
+  resetChangePathOpen()
   vi.restoreAllMocks()
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
   globalThis.IS_REACT_ACT_ENVIRONMENT = false
@@ -891,7 +902,7 @@ describe('the overview (story 2.5)', () => {
     expect(reasonCalls.count).toBe(0)
   })
 
-  it('save path: tag, full path cut from the front, one solid pill, three disabled', async () => {
+  it('save path: tag, full path cut from the front, one solid pill, two disabled', async () => {
     const data = board().map((torrent) =>
       torrent.hash === h(11) ? { ...torrent, save_path: LONG_PATH } : torrent,
     )
@@ -915,10 +926,11 @@ describe('the overview (story 2.5)', () => {
       '改路徑',
       '改檔名',
     ])
+    // Story 5.2: 改路徑 works; 「☆ 加到常用」 (5.4) and 改檔名 still wait.
     expect(pills().map((pill) => pill.disabled)).toEqual([
       false,
       true,
-      true,
+      false,
       true,
     ])
     expect(pills()[2].className).toContain('bg-primary')
@@ -926,6 +938,13 @@ describe('the overview (story 2.5)', () => {
     expect(
       pills().filter((pill) => pill.className.includes('bg-primary')),
     ).toHaveLength(1)
+  })
+
+  it('story 5.2 改路徑 opens the change-path screen for this torrent', async () => {
+    await openSeed(board())
+    expect(changePathOpenStore.state.open).toBeNull()
+    await act(async () => pills()[2].click())
+    expect(changePathOpenStore.state.open).toEqual({ hashes: [h(11)] })
   })
 
   it('story 5.1 save path: the tag shows the common path name, purple for a media library', async () => {
@@ -1234,6 +1253,17 @@ describe('the ⋯ menu (story 2.6)', () => {
     expect(pendingOpOf(h(1))).toBeNull()
     expect(item().textContent).toBe('繼續')
     expect(item().getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('story 5.2: a pending move leaves 暫停 usable; a pending delete still disables it', async () => {
+    await render(<BoardDetailPanel />, { hash: h(1) })
+    await act(async () =>
+      markPendingAll([h(1)], MOVE_PENDING_OP, '/data/media/tv'),
+    )
+    await openMenu()
+    expect(item().getAttribute('aria-disabled')).toBeNull()
+    await act(async () => markPendingAll([h(1)], 'delete'))
+    expect(item().getAttribute('aria-disabled')).toBe('true')
   })
 
   it('a settled call (重試 too) leaves no observer behind: the cache collects it', async () => {

@@ -38,6 +38,15 @@ export interface QbitClient {
     deleteFiles: boolean,
   ) => Promise<void>
   /**
+   * Story 5.2: `torrents/setLocation` for these hashes (validated, distinct,
+   * never `all`) to `location` (normalized, under `SAVE_ROOTS`). Any
+   * non-2xx (400, 409, anything) is `qbit_rejected`.
+   */
+  setLocation: (
+    hashes: ReadonlyArray<string>,
+    location: string,
+  ) => Promise<void>
+  /**
    * Story 4.7: `torrents/add` for one entry, multipart: a magnet link as
    * `urls` or a .torrent file as `torrents`, with `category` and
    * `autoTMM=true` (the category's save path applies). Never `savepath`
@@ -213,6 +222,20 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     await session.send(QBIT_PATHS.torrentsDelete, { method: 'POST', form })
   }
 
+  async function setLocation(
+    hashes: ReadonlyArray<string>,
+    location: string,
+  ): Promise<void> {
+    const form = hashesForm(hashes)
+    form.set('location', location)
+    // 403 is also qBittorrent's "Cannot write to directory".
+    await session.send(QBIT_PATHS.torrentsSetLocation, {
+      method: 'POST',
+      form,
+      forbiddenMayBeRefusal: true,
+    })
+  }
+
   async function addTorrent(
     entry: AddTorrentEntry,
     category: string,
@@ -307,6 +330,7 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
     stopTorrents,
     startTorrents,
     deleteTorrents,
+    setLocation,
     addTorrent,
     torrentFiles,
     setFilePriority,

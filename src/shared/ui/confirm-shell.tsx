@@ -39,6 +39,12 @@ export interface ConfirmShellProps {
   /** Desktop dialog (1024px and up) or phone sheet. */
   desktop: boolean
   title: string
+  /**
+   * Story 5.2: one plain `meta` `text-muted` line under the title (the
+   * torrent name of change path), cut with 「…」 (`title` holds it whole).
+   * Desktop: 4px under the title; phone: the first line of the body.
+   */
+  subtitle?: string
   /** The body, between the title and the buttons. */
   children: ReactNode
   /** The primary button's text, and while sending. */
@@ -87,6 +93,7 @@ export function ConfirmShell({
   open,
   desktop,
   title,
+  subtitle,
   children,
   primaryLabel,
   sendingLabel,
@@ -118,6 +125,19 @@ export function ConfirmShell({
     </p>
   )
   const primaryText = sending ? sendingLabel : primaryLabel
+  const subtitleLine = (extra: string) =>
+    subtitle === undefined ? null : (
+      <p
+        title={subtitle}
+        data-slot="confirm-subtitle"
+        className={cn(
+          'm-0 flex-none truncate text-meta text-text-muted',
+          extra,
+        )}
+      >
+        {subtitle}
+      </p>
+    )
 
   if (!desktop) {
     return (
@@ -152,6 +172,7 @@ export function ConfirmShell({
         }
       >
         <div id={bodyId} className="flex flex-col gap-2 px-4 pt-2 pb-1">
+          {subtitleLine('-mt-2')}
           {children}
         </div>
       </BottomSheet>
@@ -184,9 +205,18 @@ export function ConfirmShell({
           desktopWidthClass,
         )}
       >
-        <DialogTitle className="m-0 text-[18px] leading-[1.2] font-bold">
-          {title}
-        </DialogTitle>
+        {subtitle === undefined ? (
+          <DialogTitle className="m-0 text-[18px] leading-[1.2] font-bold">
+            {title}
+          </DialogTitle>
+        ) : (
+          <div className="flex min-w-0 flex-none flex-col gap-1">
+            <DialogTitle className="m-0 text-[18px] leading-[1.2] font-bold">
+              {title}
+            </DialogTitle>
+            {subtitleLine('')}
+          </div>
+        )}
         <div
           id={bodyId}
           className="flex min-h-0 flex-col gap-3 overflow-y-auto"

@@ -155,7 +155,10 @@ describe('getMaindata server function', () => {
     )
     expect(Object.keys(serverState)).toHaveLength(6)
     for (const torrent of changed) {
-      expect(Object.keys(torrent).sort()).toEqual([...TORRENT_FIELDS].sort())
+      expect(Object.keys(torrent).sort()).toEqual(
+        // `movingTo` is only on rows with a move this container sent.
+        TORRENT_FIELDS.filter((field) => field !== 'movingTo').sort(),
+      )
     }
     const text = JSON.stringify(result)
     for (const marker of Object.values(LEAK_MARKERS)) {

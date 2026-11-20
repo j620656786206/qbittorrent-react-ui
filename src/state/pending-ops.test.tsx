@@ -15,6 +15,7 @@ import {
   markPendingAll,
   pendingStore,
   pendingOpOf,
+  pendingTargetOf,
   prunePending,
   resetPendingOps,
   usePendingOp,
@@ -43,6 +44,23 @@ afterEach(() => {
 })
 
 describe('the pending store', () => {
+  it('spec 5.2: a move keeps its target per hash, gone with the entry', () => {
+    markPendingAll([A, B], 'move', '/data/media/tv')
+    expect(pendingOpOf(A)).toBe('move')
+    expect(pendingTargetOf(A)).toBe('/data/media/tv')
+    expect(pendingTargetOf(B)).toBe('/data/media/tv')
+    clearPending(A)
+    expect(pendingTargetOf(A)).toBeNull()
+    expect(pendingTargetOf(B)).toBe('/data/media/tv')
+    // Marked again without a target: the old one goes.
+    markPending(B, 'stop')
+    expect(pendingTargetOf(B)).toBeNull()
+    markPendingAll([A], 'move', '/data/media/movies')
+    vi.advanceTimersByTime(PENDING_TIMEOUT_MS)
+    expect(pendingOpOf(A)).toBeNull()
+    expect(pendingTargetOf(A)).toBeNull()
+  })
+
   it('marks, reads and clears per hash', () => {
     markPending(A, 'stop')
     expect(pendingOpOf(A)).toBe('stop')

@@ -2,6 +2,11 @@ import { ERROR_MESSAGES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
 import { PAUSE_ACTION_WORDS } from '#/lib/torrent-status'
 import type { PauseAction } from '#/lib/torrent-status'
+import {
+  MAX_SAVE_PATH,
+  normalizeSavePath,
+  savePathSchema,
+} from '#/shared/save-path'
 
 // AR-33, UX-DR96: the only place screen text for an error code comes from.
 // The wording lives once, in the error contract's fixed messages; later
@@ -131,4 +136,65 @@ export function addItemFailureText(
     return kind === 'file' ? ADD_FILE_REJECTED : ADD_LINK_REJECTED
   }
   return errorText(code)
+}
+
+/**
+ * Story 5.2 (Claude 代決): why a move the container refused as
+ * `invalid_input` failed: the path passed the shared schema in the
+ * browser, so it is outside `SAVE_ROOTS` (or the torrent is unknown).
+ */
+export const MOVE_OUTSIDE_ROOTS = '這個路徑不在允許的下載資料夾底下'
+
+/**
+ * Story 5.2: the failure toast of a move, 「改路徑失敗：qBittorrent 拒絕這
+ * 個操作」 (4.3's pattern); `invalid_input` names the download folders.
+ */
+export function setLocationFailureText(code: OperationFailureCode): string {
+  const reason = code === 'invalid_input' ? MOVE_OUTSIDE_ROOTS : errorText(code)
+  return `改路徑失敗：${reason}`
+}
+
+/** Story 5.2: the 51st common path (`invalid_input` with 50 listed). */
+export const COMMON_PATHS_FULL = '常用路徑最多 50 個'
+
+/**
+ * Story 5.2 (Claude 代決 wording): 「加到常用」 failed. With 50 paths
+ * listed an `invalid_input` is the list being full, with fewer it is the
+ * path outside the download folders (MOVE_OUTSIDE_ROOTS); any other answer
+ * is a settings write's reason (3.1's), 「沒加到常用：設定檔寫不進去」.
+ */
+export function addCommonPathFailureText(
+  code: SettingsWriteFailureCode,
+  full: boolean,
+): string {
+  if (code === 'invalid_input') {
+    // The name is built here, so a refused input is the path: outside
+    // `SAVE_ROOTS` (the box already passed the shared schema).
+    return full ? COMMON_PATHS_FULL : `沒加到常用：${MOVE_OUTSIDE_ROOTS}`
+  }
+  return `沒加到常用：${settingsWriteReason(code)}`
+}
+
+/** Story 5.2 (Claude 代決): why the 「會搬到」 box cannot be sent. */
+export const SAVE_PATH_REASONS = Object.freeze({
+  relative: '路徑要從 / 開頭',
+  dotDot: '路徑不能有 ..',
+  tooLong: '路徑太長',
+  badCharacter: '路徑不能有反斜線或控制字元',
+})
+
+/**
+ * Story 5.2: the line under the 「會搬到」 box, or `null` when the shared
+ * path schema accepts the text. One reason, the first that applies in
+ * this order: empty or relative, a `..` segment, over 1024 characters
+ * (after normalizing, like the schema), a backslash or control character.
+ */
+export function savePathFormatReason(text: string): string | null {
+  if (savePathSchema.safeParse(text).success) return null
+  const path = normalizeSavePath(text)
+  if (!path.startsWith('/')) return SAVE_PATH_REASONS.relative
+  if (path.split('/').includes('..')) return SAVE_PATH_REASONS.dotDot
+  if (path.length > MAX_SAVE_PATH) return SAVE_PATH_REASONS.tooLong
+  // What is left for the schema to refuse: a backslash or control character.
+  return SAVE_PATH_REASONS.badCharacter
 }

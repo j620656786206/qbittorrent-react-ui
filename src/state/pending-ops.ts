@@ -13,14 +13,24 @@ import { selectTorrents, useMaindata } from '#/state/maindata'
 //   no longer the op sent, judged only for the ops that reader sends), or
 //   the torrent is gone from maindata.
 // While a hash has an entry, the control that sent it is disabled.
+// Story 5.2: a move (`move`) also records its target per hash (`targets`,
+// normalized), which story 5.3 reads; it goes with the entry.
 
 export const PENDING_TIMEOUT_MS = 30_000
 
+/**
+ * Story 5.2: the op name of a move (change path). One constant, since the
+ * change-path screen marks it and the detail's menu tells it apart.
+ */
+export const MOVE_PENDING_OP = 'move'
+
 interface PendingState {
   ops: Readonly<Record<string, string>>
+  /** Story 5.2: a move's target per hash, only while its entry is there. */
+  targets: Readonly<Record<string, string>>
 }
 
-export const pendingStore = createStore<PendingState>({ ops: {} })
+export const pendingStore = createStore<PendingState>({ ops: {}, targets: {} })
 
 /**
  * One 30 s timer per mark (a single hash, or a whole batch such as a
@@ -38,9 +48,17 @@ const owners = new Map<string, Mark>()
 const marks = new Set<Mark>()
 
 function setOps(
-  update: (ops: Record<string, string>) => Record<string, string>,
+  update: (
+    ops: Record<string, string>,
+    targets: Record<string, string>,
+  ) => void,
 ): void {
-  pendingStore.setState((state) => ({ ops: update({ ...state.ops }) }))
+  pendingStore.setState((state) => {
+    const ops = { ...state.ops }
+    const targets = { ...state.targets }
+    update(ops, targets)
+    return { ops, targets }
+  })
 }
 
 /** `hash` no longer belongs to its mark; the last one out stops the timer. */
@@ -76,18 +94,23 @@ export function markPending(hash: string, op: string): void {
 
 /**
  * Story 4.3: marks many hashes at once (a delete of 3,626 torrents): one
- * store update and one timer.
+ * store update and one timer. Story 5.2: `target` is a move's destination,
+ * kept per hash with the entry (none: an older target goes).
  */
 export function markPendingAll(
   hashes: ReadonlyArray<string>,
   op: string,
+  target?: string,
 ): void {
   // A module-level store on the server would leak across requests.
   if (typeof window === 'undefined' || hashes.length === 0) return
   arm(hashes)
-  setOps((ops) => {
-    for (const hash of hashes) ops[hash] = op
-    return ops
+  setOps((ops, targets) => {
+    for (const hash of hashes) {
+      ops[hash] = op
+      if (target === undefined) delete targets[hash]
+      else targets[hash] = target
+    }
   })
 }
 
@@ -100,9 +123,11 @@ export function clearPendingAll(hashes: ReadonlyArray<string>): void {
     if (Object.hasOwn(ops, hash)) changed = true
   }
   if (!changed) return
-  setOps((next) => {
-    for (const hash of hashes) delete next[hash]
-    return next
+  setOps((next, targets) => {
+    for (const hash of hashes) {
+      delete next[hash]
+      delete targets[hash]
+    }
   })
 }
 
@@ -114,6 +139,12 @@ export function clearPending(hash: string): void {
 export function pendingOpOf(hash: string): string | null {
   const { ops } = pendingStore.state
   return Object.hasOwn(ops, hash) ? ops[hash] : null
+}
+
+/** Story 5.2: where a pending move of `hash` goes, or `null`. */
+export function pendingTargetOf(hash: string): string | null {
+  const { targets } = pendingStore.state
+  return Object.hasOwn(targets, hash) ? targets[hash] : null
 }
 
 /** Drops the entries of torrents `exists` no longer knows, in one update. */
@@ -129,7 +160,7 @@ export function resetPendingOps(): void {
   for (const mark of marks) clearTimeout(mark.timer)
   marks.clear()
   owners.clear()
-  pendingStore.setState(() => ({ ops: {} }))
+  pendingStore.setState(() => ({ ops: {}, targets: {} }))
 }
 
 /**

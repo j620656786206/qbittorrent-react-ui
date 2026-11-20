@@ -39,6 +39,12 @@ export const slimTorrentSchema = z.object({
   category: z.string(),
   /** `null` while the torrent has no metadata yet (AR-58). */
   private: z.boolean().nullable(),
+  /**
+   * Story 5.2 (AD-7, AR-43): where a `setLocation` this container sent is
+   * moving the torrent (normalized). The container's own record, never
+   * qBittorrent's: absent from rows that have none and from the raw schema.
+   */
+  movingTo: z.string().optional(),
 })
 
 export type SlimTorrent = z.infer<typeof slimTorrentSchema>

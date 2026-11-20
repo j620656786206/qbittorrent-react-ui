@@ -70,7 +70,11 @@
 //          /data/torrent/mteam-seed, /data/downloads (no common path in
 //          any seed), /data/media/movies, ...; so `many` has 4165 distinct
 //          save paths and sample's E01 to E04 land in 影集媒體庫, PT 做種,
-//          no match and 電影媒體庫 with seed=library)
+//          no match and 電影媒體庫 with seed=library); library (story 5.2)
+//          puts the n-th torrent right in one of LIBRARY_FOLDERS in turn,
+//          no subfolder: sample's E01 is in /data/torrents/tv (下載區（影集）
+//          with seed=library), E02 /data/torrent/mteam-seed, E03
+//          /data/downloads, E04 /data/media/movies
 //   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
 //   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
 //   Any `data` parameter (even the current one) also clears the deleted
@@ -100,6 +104,14 @@
 // files (415), `ops=slow` answers after 12 s, `ops=drop` closes the
 // connection (the container reads qbit_unreachable). Rejected calls are
 // logged with `rejected: true`.
+// Story 5.2: POST /api/v2/torrents/setLocation (cookie required, form
+// fields `hashes` with `|` between and `location`) records each call
+// (`{ op: 'setLocation', hashes, location }`); an empty location is 400
+// like qBittorrent. Each known torrent then reads `moving` for MOVE_MS and
+// afterwards sits in `location` (its `save_path`), so a move can be
+// watched. `ops=reject` answers 400 (logged with `rejected: true`),
+// `ops=slow` answers and applies after 12 s (409 and nothing applied when a
+// `data` parameter came meanwhile). A `data` parameter clears the moves.
 // Story 2.7: GET /api/v2/torrents/files?hash= (cookie required) answers
 // deterministic fake files for every torrent of the data set (fake names
 // under the torrent's own name, so only code-name paths); sample E03 has
@@ -206,7 +218,18 @@ const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files', 'drop'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const CATS_MODES = new Set(['normal', 'default-path', 'none'])
-const PATHS_MODES = new Set(['normal', 'varied'])
+const PATHS_MODES = new Set(['normal', 'varied', 'library'])
+/** Story 5.2 `paths=library`: the n-th torrent sits right in one of these. */
+const LIBRARY_FOLDERS = [
+  '/data/torrents/tv',
+  '/data/torrent/mteam-seed',
+  '/data/downloads',
+  '/data/media/movies',
+  '/data/media/tv',
+  '/data/torrents/movies',
+]
+/** Story 5.2: how long a moved torrent reads `moving`. */
+const MOVE_MS = 3000
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -779,13 +802,57 @@ function withVariedPaths(torrents) {
   return varied
 }
 
+const libraryCache = new Map()
+
+function withLibraryPaths(torrents) {
+  let placed = libraryCache.get(torrents)
+  if (!placed) {
+    placed = Object.fromEntries(
+      Object.entries(torrents).map(([key, value], index) => [
+        key,
+        {
+          ...value,
+          save_path: LIBRARY_FOLDERS[index % LIBRARY_FOLDERS.length],
+        },
+      ]),
+    )
+    libraryCache.set(torrents, placed)
+  }
+  return placed
+}
+
+/** Story 5.2: setLocation calls applied, by hash: `{ location, doneAt }`. */
+const moves = new Map()
+
+/** A moved torrent reads `moving` until `doneAt`, then sits in `location`. */
+function withMoves(torrents) {
+  if (moves.size === 0) return torrents
+  const now = Date.now()
+  const out = { ...torrents }
+  for (const [key, move] of moves) {
+    if (!out[key]) continue
+    out[key] =
+      now < move.doneAt
+        ? { ...out[key], state: 'moving' }
+        : { ...out[key], save_path: move.location }
+  }
+  return out
+}
+
 function currentTorrents(tick) {
   const data = DATA[mode.data]
-  const base = mode.paths === 'varied' ? withVariedPaths(data) : data
+  const base =
+    mode.paths === 'varied'
+      ? withVariedPaths(data)
+      : mode.paths === 'library'
+        ? withLibraryPaths(data)
+        : data
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
   const extra = growCount > 0 || addedCount > 0
-  return withoutRemoved(
-    withOverrides(extra ? { ...torrents, ...grown, ...added } : torrents),
+  return withMoves(
+    withoutRemoved(
+      withOverrides(extra ? { ...torrents, ...grown, ...added } : torrents),
+    ),
   )
 }
 
@@ -975,6 +1042,16 @@ const KEPT_STATES = new Set(['error', 'missingFiles'])
 function applyDelete(hashes, deleteFiles) {
   opLog.push({ op: 'delete', hashes, deleteFiles })
   for (const key of hashes) removed.add(key)
+}
+
+/** Story 5.2: setLocation: record the call and start each known move. */
+function applySetLocation(hashes, location) {
+  opLog.push({ op: 'setLocation', hashes, location })
+  const torrents = currentTorrents(rid)
+  for (const key of hashes) {
+    if (torrents[key])
+      moves.set(key, { location, doneAt: Date.now() + MOVE_MS })
+  }
 }
 
 /** stop/start: record the call and override the states it names. */
@@ -1266,6 +1343,30 @@ const fakeQbit = createServer(async (req, res) => {
     else applyOp(op, hashes)
     return send(res, 200, '')
   }
+  if (
+    req.method === 'POST' &&
+    url.pathname === '/api/v2/torrents/setLocation'
+  ) {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    const form = new URLSearchParams(await readBody(req))
+    const hashes = (form.get('hashes') ?? '').split('|').filter(Boolean)
+    const location = form.get('location') ?? ''
+    if (location === '') return send(res, 400, 'Save path is empty')
+    if (mode.ops === 'reject') {
+      opLog.push({ op: 'setLocation', hashes, location, rejected: true })
+      return send(res, 400, 'Bad Request')
+    }
+    if (mode.ops === 'slow') {
+      const epoch = dataEpoch
+      await new Promise((resolve) => setTimeout(resolve, OPS_SLOW_MS))
+      // The data set changed meanwhile: nothing moved, so not a 2xx (the
+      // container would record a move that never shows).
+      if (epoch !== dataEpoch) return send(res, 409, 'Conflict')
+    }
+    applySetLocation(hashes, location)
+    return send(res, 200, '')
+  }
   if (req.method === 'GET' && url.pathname === '/api/v2/torrents/files') {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
       return send(res, 403, 'Forbidden')
@@ -1365,6 +1466,7 @@ function controlMode(req, res, url) {
       dataEpoch += 1
       removed.clear()
       stateOverrides.clear()
+      moves.clear()
       filePriorities.clear()
       filesLog.length = 0
       opLog.length = 0

@@ -10,6 +10,10 @@ export const QBIT_PATHS = Object.freeze({
   // Story 4.3: delete, with or without the files (same wiki page).
   // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#delete-torrents
   torrentsDelete: '/api/v2/torrents/delete',
+  // Story 5.2: move torrents' files; `hashes` joined by `|`, `location`.
+  // 400 empty save path, 409 cannot create the folder, 200 otherwise.
+  // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#set-torrent-location
+  torrentsSetLocation: '/api/v2/torrents/setLocation',
   // Story 4.7: add one magnet link or one .torrent file (multipart).
   // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#add-new-torrent
   torrentsAdd: '/api/v2/torrents/add',

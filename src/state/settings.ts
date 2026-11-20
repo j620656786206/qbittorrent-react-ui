@@ -2,13 +2,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   SETTINGS_WRITE_FAILURE_CODES,
+  addCommonPathFailureText,
   orderSaveFailureText,
   sortSaveFailureText,
 } from '#/lib/error-text'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
 import { categoryOrderRowsOf, orderAfterMove } from '#/lib/category-order'
 import type { Maindata } from '#/lib/maindata-merge'
+import { MAX_COMMON_PATHS } from '#/shared/settings'
 import type {
+  AddCommonPathInput,
   GetSettingsInput,
   SetCategoryOrderInput,
   SetCategorySortInput,
@@ -232,4 +235,38 @@ export function categoryOrderOp(
 export function refreshSettings(client: QueryClient): Promise<void> {
   if (isLoginRequired()) return Promise.resolve()
   return client.refetchQueries({ queryKey: SETTINGS_KEY, exact: true })
+}
+
+export const ADD_COMMON_PATH_OP = 'add-common-path'
+
+export type AddCommonPathCall = (input: AddCommonPathInput) => Promise<Settings>
+
+/**
+ * Story 5.2: 「加到常用」 (`addCommonPath`) through `sendOp`. Idempotent on
+ * the container; the answer, the whole new settings, becomes
+ * `['settings']` (no optimistic row, AD-7), so the list shows the new path
+ * from the file. It runs in the settings write queue (SETTINGS_WRITE_SCOPE).
+ * Its failure codes are a settings write's: the toast with 「重試」 (same
+ * call); an `invalid_input` while 50 paths are listed reads
+ * 「常用路徑最多 50 個」 (`client` tells how many are listed). No success
+ * toast (5.4 adds rename).
+ */
+export function addCommonPathOp(
+  call: AddCommonPathCall,
+  client: QueryClient,
+): TrackedOp<AddCommonPathInput, SettingsWriteFailureCode, Settings> {
+  return {
+    name: ADD_COMMON_PATH_OP,
+    call,
+    keysOf: ({ path }) => [`settings:common-path:${path}`],
+    scopeOf: () => SETTINGS_WRITE_SCOPE,
+    failureCodes: SETTINGS_WRITE_FAILURE_CODES,
+    failureText: (_variables, code) => {
+      const listed =
+        client.getQueryData<Settings>(SETTINGS_KEY)?.commonPaths.length ?? 0
+      return addCommonPathFailureText(code, listed >= MAX_COMMON_PATHS)
+    },
+    onSuccess: (queryClient, _variables, settings) =>
+      applySettings(queryClient, settings),
+  }
 }
