@@ -51,10 +51,12 @@
 //          torrent, so the desktop tab row overflows; categories-emptied:
 //          the same without mteam-X
 //   grow:  0 | 1 (1: each maindata request adds one newer torrent)
-//   ops:   normal | reject | slow (story 2.6: reject answers torrents/stop
-//          and torrents/start, story 4.3 torrents/delete too, with HTTP
-//          400, which the container maps to qbit_rejected; slow: see 4.3
-//          below)
+//   ops:   normal | reject | slow | reject-files (story 2.6: reject
+//          answers torrents/stop and torrents/start, story 4.3
+//          torrents/delete too, with HTTP 400, which the container maps to
+//          qbit_rejected; slow: see 4.3 below; reject-files: only a
+//          torrents/delete with deleteFiles=true is rejected, so one of
+//          the two calls of a mixed delete fails)
 //   files: normal | slow | fail (story 2.7: slow delays torrents/files
 //          25 s, fail answers it with HTTP 500, which the container maps
 //          to qbit_rejected; for the loading and failure screenshots)
@@ -162,7 +164,7 @@ const DATA_MODES = new Set([
   'categories-emptied',
 ])
 const GROW_MODES = new Set(['0', '1'])
-const OPS_MODES = new Set(['normal', 'reject', 'slow'])
+const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const FRONT_MODES = new Set([
   'normal',
@@ -989,7 +991,10 @@ const fakeQbit = createServer(async (req, res) => {
     if (op === 'delete' && deleteFiles !== 'true' && deleteFiles !== 'false')
       return send(res, 400, 'Bad Request')
     const extra = op === 'delete' ? { deleteFiles: deleteFiles === 'true' } : {}
-    if (mode.ops === 'reject') {
+    if (
+      mode.ops === 'reject' ||
+      (mode.ops === 'reject-files' && op === 'delete' && deleteFiles === 'true')
+    ) {
       // Logged too, so a test can see 重試 really sent again.
       opLog.push({ op, hashes, ...extra, rejected: true })
       return send(res, 400, 'Bad Request')
@@ -1341,7 +1346,7 @@ switch modes:
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states | categories | categories-emptied
   grow:  0 | 1
-  ops:   normal | reject
+  ops:   normal | reject | slow | reject-files
   files: normal | slow | fail
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'

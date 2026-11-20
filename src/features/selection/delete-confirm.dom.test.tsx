@@ -2,7 +2,11 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
-import { QueryClientProvider, notifyManager } from '@tanstack/react-query'
+import {
+  QueryClientProvider,
+  notifyManager,
+  onlineManager,
+} from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeHash, fakeResponse, t } from '#/lib/testing'
@@ -25,22 +29,23 @@ import { SelectionBar } from '#/features/selection/selection-bar'
 // Spec 4.3: the delete confirmation through the selection bar, in a DOM.
 // The list (tick order, sizes, the gone words and notes, 5 rows then the
 // virtualized rest), the checkbox and the button text, close paths (no
-// request, selection kept, focus back), the send (one request, pending
-// marks, the plain toast, the refresh, the selection cleared), the failure
+// request, selection kept, focus back), the send (one request, or two when
+// only some files are there; pending marks, the plain toast, the refresh,
+// the selection cleared), the failure
 // toast with 重試 (same body), connection codes, the sending lock and the
 // close when the selection empties. The server function is faked (AD-15).
 
 const deleteCalls = vi.hoisted(() => ({
   sent: [] as Array<{ hashes: Array<string>; deleteFiles: boolean }>,
-  answer: (): Promise<unknown> =>
-    Promise.resolve({ ok: true, data: { items: [] } }),
+  answer: (_data: { hashes: Array<string>; deleteFiles: boolean }) =>
+    Promise.resolve<unknown>({ ok: true, data: { items: [] } }),
 }))
 vi.mock('#/server/functions/delete-torrents', () => ({
   deleteTorrents: (options: {
     data: { hashes: Array<string>; deleteFiles: boolean }
   }) => {
     deleteCalls.sent.push(options.data)
-    return deleteCalls.answer()
+    return deleteCalls.answer(options.data)
   },
 }))
 
@@ -402,7 +407,7 @@ describe('closing without a delete', () => {
 })
 
 describe('the delete', () => {
-  it('success: one request in tick order, pending marks, the plain toast, the refresh, the selection cleared', async () => {
+  it('success: files there and files gone go in two requests in tick order, pending marks, the whole toast last, the refresh, the selection cleared', async () => {
     await render()
     await select(C, A, B)
     await openConfirm()
@@ -410,15 +415,19 @@ describe('the delete', () => {
     torrents = []
     await act(async () => primary().click())
     await settle()
-    expect(deleteCalls.sent).toEqual([{ hashes: [C, A, B], deleteFiles: true }])
+    expect(deleteCalls.sent).toEqual([
+      { hashes: [A], deleteFiles: true },
+      { hashes: [C, B], deleteFiles: false },
+    ])
     expect(pendingOpOf(A)).toBe('delete')
     expect(pendingOpOf(C)).toBe('delete')
     expect(selectionStore.state.hashes).toEqual([])
     expect(dialog()).toBeNull()
-    expect(toastCalls.plain).toHaveBeenCalledExactlyOnceWith(
-      '已刪除 3 個種子和檔案（100 GB）',
-    )
-    expect(fetches).toBe(before + 1)
+    expect(toastCalls.plain.mock.calls).toEqual([
+      ['已刪除 1 個種子和檔案（100 GB）'],
+      ['已刪除 3 個種子和檔案（100 GB）'],
+    ])
+    expect(fetches).toBeGreaterThan(before)
     // The bar slid out, so focus goes to the main area.
     expect(document.activeElement).toBe(main)
   })
@@ -538,13 +547,18 @@ describe('review fixes', () => {
     await openConfirm()
     await act(async () => primary().click())
     await settle()
-    expect(lastFailure()?.[1].keys).toEqual([A, B])
+    expect(
+      toastCalls.failure.mock.calls.map(([, options]) => options.keys),
+    ).toEqual([[A], [B]])
     toastCalls.dismissFor.mockClear()
     await act(async () => checkbox().click())
     // Every key of that toast is dismissed (the store closes it on the first).
     expect(toastCalls.dismissFor).toHaveBeenCalledWith(A)
     expect(toastCalls.dismissFor).toHaveBeenCalledWith(B)
-    expect(deleteCalls.sent).toEqual([{ hashes: [A, B], deleteFiles: true }])
+    expect(deleteCalls.sent).toEqual([
+      { hashes: [A], deleteFiles: true },
+      { hashes: [B], deleteFiles: false },
+    ])
     // The next send carries what the screen shows.
     await act(async () => primary().click())
     await settle()
@@ -630,10 +644,10 @@ describe('review fixes', () => {
     await openConfirm()
     await act(async () => primary().click())
     await settle()
-    expect(deleteCalls.sent.at(-1)).toEqual({
-      hashes: [A, C],
-      deleteFiles: true,
-    })
+    expect(deleteCalls.sent.slice(-2)).toEqual([
+      { hashes: [A], deleteFiles: true },
+      { hashes: [C], deleteFiles: false },
+    ])
     await select(A, B)
     await openConfirm()
     await act(async () => checkbox().click())
@@ -716,10 +730,13 @@ describe('review fixes', () => {
   })
 
   it('a poll that empties the selection mid-send keeps the locked dialog until the answer', async () => {
-    let finish: (value: unknown) => void = () => {}
+    const answers: Array<(value: unknown) => void> = []
+    const finish = (value: unknown) => {
+      for (const answer of answers) answer(value)
+    }
     deleteCalls.answer = () =>
       new Promise((resolve) => {
-        finish = resolve
+        answers.push(resolve)
       })
     await render()
     await select(A, B)
@@ -867,6 +884,144 @@ describe('review fixes', () => {
       ['Moving.Show', '找不到檔案'],
     ])
     expect(primary().textContent).toBe('刪除 2 個種子和檔案（100 GB）')
+  })
+})
+
+describe('multi-model review', () => {
+  it('the selection emptying after a failure closes the dialog and its 重試 toast', async () => {
+    deleteCalls.answer = () =>
+      Promise.resolve({
+        ok: false,
+        error: { code: 'timeout', message: 'x' },
+      })
+    await render()
+    await select(A)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(lastFailure()?.[1].keys).toEqual([A])
+    toastCalls.dismissFor.mockClear()
+    await act(async () => pruneSelection(() => false))
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(A)
+  })
+
+  it('offline: the delete is sent at once, never parked until the network is back', async () => {
+    onlineManager.setOnline(false)
+    try {
+      await render()
+      await select(A)
+      await openConfirm()
+      await act(async () => primary().click())
+      await settle()
+      expect(deleteCalls.sent).toEqual([{ hashes: [A], deleteFiles: true }])
+      expect(dialog()).toBeNull()
+    } finally {
+      onlineManager.setOnline(true)
+    }
+  })
+})
+
+describe('two requests (some files there, some gone)', () => {
+  const rejectWhen =
+    (deleteFiles: boolean) =>
+    (data: { hashes: Array<string>; deleteFiles: boolean }) =>
+      Promise.resolve(
+        data.deleteFiles === deleteFiles
+          ? { ok: false, error: { code: 'qbit_rejected', message: 'x' } }
+          : { ok: true, data: { items: [] } },
+      )
+
+  it('the files call fails: the gone ones leave, the failed one stays with 重試 and no success toast covers it', async () => {
+    deleteCalls.answer = rejectWhen(true)
+    await render()
+    await select(A, B, C)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent).toEqual([
+      { hashes: [A], deleteFiles: true },
+      { hashes: [B, C], deleteFiles: false },
+    ])
+    expect(selectionStore.state.hashes).toEqual([A])
+    expect(pendingOpOf(A)).toBeNull()
+    expect(pendingOpOf(B)).toBe('delete')
+    expect(lastFailure()?.[1].keys).toEqual([A])
+    // Whichever answer came first, the failure toast shows last.
+    const failureAt = toastCalls.failure.mock.invocationCallOrder.at(-1) ?? 0
+    expect(
+      toastCalls.plain.mock.invocationCallOrder.every((at) => at < failureAt),
+    ).toBe(true)
+    expect(dialog()).not.toBeNull()
+    expect(rowTexts()).toEqual([['Alpha.Show', '100 GB']])
+    expect(primary().textContent).toBe('刪除 1 個種子和檔案（100 GB）')
+
+    deleteCalls.answer = () =>
+      Promise.resolve({ ok: true, data: { items: [] } })
+    await act(async () => lastFailure()?.[1].onRetry())
+    await settle()
+    expect(deleteCalls.sent.at(-1)).toEqual({ hashes: [A], deleteFiles: true })
+    expect(toastCalls.plain).toHaveBeenLastCalledWith(
+      '已刪除 1 個種子和檔案（100 GB）',
+    )
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(dialog()).toBeNull()
+  })
+
+  it('the gone call fails: the files one leaves with its own toast, then the failure toast; pressing again resends only the gone ones without files', async () => {
+    deleteCalls.answer = rejectWhen(false)
+    await render()
+    await select(A, B, C)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(selectionStore.state.hashes).toEqual([B, C])
+    expect(pendingOpOf(A)).toBe('delete')
+    expect(pendingOpOf(B)).toBeNull()
+    expect(lastFailure()?.[1].keys).toEqual([B, C])
+    const failureAt = toastCalls.failure.mock.invocationCallOrder.at(-1) ?? 0
+    expect(
+      toastCalls.plain.mock.invocationCallOrder.every((at) => at < failureAt),
+    ).toBe(true)
+    expect(dialog()).not.toBeNull()
+    expect(primary().textContent).toBe('刪除 2 個種子（檔案已經不在）')
+
+    deleteCalls.answer = () =>
+      Promise.resolve({ ok: true, data: { items: [] } })
+    await act(async () => primary().click())
+    await settle()
+    expect(deleteCalls.sent.at(-1)).toEqual({
+      hashes: [B, C],
+      deleteFiles: false,
+    })
+    expect(toastCalls.plain).toHaveBeenLastCalledWith('已刪除 2 個種子')
+    expect(dialog()).toBeNull()
+  })
+
+  it('stays locked until both calls answered', async () => {
+    const finish: Array<(value: unknown) => void> = []
+    deleteCalls.answer = () =>
+      new Promise((resolve) => {
+        finish.push(resolve)
+      })
+    await render()
+    await select(A, B)
+    await openConfirm()
+    await act(async () => primary().click())
+    await settle()
+    expect(finish).toHaveLength(2)
+    await act(async () => finish[0]({ ok: true, data: { items: [] } }))
+    await settle()
+    expect(primary().textContent).toBe('刪除中…')
+    await press('Escape')
+    expect(dialog()).not.toBeNull()
+    await act(async () => finish[1]({ ok: true, data: { items: [] } }))
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(toastCalls.plain).toHaveBeenLastCalledWith(
+      '已刪除 2 個種子和檔案（100 GB）',
+    )
   })
 })
 

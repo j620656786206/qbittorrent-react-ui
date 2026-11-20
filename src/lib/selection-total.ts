@@ -7,7 +7,7 @@ import type { SlimTorrent } from '#/shared/maindata'
 // sums `size` (the value the row shows) only over the ones whose files
 // exist, so 已整理 (`statusOf` archived) and 找不到檔案 (`heroKindOf`
 // missing_files) count in N but add nothing to the size. Story 4.3's delete
-// size reads the same function.
+// size follows the same rule through `goneKindOf`.
 
 export interface SelectionTotal {
   /** Selected torrents still in maindata. */

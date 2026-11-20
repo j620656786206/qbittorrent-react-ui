@@ -9,11 +9,10 @@ import {
   deleteButtonText,
   deleteGoneNotes,
   deleteMoreText,
+  deletePlan,
   deleteRows,
-  deleteSuccessText,
   deleteSummary,
   deleteTitle,
-  filesAllGone,
 } from '#/lib/delete-confirm'
 import type { DeleteRow, DeleteSummary } from '#/lib/delete-confirm'
 import { OPERATION_FAILURE_CODES, deleteFailureText } from '#/lib/error-text'
@@ -55,18 +54,21 @@ import type { TrackedOp } from '#/state/tracked-op'
 // the answer). It counts as sending only while a delete about its hashes
 // is in flight, so a 重試 for other torrents never locks it.
 //
-// Pressing delete sends one `deleteTorrents` through `sendOp` (the failure
-// toast with 重試 resends the same hashes and `deleteFiles`): the hashes go
-// into `pendingOps` on send. On success the sent hashes leave the
-// selection (a late 重試 never touches a newer selection), so the dialog
-// closes once its delete ended and the bar slides out; a plain 4 s toast
-// says what went (no undo) and maindata refreshes; local data is never
-// edited. On a failure the dialog stays open as it was and maindata
-// refreshes (a timeout may still have deleted them); connection codes go
-// only to the global handler and the button can be pressed again.
-// Changing 「連檔案一起刪」 closes the failure toast, so its 重試 can never
-// send the old choice. No partial failure: qBittorrent answers for the
-// whole batch.
+// Pressing delete sends one `deleteTorrents` through `sendOp`, or two when
+// 「連檔案一起刪」 is ticked and only some files are there (`deletePlan`:
+// the gone ones go with `deleteFiles: false`). Each call goes on its own:
+// its hashes go into `pendingOps` on send; on success they leave the
+// selection (a late 重試 never touches a newer selection) and maindata
+// refreshes; local data is never edited; on a failure its failure toast
+// with 重試 resends that call only, and maindata refreshes (a timeout may
+// still have deleted them); connection codes go only to the global
+// handler. The plain 4 s toast (no undo) says what went: the whole press's
+// text once every call went through, a call's own text while the other is
+// still out, never over the other call's failure toast (its 重試 is what
+// is left to do). The dialog closes once its delete ended and nothing is
+// left; after a failure it stays with what failed, and the button can be
+// pressed again. Changing 「連檔案一起刪」 closes the failure toast, so its
+// 重試 can never send the old choice. qBittorrent answers for a whole call.
 
 /** A row's fixed height: 8px padding around the 13px/1.4 line. */
 const ROW_HEIGHT = 34
@@ -77,8 +79,11 @@ const EXPANDED_MAX = 320
 interface DeleteVariables {
   hashes: ReadonlyArray<string>
   deleteFiles: boolean
-  /** The success toast, worked out when sent (the rows go after). */
-  successText: string
+  /**
+   * The success toast, worked out when sent (the rows go after); `null`
+   * when another call's failure toast must stay.
+   */
+  successText: string | null
 }
 
 export const deleteOp: TrackedOp<DeleteVariables> = {
@@ -92,7 +97,7 @@ export const deleteOp: TrackedOp<DeleteVariables> = {
   onSuccess: (client, { hashes, successText }) => {
     const sent = new Set(hashes)
     pruneSelection((hash) => !sent.has(hash))
-    toast.plain(successText)
+    if (successText !== null) toast.plain(successText)
     void refreshMaindata(client)
   },
   onFailure: ({ hashes }) => clearPendingAll(hashes),
@@ -288,12 +293,16 @@ export function DeleteConfirm({
   }
   useEscapeLayer(open, cancel, 'dialog')
 
-  // Nothing left selected (another device, or this delete went through):
-  // close, but only once this dialog's own delete has ended.
+  // Nothing left selected (another device, a scope change, or this delete
+  // went through): close, but only once this dialog's own delete has
+  // ended. Its failure toast goes too, so 重試 never deletes without the
+  // dialog (or reports a delete that a timeout had already done).
   const empty = hashes.length === 0
   useEffect(() => {
-    if (open && empty && !sending) onClose()
-  }, [open, empty, sending, onClose])
+    if (!open || !empty || sending) return
+    dismissFailures(sentHashes)
+    onClose()
+  }, [open, empty, sending, onClose, sentHashes])
 
   const send = () => {
     if (pressedRef.current || sendable.length === 0) return
@@ -301,35 +310,51 @@ export function DeleteConfirm({
     pressTokenRef.current += 1
     const token = pressTokenRef.current
     setPressed(true)
-    const settle = () => {
-      if (pressTokenRef.current !== token) return
+    const plan = deletePlan(sendable, deleteFiles)
+    let left = plan.batches.length
+    let failed = false
+    /** One call of this press settled (a later 重試 never counts). */
+    const settleOne = (ok: boolean) => {
+      left -= 1
+      if (!ok) failed = true
+      if (left > 0 || pressTokenRef.current !== token) return
       pressedRef.current = false
       setPressed(false)
     }
-    const variables = {
-      hashes: sendable.map((row) => row.hash),
-      // Every file already gone: never ask qBittorrent to delete files.
-      deleteFiles: deleteFiles && !filesAllGone(summary),
-      successText: deleteSuccessText(summary, deleteFiles),
+    setSentHashes(new Set(sendable.map((row) => row.hash)))
+    for (const batch of plan.batches) {
+      let first = true
+      sendOp(
+        {
+          ...deleteOp,
+          onSuccess: async (sentClient, sent, data) => {
+            let successText: string | null = sent.successText
+            if (first) {
+              first = false
+              settleOne(true)
+              if (failed) successText = null
+              else if (left === 0) successText = plan.successText
+            }
+            await deleteOp.onSuccess?.(
+              sentClient,
+              { ...sent, successText },
+              data,
+            )
+          },
+          onFailure: (sent) => {
+            if (first) {
+              first = false
+              settleOne(false)
+            }
+            deleteOp.onFailure?.(sent)
+            // A timeout may still have deleted them: show what qBittorrent has.
+            void refreshMaindata(client)
+          },
+        },
+        client,
+        batch,
+      )
     }
-    setSentHashes(new Set(variables.hashes))
-    sendOp(
-      {
-        ...deleteOp,
-        onSuccess: async (...args) => {
-          settle()
-          await deleteOp.onSuccess?.(...args)
-        },
-        onFailure: (sent) => {
-          settle()
-          deleteOp.onFailure?.(sent)
-          // A timeout may still have deleted them: show what qBittorrent has.
-          void refreshMaindata(client)
-        },
-      },
-      client,
-      variables,
-    )
   }
 
   // The list shrank to 5 or fewer while expanded: fold it, and if the
