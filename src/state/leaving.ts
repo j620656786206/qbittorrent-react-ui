@@ -19,9 +19,12 @@ import type { SlimTorrent } from '#/shared/maindata'
 //
 // Leaving hashes come in groups, one per maindata update that removed some.
 // The first group is the active one: each mounted surface runs its exit on
-// the active hashes it shows (src/state/leaving-exit.ts), claiming the ones
-// it fades and finishing the rest at once. A group captured while another
-// runs waits, rows and snapshots kept, until that one is finished (L12).
+// the active hashes it shows (src/state/leaving-exit.ts): it claims them
+// when any is visible (they all leave at the fade's end) and finishes them
+// at once when none is. A group captured while another runs waits, rows
+// and snapshots kept (L12). It becomes active when the running group's
+// rows have all left the order (at their fade's end); a surface still
+// sliding the rows below starts it after that slide.
 // Hashes no surface claimed within UNCLAIMED_LEAVING_MS (shown nowhere)
 // are finished by a timer, so a later group never waits on them.
 // Docs: TanStack Store `createStore` and `useSelector` as in

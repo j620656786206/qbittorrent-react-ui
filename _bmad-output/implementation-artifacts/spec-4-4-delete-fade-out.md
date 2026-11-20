@@ -5,7 +5,7 @@ created: '2026-11-20'
 status: 'done'
 baseline_revision: '58dfd84023e0221f9389f4ea9f3164743289c1a0'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-4-context.md'
 warnings: ['oversized']
@@ -28,6 +28,24 @@ deferred:
       the hook with `disabled = () => true`. A board test needs a FLIP still running when the refresh lands.
     location: >-
       src/features/board/torrent-board.tsx
+    severity: low
+  - summary: >-
+      Deleting rows above the viewport moves every visible row up by their height, so Alex loses his place.
+    evidence: |-
+      Pre-existing since 4.3: there the visible rows jumped when rows above were removed; 4.4 turns the jump into a
+      0.2 s slide (exitShifts counts every removed row above each kept row). Keeping the place needs scroll anchoring:
+      move scrollTop by the height removed above the visible box and slide only by the visibly removed rows. A UX
+      choice for Alex.
+    location: >-
+      src/state/leaving-exit.ts
+    severity: medium
+  - summary: >-
+      After a delete the selection bar unmounts (the selection empties), so keyboard focus falls to the body.
+    evidence: |-
+      Pre-existing since 4.3: pruneSelection empties the selection on success and the bar holding the returned focus
+      unmounts. 4.4 adds `inert` on fading rows, which a focused row would also lose. No focus target is specified.
+    location: >-
+      src/features/selection/delete-confirm.tsx
     severity: low
 ---
 
@@ -162,6 +180,40 @@ deferred:
   - `[low]` `[patch]` (edge) The phone sheet L9 is not in e2e: same as the intent row; DOM test added.
   - `[false]` `[reject]` (edge) Other hashes stop reordering while leaving rows or a queued group are shown: L7 and L12 hold the order on purpose for the whole exit and its queue.
 
+### 2026-11-20: Review pass (follow-up)
+- verdicts: 30 findings: high 0, medium 2, low 20, false 8, maybe-false 0
+- findings:
+  - `[low]` `[defer]` (gap) Board `isBusy` wiring (L13) untested on the board: carried, already deferred in the first pass.
+  - `[false]` `[reject]` (intent) L3 off-screen rows wait for the fade end instead of leaving at once: the first-pass patch on purpose, recorded in Design Notes.
+  - `[false]` `[reject]` (intent) A poll that removes a hash before the success response drops it without a fade: the intent fades only what the data reflects after the success (AD-7); such a row already left.
+  - `[low]` `[reject]` (intent) "Never per frame" is checked only by the local trace: the trace measures it on real Chromium; a CI performance gate would be flaky.
+  - `[low]` `[reject]` (intent) Visibility tests mock the boxes: e2e covers the visible case in Chromium; off-screen cases need rects only the mock can pin.
+  - `[false]` `[reject]` (intent) The second hold in order-freeze: carried, false in the first pass.
+  - `[false]` `[reject]` (intent) PR #40, #42, #47 behavior has no new test: the existing suites cover it and pass (3398 unit tests, related e2e).
+  - `[low]` `[reject]` (blind) `captureLeaving` in the query function for a discarded result: carried, rejected in the first pass.
+  - `[low]` `[reject]` (blind) The `removing` phase ends only by the backstop when a deleted hash comes back mid-exit: needs the same torrent re-added within 0.2 s; the fix adds a branch.
+  - `[low]` `[reject]` (blind) `lastRef` written during render: carried, rejected in the first pass.
+  - `[low]` `[reject]` (blind) A leaving row re-mounted or scrolled into view during the fade shows at full opacity: only within the 0.2 s fade; the fix moves opacity and inert into render state.
+  - `[low]` `[defer]` (blind) Keyboard focus after a delete: pre-existing since 4.3 (the bar unmounts when the selection empties); deferred.
+  - `[medium]` `[defer]` (blind) No scroll anchoring when rows above the viewport are deleted: pre-existing since 4.3 (the jump), 4.4 turns it into a slide; a UX choice, deferred for Alex.
+  - `[low]` `[patch]` (blind) One backstop covers both phases: re-armed at the slide start for `SLIDE_MS + HOLD_SLACK_MS`; test added.
+  - `[low]` `[patch]` (blind) The queue advances at the fade end, not the exit end, unlike the comment: comment corrected in leaving.ts.
+  - `[low]` `[reject]` (blind) A collapse FLIP starting during the slide: a 0.2 s window after the pre-slide `disabled()` check; coordinating both animations is more than a direct fix.
+  - `[low]` `[reject]` (blind) Constants copied into e2e and the trace script: the e2e pins the spec's values on purpose; `EXPECT_LEAVING_MS` carried.
+  - `[low]` `[reject]` (blind) e2e thinner than unit tests (phone board, L9 phone, L14, L13, L12): unit and DOM tests cover them; L9 phone is unreachable from this tab.
+  - `[false]` `[reject]` (blind) Trace and recording overwrite committed files: the trace is run on purpose to refresh the PR artifacts (first-pass fix), the recordings test is opt-in.
+  - `[medium]` `[patch]` (edge) Scrolled to the bottom, the removal clamps `scrollTop` and rows jump: the slide now starts each wrapper at `shift - clamp`, so rows above slide down and rows below slide up; two hook tests added.
+  - `[low]` `[reject]` (edge) A collapse FLIP starting during the slide: same as the blind row.
+  - `[low]` `[reject]` (edge) `removing` with the hashes still in the order: same as the blind row.
+  - `[low]` `[reject]` (edge) `captureLeaving` before Query commits: carried.
+  - `[low]` `[patch]` (edge) The trace left the removal commit uncounted: added a `removal` window (41 ms: 1 Layout at its start, 0 during).
+  - `[low]` `[reject]` (edge) `PHASE_START_MS` spans about three frames: the summary lists each event's time, so per-frame grouping adds nothing.
+  - `[false]` `[reject]` (edge) Off-screen rows do not finish at once as the Tasks say: the first-pass patch, recorded in Design Notes.
+  - `[low]` `[reject]` (edge) The slide start shows 2 Layouts against "at most one": both fall in the first two frames of the commit (7 ms, 25 ms), none during the animation, which meets the story AC ("no per-frame layout"); the spec's stricter wording is not changed by a review.
+  - `[low]` `[reject]` (edge) L9 phone sheet not in e2e: carried.
+  - `[false]` `[reject]` (edge) The trace writes to the committed folder, not `e2e-output`: changed on purpose in the first pass.
+  - `[false]` `[reject]` (edge) Other hashes wait while a leaving hash is shown: carried.
+
 ## Design Notes
 
 Claude 代決 (Alex can veto):
@@ -229,3 +281,17 @@ Status: done (first pass; a follow-up review pass is recommended).
 - `check.sh`: every line ok.
 
 **Residual risks.** The slide's per-frame style recalc (deferred). A collapse FLIP starting during the fade is handled only by skipping the slide.
+
+### Follow-up pass 1 (2026-11-20)
+
+Status: done. Follow-up review: false (no high patched in this follow-up pass; converged).
+
+**Review.** 30 findings. Patched: medium 1 (the bottom scroll clamp), low 3 (slide backstop, queue comment, trace removal window). Deferred: 2 new (scroll anchoring for rows deleted above the view, medium, pre-existing since 4.3; keyboard focus after a delete, low, pre-existing) plus 1 carried. Rejected: 8 false, 19 low with reasons in the triage log.
+
+**Verification (after the patches).**
+- `npm run lint`, `npm run typecheck`: exit 0.
+- `npm test`: 139 files, 3398 tests pass.
+- `npm run build`: pass.
+- `npx playwright test` on delete-exit, delete, selection, board-collapse: 46 passed, 1 skipped (recordings).
+- `node scripts/trace-delete-exit.mjs`: fade 200 ms (Layout 2 at start, 0 during), removal 41 ms (1 at start, 0 during), slide 200 ms (2 at start, 0 during); Paint 0 during every window.
+- `check.sh`: every line ok.

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, useRef } from 'react'
+import { act, useLayoutEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -76,6 +76,11 @@ interface SurfaceProps {
   slide?: boolean
   /** Another filter (category, keyword) applies at once, held or not. */
   filterKey?: string
+  /**
+   * The scroll box's `scrollTop` by how many rows show, set before the
+   * hook's layout effect (the browser clamping it when content shrinks).
+   */
+  scrollFor?: Readonly<Record<number, number>>
 }
 
 const rowSize = () => ROW
@@ -86,9 +91,15 @@ function Surface({
   disabled,
   slide,
   filterKey,
+  scrollFor,
 }: SurfaceProps) {
   const ref = useRef<HTMLDivElement>(null)
   const shown = useFrozenOrder(live, { filterKey }) ?? []
+  const scrollTop = scrollFor?.[shown.length]
+  useLayoutEffect(() => {
+    if (scrollTop !== undefined && ref.current)
+      ref.current.scrollTop = scrollTop
+  }, [scrollTop])
   useLeavingExit(ref, {
     order: shown,
     sizeOf: rowSize,
@@ -236,6 +247,75 @@ describe('useLeavingExit', () => {
     await finishAll([...stub.calls])
     expect(held()).toBe(false)
     expect(leavingStore.state.hashes.size).toBe(0)
+  })
+
+  it('scrolled to the bottom: the clamped scroll moves every row, so each starts where it was', async () => {
+    // 4 rows scrolled 122px; without D the browser clamps to 61px.
+    const scrollFor = { 4: 2 * STEP, 3: STEP }
+    const view = await mount({ live: [A, B, C, D], scrollFor })
+    await deleteAndRefresh(view, [A, B, C, D], [D], { scrollFor })
+    const fades = [...stub.calls]
+    expect(on(fades, D)).toHaveLength(1)
+    stub.calls.length = 0
+    await finishAll(fades)
+    expect(rendered(view.container)).toEqual([A, B, C])
+    // Nothing removed above them: each only undoes the 61px clamp.
+    expect(
+      stub.calls.map((call) => [
+        (call.element as HTMLElement).dataset.hash,
+        call.keyframes,
+      ]),
+    ).toEqual(
+      [A, B, C].map((hash) => [
+        hash,
+        [{ translate: `0px ${-STEP}px` }, { translate: '0px 0px' }],
+      ]),
+    )
+    await finishAll([...stub.calls])
+    expect(held()).toBe(false)
+  })
+
+  it('the clamp and the slide add up for rows below a removed one', async () => {
+    const scrollFor = { 4: 2 * STEP, 3: STEP }
+    const view = await mount({ live: [A, B, C, D], scrollFor })
+    await deleteAndRefresh(view, [A, B, C, D], [B], { scrollFor })
+    const fades = [...stub.calls]
+    stub.calls.length = 0
+    await finishAll(fades)
+    const offsetOf = (hash: string) =>
+      on(stub.calls, hash)[0]?.keyframes[0].translate
+    // A was above B: it slides down from where it was. C and D moved up
+    // one row and down the clamp: they end where they started.
+    expect(offsetOf(A)).toBe(`0px ${-STEP}px`)
+    expect(offsetOf(C)).toBeUndefined()
+    expect(offsetOf(D)).toBeUndefined()
+  })
+
+  it('the slide arms its own backstop', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const view = await mount({ live: [A, B, C] })
+    await deleteAndRefresh(view, [A, B, C], [A])
+    // The fade ends late, just before its backstop.
+    await act(async () => {
+      vi.advanceTimersByTime(FADE_MS + SLIDE_MS + HOLD_SLACK_MS - 10)
+    })
+    const fades = [...stub.calls]
+    stub.calls.length = 0
+    await finishAll(fades)
+    const slides = [...stub.calls]
+    expect(slides.length).toBeGreaterThan(0)
+    // The fade's backstop would have fired by now; the slide's has not.
+    await act(async () => {
+      vi.advanceTimersByTime(SLIDE_MS)
+    })
+    expect(held()).toBe(true)
+    expect(slides.every((call) => call.cancel.mock.calls.length === 0)).toBe(
+      true,
+    )
+    await act(async () => {
+      vi.advanceTimersByTime(HOLD_SLACK_MS)
+    })
+    expect(held()).toBe(false)
   })
 
   it('a fading row is inert; a cut run clears it', async () => {

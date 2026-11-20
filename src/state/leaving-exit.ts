@@ -23,8 +23,12 @@ import { holdOrderForAnimation } from '#/state/order-freeze'
 // and in the layout effect after that commit every rendered wrapper below
 // a removed row starts `translate`d down by what was removed above it
 // (exitShifts) and slides to its place (SLIDE_MS); rows rendered only by
-// that commit slide in too. The order hold ends with the slide, or on a
-// backstop timer, or on unmount (which also lets the fading rows go). Only
+// that commit slide in too. When the shorter content made the browser
+// clamp `scrollTop` (scrolled to the bottom), every row starts that much
+// higher too, so rows above the removed ones slide down from where they
+// were. The order hold ends with the slide, or on a backstop timer (one
+// for the fade and the removal commit, another for the slide), or on
+// unmount (which also lets the fading rows go). Only
 // `opacity` and the `translate` property move: the virtualizer's inline
 // `transform` on the wrapper is never animated, and nothing is measured
 // per frame. Reduced motion, no Web Animations, or `disabled` (the board's
@@ -66,10 +70,11 @@ interface Run {
   fading: ReadonlyArray<HTMLElement>
   animations: Array<Animation>
   release: () => void
-  backstop: ReturnType<typeof setTimeout>
-  /** The order and the removed rows' sizes when the fade ended. */
+  backstop: ReturnType<typeof setTimeout> | undefined
+  /** The order, the removed rows' sizes and the scroll when the fade ended. */
   before: ReadonlyArray<string>
   sizes: ReadonlyMap<string, number>
+  scrollTop: number
 }
 
 /** Ends the order hold early and lets the fading rows go (unmount, cut). */
@@ -124,6 +129,16 @@ export function useLeavingExit(
 
   useLayoutEffect(() => {
     latestRef.current = { order, sizeOf, gap, slide }
+    // Should a `finished` never settle, the hold ends anyway.
+    const armBackstop = (run: Run, ms: number) => {
+      clearTimeout(run.backstop)
+      run.backstop = setTimeout(() => {
+        if (runRef.current !== run) return
+        runRef.current = null
+        stop(run)
+        rerender()
+      }, ms)
+    }
     const end = (run: Run) => {
       clearTimeout(run.backstop)
       run.release()
@@ -148,19 +163,23 @@ export function useLeavingExit(
         const container = containerRef.current
         // A collapse FLIP that started during the fade owns the wrappers.
         if (!slide || !container || disabled?.() === true) return end(run)
+        armBackstop(run, SLIDE_MS + HOLD_SLACK_MS)
         const shifts = exitShifts(
           run.before,
           order,
           (hash) => run.sizes.get(hash) ?? sizeOf(hash),
           gap,
         )
-        if (shifts.size === 0) return end(run)
+        // Scrolled to the bottom, the shorter content made the browser
+        // clamp `scrollTop`: every row moved down by that much, so each
+        // starts where it was (rows above the removed ones slide down).
+        const clamp = run.scrollTop - container.scrollTop
         for (const [hash, element] of wrappersOf(container, null)) {
-          const shift = shifts.get(hash)
-          if (shift === undefined) continue
+          const offset = (shifts.get(hash) ?? 0) - clamp
+          if (offset === 0) continue
           run.animations.push(
             element.animate(
-              [{ translate: `0px ${shift}px` }, { translate: '0px 0px' }],
+              [{ translate: `0px ${offset}px` }, { translate: '0px 0px' }],
               { duration: SLIDE_MS, easing: EXIT_EASING },
             ),
           )
@@ -220,19 +239,13 @@ export function useLeavingExit(
       fading: fading.map(([, element]) => element),
       animations,
       release: holdOrderForAnimation(),
-      // Should a `finished` never settle, the hold ends anyway.
-      backstop: setTimeout(
-        () => {
-          if (runRef.current !== started) return
-          runRef.current = null
-          stop(started)
-          rerender()
-        },
-        FADE_MS + SLIDE_MS + HOLD_SLACK_MS,
-      ),
+      backstop: undefined,
       before: order,
       sizes: new Map(),
+      scrollTop: 0,
     }
+    // The fade and the removal commit; the slide arms its own.
+    armBackstop(started, FADE_MS + SLIDE_MS + HOLD_SLACK_MS)
     runRef.current = started
     void Promise.allSettled(
       animations.map((animation) => animation.finished),
@@ -243,6 +256,7 @@ export function useLeavingExit(
       started.sizes = new Map(
         [...hashes].map((hash) => [hash, latest.sizeOf(hash)]),
       )
+      started.scrollTop = containerRef.current?.scrollTop ?? 0
       started.phase = 'removing'
       finishLeaving(hashes)
     })

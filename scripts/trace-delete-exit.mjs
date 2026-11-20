@@ -7,10 +7,11 @@
 // records a Chrome trace (devtools.timeline, over CDP `Tracing` through
 // Playwright) over the exit. The fade starts with the first `animate` call
 // on a row wrapper, the slide with the first `translate` one (both marked
-// with `console.timeStamp` by an init script). Layout, Paint and
-// UpdateLayoutTree events within PHASE_START_MS of a phase's start are that
-// phase's one layout change (the commit that starts it); the rest happened
-// during its animation. Writes a JSON summary and a rendered summary image
+// with `console.timeStamp` by an init script). Three windows: the fade,
+// the removal (from the fade's end to the slide's start: the commit that
+// takes the rows out) and the slide. Layout, Paint and UpdateLayoutTree
+// events within PHASE_START_MS of a window's start count as its start (the
+// commit that starts it); the rest happened during its animation. Writes a JSON summary and a rendered summary image
 // into the committed screenshots folder, so a rerun updates what is in git.
 //
 // Usage: npm run build && node scripts/trace-delete-exit.mjs [--keep trace.json]
@@ -163,6 +164,8 @@ try {
   const ms = (us) => us / 1000
   const windows = [
     { name: 'fade', start: ms(fadeAt), end: ms(fadeAt) + FADE_MS },
+    // From the fade's end to the first slide: the removal commit.
+    { name: 'removal', start: ms(fadeAt) + FADE_MS, end: ms(slideAt) },
     { name: 'slide', start: ms(slideAt), end: ms(slideAt) + SLIDE_MS },
   ]
   const NAMES = ['Layout', 'Paint', 'UpdateLayoutTree']
