@@ -24,6 +24,8 @@ import { MoreMenu } from '#/features/detail/more-menu'
 // shortcut registry) do what ‹ › do, inside the same column; at its end
 // nothing moves and the key is still taken. List mode's arrows are the
 // list's own (they move focus to the row).
+// Story 4.6: without a position (a torrent opened from outside the list or
+// column) the nav group is left out; `↑` `↓` are still taken, and do nothing.
 
 export type DetailHeaderLayout = 'row' | 'stacked' | 'phone'
 
@@ -67,7 +69,8 @@ export interface DetailHeaderProps {
   torrent: SlimTorrent
   /** Names the dialog on the phone (the sheet's `aria-labelledby`). */
   titleId?: string
-  position: DetailPosition
+  /** `null`: opened from outside the list (story 4.6), no nav group. */
+  position: DetailPosition | null
   /** The board's column name before 「第 N 個」; none in list mode. */
   columnName?: string | null
   /** ‹ or ›: show this torrent instead. */
@@ -120,7 +123,7 @@ export function DetailHeader({
     'prevItem',
     arrowKeys
       ? () => {
-          go(position.prev, 'prev', { fromKey: true })
+          go(position?.prev ?? null, 'prev', { fromKey: true })
           return true
         }
       : null,
@@ -129,7 +132,7 @@ export function DetailHeader({
     'nextItem',
     arrowKeys
       ? () => {
-          go(position.next, 'next', { fromKey: true })
+          go(position?.next ?? null, 'next', { fromKey: true })
           return true
         }
       : null,
@@ -149,7 +152,7 @@ export function DetailHeader({
     }
   })
 
-  const nav = (
+  const nav = position && (
     <div className="flex flex-none items-center gap-1.5">
       <IconButton
         label="上一個"

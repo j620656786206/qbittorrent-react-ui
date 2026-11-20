@@ -8,6 +8,7 @@ import { AlertBar } from '#/shared/ui/alert-bar'
 import { cn } from '#/shared/ui/cn'
 import { MAIN_ID, getMain } from '#/shared/ui/main-scroll'
 import { Skeleton } from '#/shared/ui/skeleton'
+import { openAdd } from '#/state/add-open'
 import { useCategoryTabs, useListView } from '#/state/list-view'
 import { PhoneCategorySheet } from '#/features/header/category-sheet'
 import { DesktopCategoryTabs } from '#/features/header/category-tabs'
@@ -45,9 +46,9 @@ import { DesktopSpeed, PhoneLine } from '#/features/header/speed-area'
 // (search-box.tsx): on desktop it turns in place into the 240px pill, on
 // the phone the field covers the first row. Story 3.7: the desktop 快捷鍵
 // button opens the shortcut help (shortcut-help.tsx), its tooltip naming
-// `?`; the phone has no 快捷鍵 button. The Epic 1 placeholder 新增
-// carries the native `disabled`: 50% and not-allowed from the base rule,
-// no hover, not focusable, and no `title`.
+// `?`; the phone has no 快捷鍵 button. Story 4.6: the desktop 「新增」 and
+// the phone's round 「新增種子」 open the add screen (src/state/add-open.ts;
+// the route mounts it, features/add).
 //
 // The header model is computed once per tick in HeaderProvider; the layout
 // and the page (`children`) keep their identity, so only the small leaves
@@ -73,7 +74,8 @@ export function ShellLayout({ children }: { children: ReactNode }) {
           <DesktopSearch />
           <button
             type="button"
-            disabled
+            aria-haspopup="dialog"
+            onClick={() => openAdd()}
             className="inline-flex h-9 flex-none items-center gap-1.5 rounded-full bg-primary pr-4 pl-3 font-bold text-primary-foreground hover-solid"
           >
             <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
@@ -89,8 +91,9 @@ export function ShellLayout({ children }: { children: ReactNode }) {
             add={
               <button
                 type="button"
-                disabled
+                aria-haspopup="dialog"
                 aria-label="新增種子"
+                onClick={() => openAdd()}
                 className="inline-flex size-11 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground hover-solid"
               >
                 <Plus size={20} strokeWidth={2.4} aria-hidden="true" />

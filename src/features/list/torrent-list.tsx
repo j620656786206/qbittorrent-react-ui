@@ -49,6 +49,7 @@ import {
 } from '#/state/selection'
 import { usePublishShownList } from '#/state/shown-order'
 import { bindFetchSortKeys, useSortKeys } from '#/state/sort-keys'
+import { openAdd } from '#/state/add-open'
 import { useViewedHash } from '#/state/viewed-hash'
 import {
   ROW_GAP,
@@ -68,6 +69,9 @@ import {
 } from '#/features/list/list-states'
 import { SHIFT_CLASS, TorrentRow } from '#/features/list/torrent-row'
 import { useArrowStepping } from '#/features/list/use-arrow-stepping'
+
+/** Story 4.6: the empty state's 「新增種子」 opens the add screen. */
+const openAddScreen = () => openAdd()
 
 // FR-15, NFR-1, AR-7, AR-50: the torrent list. Order only from
 // `useVisibleTorrents(view, sortKeys)` through the freeze (`useFrozenOrder`);
@@ -231,7 +235,8 @@ export function TorrentList({ panel }: TorrentListProps) {
   if (state === 'error')
     return <ListLoadError onRetry={retry} busy={retrying} />
   if (state === 'empty' || !shown) {
-    if (view.query === '' || categorySize === 0) return <ListEmpty />
+    if (view.query === '' || categorySize === 0)
+      return <ListEmpty onAdd={openAddScreen} />
     return (
       <ListNoResult
         text={noResultText(view.query, view.category)}

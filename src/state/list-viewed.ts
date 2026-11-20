@@ -3,6 +3,7 @@ import { resolveListViewed } from '#/lib/detail-position'
 import type { LastViewed } from '#/lib/detail-position'
 import { readPref } from '#/lib/prefs'
 import { ALL } from '#/shared/categories'
+import { useOutsideHash } from '#/state/detail-outside'
 import { useViewedHash } from '#/state/viewed-hash'
 
 // Story 2.4: the row the list's detail shows, from the URL's `hash` and the
@@ -15,6 +16,9 @@ import { useViewedHash } from '#/state/viewed-hash'
 // would be viewed (desktop list mode, `fallbackFirst`), the category's last
 // viewed torrent on this device (`lastViewedHash` in src/lib/prefs.ts) is,
 // when the order holds it. It is never scrolled into view (PRD FR-16).
+// Story 4.6: a torrent opened from outside the list (the add screen's
+// 「打開」, src/state/detail-outside.ts) that the order does not hold views
+// no row and writes nothing: the detail shows it without a position.
 
 export function useListViewed(
   order: ReadonlyArray<string> | undefined,
@@ -60,14 +64,21 @@ export function useListViewed(
     // `hash` only says when to read again.
     [fallbackFirst, scope, hash],
   )
+  const outside = useOutsideHash()
   const last = lastRef.current
-  const { viewed, write } = resolveListViewed({
-    order,
-    hash: effectiveHash,
-    previous: last !== null && last.scope === scope ? last : null,
-    fallbackFirst,
-    preferred,
-  })
+  const { viewed, write } =
+    outside !== null &&
+    outside === effectiveHash &&
+    order !== undefined &&
+    !order.includes(outside)
+      ? { viewed: null, write: undefined }
+      : resolveListViewed({
+          order,
+          hash: effectiveHash,
+          previous: last !== null && last.scope === scope ? last : null,
+          fallbackFirst,
+          preferred,
+        })
 
   useLayoutEffect(() => {
     if (order !== undefined) lastRef.current = { order, viewed, scope }

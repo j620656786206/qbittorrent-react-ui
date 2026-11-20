@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { detailPosition } from '#/lib/detail-position'
+import { useOutsideHash } from '#/state/detail-outside'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
 import { useShownTorrents } from '#/state/maindata'
 import { useSheetLayer } from '#/state/sheet-layer'
@@ -23,13 +24,21 @@ import type { DetailTarget } from '#/features/detail/detail-view'
 // open the list behind keeps its order and `Esc` closes it (useSheetLayer).
 // Closing removes `hash`; a torrent that is gone closes it (the list hook
 // or useBoardDetailTarget removes `hash`).
+// Story 4.6: a torrent opened from outside the list (the add screen's
+// 「打開」) that no row holds opens here without a position.
 
 function useListDetailTarget(): DetailTarget | null {
   const { order, viewed } = useShownList()
   // Story 4.4: a deleted row still fading keeps its sheet (snapshot).
   const torrents = useShownTorrents()
-  if (!order || viewed === null || !torrents) return null
-  if (!Object.hasOwn(torrents, viewed)) return null
+  const outside = useOutsideHash()
+  if (!torrents) return null
+  if (viewed === null) {
+    return outside !== null && Object.hasOwn(torrents, outside)
+      ? { torrent: torrents[outside], position: null }
+      : null
+  }
+  if (!order || !Object.hasOwn(torrents, viewed)) return null
   const position = detailPosition(order, viewed)
   return position ? { torrent: torrents[viewed], position } : null
 }

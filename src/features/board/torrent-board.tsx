@@ -18,6 +18,7 @@ import {
   useMatchCount,
   useShownTorrents,
 } from '#/state/maindata'
+import { openAdd } from '#/state/add-open'
 import { useAutoCollapse } from '#/state/auto-collapse'
 import { useEmptyEntrance } from '#/state/entrance'
 import { useListView } from '#/state/list-view'
@@ -43,6 +44,9 @@ import {
 } from '#/features/board/board-model'
 import { PhoneBoard, PhoneBoardSkeleton } from '#/features/board/status-tabs'
 import { useBoardCollapse } from '#/features/board/use-board-collapse'
+
+/** Story 4.6: the empty state's 「新增種子」 opens the add screen. */
+const openAddScreen = () => openAdd()
 
 // Story 2.3, FR-15: the board, what the 「狀態」 sort shows (EXPERIENCE
 // 排序決定長相). Columns and their orders come from `useBoardColumns(category)`
@@ -124,7 +128,7 @@ export function TorrentBoard() {
     )
   }
   if (state === 'empty' || !columns || !torrents || !stateBeforeMove) {
-    return <ListEmpty />
+    return <ListEmpty onAdd={openAddScreen} />
   }
   const noResult = state === 'no-result'
   // Story 3.2: another category is a new board, keyed on it: every column

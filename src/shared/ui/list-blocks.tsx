@@ -12,20 +12,26 @@ import { useRestoreFocusOnUnmount } from '#/shared/ui/restore-focus'
 // never import each other. The error text comes from src/lib/error-text.ts
 // through the caller (src/shared may not import src/lib). Story 3.5: the
 // search's no-result block (EXPERIENCE 搜尋沒結果), its text from
-// src/lib/name-search.ts through the caller too.
+// src/lib/name-search.ts through the caller too. Story 4.6: 「新增種子」
+// opens the add screen through the caller's `onAdd` (src/shared may not
+// import src/state).
 
 /** S01/S02 no-result block; phone edges and corners like the list section. */
 const BLOCK_CLASS = `${CENTER_BLOCK_CLASS} max-lg:-mx-1 max-lg:rounded-b-none`
 
-/** No visible torrent: 「這個分類沒有種子」 and the disabled 「新增種子」. */
-export function ListEmpty() {
+/** No visible torrent: 「這個分類沒有種子」 and 「新增種子」 (`onAdd`). */
+export function ListEmpty({ onAdd }: { onAdd: () => void }) {
   return (
     <section aria-label="種子列表，共 0 個" className={BLOCK_CLASS}>
       <p role="status" className={CENTER_BLOCK_TEXT_CLASS}>
         這個分類沒有種子
       </p>
-      {/* Epic 1 placeholder: native `disabled` like the header's 新增. */}
-      <button type="button" disabled className={CENTER_BLOCK_BUTTON_CLASS}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onAdd}
+        className={CENTER_BLOCK_BUTTON_CLASS}
+      >
         新增種子
       </button>
     </section>

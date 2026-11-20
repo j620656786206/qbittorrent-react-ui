@@ -329,16 +329,17 @@ describe('the list states', () => {
     expect(html).not.toMatch(/spin/)
   })
 
-  it('empty: the sentence and a disabled 「新增種子」', () => {
-    const html = renderToStaticMarkup(<ListEmpty />)
+  it('empty: the sentence and 「新增種子」, which opens the add screen (story 4.6)', () => {
+    const html = renderToStaticMarkup(<ListEmpty onAdd={() => {}} />)
     expect(html).toContain('>這個分類沒有種子<')
     const button = openTags(html, 'button')[0]
-    expect(button).toContain('disabled=""')
+    expect(button).not.toContain('disabled')
+    expect(button).toContain('aria-haspopup="dialog"')
     expect(html).toContain('新增種子</button>')
   })
 
   it('the no-result block keeps its exact classes after the move to src/shared/ui (story 2.0)', () => {
-    const html = renderToStaticMarkup(<ListEmpty />)
+    const html = renderToStaticMarkup(<ListEmpty onAdd={() => {}} />)
     expect(openTags(html, 'section')[0]).toContain(
       'class="flex h-full flex-col items-center justify-center gap-3.5 rounded-panel bg-surface p-6 text-center max-lg:-mx-1 max-lg:rounded-b-none"',
     )

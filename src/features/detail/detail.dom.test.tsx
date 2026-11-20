@@ -34,6 +34,12 @@ import {
   resetShortcuts,
 } from '#/state/shortcuts'
 import { clearShownList, publishShownList } from '#/state/shown-order'
+import {
+  detailOutsideStore,
+  openDetailOutside,
+  resetDetailOutside,
+  useDetailOutsideUpkeep,
+} from '#/state/detail-outside'
 import { ListViewContext } from '#/state/list-view'
 import { ViewedHashContext } from '#/state/viewed-hash'
 import { BoardDetailPanel } from '#/features/detail/board-detail-panel'
@@ -148,7 +154,14 @@ let client: QueryClient
 let answers: Array<MaindataResponse>
 let fetchCount: number
 let hashNow: string | null
+let setHashNow: (hash: string | null) => void = () => {}
 const writes: Array<string | null> = []
+
+/** Story 4.6: the layout's upkeep of the hash opened from outside. */
+function OutsideUpkeep({ hash }: { hash: string | null }) {
+  useDetailOutsideUpkeep(hash)
+  return null
+}
 
 function Url({
   initial,
@@ -163,8 +176,10 @@ function Url({
     writes.push(next)
     setHashState(next)
   }, [])
+  setHashNow = setHash
   return (
     <ViewedHashContext value={{ hash, setHash, followHash: setHash }}>
+      <OutsideUpkeep hash={hash} />
       {children}
     </ViewedHashContext>
   )
@@ -250,6 +265,7 @@ beforeEach(() => {
   resetEntrance()
   resetShortcuts()
   clearShownList()
+  resetDetailOutside()
   main = document.createElement('main')
   main.id = MAIN_ID
   main.tabIndex = -1
@@ -1633,5 +1649,98 @@ describe('↑ ↓ on the board panel (story 3.7)', () => {
     expect(q('[role="tabpanel"]')?.hasAttribute('data-own-arrows')).toBe(true)
     expect((await press('ArrowDown')).defaultPrevented).toBe(false)
     expect(writes).toEqual([])
+  })
+})
+
+describe('a torrent opened from outside the list (story 4.6, 打開)', () => {
+  const archived = () =>
+    t({
+      hash: h(30),
+      name: 'Archived.Show',
+      state: 'missingFiles',
+      progress: 1,
+      private: false,
+    })
+  const navButtons = () =>
+    document.querySelectorAll(
+      'button[aria-label="上一個"], button[aria-label="下一個"]',
+    )
+
+  it('the phone board sheet shows an archived torrent with no position and no ‹ ›', async () => {
+    openDetailOutside(h(30))
+    await render(<BoardDetailSheet />, {
+      hash: h(30),
+      data: [...board(), archived()],
+    })
+    const dialog = q('[role="dialog"]') as HTMLElement
+    expect(dialog).not.toBeNull()
+    const titleId = dialog.getAttribute('aria-labelledby') ?? ''
+    expect(document.getElementById(titleId)?.textContent).toBe('Archived.Show')
+    expect(positionLine()).toBeUndefined()
+    expect(navButtons()).toHaveLength(0)
+    expect(writes).toEqual([])
+    // Closing ends it.
+    await act(async () => byLabel('關閉').click())
+    expect(hashNow).toBeNull()
+    expect(detailOutsideStore.state.hash).toBeNull()
+  })
+
+  it('without the outside mark the same hash closes, as before', async () => {
+    await render(<BoardDetailSheet />, {
+      hash: h(30),
+      data: [...board(), archived()],
+    })
+    expect(writes).toEqual([null])
+    expect(q('[role="dialog"]')).toBeNull()
+  })
+
+  it('the phone list sheet and the desktop list panel show it without a position', async () => {
+    openDetailOutside(h(30))
+    await render(
+      <>
+        <ListDetailPanel />
+        <ListDetailSheet />
+      </>,
+      { hash: h(30), data: [...board(), archived()] },
+    )
+    await act(async () =>
+      publishShownList({ order: [h(1), h(2)], viewed: null }),
+    )
+    const aside = q('aside[aria-label="詳情"]') as HTMLElement
+    expect(aside.querySelector('h2')?.textContent).toBe('Archived.Show')
+    expect(q('[role="dialog"]')).not.toBeNull()
+    expect(positionLine()).toBeUndefined()
+    expect(navButtons()).toHaveLength(0)
+    // Another row chosen: back to the list's rows with N of M.
+    await act(async () => setHashNow(h(2)))
+    await act(async () => publishShownList({ order: [h(1), h(2)], viewed: h(2) }))
+    expect(detailOutsideStore.state.hash).toBeNull()
+    expect(aside.querySelector('h2')?.textContent).toBe('Down2')
+    expect(positionLine()).toBe('第 2 個／共 2 個')
+  })
+
+  it('the torrent leaving the data ends it and closes the sheet', async () => {
+    openDetailOutside(h(30))
+    await render(<BoardDetailSheet />, {
+      hash: h(30),
+      data: [...board(), archived()],
+    })
+    expect(q('[role="dialog"]')).not.toBeNull()
+    await poll(
+      fakeResponse({
+        version: 'v2',
+        full: false,
+        changed: [],
+        removed: [h(30)],
+      }),
+    )
+    expect(detailOutsideStore.state.hash).toBeNull()
+    expect(writes).toEqual([null])
+  })
+
+  it('a torrent the column does hold keeps its position', async () => {
+    openDetailOutside(h(11))
+    await render(<BoardDetailSheet />, { hash: h(11) })
+    expect(positionLine()).toBe('做種中　第 1 個／共 3 個')
   })
 })

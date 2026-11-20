@@ -13,6 +13,8 @@ import {
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
+import { AddScreen } from '#/features/add/add-screen'
+import { DropOverlay } from '#/features/add/drop-overlay'
 import { AppShell } from '#/features/header/app-shell'
 import { requireSession } from '#/features/login/require-session'
 import { sessionQueryOptions } from '#/features/login/session-query'
@@ -42,6 +44,7 @@ import type { Settings } from '#/shared/settings'
 import { resetListScroll } from '#/shared/ui/main-scroll'
 import { callFn } from '#/state/call-fn'
 import { replayEntrance } from '#/state/entrance'
+import { useDetailOutsideUpkeep } from '#/state/detail-outside'
 import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
@@ -107,6 +110,10 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // this device: src/state/resume-last-place.ts. The list and the board keep
 // their skeleton while it restores (`viewReady`); a tab click cancels it.
 // https://tanstack.com/router/latest/docs/framework/react/guide/search-params
+// Story 4.6: the add screen and the desktop drop overlay are mounted here,
+// over every page of the layout (features/add, opened through
+// src/state/add-open.ts); a torrent its 「打開」 shows from outside the list
+// is tracked against the URL's `hash` (src/state/detail-outside.ts).
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -512,6 +519,7 @@ function AuthedLayout() {
     () => ({ hash: hash ?? null, setHash, followHash }),
     [hash, setHash, followHash],
   )
+  useDetailOutsideUpkeep(hash ?? null)
 
   return (
     <ListViewContext value={control}>
@@ -520,6 +528,8 @@ function AuthedLayout() {
           <AppShell>
             <Outlet />
           </AppShell>
+          <AddScreen />
+          <DropOverlay />
         </ViewedHashContext>
       </CategoryTabsContext>
     </ListViewContext>

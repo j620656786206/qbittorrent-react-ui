@@ -60,6 +60,9 @@
 //   files: normal | slow | fail (story 2.7: slow delays torrents/files
 //          25 s, fail answers it with HTTP 500, which the container maps
 //          to qbit_rejected; for the loading and failure screenshots)
+//   cats:  normal | default-path (story 4.6: default-path adds X-default,
+//          a category whose savePath is '', for the add screen's
+//          「會存到 qBittorrent 的預設位置」)
 //   Story 4.3: ops=slow delays torrents/stop, /start and /delete 12 s
 //   (past the dialog's 10 s 「還在等 NAS 回應」), then applies them.
 //   Any `data` parameter (even the current one) also clears the deleted
@@ -166,6 +169,7 @@ const DATA_MODES = new Set([
 const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
+const CATS_MODES = new Set(['normal', 'default-path'])
 const FRONT_MODES = new Set([
   'normal',
   'down',
@@ -183,6 +187,7 @@ const mode = {
   grow: '0',
   ops: 'normal',
   files: 'normal',
+  cats: 'normal',
 }
 
 /** `--port 3200` or `--port=3200`; 3100 when absent. */
@@ -931,6 +936,15 @@ const CATEGORIES = {
   'X-empty': { name: 'X-empty', savePath: '/data/media/X-empty' },
 }
 
+/**
+ * Story 4.6 (`cats=default-path`): plus a category without a save path,
+ * which qBittorrent reports as `savePath: ''` (its default location).
+ */
+const CATEGORIES_DEFAULT_PATH = {
+  ...CATEGORIES,
+  'X-default': { name: 'X-default', savePath: '' },
+}
+
 function serverState() {
   const state = {
     dl_info_speed: 10_433_331,
@@ -1051,7 +1065,8 @@ const fakeQbit = createServer(async (req, res) => {
         rid,
         full_update: true,
         torrents: currentTorrents(rid),
-        categories: CATEGORIES,
+        categories:
+          mode.cats === 'default-path' ? CATEGORIES_DEFAULT_PATH : CATEGORIES,
         server_state: serverState(),
       }),
       { 'content-type': 'application/json' },
@@ -1079,6 +1094,7 @@ function controlMode(req, res, url) {
       grow: GROW_MODES,
       ops: OPS_MODES,
       files: FILES_MODES,
+      cats: CATS_MODES,
     }
     const next = {}
     for (const [name, values] of Object.entries(allowed)) {
@@ -1105,7 +1121,7 @@ function controlMode(req, res, url) {
     }
     Object.assign(mode, next)
     console.log(
-      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files}`,
+      `mode: qbit=${mode.qbit} front=${mode.front} data=${mode.data} grow=${mode.grow} ops=${mode.ops} files=${mode.files} cats=${mode.cats}`,
     )
   } else if (req.method !== 'GET') {
     return send(res, 405, 'POST or GET\n')
@@ -1341,13 +1357,14 @@ fake qBittorrent is up. Open ${origin}/
   username: ${USERNAME}
   password: ${PASSWORD}
 switch modes:
-  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal'
+  curl -X POST '${origin}/__fake/mode?qbit=normal&front=normal&data=sample&grow=0&ops=normal&files=normal&cats=normal'
   qbit:  normal | alt | firewalled | disconnected | slow | down | rejected
   front: normal | down | cloudflare | cloudflare-redirect | cloudflare-html
   data:  sample | many | empty | archived | calm | states | categories | categories-emptied
   grow:  0 | 1
   ops:   normal | reject | slow | reject-files
   files: normal | slow | fail
+  cats:  normal | default-path
 stop/start and filePrio calls: curl '${origin}/__fake/ops'
 torrents/files requests: curl '${origin}/__fake/files'
 reset settings.json: curl -X POST '${origin}/__fake/settings?reset=1'
