@@ -228,7 +228,12 @@ export function createQbitClient(options: QbitSessionOptions): QbitClient {
   ): Promise<void> {
     const form = hashesForm(hashes)
     form.set('location', location)
-    await session.send(QBIT_PATHS.torrentsSetLocation, { method: 'POST', form })
+    // 403 is also qBittorrent's "Cannot write to directory".
+    await session.send(QBIT_PATHS.torrentsSetLocation, {
+      method: 'POST',
+      form,
+      forbiddenMayBeRefusal: true,
+    })
   }
 
   async function addTorrent(

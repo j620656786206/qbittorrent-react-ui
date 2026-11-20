@@ -4,13 +4,20 @@ type: 'feature'
 created: '2026-11-21'
 status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 baseline_revision: '6f89849c2970ceb675beb8c104f210454fdc74e0'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-5-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-react-torrent-2026-11-15/ARCHITECTURE-SPINE.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      The 10-minute movingTo expiry may drop a move that qBittorrent has queued behind another move, if a queued move does not report moving.
+    evidence: |-
+      Unverified. Settle on the NAS: start two moves at once and watch whether the second torrent reads moving while it waits. If it does not, the expiry rule needs a queue-aware condition.
+    location: >-
+      src/server/sync/torrent-table.ts settleMoves
+    severity: medium (unverified)
 ---
 
 <intent-contract>
@@ -162,6 +169,42 @@ deferred: []
   - `[low]` `[reject]` (edge) `fitName` can split a grapheme past 50 units: needs a 50-character folder name ending in an emoji sequence.
   - `[false]` `[reject]` (edge) `readMoveStates` reuses a pull up to 6 s old: the spec asks for a read like `readCategoryNames`, which is this reuse.
 
+### 2026-11-21: Review pass (follow-up)
+- verdicts: 32 findings: high 0, medium 2, low 20, false 9, maybe-false 1
+- findings:
+  - `[false]` `[reject]` (intent) pendingOps is written on send: carried, the 4.3 pattern.
+  - `[false]` `[reject]` (intent) A fourth `movingTo` clearing rule: added by the first pass for the moved-elsewhere case; the intent lists conditions that must clear, not the only ones.
+  - `[low]` `[reject]` (intent) An unknown hash reads as outside the download folders: carried.
+  - `[low]` `[reject]` (intent) The 50-path toast relies on cached settings: carried.
+  - `[false]` `[reject]` (intent) Additions beyond the intent: each is a first-pass patch or a logged Claude 代決.
+  - `[false]` `[reject]` (intent) A real move is untested: carried, AD-15.
+  - `[false]` `[reject]` (intent) `accent` written as `primary`: the brand accent is the `primary` token (`styles.css`), the same one ConfirmShell's accent tone uses.
+  - `[medium]` `[patch]` (blind) A 403 from setLocation (folder not writable) is taken as an expired session and blocks every qBittorrent call for 60 s: `send` has an opt-in `forbiddenMayBeRefusal`, set only by `setLocation`; a 403 after the re-login is `qbit_rejected` for that call, no cooldown, cookie kept. Tests in session, client and set-location.
+  - `[low]` `[reject]` (blind) Pausing during a pending move overwrites the move entry and its target: needs a pause within the 30 s window; 5.3, the first reader of the target, decides how a move entry survives (noted for 5.3 in the PR).
+  - `[low]` `[reject]` (blind) Two overlapping moves pass the pre-check: carried.
+  - `[low]` `[reject]` (blind) The already-moving refusal reads as qBittorrent's: carried (5.3 disables the button while moving).
+  - `[low]` `[reject]` (blind) An unknown torrent gets the path text: carried.
+  - `[low]` `[reject]` (blind) 改路徑 stays enabled while moving: carried (5.3).
+  - `[false]` `[reject]` (blind) 加到常用 does not block the 51st path: carried, the AC asks for the toast.
+  - `[low]` `[reject]` (blind) A typo creates a new folder: qBittorrent creates missing folders by design; a "folder does not exist yet" hint is new scope.
+  - `[low]` `[reject]` (blind) Disabled buttons do not say why: the spec gives the only texts; 「目前」 marks the current row.
+  - `[low]` `[reject]` (blind) The fake never answers 403: the 403 path is covered by vitest after the patch above.
+  - `[false]` `[reject]` (blind) `targets` is written but never read: the AC asks to record the target for 5.3.
+  - `[low]` `[patch]` (blind) The op name `'move'` is written twice: one `MOVE_PENDING_OP` exported from `src/state/pending-ops.ts`.
+  - `[maybe-false]` `[defer]` (blind) A queued move behind another move may not report `moving`, so the 10-minute expiry could drop `movingTo` while it waits: settle by checking on the NAS whether qBittorrent 5.1.4 reports `moving` for a queued move (if not, the expiry is wrong; medium if true).
+  - `[low]` `[patch]` (verification) An IME-composing Enter is untested: DOM test added with the Safari case below.
+  - `[low]` `[reject]` (verification) Closing while sending when the torrent leaves maindata is untested: needs a delete from another client during the send; the result still arrives by toast or refresh.
+  - `[medium]` `[patch]` (verification) Safari commits an IME candidate with keyCode 229 and `isComposing` false, so Enter could send a half-typed Chinese folder name: the box also skips keyCode 229, like the add screen; DOM test.
+  - `[false]` `[reject]` (edge) The screen can open before maindata has the torrent: it opens only from the detail, which renders only a torrent in maindata.
+  - `[low]` `[reject]` (edge) Overlapping setLocation calls: carried.
+  - `[low]` `[reject]` (edge) A move that fails between pulls keeps `movingTo` for 10 minutes: the expiry clears it; 5.3 shows failures.
+  - `[low]` `[reject]` (edge) 50 listed plus outside roots, or a stale count: carried.
+  - `[low]` `[reject]` (edge) A failed settings read makes a full list read as the path text: needs the read to fail and 50 paths at once.
+  - `[low]` `[reject]` (edge) An unknown hash reads as the path text: carried.
+  - `[low]` `[reject]` (edge) `fitName` can split a grapheme: carried.
+  - `[low]` `[reject]` (edge) The fake ignores `ops=drop` for setLocation: e2e scope only; connection codes are the global handler's, tested in earlier stories.
+  - `[false]` `[reject]` (edge) `readMoveStates` reuses a 6 s pull: carried.
+
 ## Design Notes
 
 - qBittorrent 5.0 WebUI API, "Set torrent location": `POST /api/v2/torrents/setLocation`, `hashes` separated by `|`, `location` (created if missing); 400 save path empty, 409 cannot create the folder, 200 otherwise, no body (https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#set-torrent-location). The torrent state `moving` is documented in the same page's state table.
@@ -198,3 +241,7 @@ Status: done (first pass). Follow-up review recommended: 3 medium entries were p
 - `check.sh`: every line ok. Matrix rows S1 to S7, C1 to C4, U1 to U4 each have a tagged test that ran.
 
 **Residual risks.** Real qBittorrent behaviour during a move (when `save_path` changes, how long `moving` shows) is known only from the docs until the NAS check. The phone sheet over the detail sheet is e2e-tested in Chromium only.
+
+### Follow-up pass (2026-11-21)
+
+Status: done. Follow-up review not recommended: no high was patched (medium 2 entries, low 1 entry). Patches: a 403 from setLocation no longer blocks qBittorrent for 60 s; the 「會搬到」 box ignores Safari's IME Enter (keyCode 229); one constant for the move op name. Deferred: 1 (queued move and the 10-minute expiry, unverified). Rejected: the rest, with reasons in the triage log.

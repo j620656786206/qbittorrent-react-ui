@@ -464,6 +464,21 @@ describe('qBittorrent client', () => {
     ])
   })
 
+  it('story 5.2 setLocation answered 403 twice (a folder it cannot write): qbit_rejected, maindata still works', async () => {
+    const { client, calls } = setup({
+      setLocation: () =>
+        new Response('Cannot write to directory', { status: 403 }),
+    })
+    await client.syncMaindata(0)
+    await expect(client.setLocation([HASH_A], '/downloads/ro')).rejects.toEqual(
+      failure('qbit_rejected'),
+    )
+    expect(
+      calls.filter((call) => call.path === '/api/v2/torrents/setLocation'),
+    ).toHaveLength(2)
+    await expect(client.syncMaindata(1)).resolves.toBeDefined()
+  })
+
   it.each([400, 409, 500])(
     'story 5.2 setLocation answered %s: qbit_rejected',
     async (status) => {

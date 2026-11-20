@@ -444,6 +444,32 @@ describe('change path, one torrent (spec 5.2)', () => {
     ])
   })
 
+  it('an Enter that commits an IME candidate (composing, or keyCode 229) sends nothing; a plain Enter sends', async () => {
+    await render()
+    await openFor()
+    await type('/data/media/電影')
+    const composingEnter = (init: KeyboardEventInit) =>
+      act(async () => {
+        input().dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+            ...init,
+          }),
+        )
+      })
+    await composingEnter({ isComposing: true })
+    await composingEnter({ keyCode: 229 })
+    await settle()
+    expect(env.moveSent).toEqual([])
+    await press('Enter', input())
+    await settle()
+    expect(env.moveSent).toEqual([
+      { hashes: [A], location: '/data/media/電影' },
+    ])
+  })
+
   it('after 10 s of sending: 「還在等 NAS 回應」', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {

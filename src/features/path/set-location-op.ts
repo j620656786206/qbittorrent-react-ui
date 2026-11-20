@@ -6,7 +6,11 @@ import {
 import type { OperationFailureCode } from '#/lib/error-text'
 import type { BatchResult, SetLocationInput } from '#/shared/torrent-ops'
 import { refreshMaindata } from '#/state/maindata'
-import { clearPendingAll, markPendingAll } from '#/state/pending-ops'
+import {
+  MOVE_PENDING_OP,
+  clearPendingAll,
+  markPendingAll,
+} from '#/state/pending-ops'
 import type { TrackedOp } from '#/state/tracked-op'
 
 // Story 5.2 (AD-7, AD-14): one `setLocation` through `sendOp`. The hashes go
@@ -54,7 +58,8 @@ export function setLocationOp(call: SetLocationCall): MoveOp {
     keysOf: ({ hashes }) => hashes.map(moveToastKey),
     failureCodes: OPERATION_FAILURE_CODES,
     failureText: (_variables, code) => setLocationFailureText(code),
-    onSend: ({ hashes, location }) => markPendingAll(hashes, 'move', location),
+    onSend: ({ hashes, location }) =>
+      markPendingAll(hashes, MOVE_PENDING_OP, location),
     onSuccess: (client) => {
       void refreshMaindata(client)
     },

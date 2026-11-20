@@ -18,6 +18,12 @@ import { selectTorrents, useMaindata } from '#/state/maindata'
 
 export const PENDING_TIMEOUT_MS = 30_000
 
+/**
+ * Story 5.2: the op name of a move (change path). One constant, since the
+ * change-path screen marks it and the detail's menu tells it apart.
+ */
+export const MOVE_PENDING_OP = 'move'
+
 interface PendingState {
   ops: Readonly<Record<string, string>>
   /** Story 5.2: a move's target per hash, only while its entry is there. */

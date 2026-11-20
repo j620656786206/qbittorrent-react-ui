@@ -310,6 +310,44 @@ describe('qBittorrent session', () => {
     expect(count(LOGIN)).toBe(4)
   })
 
+  it('story 5.2 forbiddenMayBeRefusal: 403 then 403 after the re-login is qbit_rejected for that call only; no cooldown, cookie kept', async () => {
+    const MOVE = '/api/v2/torrents/setLocation'
+    const { session, sync, count, calls } = setup({
+      login: loginSequence(),
+      setLocation: forbidden,
+    })
+    await sync() // stores OLD
+    await expect(
+      session.send(MOVE, {
+        method: 'POST',
+        form: new URLSearchParams({ hashes: 'a', location: '/x' }),
+        forbiddenMayBeRefusal: true,
+      }),
+    ).rejects.toEqual(failure('qbit_rejected'))
+    // The first 403 still logs in once (an expired session looks the same).
+    expect(count(LOGIN)).toBe(2)
+    expect(count(MOVE)).toBe(2)
+    // No 60 s block: the next poll is sent with the new cookie, no login.
+    await expect(sync()).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(2)
+    expect(calls.at(-1)?.headers.get('cookie')).toBe(NEW)
+  })
+
+  it('story 5.2 forbiddenMayBeRefusal: a 403 right after the initial login is qbit_rejected with no cooldown', async () => {
+    const MOVE = '/api/v2/torrents/setLocation'
+    const { session, sync, count } = setup({ setLocation: forbidden })
+    await expect(
+      session.send(MOVE, {
+        method: 'POST',
+        form: new URLSearchParams({ hashes: 'a', location: '/x' }),
+        forbiddenMayBeRefusal: true,
+      }),
+    ).rejects.toEqual(failure('qbit_rejected'))
+    expect(count(LOGIN)).toBe(1)
+    await expect(sync()).resolves.toMatchObject({ status: 200 })
+    expect(count(LOGIN)).toBe(1)
+  })
+
   it('a 403 after a fresh login keeps a newer cookie another call stored', async () => {
     let holdNext = true
     const release = deferred<undefined>()

@@ -67,6 +67,14 @@ export interface SendOptions {
    * `qbit_rejected` (story 4.7: 415 from `torrents/add`). Never 403.
    */
   accept?: ReadonlyArray<number>
+  /**
+   * Story 5.2: this endpoint also answers 403 for a refusal of its own
+   * (`torrents/setLocation`: "Cannot write to directory"). The first 403
+   * still logs in again once (the session may have expired), but a 403
+   * after that login is a plain `qbit_rejected` for this call only: no
+   * cooldown, the cookie kept.
+   */
+  forbiddenMayBeRefusal?: boolean
 }
 
 /** A 2xx answer (or an `accept`ed status), body read inside the deadline. */
@@ -306,9 +314,16 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
       used = await login('initial', signal)
       loggedIn = true
     }
+    const afterLogin = (
+      response: { status: number; body: string },
+      refused: string,
+    ) =>
+      sendOptions.forbiddenMayBeRefusal
+        ? expectOk(path, response)
+        : rejectedAfterLogin(path, response, refused)
     const first = await request(path, sendOptions, used, signal)
     if (first.status !== 403) return expectOk(path, first, sendOptions.accept)
-    if (loggedIn) return rejectedAfterLogin(path, first, used)
+    if (loggedIn) return afterLogin(first, used)
     if (now() < reloginBlockedUntil) return expectOk(path, first)
 
     if (cookie !== null && cookie !== used) {
@@ -319,7 +334,7 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     }
     // Exactly one resend; a second 403 is qbit_rejected, not the breaker.
     const resent = await request(path, sendOptions, used, signal)
-    if (resent.status === 403) return rejectedAfterLogin(path, resent, used)
+    if (resent.status === 403) return afterLogin(resent, used)
     return expectOk(path, resent, sendOptions.accept)
   }
 

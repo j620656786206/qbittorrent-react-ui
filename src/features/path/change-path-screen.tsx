@@ -273,7 +273,9 @@ export function ChangePathScreen({ moveOp, addPathOp }: ChangePathScreenProps) {
           aria-describedby={view.reason !== null ? reasonId : undefined}
           onChange={(event) => editBox(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+            if (event.key !== 'Enter') return
+            // An IME commit (Safari: not composing, keyCode 229) is no press.
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return
             event.preventDefault()
             send()
           }}

@@ -48,9 +48,11 @@ function run(
   }) as Promise<Result<BatchResult>>
 }
 
-async function maindata(): Promise<MaindataResponse> {
+async function maindata(
+  value: { fresh?: boolean } = {},
+): Promise<MaindataResponse> {
   const result = (await guardedOf(getMaindata).run({
-    data: input(getMaindataInputSchema)({}),
+    data: input(getMaindataInputSchema)(value),
     context: { session: testSession() },
   })) as Result<MaindataResponse>
   if (!result.ok) throw new Error(`expected ok, got ${result.error.code}`)
@@ -278,6 +280,23 @@ describe('setLocation server function (spec 5.2)', () => {
       },
     })
     expect(opCalls()).toHaveLength(0)
+  })
+
+  it('S6 403 then 403 after the re-login (a folder qBittorrent cannot write): qbit_rejected, the next getMaindata still answers', async () => {
+    opAnswer = () => new Response('Cannot write to directory', { status: 403 })
+    await maindata()
+    expect(await run({ hashes: [HASH_A], location: '/downloads/ro' })).toEqual({
+      ok: false,
+      error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
+    })
+    expect(opCalls()).toHaveLength(2)
+    // No 60 s block: a fresh pull (refreshMaindata) reaches qBittorrent.
+    const pulls = qbit.count('/api/v2/sync/maindata')
+    const { changed } = await maindata({ fresh: true })
+    expect(qbit.count('/api/v2/sync/maindata')).toBe(pulls + 1)
+    expect(changed.find((t) => t.hash === HASH_A)).not.toHaveProperty(
+      'movingTo',
+    )
   })
 
   it.each([400, 409, 500])(
