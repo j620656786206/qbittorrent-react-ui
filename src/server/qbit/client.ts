@@ -92,14 +92,17 @@ export class AddRefused extends ServerFailure {
 const UNSUPPORTED_MEDIA_TYPE = 415
 
 /**
- * qBittorrent 5.0 answers `Ok.` or `Fails.` with 200; newer versions may
- * answer JSON with counts. Added: `Ok.`, an empty body, or JSON with
+ * qBittorrent 5.0.5 and 5.1.4 answer `Ok.` or `Fails.` with 200 and never
+ * an empty body (`TorrentsController::addAction`, src/webui/api/
+ * torrentscontroller.cpp at tags release-5.0.5 and release-5.1.4); newer
+ * versions may answer JSON with counts. Added: `Ok.`, or JSON with
  * `success_count` above 0 (the next maindata tells). Refused: `Fails.` or
- * any other JSON object. Anything else (HTML, junk) is not an answer.
+ * any other JSON object. Anything else (empty, HTML, junk) is not an
+ * answer: a proxy or the tunnel may send an empty 200.
  */
 function addAnswer(body: string): 'added' | 'refused' | 'unknown' {
   const text = body.trim()
-  if (text === 'Ok.' || text === '') return 'added'
+  if (text === 'Ok.') return 'added'
   if (text === 'Fails.') return 'refused'
   if (!text.startsWith('{')) return 'unknown'
   let json: unknown

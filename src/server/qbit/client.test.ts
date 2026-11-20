@@ -327,6 +327,7 @@ describe('qBittorrent client', () => {
 
     it.each([
       ['JSON that does not parse', () => new Response('{oops')],
+      ['an empty body', () => new Response('')],
       ['an HTML page', () => new Response('<html><body>hi</body></html>')],
       ['other text', () => new Response('Something else')],
       ['a JSON array body', () => new Response('[1]')],
@@ -363,7 +364,6 @@ describe('qBittorrent client', () => {
 
     it.each([
       ['Ok.', () => new Response('Ok.')],
-      ['an empty body', () => new Response('')],
       [
         'JSON with only success_count 1',
         () => jsonResponse({ success_count: 1 }),

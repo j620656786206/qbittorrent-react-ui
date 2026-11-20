@@ -26,7 +26,7 @@ import {
   addedToastText,
   outcomeOf,
 } from '#/features/add/add-model'
-import type { AddItem, AddOutcome } from '#/features/add/add-model'
+import type { AddFailure, AddItem, AddOutcome } from '#/features/add/add-model'
 import type { AddEntries } from '#/features/add/use-add-entries'
 
 // Story 4.7 (EXPERIENCE add results, 送出中): submitting the add screen.
@@ -53,14 +53,17 @@ import type { AddEntries } from '#/features/add/use-add-entries'
 //   Every whole failure but `not_logged_in` refreshes maindata too (a
 //   deleted category leaves the menu; a timeout or a lost connection may
 //   still have added some). The add's own browser timeout is `timeout`
-//   (the NAS may still be adding), not a lost connection. A later request
-//   failing as a whole only fails its own entries, with that code
-//   (`not_sent` when the browser failed before any answer), since the
-//   earlier ones were added; a login-stop or connection code there fails
-//   the rest unsent, and the global handler still sees that code (login,
-//   the connection alert): `not_logged_in` shows what was added before the
-//   list goes, the others leave the added rows and keep the failed ones
-//   with their reasons, like a partial failure.
+//   (the NAS may still be adding), not a lost connection.
+// - a stop after something was added: a later request failing as a whole
+//   (any code; `not_sent` when the browser failed before any answer), or
+//   an answer with an entry failed by a timeout, a login-stop or a
+//   connection code (the server stops at those, _add-entries.ts). The rest
+//   is not sent and fails with that code, like the server's own rule: only
+//   qBittorrent refusing one entry lets the next go. A login-stop or
+//   connection code also reaches the global handler (login, the connection
+//   alert), even in the first answer: `not_logged_in` shows what was added
+//   before the list goes, the others leave the added rows and keep the
+//   failed ones with their reasons, like a partial failure.
 //   重試 uses the screen's current category, and does nothing (closing
 //   the toast) when 新增 would be disabled.
 // While the add is out (the press, or a 重試) the screen is `sending`: it
@@ -78,9 +81,9 @@ export interface AddVariables {
 }
 
 /**
- * A login-stop or connection code after an earlier request added some: the
- * global handler sees the code (login, the connection alert), the screen
- * sees what was done.
+ * A login-stop or connection code once some were added (an entry of an
+ * answer, or a later request): the global handler sees the code (login,
+ * the connection alert), the screen sees what was done.
  */
 export class AddInterrupted extends AppError {
   readonly outcome: AddOutcome
@@ -91,12 +94,24 @@ export class AddInterrupted extends AppError {
   }
 }
 
+/** An answer's entry that stops the rest: the server stopped there too. */
+function stopIn(part: AddOutcome): AddFailure['code'] | null {
+  const stop = part.failed.find(
+    ({ code }) =>
+      code === 'timeout' ||
+      (code !== 'not_sent' &&
+        (isLoginStopCode(code) || isConnectionCode(code))),
+  )
+  return stop === undefined ? null : stop.code
+}
+
 /** Sends the batches in order and merges the answers (see the top). */
 async function sendAdd({ entries, category }: AddVariables) {
   const outcome: AddOutcome = { added: [], failed: [] }
   const batches = addBatches(entries)
   for (const [index, batch] of batches.entries()) {
     const { form, order, bytes } = addFormOf(batch, category)
+    let stop: AddFailure['code'] | null
     try {
       const result = await callFn(addTorrents, form, {
         timeoutMs: addCallTimeoutMs(bytes),
@@ -105,17 +120,23 @@ async function sendAdd({ entries, category }: AddVariables) {
       const part = outcomeOf(order, result)
       outcome.added.push(...part.added)
       outcome.failed.push(...part.failed)
+      stop = stopIn(part)
     } catch (error) {
       if (index === 0) throw error
-      const code = isAppError(error) ? error.code : 'not_sent'
-      const stop =
-        code !== 'not_sent' && (isLoginStopCode(code) || isConnectionCode(code))
-      // Logged out, qBittorrent's login refused or unreachable: the rest is
-      // not sent either.
-      const failing = stop ? batches.slice(index).flat() : batch
-      for (const item of failing) outcome.failed.push({ item, code })
-      if (stop) throw new AddInterrupted(code, outcome)
+      stop = isAppError(error) ? error.code : 'not_sent'
+      for (const item of batch) outcome.failed.push({ item, code: stop })
     }
+    if (stop === null) continue
+    for (const item of batches.slice(index + 1).flat()) {
+      outcome.failed.push({ item, code: stop })
+    }
+    if (
+      stop !== 'not_sent' &&
+      (isLoginStopCode(stop) || isConnectionCode(stop))
+    ) {
+      throw new AddInterrupted(stop, outcome)
+    }
+    break
   }
   return outcome
 }

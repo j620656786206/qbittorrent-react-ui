@@ -850,3 +850,93 @@ describe('review fixes (spec 4.7)', () => {
     expect(rowNames()).toEqual(['Fake.Bad.C'])
   })
 })
+
+describe('a stop inside an answer (second review)', () => {
+  /** The first `added` entries of each request go, the rest fail with `code`. */
+  const stoppedAt =
+    (added: number, code: string): Answer =>
+    (sent) =>
+      Promise.resolve({
+        ok: true,
+        data: {
+          items: sent.magnets.map((_, i) =>
+            i < added
+              ? { key: String(i), ok: true }
+              : { key: String(i), ok: false, code, message: 'x' },
+          ),
+        },
+      })
+
+  it('one request, unreachable after the first went: the connection error is marked, the failed rows stay', async () => {
+    await start(stoppedAt(1, 'qbit_unreachable'))
+    await paste(
+      [magnet(NEW_A, 'A'), magnet(NEW_B, 'B'), magnet(NEW_C, 'C')].join('\n'),
+    )
+    const marked: Array<ReadonlyArray<string>> = []
+    const watch = connectionStore.subscribe(() =>
+      marked.push(connectionStore.state.errors),
+    )
+    await click(submit())
+    await settle()
+    watch.unsubscribe()
+    expect(marked.some((errors) => errors.includes('qbit_unreachable'))).toBe(
+      true,
+    )
+    expect(rows()).toHaveLength(2)
+    expect(resultLine()).toBe('1 個加好了，2 個失敗')
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(toastCalls.action).not.toHaveBeenCalled()
+  })
+
+  it('one request, qbit_auth_failed after the first went: login is required', async () => {
+    await start(stoppedAt(1, 'qbit_auth_failed'))
+    await paste([magnet(NEW_A, 'A'), magnet(NEW_B, 'B')].join('\n'))
+    await click(submit())
+    await settle()
+    expect(loginStore.state.loginRequired?.reason).toBe('qbit_auth_failed')
+    expect(rows()).toHaveLength(1)
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+  })
+
+  it('3 batches, batch 1 stopped by a timeout: nothing more is sent, the rest fails with it', async () => {
+    await start(stoppedAt(15, 'timeout'))
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x700 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    await click(submit())
+    await settle()
+    expect(addCalls.sent).toHaveLength(1)
+    expect(rows()).toHaveLength(30)
+    expect(resultLine()).toBe('15 個加好了，30 個失敗')
+    expect(new Set(reasons())).toEqual(
+      new Set(['qBittorrent 沒有回應，請再試一次']),
+    )
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+  })
+
+  it('3 batches, batch 2 qbit_rejected as a whole: batch 3 is not sent either', async () => {
+    await start((sent, call) =>
+      Promise.resolve(call === 1 ? failed('qbit_rejected') : allOk(sent)),
+    )
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x780 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    await click(submit())
+    await settle()
+    expect(addCalls.sent).toHaveLength(2)
+    expect(rows()).toHaveLength(25)
+    expect(resultLine()).toBe('20 個加好了，25 個失敗')
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(loginStore.state.loginRequired).toBeNull()
+  })
+
+  it('a refused entry does not stop: the next batches still go', async () => {
+    await start(stoppedAt(19, 'qbit_rejected'))
+    const hashes = Array.from({ length: 45 }, (_, i) => fakeHash(0x800 + i))
+    await paste(hashes.map((hash) => magnet(hash)).join('\n'))
+    await click(submit())
+    await settle()
+    expect(addCalls.sent.map((sent) => sent.magnets.length)).toEqual([
+      20, 20, 5,
+    ])
+    expect(resultLine()).toBe('43 個加好了，2 個失敗')
+  })
+})

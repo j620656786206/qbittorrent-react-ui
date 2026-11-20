@@ -63,14 +63,13 @@ import { dismissAddFailure, useAddSubmit } from '#/features/add/use-add-submit'
 // submits (use-add-submit.ts): 「新增中…」 on the button, after 10 s
 // 「還在等 NAS 回應」 under it, and every close path (取消, ✕, Esc, a drag
 // down, 打開) and every change (paste, 選檔案, 拿掉, the category) does
-// nothing until the send ends (a drop waits and joins after it); 新增 also waits for files still being
-// read. A failed row shows its
-// reason, and the list frame's top line counts what went and what failed.
-// 「打開」 closes the screen and
-// opens that torrent's detail, without a position when no list or column
-// holds it (src/state/detail-outside.ts). Any close discards the list;
-// files still being read are dropped (use-add-entries.ts). Crossing 1024px
-// swaps the shell and keeps the list and the typed draft (both reset on
+// nothing until the send ends (a drop waits and joins after it); 新增 also
+// waits for files still being read. A failed row shows its reason, and the
+// list frame's top line counts what went and what failed. 「打開」 closes
+// the screen and opens that torrent's detail, without a position when no
+// list or column holds it (src/state/detail-outside.ts). Any close
+// discards the list; files still being read are dropped
+// (use-add-entries.ts). Crossing 1024px swaps the shell and keeps the list and the typed draft (both reset on
 // every open). When the box and the list swap, focus that fell to `body`
 // goes to the paste textarea that is there now, so a second paste works.
 // Phone: the list frame is the sheet's scrolling content and the category,
