@@ -30,6 +30,11 @@ import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { resetOrderFreeze } from '#/state/order-freeze'
 import { moveRecordOf, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
+import {
+  resetSelection,
+  selectionStore,
+  toggleSelected,
+} from '#/state/selection'
 import { createQueryClient } from '#/state/query-client'
 import {
   SETTINGS_KEY,
@@ -48,7 +53,8 @@ import { setLocationOp } from '#/features/path/set-location-op'
 // toast with 重試 (same body), connection codes, the phone sheet over a
 // detail sheet. The server functions are fakes passed in (AD-15). Spec 5.4
 // rows E1 to E4, A1 and D2's opening: edit mode, inline rename, 「媒體庫」,
-// ✕, the per-row locks.
+// ✕, the per-row locks. Spec 5.5 rows N1 to N8: many mode from the
+// selection, the skip, full success, the failure view and its retry.
 
 const toastCalls = vi.hoisted(() => ({
   plain: vi.fn((_text: string) => {}),
@@ -188,7 +194,9 @@ async function openFor(hash = A) {
 
 const dialog = () =>
   [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
-    (element) => element.textContent.includes('會搬到'),
+    (element) =>
+      element.textContent.includes('會搬到') ||
+      element.querySelector('[data-move-failures]') !== null,
   ) ?? null
 const buttons = () => [...(dialog()?.querySelectorAll('button') ?? [])]
 const buttonNamed = (name: string) =>
@@ -376,6 +384,7 @@ beforeEach(() => {
   resetPendingOps()
   resetOrderFreeze()
   resetShortcuts()
+  resetSelection()
 })
 
 afterEach(async () => {
@@ -1445,3 +1454,474 @@ describe('edit mode on the phone (spec 5.4)', () => {
     expect(document.activeElement).toBe(field)
   })
 })
+
+const B = fakeHash(0xb1)
+const C = fakeHash(0xc1)
+const D = fakeHash(0xd1)
+const E = fakeHash(0xe1)
+const BATCH = [A, B, C, D, E]
+
+/** N1's batch: A, B, C in the TV downloads; D, E in /data/downloads. */
+function manyTorrents(): Array<SlimTorrent> {
+  const at = (hash: string, name: string, savePath: string) =>
+    t({ hash, name, save_path: savePath, state: 'stalledUP', progress: 1 })
+  return [
+    at(A, 'Fake.Drama.S02.1080p.WEB-DL', '/data/torrents/tv/'),
+    at(B, 'Made.Up.Show.S01.1080p', '/data/torrents/tv'),
+    at(C, 'Pretend.Series.S03.720p', '/data/torrents/tv/'),
+    at(D, 'Imaginary.Saga.S01.2160p', '/data/downloads'),
+    at(E, 'Fictional.Tale.S02.1080p', '/data/downloads/'),
+  ]
+}
+
+/** Selects `hashes` and opens the screen from the selection bar. */
+async function openFromSelection(hashes: ReadonlyArray<string> = BATCH) {
+  await act(async () => {
+    for (const hash of hashes) toggleSelected(hash)
+    openChangePath(hashes, { fromSelection: true })
+  })
+  await settle()
+}
+
+const tagOf = (name: string) =>
+  rowNamed(name).querySelector('[data-current-tag]')?.textContent ?? null
+const failureRows = () => [
+  ...(dialog()?.querySelectorAll<HTMLElement>('[data-move-failure]') ?? []),
+]
+const resultLine = () =>
+  dialog()?.querySelector('[data-move-result]')?.textContent ?? null
+
+describe('change path, many torrents (spec 5.5)', () => {
+  beforeEach(() => {
+    env.torrents = manyTorrents()
+  })
+
+  it('N1 open many: 「搬 5 個種子」 over 「5 個種子現在在 2 個位置」, 「目前 3 個」 on the downloads row only, the box empty, 搬過去 disabled', async () => {
+    await render()
+    await openFromSelection()
+    const shell = dialog() as HTMLElement
+    expect(shell.className).toContain('w-[560px]')
+    expect(shell.querySelector('h2')?.textContent).toBe('搬 5 個種子')
+    expect(shell.textContent).toContain('5 個種子現在在 2 個位置')
+    expect(shell.textContent).not.toContain('Fake.Drama.S02.1080p.WEB-DL')
+    expect(tagOf('下載區（影集）')).toBe('目前 3 個')
+    expect(tagOf('影集媒體庫')).toBeNull()
+    expect(tagOf('電影媒體庫')).toBeNull()
+    expect(input().value).toBe('')
+    expect(reason()).toBeNull()
+    expect(selectedNames()).toEqual([])
+    expect(primary().textContent).toBe('搬過去')
+    expect(primary().getAttribute('aria-disabled')).toBe('true')
+    expect(addRow().disabled).toBe(true)
+    expect(editPill().textContent).toBe('編輯')
+    // Edit mode shows the count too.
+    await enterEditMode()
+    expect(
+      editRowNamed('下載區（影集）').querySelector('[data-current-tag]')
+        ?.textContent,
+    ).toBe('目前 3 個')
+  })
+
+  it('N2 every torrent already at the target: 搬過去 disabled', async () => {
+    await render()
+    await openFromSelection([A, B, C])
+    expect(dialog()?.textContent).toContain('3 個種子現在在 1 個位置')
+    await click(rowNamed('下載區（影集）'))
+    expect(input().value).toBe('/data/torrents/tv')
+    expect(primary().getAttribute('aria-disabled')).toBe('true')
+    await click(primary())
+    expect(env.moveSent).toEqual([])
+  })
+
+  it('a bad format shows the 5.2 reason; 加到常用 adds a typed path', async () => {
+    await render()
+    await openFromSelection()
+    await type('data/tv')
+    expect(reason()).toBe('路徑要從 / 開頭')
+    expect(primary().getAttribute('aria-disabled')).toBe('true')
+    await type('/data/media/anime')
+    expect(addRow().disabled).toBe(false)
+    await click(addRow())
+    expect(env.addSent).toEqual([
+      { path: '/data/media/anime', name: 'media/anime', mediaLibrary: false },
+    ])
+  })
+
+  it('N3 + N8 skip those already there: one call with the others, 「已開始搬 2 個種子」, selection cleared, closed, no move record', async () => {
+    await render()
+    await openFromSelection()
+    await click(rowNamed('下載區（影集）'))
+    expect(primary().getAttribute('aria-disabled')).toBeNull()
+    let answer: (value: BatchResult) => void = () => {}
+    env.moveAnswer = () =>
+      new Promise((resolve) => {
+        answer = resolve
+      })
+    const before = env.maindataFetches
+    await click(primary())
+    expect(env.moveSent).toEqual([
+      { hashes: [D, E], location: '/data/torrents/tv' },
+    ])
+    expect(primary().textContent).toBe('搬移中…')
+    await press('Escape')
+    await click(primary())
+    expect(env.moveSent).toHaveLength(1)
+    expect(dialog()).not.toBeNull()
+    await act(async () =>
+      answer({
+        items: [
+          { key: D, ok: true },
+          { key: E, ok: true },
+        ],
+      }),
+    )
+    await settle()
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(changePathOpenStore.state.open).toBeNull()
+    expect(toastCalls.plain).toHaveBeenCalledWith('已開始搬 2 個種子')
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(env.maindataFetches).toBeGreaterThan(before)
+    // N8: a many move writes no move record, so no done toast follows.
+    expect(moveRecordOf(D)).toBeNull()
+    expect(moveRecordOf(E)).toBeNull()
+  })
+
+  it('N4 partial: 「2 個開始搬了，2 個失敗」, one row per failed torrent with its reason, 「重試 2 個」, the selection keeps the failed ones', async () => {
+    await render()
+    await openFromSelection([A, B, C, D])
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    expect(env.moveSent).toEqual([
+      { hashes: [A, B, C, D], location: '/data/media/tv' },
+    ])
+    expect(resultLine()).toBe('2 個開始搬了，2 個失敗')
+    expect(dialog()?.querySelector('[data-move-result]')?.className).toContain(
+      'text-status-error',
+    )
+    expect(failureRows().map((row) => row.textContent)).toEqual([
+      'Made.Up.Show.S01.1080p這個種子正在搬',
+      'Imaginary.Saga.S01.2160p找不到這個種子',
+    ])
+    expect(primary().textContent).toBe('重試 2 個')
+    expect(primary().getAttribute('aria-disabled')).toBeNull()
+    // Only the failures: no list, no box.
+    expect(rows()).toEqual([])
+    expect(dialog()?.textContent).not.toContain('會搬到')
+    expect(selectionStore.state.hashes).toEqual([B, D])
+    expect(toastCalls.plain).not.toHaveBeenCalled()
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+  })
+
+  it('N4 every sent item refused: 「0 個開始搬了，2 個失敗」', async () => {
+    await render()
+    await openFromSelection([A, D])
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [A]: 'qbit_rejected', [D]: 'qbit_rejected' })
+    await click(primary())
+    await settle()
+    expect(resultLine()).toBe('0 個開始搬了，2 個失敗')
+    expect(primary().textContent).toBe('重試 2 個')
+  })
+
+  it('N5 重試 sends only the failed ones to the same target; full success closes with 「已開始搬 2 個種子」 and clears the selection', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv/')
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'qbit_rejected' })
+    await click(primary())
+    await settle()
+    expect(primary().textContent).toBe('重試 2 個')
+    env.moveAnswer = partial({})
+    await click(primary())
+    await settle()
+    await settle()
+    expect(env.moveSent[1]).toEqual({
+      hashes: [B, D],
+      location: '/data/media/tv',
+    })
+    expect(dialog()).toBeNull()
+    expect(toastCalls.plain).toHaveBeenCalledWith('已開始搬 2 個種子')
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(moveRecordOf(B)).toBeNull()
+  })
+
+  it('N5 a retry that fails again in part shows the rest (a single torrent left stays a many retry)', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    env.moveAnswer = partial({ [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    expect(env.moveSent[1].hashes).toEqual([B, D])
+    expect(resultLine()).toBe('1 個開始搬了，1 個失敗')
+    expect(failureRows().map((row) => row.textContent)).toEqual([
+      'Imaginary.Saga.S01.2160p找不到這個種子',
+    ])
+    expect(primary().textContent).toBe('重試 1 個')
+    expect(selectionStore.state.hashes).toEqual([D])
+    // One hash left, still many mode: the refused item is a row, not a toast.
+    await click(primary())
+    await settle()
+    expect(env.moveSent[2]).toEqual({
+      hashes: [D],
+      location: '/data/media/tv',
+    })
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(resultLine()).toBe('0 個開始搬了，1 個失敗')
+  })
+
+  it('a failed torrent that left maindata keeps its name in the view; 取消 closes it', async () => {
+    await render()
+    await openFromSelection([A, D])
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    env.torrents = env.torrents.filter((torrent) => torrent.hash !== D)
+    await act(async () => {
+      await env.client.refetchQueries({ queryKey: MAINDATA_KEY })
+    })
+    await settle()
+    expect(failureRows()[0]?.textContent).toContain('Imaginary.Saga.S01.2160p')
+    await click(buttonNamed('取消') as HTMLButtonElement)
+    expect(dialog()).toBeNull()
+  })
+
+  it('N6 a whole failure: the toast with 重試, the screen open, the box kept; 重試 sends the same body', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv')
+    env.moveAnswer = () => Promise.reject(new AppError('qbit_rejected'))
+    await click(primary())
+    await settle()
+    expect(lastFailure()?.[0]).toBe('改路徑失敗：qBittorrent 拒絕這個操作')
+    expect(lastFailure()?.[1].keys).toEqual(BATCH.map((hash) => `move:${hash}`))
+    expect(dialog()).not.toBeNull()
+    expect(input().value).toBe('/data/media/tv')
+    expect(primary().textContent).toBe('搬過去')
+    expect(selectionStore.state.hashes).toEqual(BATCH)
+    env.moveAnswer = partial({})
+    await act(async () => lastFailure()?.[1].onRetry())
+    await settle()
+    await settle()
+    expect(env.moveSent[1]).toEqual(env.moveSent[0])
+    expect(dialog()).toBeNull()
+    expect(toastCalls.plain).toHaveBeenCalledWith('已開始搬 5 個種子')
+  })
+
+  it('N6 a connection code: no toast, the screen stays', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv')
+    env.moveAnswer = () => Promise.reject(new AppError('home_unreachable'))
+    await click(primary())
+    await settle()
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(dialog()).not.toBeNull()
+  })
+
+  it('editing the box dismisses the move toasts of every torrent in the batch', async () => {
+    await render()
+    await openFromSelection([A, D])
+    toastCalls.dismissFor.mockClear()
+    await type('/data/media/tv')
+    const keys = toastCalls.dismissFor.mock.calls.map(([key]) => key)
+    expect(keys).toContain(`move:${A}`)
+    expect(keys).toContain(`move:${D}`)
+  })
+
+  it('after a full success from the selection, focus goes to the main area', async () => {
+    await render()
+    await openFromSelection()
+    await click(rowNamed('下載區（影集）'))
+    await click(primary())
+    await settle()
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(document.getElementById(MAIN_ID))
+  })
+
+  it('switching to the failure view focuses its top line (not the main area)', async () => {
+    await render()
+    await openFromSelection([A, B, C, D])
+    await type('/data/media/tv')
+    input().focus()
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'invalid_input' })
+    await press('Enter', input())
+    await settle()
+    const header = dialog()?.querySelector('[data-move-result]')
+    expect(header?.getAttribute('tabindex')).toBe('-1')
+    expect(document.activeElement).toBe(header)
+    expect(document.activeElement).not.toBe(document.getElementById(MAIN_ID))
+  })
+
+  it('one torrent left to send (4 of 5 already there): 「已開始搬 1 個種子」, no move record', async () => {
+    env.torrents = manyTorrents().map((torrent) =>
+      torrent.hash === E
+        ? torrent
+        : { ...torrent, save_path: '/data/media/tv' },
+    )
+    await render()
+    await openFromSelection()
+    await click(rowNamed('影集媒體庫'))
+    await click(primary())
+    await settle()
+    await settle()
+    expect(env.moveSent).toEqual([{ hashes: [E], location: '/data/media/tv' }])
+    expect(dialog()).toBeNull()
+    expect(toastCalls.plain).toHaveBeenCalledWith('已開始搬 1 個種子')
+    expect(moveRecordOf(E)).toBeNull()
+  })
+
+  it('the failure view keeps the title and line from when it was sent, and stays open when every torrent leaves', async () => {
+    await render()
+    await openFromSelection([A, B, C, D])
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    env.torrents = []
+    await act(async () => {
+      await env.client.refetchQueries({ queryKey: MAINDATA_KEY })
+    })
+    await settle()
+    expect(changePathOpenStore.state.open).not.toBeNull()
+    expect(dialog()?.querySelector('h2')?.textContent).toBe('搬 4 個種子')
+    expect(dialog()?.textContent).toContain('4 個種子現在在 2 個位置')
+    expect(failureRows().map((row) => row.textContent)).toEqual([
+      'Made.Up.Show.S01.1080p這個種子正在搬',
+      'Imaginary.Saga.S01.2160p找不到這個種子',
+    ])
+    // Nothing left to retry.
+    expect(primary().textContent).toBe('重試 0 個')
+    expect(primary().getAttribute('aria-disabled')).toBe('true')
+    await click(primary())
+    expect(env.moveSent).toHaveLength(1)
+  })
+
+  it('重試 K 個 counts only failed torrents still there and not at the target, and sends only them', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv')
+    env.moveAnswer = partial({
+      [A]: 'qbit_rejected',
+      [B]: 'qbit_rejected',
+      [D]: 'invalid_input',
+    })
+    await click(primary())
+    await settle()
+    expect(primary().textContent).toBe('重試 3 個')
+    // D left maindata; B reached the target meanwhile.
+    env.torrents = manyTorrents()
+      .filter((torrent) => torrent.hash !== D)
+      .map((torrent) =>
+        torrent.hash === B
+          ? { ...torrent, save_path: '/data/media/tv/' }
+          : torrent,
+      )
+    await act(async () => {
+      await env.client.refetchQueries({ queryKey: MAINDATA_KEY })
+    })
+    await settle()
+    expect(failureRows()).toHaveLength(3)
+    expect(primary().textContent).toBe('重試 1 個')
+    env.moveAnswer = partial({})
+    await click(primary())
+    await settle()
+    expect(env.moveSent[1]).toEqual({
+      hashes: [A],
+      location: '/data/media/tv',
+    })
+    expect(toastCalls.plain).toHaveBeenCalledWith('已開始搬 1 個種子')
+  })
+
+  it('N7 one selected: the single screen as from the detail; success clears the selection and writes the move record', async () => {
+    await render()
+    await openFromSelection([D])
+    const shell = dialog() as HTMLElement
+    expect(shell.querySelector('h2')?.textContent).toBe('改路徑')
+    expect(shell.textContent).toContain('Imaginary.Saga.S01.2160p')
+    expect(input().value).toBe('/data/downloads')
+    await click(rowNamed('影集媒體庫'))
+    await click(primary())
+    await settle()
+    await settle()
+    expect(env.moveSent).toEqual([{ hashes: [D], location: '/data/media/tv' }])
+    expect(dialog()).toBeNull()
+    expect(selectionStore.state.hashes).toEqual([])
+    expect(moveRecordOf(D)?.target).toBe('/data/media/tv')
+    expect(toastCalls.plain).not.toHaveBeenCalled()
+  })
+
+  it('N7 one selected, its item refused: the 5.2 failure toast, the selection kept', async () => {
+    await render()
+    await openFromSelection([D])
+    await click(rowNamed('影集媒體庫'))
+    env.moveAnswer = partial({ [D]: 'qbit_rejected' })
+    await click(primary())
+    await settle()
+    expect(lastFailure()?.[0]).toBe('改路徑失敗：這個種子正在搬')
+    expect(selectionStore.state.hashes).toEqual([D])
+  })
+
+  it('from the detail (not the selection), a success leaves the selection alone', async () => {
+    await render()
+    await act(async () => toggleSelected(B))
+    await openFor(D)
+    await click(rowNamed('影集媒體庫'))
+    await click(primary())
+    await settle()
+    expect(dialog()).toBeNull()
+    expect(selectionStore.state.hashes).toEqual([B])
+  })
+})
+
+describe('change path, many torrents on the phone (spec 5.5)', () => {
+  beforeEach(() => {
+    env.desktop = false
+    env.torrents = manyTorrents()
+  })
+
+  it('N1 the sheet: the title, the locations line, 「目前 3 個」, the box empty', async () => {
+    await render()
+    await openFromSelection()
+    const sheet = dialog() as HTMLElement
+    expect(sheet.dataset.slot).toBe('bottom-sheet')
+    expect(sheet.textContent).toContain('搬 5 個種子')
+    expect(sheet.textContent).toContain('5 個種子現在在 2 個位置')
+    expect(tagOf('下載區（影集）')).toBe('目前 3 個')
+    expect(input().value).toBe('')
+    expect(input().className).toContain('h-11')
+  })
+
+  it('N4 the failure view on the phone: 「重試 2 個」 full width, ✕ closes it', async () => {
+    await render()
+    await openFromSelection()
+    await type('/data/media/tv')
+    env.moveAnswer = partial({ [B]: 'qbit_rejected', [D]: 'invalid_input' })
+    await click(primary())
+    await settle()
+    expect(resultLine()).toBe('3 個開始搬了，2 個失敗')
+    expect(primary().textContent).toBe('重試 2 個')
+    await click(buttonNamed('關閉') as HTMLButtonElement)
+    expect(dialog()).toBeNull()
+  })
+})
+
+function partial(refused: Record<string, 'qbit_rejected' | 'invalid_input'>) {
+  return (values: SetLocationInput): Promise<BatchResult> =>
+    Promise.resolve({
+      items: values.hashes.map((key) =>
+        Object.hasOwn(refused, key)
+          ? { key, ok: false as const, code: refused[key], message: 'x' }
+          : { key, ok: true as const },
+      ),
+    })
+}

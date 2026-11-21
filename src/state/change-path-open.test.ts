@@ -44,4 +44,14 @@ describe('change-path open store', () => {
     expect(changePathOpenStore.state.open).toEqual({ hashes: ['a'.repeat(40)] })
     expect(changePathOpenStore.state.open).not.toHaveProperty('editPath')
   })
+
+  it('spec 5.5 an open from the selection carries fromSelection; others carry none', () => {
+    openChangePath(['a'.repeat(40), 'b'.repeat(40)], { fromSelection: true })
+    expect(changePathOpenStore.state.open).toEqual({
+      hashes: ['a'.repeat(40), 'b'.repeat(40)],
+      fromSelection: true,
+    })
+    openChangePath(['a'.repeat(40)], { fromSelection: false })
+    expect(changePathOpenStore.state.open).not.toHaveProperty('fromSelection')
+  })
 })

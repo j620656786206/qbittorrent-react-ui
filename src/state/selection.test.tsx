@@ -16,6 +16,7 @@ import {
 import { createQueryClient } from '#/state/query-client'
 import {
   clearSelection,
+  keepSelected,
   pruneSelection,
   resetSelection,
   selectionStore,
@@ -74,6 +75,17 @@ describe('the selection store', () => {
     const before = hashes()
     pruneSelection(() => true)
     expect(hashes()).toBe(before)
+  })
+
+  it('spec 5.5 keepSelected keeps only those hashes, in tick order; none left ends the reason', () => {
+    toggleSelected(C)
+    toggleSelected(A)
+    toggleSelected(B)
+    keepSelected([B, C, fakeHash(0xd)])
+    expect(hashes()).toEqual([C, B])
+    keepSelected([])
+    expect(hashes()).toEqual([])
+    expect(freezeStore.state.selection).toBe(false)
   })
 
   it('another scope clears; the same scope keeps it', () => {

@@ -32,7 +32,12 @@ export const NAMED_SHARDS = {
   ],
   // Epic 5 change path (PR #60 pushed rest past its 20 minute limit):
   // move-status about 6 minutes, change-path and common-paths about 3 each.
-  path: ['change-path.spec.ts', 'move-status.spec.ts', 'common-paths.spec.ts'],
+  path: [
+    'change-path.spec.ts',
+    'move-status.spec.ts',
+    'common-paths.spec.ts',
+    'move-many.spec.ts',
+  ],
 }
 
 /** The catch-all shard's name. */

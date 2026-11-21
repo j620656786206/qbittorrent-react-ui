@@ -15,6 +15,9 @@ import {
   addItemFailureText,
   errorText,
   fileActionFailureText,
+  moveItemFailureText,
+  moveManyFailureHeader,
+  moveManyStartedText,
   orderSaveFailureText,
   pauseActionFailureText,
   removeCommonPathFailureText,
@@ -239,5 +242,19 @@ describe('change path texts (spec 5.2)', () => {
       tooLong: '路徑太長',
       badCharacter: '路徑不能有反斜線或控制字元',
     })
+  })
+})
+
+describe('many-torrent move texts (spec 5.5)', () => {
+  it('an item refused by the pre-check names the torrent; other codes their fixed text', () => {
+    expect(moveItemFailureText('invalid_input')).toBe('找不到這個種子')
+    expect(moveItemFailureText('qbit_rejected')).toBe('這個種子正在搬')
+    expect(moveItemFailureText('timeout')).toBe(errorText('timeout'))
+  })
+
+  it('the failure header and the started toast', () => {
+    expect(moveManyFailureHeader(2, 2)).toBe('2 個開始搬了，2 個失敗')
+    expect(moveManyFailureHeader(0, 3)).toBe('0 個開始搬了，3 個失敗')
+    expect(moveManyStartedText(2)).toBe('已開始搬 2 個種子')
   })
 })
