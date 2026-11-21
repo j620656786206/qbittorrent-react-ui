@@ -9,7 +9,6 @@ import type { MaindataResponse } from '#/shared/maindata'
 import { MOVING_TO_EXPIRY_MS } from '#/shared/maindata'
 import { MAINDATA_KEY } from '#/state/maindata'
 import {
-  MOVE_PENDING_OP,
   PENDING_TIMEOUT_MS,
   clearPending,
   clearPendingAll,
@@ -55,7 +54,7 @@ describe('spec 5.3 the move records', () => {
 
   it('a record per hash with target, normalized from, start and seen; apart from the 30 s ops', () => {
     vi.setSystemTime(5000)
-    markPendingAll([A, B], MOVE_PENDING_OP)
+    markPendingAll([A, B], 'stop')
     recordMoves([A, B], TV, fromOld)
     expect(moveRecordOf(A)).toEqual({
       target: TV,

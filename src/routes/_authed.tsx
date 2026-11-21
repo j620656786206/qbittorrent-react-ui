@@ -18,7 +18,7 @@ import { DropOverlay } from '#/features/add/drop-overlay'
 import { AppShell } from '#/features/header/app-shell'
 import { requireSession } from '#/features/login/require-session'
 import { ChangePathScreen } from '#/features/path/change-path-screen'
-import { setLocationOp } from '#/features/path/set-location-op'
+import { moveVariables, setLocationOp } from '#/features/path/set-location-op'
 import { sessionQueryOptions } from '#/features/login/session-query'
 import { categoryTabs, resolveCategory } from '#/lib/category-tabs'
 import type { Maindata } from '#/lib/maindata-merge'
@@ -537,7 +537,7 @@ function AuthedLayout() {
   // Story 5.3: 「沒有搬到 …」's 重試 sends the same hash and target.
   const resendMove = useCallback(
     (moved: string, target: string) => {
-      void sendOp(moveOp, client, { hashes: [moved], location: target })
+      void sendOp(moveOp, client, moveVariables(client, [moved], target))
     },
     [client],
   )

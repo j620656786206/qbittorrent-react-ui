@@ -43,10 +43,13 @@ import type { TorrentDetailResponse } from '#/shared/torrent-detail'
 // by name only), with the same pull reuse as the detail. The browser shows
 // a reason only where classify says `error`, a move from error included.
 // `readCategoryNames` (story 4.7) answers the categories an add may name,
-// with the same reuse. `readMoveStates` (story 5.2) answers, for
+// with the same reuse. `reserveMoves` (story 5.2) answers, for
 // `setLocation`'s pre-check, whether each known torrent is already moving
-// (`movingTo` set or qBittorrent's `moving`), with the same reuse; `markMoving`
-// records the target of a move qBittorrent accepted (`movingTo`, AR-43).
+// (`movingTo` set, qBittorrent's `moving`, or another setLocation still
+// sending it), with the same reuse, and reserves the free ones in the same
+// synchronous step, so two calls for one torrent never both pass;
+// `releaseMoves` ends a reservation. `markMoving` records the target of a
+// move qBittorrent accepted (`movingTo`, AR-43).
 
 export const MIN_PULL_INTERVAL_MS = 1000
 /** The detail read reuses a pull this recent: a little over one 5 s poll. */
@@ -87,11 +90,15 @@ export interface Syncer {
   readCategoryNames: () => Promise<Array<string>>
   /**
    * Story 5.2: for each hash the table has, whether it is already moving
-   * (`movingTo` set or qBittorrent's `moving`); unknown hashes are absent.
+   * (`movingTo` set, qBittorrent's `moving`, or reserved by a setLocation
+   * still sending); unknown hashes are absent. Each free one is reserved
+   * until `releaseMoves`.
    */
-  readMoveStates: (
+  reserveMoves: (
     hashes: ReadonlyArray<string>,
   ) => Promise<Map<string, boolean>>
+  /** Story 5.2: ends `reserveMoves`' reservation of these hashes. */
+  releaseMoves: (hashes: ReadonlyArray<string>) => void
   /** Story 5.2: qBittorrent accepted moving these torrents to `target`. */
   markMoving: (hashes: ReadonlyArray<string>, target: string) => void
 }
@@ -252,17 +259,21 @@ export function createSyncer(options: SyncerOptions): Syncer {
     return Object.keys(table.categories)
   }
 
-  async function readMoveStates(
+  /** Story 5.2: hashes a setLocation is sending (reserveMoves). */
+  const sendingMoves = new Set<string>()
+
+  async function reserveMoves(
     hashes: ReadonlyArray<string>,
   ): Promise<Map<string, boolean>> {
     await pull(DETAIL_PULL_REUSE_MS)
+    // Synchronous from here: no other call checks between check and reserve.
     const found = new Map<string, boolean>()
     for (const hash of hashes) {
       const torrent = table.get(hash)
-      if (torrent) {
-        // `movingTo` set or qBittorrent's `moving`.
-        found.set(hash, isMovingTorrent(torrent))
-      }
+      if (!torrent) continue
+      const moving = isMovingTorrent(torrent) || sendingMoves.has(hash)
+      found.set(hash, moving)
+      if (!moving) sendingMoves.add(hash)
     }
     return found
   }
@@ -274,7 +285,10 @@ export function createSyncer(options: SyncerOptions): Syncer {
     readTorrentDetail,
     readErrorCandidates,
     readCategoryNames,
-    readMoveStates,
+    reserveMoves,
+    releaseMoves: (hashes) => {
+      for (const hash of hashes) sendingMoves.delete(hash)
+    },
     markMoving: (hashes, target) => table.setMovingTo(hashes, target),
   }
 }

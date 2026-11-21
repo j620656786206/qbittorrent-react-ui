@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
+import { isMovingTorrent } from '#/lib/torrent-status'
 import { toast } from '#/lib/toast'
 import type { SlimTorrent } from '#/shared/maindata'
 import type {
@@ -40,7 +41,8 @@ import {
   addCommonPathInput,
   changePathView,
 } from '#/features/path/change-path-model'
-import type { MoveOp, MoveVariables } from '#/features/path/set-location-op'
+import { moveVariables } from '#/features/path/set-location-op'
+import type { MoveOp } from '#/features/path/set-location-op'
 
 // Story 5.2 (DESIGN change-path and text-input, EXPERIENCE change-path,
 // mockups S08-path-desktop, S08-path-phone): the change-path screen for one
@@ -116,8 +118,9 @@ export function ChangePathScreen({ moveOp, addPathOp }: ChangePathScreenProps) {
         box,
         savePath: torrent?.save_path ?? '',
         commonPaths,
+        moving: torrent !== null && isMovingTorrent(torrent),
       }),
-    [box, torrent?.save_path, commonPaths],
+    [box, torrent, commonPaths],
   )
 
   // Set on press, before the in-flight state shows (the same tick): blocks
@@ -159,7 +162,7 @@ export function ChangePathScreen({ moveOp, addPathOp }: ChangePathScreenProps) {
     }
     pressedRef.current = true
     setPressed(true)
-    const variables: MoveVariables = { hashes: [hash], location: view.target }
+    const variables = moveVariables(client, [hash], view.target)
     void sendOp(
       {
         ...moveOp,
@@ -288,6 +291,9 @@ export function ChangePathScreen({ moveOp, addPathOp }: ChangePathScreenProps) {
           <p id={reasonId} className="m-0 text-meta text-delete">
             {view.reason}
           </p>
+        )}
+        {view.movingNote !== null && (
+          <p className="m-0 text-meta text-text-muted">{view.movingNote}</p>
         )}
       </div>
     </ConfirmShell>

@@ -186,9 +186,9 @@ describe('createLocationResolver', () => {
       for (const path of paths) locate(path)
       return performance.now() - start
     }).sort((a, b) => a - b)
-    // The median of five full recomputes, with a generous bound so a busy
-    // CI machine does not flake.
-    expect(runs[2]).toBeLessThan(50)
+    // The median of five full recomputes. The AC is 100 ms; 80 leaves room
+    // for a busy CI machine (PR #58's run measured 51.5 ms).
+    expect(runs[2]).toBeLessThan(80)
   })
 
   it('a new list is a new resolver with new answers', () => {

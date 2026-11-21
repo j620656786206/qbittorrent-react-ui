@@ -50,7 +50,8 @@ export interface TrackedOp<
    * and `failureText` only sees codes it knows. Never a connection code.
    */
   failureCodes: ReadonlyArray<TCode>
-  failureText: (variables: TVariables, code: TCode) => string
+  /** `error` is what the call threw (story 5.2: which check refused it). */
+  failureText: (variables: TVariables, code: TCode, error: unknown) => string
   onSend?: (variables: TVariables) => void
   /** `data` is the call's answer. */
   onSuccess?: (
@@ -95,7 +96,7 @@ export function sendOp<TVariables, TCode extends ErrorCode, TData>(
     onError: (error, sent) => {
       op.onFailure?.(sent, isAppError(error) ? error.code : undefined, error)
       if (!isAppError(error) || !isFailureCode(error.code)) return
-      toast.failure(op.failureText(sent, error.code), {
+      toast.failure(op.failureText(sent, error.code, error), {
         keys: op.keysOf(sent),
         onRetry: () => {
           if (op.retry) op.retry(sent)

@@ -257,6 +257,17 @@ describe('spec 5.3 moving summary', () => {
     )
   })
 
+  it('movingTo on an errored torrent: no 搬移中 prefix, like its row', () => {
+    const hero = detailHero(
+      t({ ...TV, state: 'error', movingTo: '/data/media/tv' }),
+      OPTIONS,
+    )
+    expect(hero.summaryParts[0]).not.toBe('搬移中')
+    expect(hero.summaryParts.some((part) => part.startsWith('正在搬到'))).toBe(
+      false,
+    )
+  })
+
   it('M3 not moving: no prefix', () => {
     const hero = detailHero(t({ ...TV, state: 'queuedDL' }), OPTIONS)
     expect(hero.summaryParts.join(' · ')).toBe('85 GB · mteam-tv')

@@ -18,20 +18,15 @@ import { selectTorrents, useMaindata } from '#/state/maindata'
 // While a hash has an entry, the control that sent it is disabled.
 // Story 5.3: beside these, the moves this tab started (`moveRecordStore`,
 // one per hash: target, start, seen), which decide the done or failed
-// toast (src/state/move-outcomes.ts). A record outlives the 30 s entry: it
+// toast (src/state/move-outcomes.ts). A move marks no 30 s entry. A record
 // is written when setLocation answers ok for that hash (with the
-// `save_path` it is leaving), replaced by a newer move of the same hash,
-// and goes when the outcome is decided, when the torrent leaves maindata,
-// or MOVING_TO_EXPIRY_MS after it started without the move ever showing. The 30 s timer and other ops never touch it. Per tab:
-// a reload loses it (the move still shows as moving, with no toast).
+// `save_path` it was leaving when Alex pressed), replaced by a newer move
+// of the same hash, and goes when the outcome is decided, when the torrent
+// leaves maindata, or MOVING_TO_EXPIRY_MS after it started without the
+// move ever showing. Per tab: a reload loses it (the move still shows as
+// moving, with no toast).
 
 export const PENDING_TIMEOUT_MS = 30_000
-
-/**
- * Story 5.2: the op name of a move (change path). One constant, since the
- * change-path screen marks it and the detail's menu tells it apart.
- */
-export const MOVE_PENDING_OP = 'move'
 
 /**
  * Story 5.2: a move's failure toast key: not the bare hash, which pause and

@@ -5,6 +5,7 @@ import {
   KNOWN_STATE_CODES,
   PAUSE_ACTION_WORDS,
   heroKindOf,
+  isMoveUnderway,
   isMovingTorrent,
   isQbitMoving,
   pauseActionFlips,
@@ -319,6 +320,15 @@ describe('spec 5.3 moving from movingTo or the state', () => {
         column,
         moving: false,
       })
+    },
+  )
+
+  it.each(['error', 'missingFiles'] as const)(
+    'movingTo on a %s torrent: not moving on any screen, still under way for move-outcome',
+    (state) => {
+      const torrent = t({ hash, state, movingTo: '/data/media/tv' })
+      expect(isMovingTorrent(torrent)).toBe(false)
+      expect(isMoveUnderway(torrent)).toBe(true)
     },
   )
 

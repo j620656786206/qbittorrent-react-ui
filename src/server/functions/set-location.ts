@@ -12,7 +12,8 @@ import type { BatchItem } from '#/shared/torrent-ops'
 // path. The path is the shared schema's normalized one and must sit under
 // `SAVE_ROOTS`. Each hash is checked against the container's table first: one
 // the table does not know is `invalid_input`, one already moving (`movingTo`
-// set or qBittorrent's `moving`) is `qbit_rejected`. The rest go to
+// set, qBittorrent's `moving`, or another setLocation still sending it) is
+// `qbit_rejected`. The check reserves the rest until this call ends. They go to
 // qBittorrent in one call; any non-2xx fails the whole call. Only after a
 // 2xx does the table record `movingTo` for the sent hashes, so the next
 // getMaindata carries the target (AR-43).
@@ -24,21 +25,26 @@ export const setLocation = serverPost
       async ({ input: values }) => {
         if (!isUnderSaveRoot(values.location)) return fail('invalid_input')
         const syncer = getSyncer()
-        const moving = await syncer.readMoveStates(uniqueHashes(values.hashes))
-        const refused = (hash: string): ErrorCode | null => {
-          const state = moving.get(hash)
-          if (state === undefined) return 'invalid_input'
-          return state ? 'qbit_rejected' : null
-        }
-        const sending = uniqueHashes(values.hashes).filter(
-          (hash) => refused(hash) === null,
+        const hashes = uniqueHashes(values.hashes)
+        const moving = await syncer.reserveMoves(hashes)
+        const refused = new Map<string, ErrorCode | null>(
+          hashes.map((hash) => {
+            const state = moving.get(hash)
+            if (state === undefined) return [hash, 'invalid_input']
+            return [hash, state ? 'qbit_rejected' : null]
+          }),
         )
-        if (sending.length > 0) {
-          await getQbitClient().setLocation(sending, values.location)
-          syncer.markMoving(sending, values.location)
+        const sending = hashes.filter((hash) => refused.get(hash) === null)
+        try {
+          if (sending.length > 0) {
+            await getQbitClient().setLocation(sending, values.location)
+            syncer.markMoving(sending, values.location)
+          }
+        } finally {
+          syncer.releaseMoves(sending)
         }
         const items = values.hashes.map((key): BatchItem => {
-          const code = refused(key)
+          const code = refused.get(key) ?? null
           return code === null
             ? { key, ok: true }
             : { key, ok: false, code, message: ERROR_MESSAGES[code] }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MOVING_NOTE,
   addCommonPathInput,
   changePathView,
 } from '#/features/path/change-path-model'
@@ -19,17 +20,34 @@ const library = {
 const dupe = { path: '/data/media/tv/', name: 'dupe', mediaLibrary: false }
 
 describe('changePathView', () => {
+  it('review: a moving torrent cannot be moved again; the note shows unless the format is wrong', () => {
+    const base = {
+      savePath: '/data/torrents/tv',
+      commonPaths: [downloads, library],
+      moving: true,
+    }
+    const view = changePathView({ ...base, box: '/data/media/tv' })
+    expect(view.moveDisabled).toBe(true)
+    expect(view.movingNote).toBe(MOVING_NOTE)
+    expect(view.reason).toBeNull()
+    const bad = changePathView({ ...base, box: 'data/x' })
+    expect(bad.movingNote).toBeNull()
+    expect(bad.reason).not.toBeNull()
+  })
+
   it('U1: the box at the save path selects its row, which is also 「目前」; nothing to move', () => {
     const view = changePathView({
       box: '/data/torrents/tv/',
       savePath: '/data/torrents/tv/',
       commonPaths: [downloads, library],
+      moving: false,
     })
     expect(view).toEqual({
       target: '/data/torrents/tv',
       reason: null,
       selected: downloads,
       current: downloads,
+      movingNote: null,
       moveDisabled: true,
     })
   })
@@ -39,6 +57,7 @@ describe('changePathView', () => {
       box: '/data/media/tv',
       savePath: '/data/torrents/tv/Show',
       commonPaths: [downloads, library, dupe],
+      moving: false,
     })
     expect(view.selected).toBe(library)
     expect(view.current).toBe(downloads)
@@ -50,6 +69,7 @@ describe('changePathView', () => {
       box: '/data/../x',
       savePath: '/data/torrents/tv',
       commonPaths: [downloads],
+      moving: false,
     })
     expect(view.reason).toBe('路徑不能有 ..')
     expect(view.selected).toBeNull()
@@ -62,6 +82,7 @@ it('outer spaces of a pasted path are trimmed before matching and sending', () =
     box: '  /data/media/tv/  ',
     savePath: '/data/torrents/tv',
     commonPaths: [downloads, library],
+    moving: false,
   })
   expect(view.target).toBe('/data/media/tv')
   expect(view.reason).toBeNull()
@@ -72,6 +93,7 @@ it('outer spaces of a pasted path are trimmed before matching and sending', () =
       box: '/data/torrents/tv ',
       savePath: '/data/torrents/tv/',
       commonPaths: [],
+      moving: false,
     }).moveDisabled,
   ).toBe(true)
 })

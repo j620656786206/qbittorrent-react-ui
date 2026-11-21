@@ -16,6 +16,11 @@ export const ADD_COMMON_PATH_TEXT = '加到常用'
 export const BOX_LABEL = '會搬到'
 export const MEDIA_LIBRARY_TAG = '媒體庫'
 export const CURRENT_TAG = '目前'
+/**
+ * Review of 5.1 to 5.3 (Claude 代決): under the box while the torrent is
+ * moving (isMovingTorrent), when 「搬過去」 waits for the move to end.
+ */
+export const MOVING_NOTE = '正在搬移中，搬完才能再改路徑'
 /** Beside a disabled 「加到常用」 whose path is already listed. */
 export const ALREADY_LISTED_TEXT = {
   desktop: '框裡的路徑已經在清單裡',
@@ -31,7 +36,12 @@ export interface ChangePathView {
   selected: CommonPath | null
   /** The row the torrent is in now (longest match), or `null`. */
   current: CommonPath | null
-  /** 搬過去 cannot be pressed (bad format, or the box is where it is). */
+  /** MOVING_NOTE while the torrent moves and the format is fine, else `null`. */
+  movingNote: string | null
+  /**
+   * 搬過去 cannot be pressed (bad format, the box is where it is, or the
+   * torrent is moving).
+   */
   moveDisabled: boolean
 }
 
@@ -39,10 +49,13 @@ export function changePathView({
   box,
   savePath,
   commonPaths,
+  moving,
 }: {
   box: string
   savePath: string
   commonPaths: ReadonlyArray<CommonPath>
+  /** isMovingTorrent of the torrent. */
+  moving: boolean
 }): ChangePathView {
   // A pasted path's outer spaces never reach qBittorrent (a folder name
   // ending in a space).
@@ -54,7 +67,9 @@ export function changePathView({
     reason,
     selected: listedCommonPath(target, commonPaths),
     current: currentCommonPath(savePath, commonPaths),
-    moveDisabled: reason !== null || target === normalizeSavePath(savePath),
+    movingNote: moving && reason === null ? MOVING_NOTE : null,
+    moveDisabled:
+      moving || reason !== null || target === normalizeSavePath(savePath),
   }
 }
 

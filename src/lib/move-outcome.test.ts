@@ -95,6 +95,21 @@ describe('moveOutcomeOf', () => {
     })
   })
 
+  it('from unknown: seen, now not moving and not at the target is failed, never a silent drop', () => {
+    const current = t({ save_path: OLD, state: 'uploading' })
+    expect(moveOutcomeOf({ ...seen, from: '' }, undefined, current)).toEqual({
+      kind: 'failed',
+    })
+  })
+
+  it('an errored torrent still holding movingTo is still under way: waiting', () => {
+    const current = t({ save_path: OLD, state: 'error', movingTo: TARGET })
+    expect(moveOutcomeOf(seen, undefined, current)).toEqual({
+      kind: 'waiting',
+      record: seen,
+    })
+  })
+
   it('a target with a trailing slash still matches', () => {
     const record = { ...seen, target: `${TARGET}/` }
     const current = t({ save_path: TARGET, state: 'uploading' })

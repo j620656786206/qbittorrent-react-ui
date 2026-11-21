@@ -26,8 +26,7 @@ export interface TorrentClassification {
   /** The second line (plain text). */
   detail: string
   /**
-   * isMovingTorrent (story 5.3: `movingTo` or qBittorrent's `moving`);
-   * `status` is what it was before.
+   * isMovingTorrent (story 5.3); `status` is what it was before.
    */
   moving: boolean
   /** The status circle draws a progress ring. */
@@ -275,12 +274,34 @@ export function isQbitMoving(torrent: SlimTorrent): boolean {
   return kindOf(torrent.state) === 'moving'
 }
 
+/** Story 5.3: kinds whose line `movingTo` alone does not replace. */
+const ERROR_KINDS_OVER_MOVING_TO: ReadonlySet<StateKind> = new Set([
+  'error',
+  'missing_files',
+])
+
 /**
- * Story 5.3: the torrent reads 「搬移中」: the container recorded a move it
- * sent (`movingTo`, which can show before qBittorrent turns `moving`), or
- * qBittorrent says `moving` (a move another client started too).
+ * Story 5.3: the torrent reads 「搬移中」 on every screen (row, card, detail)
+ * and the container refuses another move: qBittorrent says `moving` (a move
+ * another client started too), or the container recorded a move it sent
+ * (`movingTo`, which can show before qBittorrent turns `moving`), except
+ * on an error or missing files, which keep their own line and stay
+ * movable (the container may hold `movingTo` for up to MOVING_TO_EXPIRY_MS
+ * after qBittorrent gave up).
  */
 export function isMovingTorrent(torrent: SlimTorrent): boolean {
+  if (isQbitMoving(torrent)) return true
+  return (
+    torrent.movingTo !== undefined &&
+    !ERROR_KINDS_OVER_MOVING_TO.has(kindOf(torrent.state))
+  )
+}
+
+/**
+ * Story 5.3: a move is still under way for move-outcome: `movingTo` set or
+ * qBittorrent's `moving`, on an error too (the container still waits on it).
+ */
+export function isMoveUnderway(torrent: SlimTorrent): boolean {
   return torrent.movingTo !== undefined || isQbitMoving(torrent)
 }
 
@@ -332,12 +353,6 @@ export function pauseActionFlips(
   if (isQbitMoving(torrent)) return false
   return !KEPT_AFTER_PAUSE.has(effectiveKind(torrent, stateBeforeMove))
 }
-
-/** Story 5.3: kinds whose line `movingTo` alone does not replace. */
-const ERROR_KINDS_OVER_MOVING_TO: ReadonlySet<StateKind> = new Set([
-  'error',
-  'missing_files',
-])
 
 /** The menu item's word for an action. */
 export const PAUSE_ACTION_WORDS: Readonly<Record<PauseAction, string>> = {
@@ -424,14 +439,10 @@ export function classify(
   torrent: SlimTorrent,
   options: ClassifyOptions,
 ): TorrentClassification {
-  // Story 5.3: `movingTo` reads as moving too, but the column stays the
-  // torrent's own kind until qBittorrent turns `moving`; an error or missing
-  // files keeps its own line (the container may hold `movingTo` for up to
-  // MOVING_TO_EXPIRY_MS after qBittorrent gave up).
+  // Story 5.3: the column stays the torrent's own kind until qBittorrent
+  // turns `moving`; the line follows isMovingTorrent.
   const kind = effectiveKind(torrent, options.stateBeforeMove)
-  const moving =
-    isQbitMoving(torrent) ||
-    (torrent.movingTo !== undefined && !ERROR_KINDS_OVER_MOVING_TO.has(kind))
+  const moving = isMovingTorrent(torrent)
   const status = statusOfKind(kind, torrent)
   return {
     status,

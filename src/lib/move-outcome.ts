@@ -1,18 +1,19 @@
-import { isMovingTorrent } from '#/lib/torrent-status'
+import { isMoveUnderway } from '#/lib/torrent-status'
 import type { SlimTorrent } from '#/shared/maindata'
 import { normalizeSavePath } from '#/shared/save-path'
 
 // Story 5.3 (FR-45, AR-43): whether a move this tab started is done, failed
 // or still running, from the tab's record of it plus the previous and the
 // current torrent. Pure; src/state/move-outcomes.ts runs it on every
-// maindata change and shows the toasts. "Moving" is isMovingTorrent's
-// (`movingTo` or qBittorrent's `moving`), and paths compare normalized.
+// maindata change and shows the toasts. "Moving" is isMoveUnderway's
+// (`movingTo` or qBittorrent's `moving`, errors included), and paths
+// compare normalized.
 
 /** A move this tab started (src/state/pending-ops.ts keeps one per hash). */
 export interface MoveRecord {
   /** Normalized target. */
   target: string
-  /** Normalized `save_path` when the move was recorded ('' if unknown). */
+  /** Normalized `save_path` when Alex pressed ('' if unknown). */
   from: string
   /** Epoch ms when setLocation answered ok. */
   startedAt: number
@@ -31,8 +32,9 @@ export type MoveOutcome =
  * - moving now: `waiting`, `seen` set;
  * - seen before (in the record, or moving in the previous torrent), now
  *   not: `done` at the target, `failed` back at `from` (qBittorrent did
- *   not move it, or the container's `movingTo` expired), `dropped`
- *   anywhere else (another client moved it; a retry would move it back);
+ *   not move it, or the container's `movingTo` expired) or anywhere when
+ *   `from` is unknown, `dropped` anywhere else (another client moved it;
+ *   a retry would move it back);
  * - never seen, now not moving: `done` at the target (it finished between
  *   two polls), else `waiting` (the move has not shown yet).
  *
@@ -43,7 +45,7 @@ export function moveOutcomeOf(
   previous: SlimTorrent | undefined,
   current: SlimTorrent,
 ): MoveOutcome {
-  if (isMovingTorrent(current)) {
+  if (isMoveUnderway(current)) {
     return {
       kind: 'waiting',
       record: record.seen ? record : { ...record, seen: true },
@@ -52,7 +54,9 @@ export function moveOutcomeOf(
   const savePath = normalizeSavePath(current.save_path)
   if (savePath === normalizeSavePath(record.target)) return { kind: 'done' }
   const seen =
-    record.seen || (previous !== undefined && isMovingTorrent(previous))
+    record.seen || (previous !== undefined && isMoveUnderway(previous))
   if (!seen) return { kind: 'waiting', record }
-  return savePath === record.from ? { kind: 'failed' } : { kind: 'dropped' }
+  return record.from === '' || savePath === record.from
+    ? { kind: 'failed' }
+    : { kind: 'dropped' }
 }

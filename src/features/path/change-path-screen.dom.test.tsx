@@ -399,7 +399,7 @@ describe('change path, one torrent (spec 5.2)', () => {
     },
   )
 
-  it('send: one call with the hash and the normalized path, pending, then recorded, closed and refreshed', async () => {
+  it('send: one call with the hash and the normalized path, no 30 s entry, then recorded, closed and refreshed', async () => {
     await render()
     await openFor()
     await type('/data/media/tv/')
@@ -411,7 +411,7 @@ describe('change path, one torrent (spec 5.2)', () => {
       })
     await click(primary())
     expect(env.moveSent).toEqual([{ hashes: [A], location: '/data/media/tv' }])
-    expect(pendingOpOf(A)).toBe('move')
+    expect(pendingOpOf(A)).toBeNull()
     // Spec 5.3: the move record waits for the ok answer.
     expect(moveRecordOf(A)).toBeNull()
     expect(primary().textContent).toBe('搬移中…')
@@ -529,7 +529,7 @@ describe('change path, one torrent (spec 5.2)', () => {
     },
   )
 
-  it('a single failed item (the container pre-check) is that code failing', async () => {
+  it('a single failed item (the container pre-check) is that code failing, named for the torrent', async () => {
     await render()
     await openFor()
     await type('/data/media/tv')
@@ -546,7 +546,7 @@ describe('change path, one torrent (spec 5.2)', () => {
       })
     await click(primary())
     await settle()
-    expect(lastFailure()?.[0]).toBe('改路徑失敗：qBittorrent 拒絕這個操作')
+    expect(lastFailure()?.[0]).toBe('改路徑失敗：這個種子正在搬')
     expect(dialog()).not.toBeNull()
   })
 
@@ -739,6 +739,20 @@ describe('change path, one torrent (spec 5.2)', () => {
     await settle()
     expect(changePathOpenStore.state.open).toBeNull()
     expect(dialog()).toBeNull()
+  })
+})
+
+describe('change path while the torrent moves (review of 5.1 to 5.3)', () => {
+  it('a moving torrent: 搬過去 stays disabled with the note, nothing is sent', async () => {
+    env.torrents = [{ ...env.torrents[0], movingTo: '/data/media/movies' }]
+    await render()
+    await openFor()
+    await type('/data/media/tv')
+    expect(primary().getAttribute('aria-disabled')).toBe('true')
+    expect(dialog()?.textContent).toContain('正在搬移中，搬完才能再改路徑')
+    await click(primary())
+    await settle()
+    expect(env.moveSent).toEqual([])
   })
 })
 
