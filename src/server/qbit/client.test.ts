@@ -222,8 +222,9 @@ describe('qBittorrent client', () => {
     expect(Object.isFrozen(client)).toBe(true)
   })
 
-  it('Q11 QBIT_PATHS holds only login, sync/maindata, torrents/stop, start, delete, setLocation, add, files, filePrio and log/main', () => {
+  it('Q11 QBIT_PATHS holds only app/version, login, sync/maindata, torrents/stop, start, delete, setLocation, add, files, filePrio and log/main', () => {
     expect(Object.values(QBIT_PATHS).sort()).toEqual([
+      '/api/v2/app/version',
       '/api/v2/auth/login',
       '/api/v2/log/main',
       '/api/v2/sync/maindata',
@@ -464,7 +465,7 @@ describe('qBittorrent client', () => {
     ])
   })
 
-  it('story 5.2 setLocation answered 403 twice (a folder it cannot write): qbit_rejected, maindata still works', async () => {
+  it('story 5.2 setLocation answered 403 with a live session (a folder it cannot write): qbit_rejected after one app/version read, no resend, maindata still works', async () => {
     const { client, calls } = setup({
       setLocation: () =>
         new Response('Cannot write to directory', { status: 403 }),
@@ -475,7 +476,10 @@ describe('qBittorrent client', () => {
     )
     expect(
       calls.filter((call) => call.path === '/api/v2/torrents/setLocation'),
-    ).toHaveLength(2)
+    ).toHaveLength(1)
+    expect(
+      calls.filter((call) => call.path === '/api/v2/app/version'),
+    ).toHaveLength(1)
     await expect(client.syncMaindata(1)).resolves.toBeDefined()
   })
 

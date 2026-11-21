@@ -68,11 +68,13 @@ export interface SendOptions {
    */
   accept?: ReadonlyArray<number>
   /**
-   * Story 5.2: this endpoint also answers 403 for a refusal of its own
-   * (`torrents/setLocation`: "Cannot write to directory"). The first 403
-   * still logs in again once (the session may have expired), but a 403
-   * after that login is a plain `qbit_rejected` for this call only: no
-   * cooldown, the cookie kept.
+   * Story 5.2, AD-4 (2026-11-21): this endpoint also answers 403 for a
+   * refusal of its own (`torrents/setLocation`: "Cannot write to
+   * directory"). After its first 403 the session reads `app/version` with
+   * the same cookie: a 2xx means the session is live, so the 403 is a plain
+   * `qbit_rejected` with no login and no resend. Otherwise it logs in once
+   * and resends as usual, and a 403 after that login is also a plain
+   * `qbit_rejected` for this call only: no cooldown, the cookie kept.
    */
   forbiddenMayBeRefusal?: boolean
 }
@@ -325,6 +327,18 @@ export function createQbitSession(options: QbitSessionOptions): QbitSession {
     if (first.status !== 403) return expectOk(path, first, sendOptions.accept)
     if (loggedIn) return afterLogin(first, used)
     if (now() < reloginBlockedUntil) return expectOk(path, first)
+    if (sendOptions.forbiddenMayBeRefusal) {
+      const probe = await request(
+        QBIT_PATHS.appVersion,
+        { method: 'GET' },
+        used,
+        signal,
+      )
+      // The session is live: the 403 was this endpoint's own refusal.
+      if (probe.status >= 200 && probe.status <= 299) {
+        return expectOk(path, first)
+      }
+    }
 
     if (cookie !== null && cookie !== used) {
       // Stale: another call already stored a newer cookie (Q4).

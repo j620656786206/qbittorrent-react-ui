@@ -78,6 +78,7 @@ flowchart TD
 - **Binds:** `src/server/qbit`
 - **Prevents:** 每個請求各自重登，幾十秒內錯滿 5 次，容器 IP 被 qBittorrent 封 1 小時；為了連得上去關掉 qBittorrent 的防護。
 - **Rule:** session cookie 只在容器記憶體，名稱和值從 `auth/login` 回應的 `Set-Cookie` 原樣拿，不寫死 `SID`。登入成功的判斷：回應是 `Ok.` 而且有 `Set-Cookie`。同一時間只有一個重登在跑，其他請求等它的結果。qBittorrent 回 403 時重登一次再重送；重登回 `Fails.` 或 `auth/login` 回 403，容器就進入斷路：之後所有請求直接回 `qbit_auth_failed`，不再碰 `auth/login`，直到容器重啟。不准關掉 qBittorrent 的 CSRF 防護、Host 檢查、登入封鎖，不准打開「略過驗證」或 IP 白名單。
+  - `torrents/setLocation` 是例外，因為它也會用 403 表示資料夾不能寫入。碰到這個 403，容器先用同一個 cookie 打一次 `GET app/version`。回 2xx 代表登入還有效，這次直接算 `qbit_rejected`，不重登也不重送。不是 2xx 才照上面的規則重登重送。2026-11-21 Alex 選的。
 
 ### AD-5：白名單閘門，每個 server function 都從同一個工廠出來 [ADOPTED]
 

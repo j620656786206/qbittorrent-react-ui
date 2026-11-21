@@ -181,6 +181,8 @@ export interface FakeQbitRoutes {
   add?: Handler
   /** Story 5.2: `torrents/setLocation`; 200 with an empty body by default. */
   setLocation?: Handler
+  /** AD-4 (2026-11-21): `app/version`; 200 `v5.1.4` by default. */
+  appVersion?: Handler
 }
 
 /** Story 2.7: a raw `torrents/files` entry with qBittorrent's extra fields. */
@@ -220,6 +222,7 @@ export function fakeQbit(routes: FakeQbitRoutes = {}) {
     '/api/v2/torrents/add': routes.add ?? (() => new Response('Ok.')),
     '/api/v2/torrents/setLocation':
       routes.setLocation ?? (() => new Response('')),
+    '/api/v2/app/version': routes.appVersion ?? (() => new Response('v5.1.4')),
   }
   const fetch = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

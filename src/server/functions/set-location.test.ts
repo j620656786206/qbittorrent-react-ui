@@ -345,14 +345,15 @@ describe('setLocation server function (spec 5.2)', () => {
     expect(opCalls()).toHaveLength(0)
   })
 
-  it('S6 403 then 403 after the re-login (a folder qBittorrent cannot write): qbit_rejected, the next getMaindata still answers', async () => {
+  it('S6 403 with a live session (a folder qBittorrent cannot write): qbit_rejected with no resend, the next getMaindata still answers', async () => {
     opAnswer = () => new Response('Cannot write to directory', { status: 403 })
     await maindata()
     expect(await run({ hashes: [HASH_A], location: '/downloads/ro' })).toEqual({
       ok: false,
       error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
     })
-    expect(opCalls()).toHaveLength(2)
+    expect(opCalls()).toHaveLength(1)
+    expect(qbit.count('/api/v2/auth/login')).toBe(1)
     // No 60 s block: a fresh pull (refreshMaindata) reaches qBittorrent.
     const pulls = qbit.count('/api/v2/sync/maindata')
     const { changed } = await maindata({ fresh: true })

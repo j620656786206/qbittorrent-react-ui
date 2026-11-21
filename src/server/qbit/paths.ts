@@ -24,6 +24,11 @@ export const QBIT_PATHS = Object.freeze({
   // reasons (warning level, incremental by `last_known_id`).
   // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#get-log
   logMain: '/api/v2/log/main',
+  // AD-4 (2026-11-21): a cheap read that answers 2xx only to a live
+  // session; after setLocation's 403 it tells a refusal from an expired
+  // cookie.
+  // https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0)#get-application-version
+  appVersion: '/api/v2/app/version',
 } as const)
 
 export type QbitPath = (typeof QBIT_PATHS)[keyof typeof QBIT_PATHS]
