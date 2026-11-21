@@ -28,8 +28,10 @@ import { nameMatches, searchNeedle } from '#/lib/name-search'
 import { rememberedSortOf, sameSort } from '#/lib/remembered-sort'
 import { inCategory } from '#/lib/visible-torrents'
 import { addCommonPath } from '#/server/functions/add-common-path'
+import { removeCommonPath } from '#/server/functions/remove-common-path'
 import { setCategorySort } from '#/server/functions/set-category-sort'
 import { setLocation } from '#/server/functions/set-location'
+import { updateCommonPath } from '#/server/functions/update-common-path'
 import { ALL } from '#/shared/categories'
 import {
   DEFAULT_SORT_VIEW,
@@ -58,7 +60,13 @@ import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { useResumeLastPlace } from '#/state/resume-last-place'
 import { useSearchOpen } from '#/state/search-open'
-import { addCommonPathOp, categorySortOp, useSettings } from '#/state/settings'
+import {
+  addCommonPathOp,
+  categorySortOp,
+  removeCommonPathOp,
+  updateCommonPathOp,
+  useSettings,
+} from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
 import { ViewedHashContext } from '#/state/viewed-hash'
 
@@ -124,7 +132,8 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // opened through src/state/change-path-open.ts), with the bound
 // `setLocation` and `addCommonPath` calls. Story 5.3: the move outcome
 // toasts (src/state/move-outcomes.ts) run here, their 重試 bound to the
-// same move op.
+// same move op. Story 5.4: the screen also gets the bound
+// `updateCommonPath` and `removeCommonPath` calls for its edit mode.
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -139,6 +148,12 @@ export const Route = createFileRoute('/_authed')({
 
 const saveSortOp = categorySortOp((values) => callFn(setCategorySort, values))
 const moveOp = setLocationOp((values) => callFn(setLocation, values))
+const updatePathOp = updateCommonPathOp((values) =>
+  callFn(updateCommonPath, values),
+)
+const removePathOp = removeCommonPathOp((values) =>
+  callFn(removeCommonPath, values),
+)
 
 /** A sort change and the category it happened on (`null`: none). */
 type SortChangeOn = SortChange & { category: string | null }
@@ -556,7 +571,12 @@ function AuthedLayout() {
             <Outlet />
           </AppShell>
           <AddScreen />
-          <ChangePathScreen moveOp={moveOp} addPathOp={addPathOp} />
+          <ChangePathScreen
+            moveOp={moveOp}
+            addPathOp={addPathOp}
+            updatePathOp={updatePathOp}
+            removePathOp={removePathOp}
+          />
           <DropOverlay />
         </ViewedHashContext>
       </CategoryTabsContext>

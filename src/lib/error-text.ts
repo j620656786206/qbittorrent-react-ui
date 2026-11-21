@@ -194,6 +194,29 @@ export function addCommonPathFailureText(
   return `沒加到常用：${settingsWriteReason(code)}`
 }
 
+/**
+ * Story 5.4 (Claude 代決 wording): renaming a common path or ticking its
+ * 「媒體庫」 failed, 「名稱沒改到：設定檔寫不進去」 or 「媒體庫沒改到：…」,
+ * the reason a settings write's (3.1's).
+ */
+export function updateCommonPathFailureText(
+  code: SettingsWriteFailureCode,
+  change: 'name' | 'mediaLibrary',
+): string {
+  const what = change === 'name' ? '名稱沒改到' : '媒體庫沒改到'
+  return `${what}：${settingsWriteReason(code)}`
+}
+
+/**
+ * Story 5.4 (Claude 代決 wording): taking a path off the common paths
+ * failed, 「沒從常用拿掉：設定檔寫不進去」.
+ */
+export function removeCommonPathFailureText(
+  code: SettingsWriteFailureCode,
+): string {
+  return `沒從常用拿掉：${settingsWriteReason(code)}`
+}
+
 /** Story 5.2 (Claude 代決): why the 「會搬到」 box cannot be sent. */
 export const SAVE_PATH_REASONS = Object.freeze({
   relative: '路徑要從 / 開頭',

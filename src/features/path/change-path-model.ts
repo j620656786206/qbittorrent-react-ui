@@ -1,12 +1,13 @@
 import { savePathFormatReason } from '#/lib/error-text'
-import { currentCommonPath, listedCommonPath, locationLabel } from '#/lib/paths'
+import { currentCommonPath, listedCommonPath } from '#/lib/paths'
 import { normalizeSavePath } from '#/shared/save-path'
-import { MAX_COMMON_PATH_NAME } from '#/shared/settings'
-import type { AddCommonPathInput, CommonPath } from '#/shared/settings'
+import { commonPathNameSchema } from '#/shared/settings'
+import type { CommonPath } from '#/shared/settings'
 
 // Story 5.2 (EXPERIENCE change-path): what the change-path screen shows for
 // one torrent, from the 「會搬到」 box, the torrent's save path and the
-// common paths. Path matching only through src/lib/paths.ts.
+// common paths. Path matching only through src/lib/paths.ts. Story 5.4:
+// edit mode's texts and what a finished inline rename does.
 
 export const CHANGE_PATH_TITLE = '改路徑'
 export const MOVE_BUTTON_TEXT = '搬過去'
@@ -21,6 +22,16 @@ export const CURRENT_TAG = '目前'
  * moving (isMovingTorrent), when 「搬過去」 waits for the move to end.
  */
 export const MOVING_NOTE = '正在搬移中，搬完才能再改路徑'
+/** Story 5.4: the pill right of 「常用路徑」, and while in edit mode. */
+export const EDIT_TEXT = '編輯'
+export const DONE_TEXT = '完成'
+/** Story 5.4: the ✕'s tooltip in edit mode. */
+export const REMOVE_TOOLTIP = '從常用拿掉（不動檔案）'
+/** Story 5.4: the accessible names in edit mode, per row. */
+export const renameLabel = (name: string) => `改名：${name}`
+export const mediaLibraryLabel = (name: string) => `媒體庫：${name}`
+export const removeLabel = (name: string) => `從常用拿掉：${name}`
+export const nameInputLabel = (path: string) => `${path} 的名稱`
 /** Beside a disabled 「加到常用」 whose path is already listed. */
 export const ALREADY_LISTED_TEXT = {
   desktop: '框裡的路徑已經在清單裡',
@@ -73,22 +84,19 @@ export function changePathView({
   }
 }
 
-/** At most MAX_COMMON_PATH_NAME UTF-16 units, never half a character. */
-function fitName(name: string): string {
-  const characters = Array.from(name)
-  while (characters.join('').length > MAX_COMMON_PATH_NAME) characters.pop()
-  return characters.join('')
-}
-
 /**
- * What 「加到常用」 sends: the normalized box path, named by its last two
- * folders (cut to the 50-character name bound, Claude 代決), not a media
- * library.
+ * Story 5.4: what Enter or blur does with an inline rename. The name is
+ * trimmed; the same name as now sends nothing (the input just closes), a
+ * name the shared schema refuses (blank, over 50 characters, a control
+ * character) is not sent and the input stays with the `delete` border.
  */
-export function addCommonPathInput(target: string): AddCommonPathInput {
-  return {
-    path: target,
-    name: fitName(locationLabel(target)),
-    mediaLibrary: false,
-  }
+export type RenameOutcome =
+  { kind: 'unchanged' } | { kind: 'invalid' } | { kind: 'send'; name: string }
+
+export function renameOutcome(text: string, name: string): RenameOutcome {
+  const trimmed = text.trim()
+  if (trimmed === name) return { kind: 'unchanged' }
+  return commonPathNameSchema.safeParse(trimmed).success
+    ? { kind: 'send', name: trimmed }
+    : { kind: 'invalid' }
 }

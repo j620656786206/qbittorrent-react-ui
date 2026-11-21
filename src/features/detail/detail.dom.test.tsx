@@ -123,7 +123,28 @@ vi.mock('#/server/functions/start-torrents', () => ({
     return opCalls.answer('start')
   },
 }))
+// Story 5.4: addCommonPath (the detail's 「☆ 加到常用」) never reaches a
+// server either.
+const commonCalls = vi.hoisted(() => ({
+  sent: [] as Array<{ path: string; name: string; mediaLibrary: boolean }>,
+  answer: (_values: {
+    path: string
+    name: string
+    mediaLibrary: boolean
+  }): Promise<unknown> => new Promise(() => {}),
+}))
+vi.mock('#/server/functions/add-common-path', () => ({
+  addCommonPath: (options: {
+    data: { path: string; name: string; mediaLibrary: boolean }
+  }) => {
+    commonCalls.sent.push(options.data)
+    return commonCalls.answer(options.data)
+  },
+}))
 const toastCalls = vi.hoisted(() => ({
+  action: vi.fn(
+    (_text: string, _options: { label: string; run: () => void }) => {},
+  ),
   dismissFor: vi.fn((_key: string) => {}),
   failure: vi.fn(
     (
@@ -780,9 +801,10 @@ describe('the phone sheet', () => {
 describe('the overview (story 2.5)', () => {
   const LONG_PATH = '/data/media/tv/假影集.Fake.Show.S01.2160p.WEB-DL'
   const sectionOf = () => q('section[aria-label="儲存位置"]') as HTMLElement
+  // Story 5.4: 「☆ 加到常用」 sits in a wrapper (its tooltip).
   const pills = () => [
     ...sectionOf().querySelectorAll<HTMLButtonElement>(
-      ':scope > div:last-child > button',
+      ':scope > div:last-child button',
     ),
   ]
   const tileTexts = () =>
@@ -925,7 +947,8 @@ describe('the overview (story 2.5)', () => {
       '改路徑',
       '改檔名',
     ])
-    // Story 5.2: 改路徑 works; 「☆ 加到常用」 (5.4) and 改檔名 still wait.
+    // Story 5.4: 「☆ 加到常用」 waits for ['settings'] (never answered
+    // here); 改檔名 still waits.
     expect(pills().map((pill) => pill.disabled)).toEqual([
       false,
       true,
@@ -944,6 +967,171 @@ describe('the overview (story 2.5)', () => {
     expect(changePathOpenStore.state.open).toBeNull()
     await act(async () => pills()[2].click())
     expect(changePathOpenStore.state.open).toEqual({ hashes: [h(11)] })
+  })
+
+  describe('「☆ 加到常用」 (spec 5.4)', () => {
+    const SEED_PATH = '/data/media/X/incompleted'
+    const answerWith = (
+      commonPaths: Array<{ path: string; name: string; mediaLibrary: boolean }>,
+    ) =>
+      Promise.resolve({ ok: true, data: { ...defaultSettings(), commonPaths } })
+
+    beforeEach(() => {
+      commonCalls.sent.length = 0
+      commonCalls.answer = (values) => answerWith([values])
+      toastCalls.action.mockClear()
+      toastCalls.failure.mockClear()
+      resetChangePathOpen()
+    })
+    afterEach(() => resetChangePathOpen())
+
+    const star = () => pills()[1]
+    const settingsAnswered = () =>
+      act(async () => {
+        client.setQueryData(SETTINGS_KEY, defaultSettings())
+      })
+
+    it('disabled until the common paths are known', async () => {
+      await openSeed()
+      expect(star().disabled).toBe(true)
+      await act(async () => star().click())
+      expect(commonCalls.sent).toEqual([])
+      await settingsAnswered()
+      expect(star().disabled).toBe(false)
+    })
+
+    it('the toast names the entry as stored (the same path stored as 「動畫」)', async () => {
+      await openSeed()
+      await settingsAnswered()
+      commonCalls.answer = (values) =>
+        answerWith([{ path: values.path, name: '動畫', mediaLibrary: true }])
+      await act(async () => star().click())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(commonCalls.sent[0].name).toBe('X/incompleted')
+      expect(toastCalls.action.mock.calls[0][0]).toBe('已加到常用：動畫')
+    })
+    const starWrapper = () =>
+      sectionOf().querySelector('[data-slot="add-common"]') as HTMLElement
+
+    it('D1 an unlisted path: addCommonPath with the normalized path named by its last two folders, no prompt; then the toast 「已加到常用：…」 with 改名', async () => {
+      const data = board().map((torrent) =>
+        torrent.hash === h(11)
+          ? { ...torrent, save_path: '/data/media/anime/' }
+          : torrent,
+      )
+      await openSeed(data)
+      await act(async () => {
+        client.setQueryData(SETTINGS_KEY, defaultSettings())
+      })
+      expect(star().disabled).toBe(false)
+      expect(starWrapper().hasAttribute('title')).toBe(false)
+      await act(async () => star().click())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(commonCalls.sent).toEqual([
+        { path: '/data/media/anime', name: 'media/anime', mediaLibrary: false },
+      ])
+      expect(toastCalls.action).toHaveBeenCalledOnce()
+      const [text, options] = toastCalls.action.mock.calls[0]
+      expect(text).toBe('已加到常用：media/anime')
+      expect(options.label).toBe('改名')
+      // The answer is the list now: the path is listed, ☆ disabled.
+      expect(star().disabled).toBe(true)
+      expect(starWrapper().getAttribute('title')).toBe('已經在常用路徑裡')
+      expect(changePathOpenStore.state.open).toBeNull()
+      // D2: 改名 opens change path for this torrent in edit mode on that row.
+      await act(async () => options.run())
+      expect(changePathOpenStore.state.open).toEqual({
+        hashes: [h(11)],
+        editPath: '/data/media/anime',
+      })
+    })
+
+    it('D3 the save path already listed (normalized): ☆ disabled with the tooltip 「已經在常用路徑裡」', async () => {
+      await openSeed()
+      await act(async () => {
+        client.setQueryData(SETTINGS_KEY, {
+          ...defaultSettings(),
+          commonPaths: [
+            { path: `${SEED_PATH}/`, name: 'X 下載', mediaLibrary: false },
+          ],
+        })
+      })
+      expect(star().disabled).toBe(true)
+      expect(starWrapper().getAttribute('title')).toBe('已經在常用路徑裡')
+      await act(async () => star().click())
+      expect(commonCalls.sent).toEqual([])
+    })
+
+    it('disabled while its request is out; one call', async () => {
+      await openSeed()
+      await settingsAnswered()
+      commonCalls.answer = () => new Promise(() => {})
+      await act(async () => star().click())
+      expect(star().disabled).toBe(true)
+      // Not listed: no tooltip, just waiting.
+      expect(starWrapper().hasAttribute('title')).toBe(false)
+      await act(async () => star().click())
+      expect(commonCalls.sent).toHaveLength(1)
+    })
+
+    it('a full list: 「常用路徑最多 50 個」 with 重試, no success toast', async () => {
+      const fifty = Array.from({ length: 50 }, (_, index) => ({
+        path: `/data/p${index}`,
+        name: `p${index}`,
+        mediaLibrary: false,
+      }))
+      await openSeed()
+      await act(async () => {
+        client.setQueryData(SETTINGS_KEY, {
+          ...defaultSettings(),
+          commonPaths: fifty,
+        })
+      })
+      commonCalls.answer = () =>
+        Promise.resolve({
+          ok: false,
+          error: { code: 'invalid_input', message: '送出的資料格式不對' },
+        })
+      await act(async () => star().click())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(toastCalls.failure).toHaveBeenCalledOnce()
+      expect(toastCalls.failure.mock.calls[0][0]).toBe('常用路徑最多 50 個')
+      expect(toastCalls.action).not.toHaveBeenCalled()
+      expect(star().disabled).toBe(false)
+    })
+
+    it('a failed write: 「沒加到常用：設定檔寫不進去」 with 重試 (same call)', async () => {
+      await openSeed()
+      await settingsAnswered()
+      commonCalls.answer = () =>
+        Promise.resolve({
+          ok: false,
+          error: { code: 'settings_write_failed', message: '設定檔寫不進去' },
+        })
+      await act(async () => star().click())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(toastCalls.failure.mock.calls[0][0]).toBe(
+        '沒加到常用：設定檔寫不進去',
+      )
+      commonCalls.answer = (values) => answerWith([values])
+      await act(async () => toastCalls.failure.mock.calls[0][1].onRetry())
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(commonCalls.sent).toHaveLength(2)
+      expect(commonCalls.sent[1]).toEqual(commonCalls.sent[0])
+      expect(toastCalls.action.mock.calls[0][0]).toBe(
+        '已加到常用：X/incompleted',
+      )
+    })
   })
 
   it('spec 5.3 M1 movingTo: the summary starts 搬移中 · 正在搬到 (plain text), all four pills disabled', async () => {

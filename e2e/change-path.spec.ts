@@ -110,9 +110,10 @@ test.describe('desktop', () => {
     await expect(moveButton(page)).toHaveAttribute('aria-disabled', 'true')
     await expect(addRow(page)).toBeDisabled()
     await expect(addRow(page)).toContainText('框裡的路徑已經在清單裡')
+    // Story 5.4: the 編輯 pill (edit mode is e2e/common-paths.spec.ts).
     await expect(
       screen(page).getByRole('button', { name: '編輯' }),
-    ).toHaveCount(0)
+    ).toBeVisible()
     // Two media libraries, each tagged once.
     await expect(screen(page).locator('[data-media-library]')).toHaveText([
       '媒體庫',
@@ -247,6 +248,8 @@ test.describe('desktop', () => {
     await box(page).fill('/data/media/anime/')
     await expect(addRow(page)).toBeEnabled()
     await addRow(page).click()
+    // Story 5.4: the new row's name opens for renaming; Enter keeps it.
+    await screen(page).locator('[data-rename-input]').press('Enter')
     await expect(radio(page, 'media/anime')).toBeVisible()
     expect(await selectedNames(page)).toEqual(['media/anime'])
     await expect(
@@ -341,6 +344,8 @@ test('screenshots: open with the library selected, bad format, already listed, �
 
       await box(page).fill('/data/media/anime')
       await addRow(page).click()
+      // Story 5.4: the new row's name opens for renaming; Enter keeps it.
+      await screen(page).locator('[data-rename-input]').press('Enter')
       await expect(addRow(page)).toContainText(
         desktop ? '框裡的路徑已經在清單裡' : '已在清單裡',
       )

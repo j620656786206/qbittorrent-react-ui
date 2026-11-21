@@ -1,4 +1,5 @@
-import type { CommonPath } from '#/shared/settings'
+import { MAX_COMMON_PATH_NAME } from '#/shared/settings'
+import type { AddCommonPathInput, CommonPath } from '#/shared/settings'
 import { normalizeSavePath } from '#/shared/save-path'
 
 // AD-13, AR-41: the only place path logic lives. Epic 1 needs just the
@@ -118,6 +119,28 @@ export function listedCommonPath(
     commonPaths.find((common) => normalizeSavePath(common.path) === target) ??
     null
   )
+}
+
+/** At most MAX_COMMON_PATH_NAME UTF-16 units, never half a character. */
+function fitName(name: string): string {
+  const characters = Array.from(name)
+  while (characters.join('').length > MAX_COMMON_PATH_NAME) characters.pop()
+  return characters.join('')
+}
+
+/**
+ * Story 5.2: what 「加到常用」 sends for a path: the normalized path, named
+ * by its last two folders (cut to the 50-character name bound, Claude
+ * 代決), not a media library. Story 5.4: the detail's 「☆ 加到常用」 sends
+ * the same for the torrent's save path.
+ */
+export function addCommonPathInput(path: string): AddCommonPathInput {
+  const target = normalizeSavePath(path)
+  return {
+    path: target,
+    name: fitName(locationLabel(target)),
+    mediaLibrary: false,
+  }
 }
 
 /**

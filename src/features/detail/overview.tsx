@@ -1,23 +1,31 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { detailHero } from '#/lib/detail-hero'
 import { isMovingTorrent } from '#/lib/torrent-status'
 import { reasonOf } from '#/lib/error-reason'
 import type { DetailHero } from '#/lib/detail-hero'
+import { addCommonPathInput, listedCommonPath } from '#/lib/paths'
+import { toast } from '#/lib/toast'
+import { addCommonPath } from '#/server/functions/add-common-path'
 import { getTorrentDetail } from '#/server/functions/get-torrent-detail'
 import type { SlimTorrent } from '#/shared/maindata'
+import { normalizeSavePath } from '#/shared/save-path'
 import type { TorrentDetail } from '#/shared/torrent-detail'
 import type { TorrentStatusId } from '#/shared/torrent-status'
 import { cn } from '#/shared/ui/cn'
 import { copyText } from '#/shared/ui/copy-text'
 import { LocationTag } from '#/shared/ui/location-tag'
 import { StatusCircle } from '#/shared/ui/status-circle'
+import { callFn } from '#/state/call-fn'
 import { openChangePath } from '#/state/change-path-open'
 import { useEntrance } from '#/state/entrance'
 import { useErrorReasons } from '#/state/error-reasons'
 import { useLocationResolver } from '#/state/locations'
 import { selectStateBeforeMove, useMaindata } from '#/state/maindata'
 import { useDayClock } from '#/state/now'
+import { addCommonPathOp, useSettings } from '#/state/settings'
+import { sendOp, useOpsInFlight } from '#/state/tracked-op'
 import {
   bindFetchTorrentDetail,
   useTorrentDetail,
@@ -214,6 +222,54 @@ function useCopyButton(path: string, hostRef: RefObject<HTMLElement | null>) {
 }
 
 const PILL = 'flex-none rounded-full border px-3.5 whitespace-nowrap'
+
+/** Story 5.4: the ☆ tooltip while the save path is already listed. */
+export const ALREADY_COMMON_TOOLTIP = '已經在常用路徑裡'
+/** Story 5.4: the toast after 「☆ 加到常用」, and its button. */
+export const addedToCommonText = (name: string) => `已加到常用：${name}`
+export const RENAME_COMMON_LABEL = '改名'
+
+/**
+ * Story 5.4: 「☆ 加到常用」 for this torrent's save path: whether it is
+ * listed or being added now, and the press.
+ */
+function useAddToCommon(hash: string, path: string) {
+  const client = useQueryClient()
+  // The op reads how many paths are listed for its failure text.
+  const op = useMemo(
+    () => addCommonPathOp((values) => callFn(addCommonPath, values), client),
+    [client],
+  )
+  const commonPaths = useSettings().settings?.commonPaths
+  const target = normalizeSavePath(path)
+  // Unknown until `['settings']` answered with a list (a failed read too):
+  // disabled, like the change-path screen's 編輯 pill.
+  const known = commonPaths !== undefined
+  const listed = known && listedCommonPath(target, commonPaths) !== null
+  const adding = useOpsInFlight(op).some(
+    (variables) => normalizeSavePath(variables.path) === target,
+  )
+  const add = () => {
+    void sendOp(
+      {
+        ...op,
+        onSuccess: async (sentClient, sent, settings) => {
+          await op.onSuccess?.(sentClient, sent, settings)
+          // The entry's name as stored (already listed elsewhere: that one).
+          const name =
+            listedCommonPath(sent.path, settings.commonPaths)?.name ?? sent.name
+          toast.action(addedToCommonText(name), {
+            label: RENAME_COMMON_LABEL,
+            run: () => openChangePath([hash], { editPath: sent.path }),
+          })
+        },
+      },
+      client,
+      addCommonPathInput(target),
+    )
+  }
+  return { known, listed, adding, add }
+}
 const PILL_OUTLINE = 'border-border bg-surface text-text hover-outline'
 
 /**
@@ -223,13 +279,20 @@ const PILL_OUTLINE = 'border-border bg-surface text-text hover-outline'
  * 「…media/tv/牧神記」 in order, https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdi),
  * then 複製, 「☆ 加到常用」, 改路徑 (the only solid `accent` one) and 改檔名.
  * Story 5.2: 改路徑 opens the change-path screen for this torrent
- * (src/state/change-path-open.ts). 「☆ 加到常用」 (5.4) and 改檔名 (5.6 to
- * 5.8) still wait: native `disabled` (50%, not-allowed, no hover, not
- * focusable). Story 5.3: while the torrent moves (isMovingTorrent, from
- * maindata's `movingTo` or `moving`, so a closed screen, a reload and
- * another device agree) all four are `disabled` the same way. Desktop:
- * the path's `title` is the full path; phone: tapping the path wraps it,
- * tapping again cuts it again.
+ * (src/state/change-path-open.ts). 改檔名 (5.6 to 5.8) still waits: native
+ * `disabled` (50%, not-allowed, no hover, not focusable). Story 5.3: while
+ * the torrent moves (isMovingTorrent, from maindata's `movingTo` or
+ * `moving`, so a closed screen, a reload and another device agree) all
+ * four are `disabled` the same way. Story 5.4: 「☆ 加到常用」 adds the
+ * current save path (5.2's `addCommonPath`, named by its last two
+ * folders, not a media library, no prompt); its toast 「已加到常用：<名稱>」
+ * has 「改名」, which opens change path for this torrent in edit mode with
+ * that row's name input focused. Disabled while the path is listed
+ * (tooltip 「已經在常用路徑裡」 on a wrapper, since a disabled button gets
+ * no hover), before the common paths are known, while its own add is out,
+ * and while moving. Failures are
+ * 5.2's toast with 重試. Desktop: the path's `title` is the full path;
+ * phone: tapping the path wraps it, tapping again cuts it again.
  */
 function SavePathBlock({
   hash,
@@ -246,6 +309,7 @@ function SavePathBlock({
   const [expanded, setExpanded] = useState(false)
   const { label, copy } = useCopyButton(path, sectionRef)
   const location = useLocationResolver()(path)
+  const common = useAddToCommon(hash, path)
   const size = phone ? 'h-11 text-[13px]' : 'h-[34px] text-[12px]'
   const cut = (
     <span
@@ -306,9 +370,20 @@ function SavePathBlock({
         >
           {label}
         </button>
-        <button type="button" disabled className={cn(PILL, PILL_OUTLINE, size)}>
-          ☆ 加到常用
-        </button>
+        <span
+          title={common.listed ? ALREADY_COMMON_TOOLTIP : undefined}
+          data-slot="add-common"
+          className={cn('flex', !phone && 'flex-none')}
+        >
+          <button
+            type="button"
+            disabled={moving || !common.known || common.listed || common.adding}
+            onClick={common.add}
+            className={cn(PILL, PILL_OUTLINE, size, phone && 'w-full')}
+          >
+            ☆ 加到常用
+          </button>
+        </span>
         <button
           type="button"
           disabled={moving}

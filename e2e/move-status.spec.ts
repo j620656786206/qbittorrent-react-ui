@@ -53,7 +53,8 @@ const detailSheet = (page: Page) =>
 const savePathBlock = (scope: Locator) =>
   scope.locator('section[aria-label="儲存位置"]')
 const pills = (scope: Locator) =>
-  savePathBlock(scope).locator(':scope > div:last-child > button')
+  // Story 5.4: 「☆ 加到常用」 sits in a wrapper (its tooltip).
+  savePathBlock(scope).locator(':scope > div:last-child button')
 const summaryOf = (scope: Locator) =>
   scope
     .locator('[role="tabpanel"] p')
