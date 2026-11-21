@@ -364,6 +364,9 @@ test('screenshots: open with the library selected, bad format, already listed, �
       await expect(moveButton(page)).toHaveText('搬移中…')
       // A new data set drops the slow move (it is not applied).
       await setModes(request, { ...DEFAULT_MODES, paths: 'library' })
+      // Let it settle: while it is in flight the container refuses another
+      // move of the same torrent, which the next scheme's failure toast needs.
+      await expect(moveButton(page)).toHaveText('搬過去', { timeout: 20_000 })
     }
     await context.close()
   }

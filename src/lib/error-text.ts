@@ -141,15 +141,34 @@ export function addItemFailureText(
 /**
  * Story 5.2 (Claude 代決): why a move the container refused as
  * `invalid_input` failed: the path passed the shared schema in the
- * browser, so it is outside `SAVE_ROOTS` (or the torrent is unknown).
+ * browser, so it is outside `SAVE_ROOTS`.
  */
 export const MOVE_OUTSIDE_ROOTS = '這個路徑不在允許的下載資料夾底下'
 
 /**
+ * Review of 5.1 to 5.3 (Claude 代決): the container's pre-check refused the
+ * torrent itself: unknown to it (`invalid_input`, deleted elsewhere) or
+ * already moving (`qbit_rejected`). No new code (AD-9): the item-level
+ * answer tells them apart from the call-level ones.
+ */
+export const MOVE_TORRENT_GONE = '找不到這個種子'
+export const MOVE_ALREADY_MOVING = '這個種子正在搬'
+
+/**
  * Story 5.2: the failure toast of a move, 「改路徑失敗：qBittorrent 拒絕這
  * 個操作」 (4.3's pattern); `invalid_input` names the download folders.
+ * `itemRefused`: the container's per-torrent check refused it.
  */
-export function setLocationFailureText(code: OperationFailureCode): string {
+export function setLocationFailureText(
+  code: OperationFailureCode,
+  itemRefused = false,
+): string {
+  if (itemRefused && code === 'invalid_input') {
+    return `改路徑失敗：${MOVE_TORRENT_GONE}`
+  }
+  if (itemRefused && code === 'qbit_rejected') {
+    return `改路徑失敗：${MOVE_ALREADY_MOVING}`
+  }
   const reason = code === 'invalid_input' ? MOVE_OUTSIDE_ROOTS : errorText(code)
   return `改路徑失敗：${reason}`
 }

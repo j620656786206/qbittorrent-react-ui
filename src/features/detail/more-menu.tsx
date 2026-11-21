@@ -27,7 +27,6 @@ import {
   useMaindata,
 } from '#/state/maindata'
 import {
-  MOVE_PENDING_OP,
   clearPending,
   markPending,
   usePendingOp,
@@ -153,10 +152,7 @@ export function MoreMenu({
         className="min-w-36"
       >
         <DropdownMenuItem
-          // Story 5.2: a pending move leaves it usable (5.3's call).
-          disabled={
-            (pending !== null && pending !== MOVE_PENDING_OP) || inFlight
-          }
+          disabled={pending !== null || inFlight}
           onSelect={() =>
             sendOp(pauseOp, client, { hash: torrent.hash, op: action, flips })
           }

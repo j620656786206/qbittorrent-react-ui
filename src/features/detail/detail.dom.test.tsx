@@ -34,7 +34,6 @@ import { clearMaindataFailure } from '#/state/maindata-failure'
 import { freezeStore, resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import {
-  MOVE_PENDING_OP,
   clearPending,
   markPendingAll,
   pendingOpOf,
@@ -1296,9 +1295,8 @@ describe('the ⋯ menu (story 2.6)', () => {
     expect(item().getAttribute('aria-disabled')).toBeNull()
   })
 
-  it('story 5.2: a pending move leaves 暫停 usable; a pending delete still disables it', async () => {
+  it('a pending delete disables 暫停', async () => {
     await render(<BoardDetailPanel />, { hash: h(1) })
-    await act(async () => markPendingAll([h(1)], MOVE_PENDING_OP))
     await openMenu()
     expect(item().getAttribute('aria-disabled')).toBeNull()
     await act(async () => markPendingAll([h(1)], 'delete'))

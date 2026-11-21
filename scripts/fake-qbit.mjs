@@ -1343,6 +1343,13 @@ const fakeQbit = createServer(async (req, res) => {
       'set-cookie': 'SID=fake; HttpOnly; path=/',
     })
   }
+  // AD-4 (2026-11-21): the container reads this after setLocation's 403 to
+  // tell an expired session (403 here too) from a refusal.
+  if (req.method === 'GET' && url.pathname === '/api/v2/app/version') {
+    if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
+      return send(res, 403, 'Forbidden')
+    return send(res, 200, 'v5.1.4')
+  }
   if (req.method === 'POST' && url.pathname === '/api/v2/torrents/add') {
     if (!/(^|;\s*)SID=fake(;|$)/.test(req.headers.cookie ?? ''))
       return send(res, 403, 'Forbidden')

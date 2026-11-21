@@ -264,6 +264,69 @@ describe('setLocation server function (spec 5.2)', () => {
     expect(opCalls()).toHaveLength(1)
   })
 
+  it('two overlapping calls for one torrent: only the first reaches qBittorrent', async () => {
+    let answer: (response: Response) => void = () => {}
+    qbit = fakeQbit({
+      setLocation: () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve
+        }),
+      maindata: () => jsonResponse(fullMaindata({ torrents })),
+    })
+    vi.stubGlobal('fetch', qbit.fetch)
+    const first = run({ hashes: [HASH_A], location: '/downloads/tv' })
+    await vi.waitFor(() => expect(opCalls()).toHaveLength(1))
+    const second = await run({ hashes: [HASH_A], location: '/downloads/x' })
+    expect(second).toEqual({
+      ok: true,
+      data: {
+        items: [
+          {
+            key: HASH_A,
+            ok: false,
+            code: 'qbit_rejected',
+            message: ERROR_MESSAGES.qbit_rejected,
+          },
+        ],
+      },
+    })
+    answer(new Response(''))
+    expect(await first).toEqual({
+      ok: true,
+      data: { items: [{ key: HASH_A, ok: true }] },
+    })
+    expect(opCalls()).toHaveLength(1)
+    const { changed } = await maindata()
+    expect(changed.find((t) => t.hash === HASH_A)?.movingTo).toBe(
+      '/downloads/tv',
+    )
+  })
+
+  it('a call qBittorrent refused leaves no reservation: the retry is sent', async () => {
+    opAnswer = () => new Response('', { status: 409 })
+    const refused = await run({ hashes: [HASH_A], location: '/downloads/tv' })
+    expect(refused.ok).toBe(false)
+    opAnswer = () => new Response('')
+    expect(
+      await run({ hashes: [HASH_A], location: '/downloads/tv' }),
+    ).toEqual({ ok: true, data: { items: [{ key: HASH_A, ok: true }] } })
+    expect(opCalls()).toHaveLength(2)
+  })
+
+  it('a movingTo on a torrent qBittorrent now reports as errored: the retry is sent', async () => {
+    await run({ hashes: [HASH_A], location: '/downloads/tv' })
+    torrents = { ...torrents, [HASH_A]: rawTorrent({ name: 'A', state: 'error' }) }
+    const { changed } = await maindata({ fresh: true })
+    // The container still holds the target: only the predicate lets it go.
+    expect(changed.find((t) => t.hash === HASH_A)?.movingTo).toBe(
+      '/downloads/tv',
+    )
+    expect(
+      await run({ hashes: [HASH_A], location: '/downloads/tv' }),
+    ).toEqual({ ok: true, data: { items: [{ key: HASH_A, ok: true }] } })
+    expect(opCalls()).toHaveLength(2)
+  })
+
   it('S5 every hash refused: no qBittorrent call, every item failed', async () => {
     const result = await run({ hashes: [HASH_D], location: '/downloads/tv' })
     expect(result).toEqual({
@@ -282,14 +345,15 @@ describe('setLocation server function (spec 5.2)', () => {
     expect(opCalls()).toHaveLength(0)
   })
 
-  it('S6 403 then 403 after the re-login (a folder qBittorrent cannot write): qbit_rejected, the next getMaindata still answers', async () => {
+  it('S6 403 with a live session (a folder qBittorrent cannot write): qbit_rejected with no resend, the next getMaindata still answers', async () => {
     opAnswer = () => new Response('Cannot write to directory', { status: 403 })
     await maindata()
     expect(await run({ hashes: [HASH_A], location: '/downloads/ro' })).toEqual({
       ok: false,
       error: { code: 'qbit_rejected', message: ERROR_MESSAGES.qbit_rejected },
     })
-    expect(opCalls()).toHaveLength(2)
+    expect(opCalls()).toHaveLength(1)
+    expect(qbit.count('/api/v2/auth/login')).toBe(1)
     // No 60 s block: a fresh pull (refreshMaindata) reaches qBittorrent.
     const pulls = qbit.count('/api/v2/sync/maindata')
     const { changed } = await maindata({ fresh: true })
