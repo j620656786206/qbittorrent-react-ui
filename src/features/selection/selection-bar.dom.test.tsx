@@ -10,6 +10,10 @@ import { MAINDATA_KEY } from '#/state/maindata'
 import { resetOrderFreeze } from '#/state/order-freeze'
 import { createQueryClient } from '#/state/query-client'
 import {
+  changePathOpenStore,
+  resetChangePathOpen,
+} from '#/state/change-path-open'
+import {
   resetSelection,
   selectionStore,
   toggleSelected,
@@ -25,6 +29,8 @@ import {
 // mounted with the last numbers) and the toast lift.
 // Spec 4.2: the phone layout, two rows, the same texts and behaviour, no
 // toast lift (the phone's toasts are at the top).
+// Spec 5.5: 改路徑 opens the change-path screen for every selected hash,
+// from the selection, in both layouts.
 
 // The toast API as features see it (they never import the toast store):
 // records the lift the bar asks for.
@@ -113,6 +119,7 @@ afterEach(async () => {
   document.body.replaceChildren()
   resetSelection()
   resetOrderFreeze()
+  resetChangePathOpen()
   lift.on = false
   lift.calls = 0
   notifyManager.setScheduler((callback) => setTimeout(callback, 0))
@@ -155,7 +162,7 @@ describe('the selection bar', () => {
       '刪除（含檔案）',
     ])
     expect(button('取消').disabled).toBe(false)
-    expect(button('改路徑').disabled).toBe(true)
+    expect(button('改路徑').disabled).toBe(false)
     expect(button('刪除（含檔案）').disabled).toBe(false)
     expect(lift.on).toBe(true)
   })
@@ -287,7 +294,7 @@ describe('the phone selection bar (story 4.2)', () => {
       '刪除（含檔案）',
     ])
     expect(button('取消').disabled).toBe(false)
-    expect(button('改路徑').disabled).toBe(true)
+    expect(button('改路徑').disabled).toBe(false)
     expect(button('刪除（含檔案）').disabled).toBe(false)
     expect(lift.calls).toBe(0)
   })
@@ -376,4 +383,28 @@ describe('the phone selection bar (story 4.2)', () => {
     expect(bar().className).toContain('rounded-panel')
     expect(lift.on).toBe(false)
   })
+})
+
+describe('改路徑 on the selection bar (spec 5.5)', () => {
+  it.each([
+    ['desktop', true],
+    ['phone', false],
+  ])(
+    '%s: opens the change-path screen for every selected hash, in tick order, from the selection',
+    async (_layout, desktop) => {
+      await render(desktop)
+      await act(async () => {
+        toggleSelected(C)
+        toggleSelected(A)
+      })
+      expect(button('改路徑').getAttribute('aria-haspopup')).toBe('dialog')
+      await act(async () => button('改路徑').click())
+      expect(changePathOpenStore.state.open).toEqual({
+        hashes: [C, A],
+        fromSelection: true,
+      })
+      // The selection stays until the move answers.
+      expect(selectionStore.state.hashes).toEqual([C, A])
+    },
+  )
 })

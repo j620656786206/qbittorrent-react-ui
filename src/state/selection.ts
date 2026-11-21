@@ -55,6 +55,15 @@ export function clearSelection(): void {
   setHashes(EMPTY)
 }
 
+/**
+ * Story 5.5: keeps only the selected hashes in `keep` (in their order);
+ * none left clears the selection.
+ */
+export function keepSelected(keep: ReadonlyArray<string>): void {
+  const wanted = new Set(keep)
+  pruneSelection((hash) => wanted.has(hash))
+}
+
 /** Drops the hashes `exists` no longer knows; the rest keep their order. */
 export function pruneSelection(exists: (hash: string) => boolean): void {
   const { hashes } = selectionStore.state

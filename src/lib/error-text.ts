@@ -173,6 +173,31 @@ export function setLocationFailureText(
   return `改路徑失敗：${reason}`
 }
 
+/**
+ * Story 5.5: why one torrent of a many-torrent move failed, under its name
+ * in the failure view: the container's pre-check refused it, unknown
+ * (`invalid_input`, MOVE_TORRENT_GONE) or already moving (`qbit_rejected`,
+ * MOVE_ALREADY_MOVING); any other code is its fixed text.
+ */
+export function moveItemFailureText(code: ErrorCode): string {
+  if (code === 'invalid_input') return MOVE_TORRENT_GONE
+  if (code === 'qbit_rejected') return MOVE_ALREADY_MOVING
+  return errorText(code)
+}
+
+/**
+ * Story 5.5: the failure view's top line, 「3 個開始搬了，2 個失敗」 (`ok`
+ * items started, `failed` items refused).
+ */
+export function moveManyFailureHeader(ok: number, failed: number): string {
+  return `${ok} 個開始搬了，${failed} 個失敗`
+}
+
+/** Story 5.5: a many-torrent move fully answered ok, `count` items sent. */
+export function moveManyStartedText(count: number): string {
+  return `已開始搬 ${count} 個種子`
+}
+
 /** Story 5.2: the 51st common path (`invalid_input` with 50 listed). */
 export const COMMON_PATHS_FULL = '常用路徑最多 50 個'
 

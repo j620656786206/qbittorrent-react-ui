@@ -207,9 +207,11 @@ export interface Modes {
    * /data/downloads, E04 /data/media/movies). Story 5.2: `library` puts
    * each torrent right in a folder, no subfolder (sample: E01
    * /data/torrents/tv, E02 /data/torrent/mteam-seed, E03 /data/downloads,
-   * E04 /data/media/movies).
+   * E04 /data/media/movies). Story 5.5: `batch` puts the first three
+   * torrents in /data/torrents/tv, the next two in /data/downloads, the
+   * rest in /data/torrent/mteam-seed.
    */
-  paths?: 'normal' | 'varied' | 'library'
+  paths?: 'normal' | 'varied' | 'library' | 'batch'
   /**
    * Story 5.3, how a move ends (torrents/setLocation and moveElsewhere):
    * `hold` keeps it `moving` until releaseMoves lands it at its target,

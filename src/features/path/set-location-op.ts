@@ -25,6 +25,12 @@ import type { TrackedOp } from '#/state/tracked-op'
 // body; connection codes are the global handler's. The screen adds closing
 // on success and a refresh on failure (a timeout may still have started
 // the move).
+//
+// Story 5.5: a many-torrent move (`many`, by default more than one hash;
+// the screen marks a retry of one failed torrent as many too) answers its
+// items as they are, even when every one failed, so the screen lists the
+// refused ones; and it writes no move record, so no done or failed toast
+// follows (only a single-hash move does).
 
 export const MOVE_OP = 'set-location'
 
@@ -34,16 +40,25 @@ export interface MoveVariables {
   location: string
   /** Each hash's `save_path` when Alex pressed (not sent). */
   from: Readonly<Record<string, string>>
+  /** Story 5.5: a many-torrent move; absent: more than one hash. */
+  many?: boolean
+}
+
+/** Story 5.5: per-item results, no move records. */
+export function isManyMove({ hashes, many }: MoveVariables): boolean {
+  return many ?? hashes.length > 1
 }
 
 /**
  * The variables of a move pressed now: `from` is each torrent's
  * `save_path` in maindata at this moment, before any answer or refresh.
+ * `many` (story 5.5): a many-torrent move, also with one hash (a retry).
  */
 export function moveVariables(
   client: QueryClient,
   hashes: ReadonlyArray<string>,
   location: string,
+  { many }: { many?: boolean } = {},
 ): MoveVariables {
   const torrents = client.getQueryData<Maindata>(MAINDATA_KEY)?.torrents
   const from: Record<string, string> = {}
@@ -52,7 +67,9 @@ export function moveVariables(
       from[hash] = torrents[hash].save_path
     }
   }
-  return { hashes, location, from }
+  return many === undefined
+    ? { hashes, location, from }
+    : { hashes, location, from, many }
 }
 
 /** A single torrent's own item refused by the container's pre-check. */
@@ -65,9 +82,10 @@ export type MoveOp = TrackedOp<MoveVariables, OperationFailureCode, BatchResult>
 export function setLocationOp(call: SetLocationCall): MoveOp {
   return {
     name: MOVE_OP,
-    call: async ({ hashes, location }) => {
+    call: async (variables) => {
+      const { hashes, location } = variables
       const result = await call({ hashes: [...hashes], location })
-      if (hashes.length === 1 && result.items.length === 1) {
+      if (!isManyMove(variables) && result.items.length === 1) {
         const only = result.items[0]
         if (!only.ok) throw new MoveItemRefused(only.code)
       }
@@ -77,12 +95,15 @@ export function setLocationOp(call: SetLocationCall): MoveOp {
     failureCodes: OPERATION_FAILURE_CODES,
     failureText: (_variables, code, error) =>
       setLocationFailureText(code, error instanceof MoveItemRefused),
-    onSuccess: (client, { location, from }, result) => {
-      recordMoves(
-        result.items.filter((item) => item.ok).map((item) => item.key),
-        location,
-        (hash) => (Object.hasOwn(from, hash) ? from[hash] : ''),
-      )
+    onSuccess: (client, variables, result) => {
+      const { location, from } = variables
+      if (!isManyMove(variables)) {
+        recordMoves(
+          result.items.filter((item) => item.ok).map((item) => item.key),
+          location,
+          (hash) => (Object.hasOwn(from, hash) ? from[hash] : ''),
+        )
+      }
       void refreshMaindata(client)
     },
   }

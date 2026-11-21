@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   MOVING_NOTE,
   changePathView,
+  currentCountTag,
+  manyChangePathView,
+  manySubtitle,
+  manyTitle,
   renameOutcome,
+  retryManyLabel,
 } from '#/features/path/change-path-model'
 
 // Spec 5.2: the change-path screen's pure parts.
@@ -124,5 +129,79 @@ describe('renameOutcome (spec 5.4)', () => {
     ['a line break', 'a\nb'],
   ])('%s is invalid and not sent', (_name, text) => {
     expect(renameOutcome(text, 'media/tv')).toEqual({ kind: 'invalid' })
+  })
+})
+
+describe('manyChangePathView (spec 5.5)', () => {
+  const batch = [
+    { hash: 'a', save_path: '/data/torrents/tv' },
+    { hash: 'b', save_path: '/data/torrents/tv/' },
+    { hash: 'c', save_path: '/data/torrents/tv/Fake.Show.S01' },
+    { hash: 'd', save_path: '/data/downloads' },
+    { hash: 'e', save_path: '/data/downloads/' },
+  ]
+
+  it('N1: the texts; 3 in the downloads row (longest match, inner folders too), the box empty: no reason, nothing to send', () => {
+    const view = manyChangePathView({
+      box: '',
+      torrents: batch,
+      commonPaths: [downloads, library],
+    })
+    expect(manyTitle(5)).toBe('搬 5 個種子')
+    expect(manySubtitle(5, view.locationCount)).toBe('5 個種子現在在 3 個位置')
+    expect(view.currentCounts.get(downloads)).toBe(3)
+    expect(view.currentCounts.has(library)).toBe(false)
+    expect(currentCountTag(3)).toBe('目前 3 個')
+    expect(view.reason).toBeNull()
+    expect(view.selected).toBeNull()
+    expect(view.toSend).toEqual([])
+    expect(view.moveDisabled).toBe(true)
+  })
+
+  it('N1: distinct normalized save paths count as locations', () => {
+    const view = manyChangePathView({
+      box: '',
+      torrents: [batch[0], batch[1], batch[3], batch[4]],
+      commonPaths: [],
+    })
+    expect(view.locationCount).toBe(2)
+    expect(view.currentCounts.size).toBe(0)
+  })
+
+  it('N2: every torrent already at the target: 搬過去 disabled', () => {
+    const view = manyChangePathView({
+      box: '/data/torrents/tv/',
+      torrents: [batch[0], batch[1]],
+      commonPaths: [downloads, library],
+    })
+    expect(view.selected).toBe(downloads)
+    expect(view.toSend).toEqual([])
+    expect(view.moveDisabled).toBe(true)
+  })
+
+  it('N3: only the torrents not at the target are sent, in batch order', () => {
+    const view = manyChangePathView({
+      box: ' /data/downloads/ ',
+      torrents: batch,
+      commonPaths: [downloads, library],
+    })
+    expect(view.target).toBe('/data/downloads')
+    expect(view.toSend).toEqual(['a', 'b', 'c'])
+    expect(view.moveDisabled).toBe(false)
+  })
+
+  it('a bad format: the 5.2 reason, nothing to send', () => {
+    const view = manyChangePathView({
+      box: 'data/tv',
+      torrents: batch,
+      commonPaths: [downloads],
+    })
+    expect(view.reason).toBe('路徑要從 / 開頭')
+    expect(view.toSend).toEqual([])
+    expect(view.moveDisabled).toBe(true)
+  })
+
+  it('the failure view retry label', () => {
+    expect(retryManyLabel(2)).toBe('重試 2 個')
   })
 })

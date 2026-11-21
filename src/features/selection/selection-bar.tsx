@@ -12,6 +12,7 @@ import {
   selectTorrents,
   useMaindata,
 } from '#/state/maindata'
+import { openChangePath } from '#/state/change-path-open'
 import {
   clearSelection,
   selectionStore,
@@ -22,8 +23,8 @@ import { DeleteConfirm } from '#/features/selection/delete-confirm'
 // Story 4.1, DESIGN selection-bar (mockup S07-delete-desktop): the desktop
 // selection bar, a pill floating 24px above the bottom, centred, in the
 // `selection-bar` colours. Left to right: 「已選 N 個」 (700), 「共 X GB」
-// (12px, 70%), 取消 (text only), 改路徑 (1px outline pill, disabled until
-// Epic 5) and 刪除（含檔案） (solid `delete`).
+// (12px, 70%), 取消 (text only), 改路徑 (1px outline pill) and 刪除（含檔案）
+// (solid `delete`).
 // The size counts only torrents whose files exist (src/lib/selection-total.ts).
 // Story 4.2 (DESIGN selection-bar, mockup S07-delete-phone): below 1024px
 // the same bar is a two-row panel 16px from the sides and the bottom (plus
@@ -43,6 +44,9 @@ import { DeleteConfirm } from '#/features/selection/delete-confirm'
 // (src/features/selection/delete-confirm.tsx). Closing it without a delete
 // gives focus back to that button; after a delete (nothing selected, the
 // bar sliding out) focus goes to the main area.
+// Story 5.5: 改路徑 opens the change-path screen for every selected hash,
+// marked as from the selection, so the screen clears the selection after
+// the move (or keeps only the torrents that failed).
 
 /** 52px tall: 8px padding around the 36px buttons. */
 const BAR_CLASS =
@@ -56,8 +60,6 @@ const PHONE_BAR_CLASS =
   'fixed right-4 bottom-[calc(16px+env(safe-area-inset-bottom))] left-4 z-40 flex flex-col gap-2 rounded-panel bg-selection-bar pt-2 pr-3 pb-3 pl-[18px] text-body text-selection-bar-foreground tabular-nums shadow-float transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none'
 
 const FOCUS_CLASS = 'focus-visible:outline-selection-bar-foreground'
-
-const DISABLED_CLASS = 'disabled:cursor-not-allowed disabled:opacity-50'
 
 export function SelectionBar({ desktop }: { desktop: boolean }) {
   const hashes = useSelectedHashes()
@@ -99,7 +101,7 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
     return () => toast.setLift(false)
   }, [lift])
 
-  // One set of controls, placed by each layout (改路徑 comes with Epic 5).
+  // One set of controls, placed by each layout.
   const region = {
     role: 'region',
     'aria-label': '選取的種子',
@@ -129,12 +131,14 @@ export function SelectionBar({ desktop }: { desktop: boolean }) {
   const moveButton = (className: string) => (
     <button
       type="button"
-      disabled
+      aria-haspopup="dialog"
+      onClick={() =>
+        openChangePath(selectionStore.state.hashes, { fromSelection: true })
+      }
       className={cn(
         className,
         'rounded-full border border-selection-bar-foreground font-semibold',
         FOCUS_CLASS,
-        DISABLED_CLASS,
       )}
     >
       改路徑

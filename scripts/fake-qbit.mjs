@@ -74,7 +74,12 @@
 //          puts the n-th torrent right in one of LIBRARY_FOLDERS in turn,
 //          no subfolder: sample's E01 is in /data/torrents/tv (下載區（影集）
 //          with seed=library), E02 /data/torrent/mteam-seed, E03
-//          /data/downloads, E04 /data/media/movies
+//          /data/downloads, E04 /data/media/movies; batch (story 5.5)
+//          puts the first three torrents of the data set in
+//          /data/torrents/tv, the next two in /data/downloads and the rest
+//          in /data/torrent/mteam-seed (with data=states and seed=library:
+//          a selection of the first five is 「5 個種子現在在 2 個位置」 with
+//          「目前 3 個」 on 下載區（影集）)
 //   move:  normal | hold | fail (story 5.3, for torrents/setLocation and
 //          /__fake/move: hold keeps a move `moving` until
 //          POST /__fake/move?release=1 lands it at its target; fail reads
@@ -228,7 +233,7 @@ const GROW_MODES = new Set(['0', '1'])
 const OPS_MODES = new Set(['normal', 'reject', 'slow', 'reject-files', 'drop'])
 const FILES_MODES = new Set(['normal', 'slow', 'fail'])
 const CATS_MODES = new Set(['normal', 'default-path', 'none'])
-const PATHS_MODES = new Set(['normal', 'varied', 'library'])
+const PATHS_MODES = new Set(['normal', 'varied', 'library', 'batch'])
 const MOVE_MODES = new Set(['normal', 'hold', 'fail'])
 /** Story 5.2 `paths=library`: the n-th torrent sits right in one of these. */
 const LIBRARY_FOLDERS = [
@@ -833,6 +838,31 @@ function withLibraryPaths(torrents) {
   return placed
 }
 
+/** Story 5.5: `paths=batch`, by position in the data set; then the rest. */
+const BATCH_FOLDERS = [
+  '/data/torrents/tv',
+  '/data/torrents/tv',
+  '/data/torrents/tv',
+  '/data/downloads',
+  '/data/downloads',
+]
+const BATCH_REST_FOLDER = '/data/torrent/mteam-seed'
+const batchCache = new Map()
+
+function withBatchPaths(torrents) {
+  let placed = batchCache.get(torrents)
+  if (!placed) {
+    placed = Object.fromEntries(
+      Object.entries(torrents).map(([key, value], index) => [
+        key,
+        { ...value, save_path: BATCH_FOLDERS[index] ?? BATCH_REST_FOLDER },
+      ]),
+    )
+    batchCache.set(torrents, placed)
+  }
+  return placed
+}
+
 /**
  * Story 5.2: setLocation calls applied, by hash: `{ location, doneAt,
  * fails, from }`. Story 5.3: `doneAt` is Infinity while held (`move=hold`),
@@ -882,7 +912,9 @@ function currentTorrents(tick) {
       ? withVariedPaths(data)
       : mode.paths === 'library'
         ? withLibraryPaths(data)
-        : data
+        : mode.paths === 'batch'
+          ? withBatchPaths(data)
+          : data
   const torrents = mode.data === 'many' ? withSpeeds(base, tick) : base
   const extra = growCount > 0 || addedCount > 0
   return withMoves(

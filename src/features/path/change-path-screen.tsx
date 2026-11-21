@@ -1,11 +1,18 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { Plus, X } from 'lucide-react'
+import { CircleAlert, Plus, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import {
+  moveItemFailureText,
+  moveManyFailureHeader,
+  moveManyStartedText,
+} from '#/lib/error-text'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
 import { addCommonPathInput } from '#/lib/paths'
 import { isMovingTorrent } from '#/lib/torrent-status'
 import { toast } from '#/lib/toast'
+import type { ErrorCode } from '#/shared/errors'
+import type { BatchResult } from '#/shared/torrent-ops'
 import type { SlimTorrent } from '#/shared/maindata'
 import { normalizeSavePath } from '#/shared/save-path'
 import type {
@@ -21,6 +28,7 @@ import { cn } from '#/shared/ui/cn'
 import { ConfirmShell } from '#/shared/ui/confirm-shell'
 import { Input } from '#/shared/ui/input'
 import { LocationTag } from '#/shared/ui/location-tag'
+import { getMain } from '#/shared/ui/main-scroll'
 import {
   changePathOpenStore,
   closeChangePath,
@@ -29,6 +37,7 @@ import {
 import type { ChangePathOpen } from '#/state/change-path-open'
 import { refreshMaindata, selectTorrents, useMaindata } from '#/state/maindata'
 import { moveToastKey } from '#/state/pending-ops'
+import { clearSelection, keepSelected, selectionStore } from '#/state/selection'
 import { SETTINGS_KEY, commonPathToastKey, useSettings } from '#/state/settings'
 import { useSheetLayer } from '#/state/sheet-layer'
 import { useEscapeLayer } from '#/state/shortcuts'
@@ -48,14 +57,20 @@ import {
   MOVE_SENDING_TEXT,
   REMOVE_TOOLTIP,
   changePathView,
+  currentCountTag,
+  manyChangePathView,
+  manySubtitle,
+  manyTitle,
   mediaLibraryLabel,
   nameInputLabel,
   removeLabel,
   renameLabel,
   renameOutcome,
+  retryManyLabel,
 } from '#/features/path/change-path-model'
+import type { PathBoxView } from '#/features/path/change-path-model'
 import { moveVariables } from '#/features/path/set-location-op'
-import type { MoveOp } from '#/features/path/set-location-op'
+import type { MoveOp, MoveVariables } from '#/features/path/set-location-op'
 
 // Story 5.2 (DESIGN change-path and text-input, EXPERIENCE change-path,
 // mockups S08-path-desktop, S08-path-phone): the change-path screen for one
@@ -105,6 +120,21 @@ import type { MoveOp } from '#/features/path/set-location-op'
 // disabled; a failure keeps the typed name in the input, its toast's 重試
 // sends the same write. Every write answers the whole settings, so the
 // list and the location tags follow `['settings']`.
+//
+// Story 5.5 (EXPERIENCE change-path and 多選動作部分失敗, mockup
+// S08-path-many-desktop): the selection bar's 「改路徑」 opens the screen
+// for every selected hash (`fromSelection`). One hash is the screen above,
+// and its success also clears the selection. Two or more is many mode:
+// the title 「搬 N 個種子」 over 「N 個種子現在在 M 個位置」, each row
+// holding K of them reads 「目前 K 個」, the box starts empty. 搬過去 sends
+// only the torrents not already at the target, in one call. Every item ok:
+// the screen closes, 「已開始搬 K 個種子」, the selection clears (no done
+// toast: a many move writes no move record). Some refused by the
+// container's pre-check: the screen stays and lists only those (name, and
+// the reason under it in `status-error`) under 「A 個開始搬了，B 個失敗」;
+// the primary 「重試 B 個」 sends only them to the same target, and the
+// selection keeps only them. A whole failure is the toast with 重試, as for
+// one torrent.
 
 type SettingsWriteOp<TVariables> = TrackedOp<
   TVariables,
@@ -151,6 +181,24 @@ const FOCUS_DATA = {
 } as const
 
 const NO_PATHS: ReadonlyArray<CommonPath> = Object.freeze([])
+const NO_HASHES: ReadonlyArray<string> = Object.freeze([])
+type BatchItems = BatchResult['items']
+const NO_TORRENTS: ReadonlyArray<SlimTorrent> = Object.freeze([])
+
+/** Story 5.5: the failure view of a many-torrent move. */
+interface ManyFailure {
+  /** Normalized; a retry sends the failed ones here again. */
+  target: string
+  /** Items of the last answer that started. */
+  ok: number
+  /** The refused items, in the answer's order. */
+  failed: ReadonlyArray<{ hash: string; code: ErrorCode }>
+  /** Names kept from when they were sent (a gone torrent has none now). */
+  names: Readonly<Record<string, string>>
+  /** The title and the line under it as they read when Alex pressed. */
+  title: string
+  subtitle: string
+}
 
 export function ChangePathScreen({
   moveOp,
@@ -165,7 +213,13 @@ export function ChangePathScreen({
   const { settings, ready } = useSettings()
   const commonPaths = settings?.commonPaths ?? NO_PATHS
 
-  const hash = opened?.hashes[0] ?? null
+  // The open shown, kept while the sheet slides out after closing.
+  const [keptOpened, setKeptOpened] = useState(opened)
+  if (opened !== null && keptOpened !== opened) setKeptOpened(opened)
+  const hashes = opened?.hashes ?? NO_HASHES
+  // Story 5.5: two or more hashes is many mode.
+  const many = ((opened ?? keptOpened)?.hashes.length ?? 0) > 1
+  const hash = !many ? (opened?.hashes[0] ?? null) : null
   const live =
     hash !== null && torrents !== undefined && Object.hasOwn(torrents, hash)
       ? torrents[hash]
@@ -173,22 +227,36 @@ export function ChangePathScreen({
   // The torrent shown, kept while the sheet slides out after closing.
   const [kept, setKept] = useState<SlimTorrent | null>(live)
   if (live !== null && kept !== live) setKept(live)
-  const torrent = live ?? kept
-  const open = opened !== null && torrent !== null
+  const torrent = many ? null : (live ?? kept)
+  // Story 5.5: the batch's torrents still in maindata, in open order.
+  const liveBatch = useMemo(() => {
+    if (!many || opened === null || torrents === undefined) return NO_TORRENTS
+    return opened.hashes
+      .filter((each) => Object.hasOwn(torrents, each))
+      .map((each) => torrents[each])
+  }, [many, opened, torrents])
+  const [keptBatch, setKeptBatch] = useState(liveBatch)
+  if (opened !== null && keptBatch !== liveBatch) setKeptBatch(liveBatch)
+  const batch = opened !== null ? liveBatch : keptBatch
+  const [failure, setFailure] = useState<ManyFailure | null>(null)
+  const open =
+    opened !== null &&
+    (many ? batch.length > 0 || failure !== null : torrent !== null)
 
   const [box, setBox] = useState(live?.save_path ?? '')
   const [editing, setEditing] = useState(opened?.editPath !== undefined)
   const [renaming, setRenaming] = useState(() => renamingFor(opened))
-  // Every open starts from the torrent's save path, in normal mode unless
-  // the open asks to rename one row (story 5.4).
+  // Every open starts from the torrent's save path (many mode: empty), in
+  // normal mode unless the open asks to rename one row (story 5.4).
   const [openedFor, setOpenedFor] = useState(opened)
   if (openedFor !== opened) {
     setOpenedFor(opened)
     if (opened !== null) {
-      setBox(live?.save_path ?? '')
+      setBox(opened.hashes.length > 1 ? '' : (live?.save_path ?? ''))
       setKept(live)
       setEditing(opened.editPath !== undefined)
       setRenaming(renamingFor(opened))
+      setFailure(null)
     }
   }
   // No common paths left (the last one removed): edit mode has nothing to
@@ -200,16 +268,33 @@ export function ChangePathScreen({
   const renamingRef = useRef(renaming)
   renamingRef.current = renaming
 
-  const view = useMemo(
+  const single = useMemo(
     () =>
-      changePathView({
-        box,
-        savePath: torrent?.save_path ?? '',
-        commonPaths,
-        moving: torrent !== null && isMovingTorrent(torrent),
-      }),
-    [box, torrent, commonPaths],
+      many
+        ? null
+        : changePathView({
+            box,
+            savePath: torrent?.save_path ?? '',
+            commonPaths,
+            moving: torrent !== null && isMovingTorrent(torrent),
+          }),
+    [many, box, torrent, commonPaths],
   )
+  const multi = useMemo(
+    () =>
+      many ? manyChangePathView({ box, torrents: batch, commonPaths }) : null,
+    [many, box, batch, commonPaths],
+  )
+  const view: PathBoxView = multi ?? (single as PathBoxView)
+  /** The outline tag of a row: 「目前」, 「目前 K 個」, or none. */
+  const currentTagOf = (common: CommonPath): string | null => {
+    if (multi !== null) {
+      const count = multi.currentCounts.get(common) ?? 0
+      return count > 0 ? currentCountTag(count) : null
+    }
+    return single !== null && common === single.current ? CURRENT_TAG : null
+  }
+  const movingNote = single?.movingNote ?? null
 
   // Set on press, before the in-flight state shows (the same tick): blocks
   // a second send and every close path until the call settled. A 重試 from
@@ -217,10 +302,14 @@ export function ChangePathScreen({
   const pressedRef = useRef(false)
   const [pressed, setPressed] = useState(false)
   const inFlight = useOpsInFlight(moveOp)
-  const sending =
-    pressed ||
-    (hash !== null &&
-      inFlight.some((variables) => variables.hashes.includes(hash)))
+  const sending = useMemo(() => {
+    if (pressed) return true
+    if (inFlight.length === 0 || hashes.length === 0) return false
+    const mine = new Set(hashes)
+    return inFlight.some((variables) =>
+      variables.hashes.some((each) => mine.has(each)),
+    )
+  }, [pressed, inFlight, hashes])
   const adding = useOpsInFlight(addPathOp).length > 0
   // Story 5.4: the rows with a write in flight (their controls disabled).
   const updating = useOpsInFlight(updatePathOp)
@@ -281,16 +370,22 @@ export function ChangePathScreen({
     }
   }
 
+  /** Closes the move failure toasts about the torrents of this open. */
+  const dismissMoveToasts = (of: ReadonlyArray<string> = hashes) => {
+    for (const each of of) toast.dismissFor(moveToastKey(each))
+  }
+
   // Every open: an old failure toast's 重試 must not move without the screen.
   useEffect(() => {
-    if (hash !== null) toast.dismissFor(moveToastKey(hash))
-    if (opened !== null) dismissPathToasts()
+    if (opened === null) return
+    dismissMoveToasts(opened.hashes)
+    dismissPathToasts()
     // Only on open: a write's own failure toast stays while the screen does.
-  }, [opened, hash])
+  }, [opened])
 
   const cancel = () => {
     if (sending || pressedRef.current) return
-    if (hash !== null) toast.dismissFor(moveToastKey(hash))
+    dismissMoveToasts()
     dismissPathToasts()
     closeChangePath()
   }
@@ -298,30 +393,39 @@ export function ChangePathScreen({
   useSheetLayer(open && !desktop, cancel)
 
   // The torrent left maindata (deleted elsewhere): close, never mid-send.
-  const gone = opened !== null && torrents !== undefined && live === null
+  // Many mode: once every torrent of the batch left, unless the failure
+  // view still lists them.
+  const gone =
+    opened !== null &&
+    torrents !== undefined &&
+    (many ? liveBatch.length === 0 && failure === null : live === null)
   useEffect(() => {
     if (!gone || sending) return
-    if (hash !== null) toast.dismissFor(moveToastKey(hash))
+    dismissMoveToasts()
     dismissPathToasts()
     closeChangePath()
-  }, [gone, sending, hash])
+  }, [gone, sending])
 
-  const send = () => {
-    if (sending || pressedRef.current || hash === null || view.moveDisabled) {
-      return
-    }
+  /**
+   * Sends one move of `sendHashes` to `target`; `settle` runs with the
+   * answer and the open it was sent from (a whole failure is the toast).
+   */
+  const sendMove = (
+    variables: MoveVariables,
+    settle: (
+      sent: MoveVariables,
+      items: BatchItems,
+      sentFor: ChangePathOpen,
+    ) => void,
+  ) => {
     pressedRef.current = true
     setPressed(true)
-    const variables = moveVariables(client, [hash], view.target)
+    const sentFor = changePathOpenStore.state.open
     void sendOp(
       {
         ...moveOp,
         onSuccess: (sentClient, sent, data) => {
-          // A late 重試 for a screen opened again on another torrent leaves it.
-          const now = changePathOpenStore.state.open
-          if (now !== null && sameHashes(now.hashes, sent.hashes)) {
-            closeChangePath()
-          }
+          settle(sent, data.items, sentFor)
           return moveOp.onSuccess?.(sentClient, sent, data)
         },
         onFailure: (sent, code, error) => {
@@ -337,8 +441,108 @@ export function ChangePathScreen({
     })
   }
 
+  /**
+   * The failed torrents a retry sends: still in maindata (a gone one only
+   * fails again) and not already at the target.
+   */
+  const retryable =
+    failure === null || torrents === undefined
+      ? NO_HASHES
+      : failure.failed
+          .map((each) => each.hash)
+          .filter(
+            (each) =>
+              Object.hasOwn(torrents, each) &&
+              normalizeSavePath(torrents[each].save_path) !== failure.target,
+          )
+
+  /** The names of `of` now, else as kept by the failure view. */
+  const namesOf = (of: ReadonlyArray<string>) => {
+    const names: Record<string, string> = {}
+    for (const each of of) {
+      if (torrents !== undefined && Object.hasOwn(torrents, each)) {
+        names[each] = torrents[each].name
+      } else if (failure !== null && Object.hasOwn(failure.names, each)) {
+        names[each] = failure.names[each]
+      }
+    }
+    return names
+  }
+
+  /** Story 5.5: many mode's answer (every item, ok or refused). */
+  const settleMany =
+    (
+      names: Readonly<Record<string, string>>,
+      heading: Pick<ManyFailure, 'title' | 'subtitle'>,
+    ) =>
+    (sent: MoveVariables, items: BatchItems, sentFor: ChangePathOpen) => {
+      const failed = items.flatMap((item) =>
+        item.ok ? [] : [{ hash: item.key, code: item.code }],
+      )
+      const ok = items.length - failed.length
+      const still = changePathOpenStore.state.open === sentFor
+      if (failed.length === 0) {
+        if (still) closeChangePath()
+        if (sentFor?.fromSelection) clearSelection()
+        toast.plain(moveManyStartedText(ok))
+        return
+      }
+      if (!still) return
+      setFailure({
+        target: sent.location,
+        ok,
+        failed,
+        names,
+        title: heading.title,
+        subtitle: heading.subtitle,
+      })
+      if (sentFor?.fromSelection) keepSelected(failed.map((each) => each.hash))
+    }
+
+  const send = () => {
+    if (sending || pressedRef.current) return
+    if (failure !== null) {
+      // 重試 K 個: only the failed ones still there and not yet at the
+      // target, to the same target.
+      if (retryable.length === 0) return
+      sendMove(
+        moveVariables(client, retryable, failure.target, { many: true }),
+        settleMany(namesOf(retryable), failure),
+      )
+      return
+    }
+    if (view.moveDisabled) return
+    if (multi !== null) {
+      sendMove(
+        moveVariables(client, multi.toSend, multi.target, { many: true }),
+        settleMany(namesOf(multi.toSend), {
+          title: manyTitle(batch.length),
+          subtitle: manySubtitle(batch.length, multi.locationCount),
+        }),
+      )
+      return
+    }
+    if (hash === null) return
+    sendMove(
+      moveVariables(client, [hash], view.target),
+      (sent, _items, sentFor) => {
+        // A late 重試 for a screen opened again on another torrent leaves it.
+        const now = changePathOpenStore.state.open
+        if (now !== null && sameHashes(now.hashes, sent.hashes)) {
+          closeChangePath()
+        }
+        // Story 5.5: one torrent from the selection bar clears it too.
+        if (sentFor?.fromSelection) clearSelection()
+      },
+    )
+  }
+
   const addDisabled =
-    view.reason !== null || view.selected !== null || !ready || adding
+    view.reason !== null ||
+    view.target === '' ||
+    view.selected !== null ||
+    !ready ||
+    adding
   const add = () => {
     if (addDisabled) return
     const sentFor = opened
@@ -493,7 +697,7 @@ export function ChangePathScreen({
     if (sending) return
     setBox(text)
     // 重試 would send the old path: close the toast.
-    if (hash !== null) toast.dismissFor(moveToastKey(hash))
+    dismissMoveToasts()
   }
 
   const boxId = useId()
@@ -504,141 +708,248 @@ export function ChangePathScreen({
     <ConfirmShell
       open={open}
       desktop={desktop}
-      title={CHANGE_PATH_TITLE}
-      subtitle={torrent?.name ?? ''}
-      primaryLabel={MOVE_BUTTON_TEXT}
+      title={
+        failure !== null
+          ? failure.title
+          : many
+            ? manyTitle(batch.length)
+            : CHANGE_PATH_TITLE
+      }
+      subtitle={
+        failure !== null
+          ? failure.subtitle
+          : multi !== null
+            ? manySubtitle(batch.length, multi.locationCount)
+            : (torrent?.name ?? '')
+      }
+      primaryLabel={
+        failure !== null ? retryManyLabel(retryable.length) : MOVE_BUTTON_TEXT
+      }
       sendingLabel={MOVE_SENDING_TEXT}
       onPrimary={send}
-      primaryDisabled={view.moveDisabled}
+      primaryDisabled={
+        failure !== null ? retryable.length === 0 : view.moveDisabled
+      }
       primaryTone="accent"
       sending={sending}
       onCancel={cancel}
+      returnFocus={() =>
+        // Story 5.5: the selection bar it opened from slid out (the
+        // selection cleared): focus goes to the main area, like delete.
+        keptOpened?.fromSelection === true &&
+        selectionStore.state.hashes.length === 0
+          ? getMain()
+          : null
+      }
       initialFocus={() =>
         listRef.current?.querySelector<HTMLElement>('[data-rename-input]') ??
         null
       }
       desktopWidthClass="w-[560px]"
     >
-      <div className="flex flex-none flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span id={listLabelId} className="flex-1 text-meta font-semibold">
-            {COMMON_PATHS_HEADER}
-          </span>
-          <button
-            ref={editPillRef}
-            type="button"
-            data-edit-pill=""
-            disabled={sending || !ready || commonPaths.length === 0}
-            onClick={() => {
-              // Either way an open rename closes unsaved (a blur before the
-              // press already saved a valid changed name).
-              setRenaming(null)
-              setEditing((now) => !now)
-            }}
-            className={cn(
-              'flex-none rounded-full border border-border bg-surface px-3.5 whitespace-nowrap text-text hover-outline disabled:cursor-not-allowed',
-              desktop ? 'h-7 text-meta' : 'h-11 text-[13px]',
-              editing ? 'font-bold' : 'font-semibold',
-            )}
-          >
-            {editing ? DONE_TEXT : EDIT_TEXT}
-          </button>
-        </div>
-        {(!editing || commonPaths.length > 0) && (
-          <div
-            ref={listRef}
-            className="overflow-hidden rounded-card border bg-surface"
-          >
-            {editing ? (
-              <EditRows
-                labelId={listLabelId}
-                commonPaths={commonPaths}
-                current={view.current}
-                desktop={desktop}
-                rowBusy={(common) => rowBusy(rowPath(common))}
-                renameSlot={renameSlot}
-                onRename={startRename}
-                onTick={tick}
-                onRemove={remove}
-              />
-            ) : (
-              <>
-                {commonPaths.length > 0 && (
-                  <PathRadios
+      {failure !== null ? (
+        <FailureView failure={failure} desktop={desktop} />
+      ) : (
+        <>
+          <div className="flex flex-none flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span id={listLabelId} className="flex-1 text-meta font-semibold">
+                {COMMON_PATHS_HEADER}
+              </span>
+              <button
+                ref={editPillRef}
+                type="button"
+                data-edit-pill=""
+                disabled={sending || !ready || commonPaths.length === 0}
+                onClick={() => {
+                  // Either way an open rename closes unsaved (a blur before the
+                  // press already saved a valid changed name).
+                  setRenaming(null)
+                  setEditing((now) => !now)
+                }}
+                className={cn(
+                  'flex-none rounded-full border border-border bg-surface px-3.5 whitespace-nowrap text-text hover-outline disabled:cursor-not-allowed',
+                  desktop ? 'h-7 text-meta' : 'h-11 text-[13px]',
+                  editing ? 'font-bold' : 'font-semibold',
+                )}
+              >
+                {editing ? DONE_TEXT : EDIT_TEXT}
+              </button>
+            </div>
+            {(!editing || commonPaths.length > 0) && (
+              <div
+                ref={listRef}
+                className="overflow-hidden rounded-card border bg-surface"
+              >
+                {editing ? (
+                  <EditRows
                     labelId={listLabelId}
                     commonPaths={commonPaths}
-                    selected={view.selected}
-                    current={view.current}
+                    currentTagOf={currentTagOf}
                     desktop={desktop}
-                    disabled={sending}
+                    rowBusy={(common) => rowBusy(rowPath(common))}
                     renameSlot={renameSlot}
-                    onPick={(common) => editBox(common.path)}
+                    onRename={startRename}
+                    onTick={tick}
+                    onRemove={remove}
                   />
+                ) : (
+                  <>
+                    {commonPaths.length > 0 && (
+                      <PathRadios
+                        labelId={listLabelId}
+                        commonPaths={commonPaths}
+                        selected={view.selected}
+                        currentTagOf={currentTagOf}
+                        desktop={desktop}
+                        disabled={sending}
+                        renameSlot={renameSlot}
+                        onPick={(common) => editBox(common.path)}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      disabled={addDisabled || sending}
+                      onClick={add}
+                      className={cn(
+                        'flex w-full items-center gap-3 px-3 text-left font-semibold text-text hover-row disabled:cursor-not-allowed',
+                        desktop
+                          ? 'min-h-10 text-[13px]'
+                          : 'min-h-12 text-[15px]',
+                        commonPaths.length > 0 && 'border-t',
+                      )}
+                    >
+                      <span className="inline-flex w-5 flex-none justify-center">
+                        <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        {ADD_COMMON_PATH_TEXT}
+                      </span>
+                      {view.selected !== null && (
+                        <span className="flex-none text-meta font-normal text-text-muted">
+                          {desktop
+                            ? ALREADY_LISTED_TEXT.desktop
+                            : ALREADY_LISTED_TEXT.phone}
+                        </span>
+                      )}
+                    </button>
+                  </>
                 )}
-                <button
-                  type="button"
-                  disabled={addDisabled || sending}
-                  onClick={add}
-                  className={cn(
-                    'flex w-full items-center gap-3 px-3 text-left font-semibold text-text hover-row disabled:cursor-not-allowed',
-                    desktop ? 'min-h-10 text-[13px]' : 'min-h-12 text-[15px]',
-                    commonPaths.length > 0 && 'border-t',
-                  )}
-                >
-                  <span className="inline-flex w-5 flex-none justify-center">
-                    <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">{ADD_COMMON_PATH_TEXT}</span>
-                  {view.selected !== null && (
-                    <span className="flex-none text-meta font-normal text-text-muted">
-                      {desktop
-                        ? ALREADY_LISTED_TEXT.desktop
-                        : ALREADY_LISTED_TEXT.phone}
-                    </span>
-                  )}
-                </button>
-              </>
+              </div>
             )}
           </div>
-        )}
-      </div>
-      <div className="flex flex-none flex-col gap-1.5">
-        <label htmlFor={boxId} className="text-meta font-semibold">
-          {BOX_LABEL}
-        </label>
-        <Input
-          id={boxId}
-          type="text"
-          value={box}
-          readOnly={sending}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-invalid={view.reason !== null || undefined}
-          aria-describedby={view.reason !== null ? reasonId : undefined}
-          onChange={(event) => editBox(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return
-            // An IME commit (Safari: not composing, keyCode 229) is no press.
-            if (event.nativeEvent.isComposing || event.keyCode === 229) return
-            event.preventDefault()
-            send()
-          }}
-          className={cn(
-            'font-mono',
-            desktop ? 'h-9 text-path' : 'h-11 text-[16px]',
-          )}
-        />
-        {view.reason !== null && (
-          <p id={reasonId} className="m-0 text-meta text-delete">
-            {view.reason}
-          </p>
-        )}
-        {view.movingNote !== null && (
-          <p className="m-0 text-meta text-text-muted">{view.movingNote}</p>
-        )}
-      </div>
+          <div className="flex flex-none flex-col gap-1.5">
+            <label htmlFor={boxId} className="text-meta font-semibold">
+              {BOX_LABEL}
+            </label>
+            <Input
+              id={boxId}
+              type="text"
+              value={box}
+              readOnly={sending}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-invalid={view.reason !== null || undefined}
+              aria-describedby={view.reason !== null ? reasonId : undefined}
+              onChange={(event) => editBox(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return
+                // An IME commit (Safari: not composing, keyCode 229) is no press.
+                if (event.nativeEvent.isComposing || event.keyCode === 229)
+                  return
+                event.preventDefault()
+                send()
+              }}
+              className={cn(
+                'font-mono',
+                desktop ? 'h-9 text-path' : 'h-11 text-[16px]',
+              )}
+            />
+            {view.reason !== null && (
+              <p id={reasonId} className="m-0 text-meta text-delete">
+                {view.reason}
+              </p>
+            )}
+            {movingNote !== null && (
+              <p className="m-0 text-meta text-text-muted">{movingNote}</p>
+            )}
+          </div>
+        </>
+      )}
     </ConfirmShell>
+  )
+}
+
+/**
+ * Story 5.5 (EXPERIENCE 多選動作部分失敗): only the refused torrents, under
+ * a `status-error` line 「A 個開始搬了，B 個失敗」; each its name (plain
+ * text) over its reason in `status-error`. The list scrolls inside the
+ * screen when long. It takes focus on its top line when it appears (what
+ * had focus, the box or the list, is gone), so the line is read.
+ */
+function FailureView({
+  failure,
+  desktop,
+}: {
+  failure: ManyFailure
+  desktop: boolean
+}) {
+  const headerRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    headerRef.current?.focus({ preventScroll: true })
+  }, [])
+  return (
+    <div
+      data-move-failures=""
+      className="flex min-h-0 flex-col overflow-hidden rounded-card border bg-surface"
+    >
+      <div role="status" className="flex-none">
+        <p
+          ref={headerRef}
+          tabIndex={-1}
+          data-move-result=""
+          className={cn(
+            'm-0 flex items-center gap-1.5 border-b px-3 text-[13px] leading-[1.4] font-semibold text-status-error outline-none',
+            desktop ? 'min-h-9 py-2' : 'min-h-11 py-2',
+          )}
+        >
+          <CircleAlert
+            size={16}
+            strokeWidth={2.4}
+            aria-hidden="true"
+            className="flex-none"
+          />
+          {moveManyFailureHeader(failure.ok, failure.failed.length)}
+        </p>
+      </div>
+      <ul className="m-0 min-h-0 list-none overflow-y-auto p-0">
+        {failure.failed.map(({ hash, code }, index) => (
+          <li
+            key={hash}
+            data-move-failure={hash}
+            className={cn(
+              'flex flex-col gap-0.5 px-3',
+              desktop ? 'py-2' : 'py-2.5',
+              index > 0 && 'border-t',
+            )}
+          >
+            <span
+              className={cn(
+                'block truncate font-semibold text-text',
+                desktop ? 'text-[13px]' : 'text-[15px]',
+              )}
+              title={failure.names[hash] ?? hash}
+            >
+              {failure.names[hash] ?? hash}
+            </span>
+            <span className="text-meta font-semibold text-status-error">
+              {moveItemFailureText(code)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -663,7 +974,7 @@ function PathRadios({
   labelId,
   commonPaths,
   selected,
-  current,
+  currentTagOf,
   desktop,
   disabled,
   renameSlot,
@@ -672,7 +983,8 @@ function PathRadios({
   labelId: string
   commonPaths: ReadonlyArray<CommonPath>
   selected: CommonPath | null
-  current: CommonPath | null
+  /** 「目前」 or 「目前 K 個」 (story 5.5), or `null`. */
+  currentTagOf: (common: CommonPath) => string | null
   desktop: boolean
   disabled: boolean
   /** Story 5.4: the row's rename input, or `null` (the radio row). */
@@ -751,7 +1063,7 @@ function PathRadios({
             </span>
             <RowTags
               mediaLibrary={common.mediaLibrary}
-              current={common === current}
+              current={currentTagOf(common)}
             />
           </>
         )
@@ -805,9 +1117,10 @@ function RowTags({
   current,
 }: {
   mediaLibrary: boolean
-  current: boolean
+  /** The outline tag's text, `null` for none. */
+  current: string | null
 }) {
-  if (!mediaLibrary && !current) return null
+  if (!mediaLibrary && current === null) return null
   return (
     <span className="flex flex-none items-center gap-1.5">
       {mediaLibrary && (
@@ -818,18 +1131,18 @@ function RowTags({
           className="rounded-full px-2 py-px text-tag whitespace-nowrap"
         />
       )}
-      {current && <CurrentTag />}
+      {current !== null && <CurrentTag text={current} />}
     </span>
   )
 }
 
-function CurrentTag() {
+function CurrentTag({ text }: { text: string }) {
   return (
     <span
       data-current-tag=""
       className="inline-flex flex-none items-center rounded-full border px-2 py-px text-tag whitespace-nowrap text-text-muted"
     >
-      {CURRENT_TAG}
+      {text}
     </span>
   )
 }
@@ -843,7 +1156,7 @@ function CurrentTag() {
 function EditRows({
   labelId,
   commonPaths,
-  current,
+  currentTagOf,
   desktop,
   rowBusy,
   renameSlot,
@@ -853,7 +1166,7 @@ function EditRows({
 }: {
   labelId: string
   commonPaths: ReadonlyArray<CommonPath>
-  current: CommonPath | null
+  currentTagOf: (common: CommonPath) => string | null
   desktop: boolean
   rowBusy: (common: CommonPath) => boolean
   renameSlot: (common: CommonPath) => ReactNode
@@ -896,7 +1209,9 @@ function EditRows({
                     {common.name}
                   </button>
                 )}
-                {common === current && <CurrentTag />}
+                {currentTagOf(common) !== null && (
+                  <CurrentTag text={currentTagOf(common) as string} />
+                )}
               </span>
               <span
                 title={common.path}

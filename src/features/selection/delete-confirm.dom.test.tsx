@@ -146,12 +146,14 @@ const buttonNamed = (name: string) =>
     (each) =>
       each.textContent === name || each.getAttribute('aria-label') === name,
   ) as HTMLButtonElement
+// Story 5.5: 改路徑 opens a dialog too, so the button is found by its text.
 const barDelete = () =>
-  document
-    .querySelector('[data-selection-bar]')
-    ?.querySelector<HTMLButtonElement>(
-      'button[aria-haspopup="dialog"]',
-    ) as HTMLButtonElement
+  [
+    ...(document
+      .querySelector('[data-selection-bar]')
+      ?.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]') ??
+      []),
+  ].find((each) => each.textContent === '刪除（含檔案）') as HTMLButtonElement
 const rows = () => [
   ...(dialog()?.querySelectorAll<HTMLElement>('[data-delete-row]') ?? []),
 ]

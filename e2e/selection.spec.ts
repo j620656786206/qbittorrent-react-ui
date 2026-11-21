@@ -147,7 +147,8 @@ test('list: hover shows one checkbox; ticking 3 shows the bar and the total with
   // E04 is 找不到檔案: counted, its 4 GB not.
   await expect(bar(page)).toContainText('已選 3 個')
   await expect(bar(page)).toContainText('共 8 GB')
-  await expect(bar(page).getByRole('button', { name: '改路徑' })).toBeDisabled()
+  // Story 5.5 wired 改路徑 (e2e/move-many.spec.ts).
+  await expect(bar(page).getByRole('button', { name: '改路徑' })).toBeEnabled()
   // Story 4.3 wired delete (e2e/delete.spec.ts).
   await expect(
     bar(page).getByRole('button', { name: '刪除（含檔案）' }),

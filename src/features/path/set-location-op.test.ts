@@ -60,7 +60,7 @@ afterEach(() => {
 })
 
 describe('setLocationOp move records (spec 5.3)', () => {
-  it('records each ok hash with the target on success, not on send', async () => {
+  it('records a single move with the target on success, not on send', async () => {
     let answer: (value: BatchResult) => void = () => {}
     const sent: Array<SetLocationInput> = []
     const op = setLocationOp((input) => {
@@ -71,18 +71,13 @@ describe('setLocationOp move records (spec 5.3)', () => {
     })
     const queryClient = client()
     await queryClient.prefetchQuery({ queryKey: MAINDATA_KEY })
-    const done = sendOp(op, queryClient, moveVariables(queryClient, [A, B], TV))
+    const done = sendOp(op, queryClient, moveVariables(queryClient, [A], TV))
     await vi.waitFor(() => expect(sent).toHaveLength(1))
-    expect(sent[0]).toEqual({ hashes: [A, B], location: TV })
+    expect(sent[0]).toEqual({ hashes: [A], location: TV })
     expect(pendingOpOf(A)).toBeNull()
     expect(moveRecordOf(A)).toBeNull()
     const before = maindataFetches
-    answer({
-      items: [
-        { key: A, ok: true },
-        { key: B, ok: false, code: 'qbit_rejected', message: 'x' },
-      ],
-    })
+    answer({ items: [{ key: A, ok: true }] })
     await done
     // `from` is the save_path maindata had when pressed, normalized.
     expect(moveRecordOf(A)).toMatchObject({
@@ -90,8 +85,77 @@ describe('setLocationOp move records (spec 5.3)', () => {
       from: '/data/torrents/tv',
       seen: false,
     })
-    expect(moveRecordOf(B)).toBeNull()
     await vi.waitFor(() => expect(maindataFetches).toBeGreaterThan(before))
+  })
+
+  it('spec 5.5 a many move answers its items as they are and records nothing', async () => {
+    const op = setLocationOp(() =>
+      Promise.resolve({
+        items: [
+          { key: A, ok: true },
+          { key: B, ok: false, code: 'qbit_rejected', message: 'x' },
+        ],
+      }),
+    )
+    const answered: Array<BatchResult> = []
+    const queryClient = client()
+    await queryClient.prefetchQuery({ queryKey: MAINDATA_KEY })
+    const before = maindataFetches
+    await sendOp(
+      {
+        ...op,
+        onSuccess: (sentClient, sent, data) => {
+          answered.push(data)
+          return op.onSuccess?.(sentClient, sent, data)
+        },
+      },
+      queryClient,
+      moveVariables(queryClient, [A, B], TV),
+    )
+    expect(answered[0].items).toHaveLength(2)
+    expect(moveRecordOf(A)).toBeNull()
+    expect(moveRecordOf(B)).toBeNull()
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(maindataFetches).toBeGreaterThan(before))
+  })
+
+  it('spec 5.5 a many retry of one torrent: its refused item is an answer, not a failure', async () => {
+    const op = setLocationOp(() =>
+      Promise.resolve({
+        items: [{ key: A, ok: false, code: 'invalid_input', message: 'x' }],
+      }),
+    )
+    const answered: Array<BatchResult> = []
+    const queryClient = client()
+    const variables = moveVariables(queryClient, [A], TV, { many: true })
+    expect(variables.many).toBe(true)
+    await sendOp(
+      {
+        ...op,
+        onSuccess: (sentClient, sent, data) => {
+          answered.push(data)
+          return op.onSuccess?.(sentClient, sent, data)
+        },
+      },
+      queryClient,
+      variables,
+    )
+    expect(answered).toHaveLength(1)
+    expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(moveRecordOf(A)).toBeNull()
+  })
+
+  it('spec 5.5 a many move that succeeds for one hash writes no record either', async () => {
+    const op = setLocationOp(() =>
+      Promise.resolve({ items: [{ key: A, ok: true }] }),
+    )
+    await sendOp(op, client(), {
+      hashes: [A],
+      location: TV,
+      from: {},
+      many: true,
+    })
+    expect(moveRecordOf(A)).toBeNull()
   })
 
   it.each([
