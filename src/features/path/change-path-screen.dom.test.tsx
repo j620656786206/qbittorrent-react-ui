@@ -28,8 +28,8 @@ import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { resetOrderFreeze } from '#/state/order-freeze'
 import {
+  moveRecordOf,
   pendingOpOf,
-  pendingTargetOf,
   resetPendingOps,
 } from '#/state/pending-ops'
 import { createQueryClient } from '#/state/query-client'
@@ -40,8 +40,8 @@ import { setLocationOp } from '#/features/path/set-location-op'
 
 // Spec 5.2 rows U1 to U4 and the Always rules of the change-path screen, in
 // a DOM: the list (selection, 「目前」, the media tag), the box and its
-// reasons, 「加到常用」, the send (one call, the normalized path, pending
-// with the target, the refresh, the close), the sending lock, the failure
+// reasons, 「加到常用」, the send (one call, the normalized path, pending,
+// the move record on success, the refresh, the close), the sending lock, the failure
 // toast with 重試 (same body), connection codes, the phone sheet over a
 // detail sheet. The server functions are fakes passed in (AD-15).
 
@@ -399,7 +399,7 @@ describe('change path, one torrent (spec 5.2)', () => {
     },
   )
 
-  it('send: one call with the hash and the normalized path, pending with the target, then closed and refreshed', async () => {
+  it('send: one call with the hash and the normalized path, pending, then recorded, closed and refreshed', async () => {
     await render()
     await openFor()
     await type('/data/media/tv/')
@@ -412,7 +412,8 @@ describe('change path, one torrent (spec 5.2)', () => {
     await click(primary())
     expect(env.moveSent).toEqual([{ hashes: [A], location: '/data/media/tv' }])
     expect(pendingOpOf(A)).toBe('move')
-    expect(pendingTargetOf(A)).toBe('/data/media/tv')
+    // Spec 5.3: the move record waits for the ok answer.
+    expect(moveRecordOf(A)).toBeNull()
     expect(primary().textContent).toBe('搬移中…')
     // No second send, no close meanwhile.
     await click(primary())
@@ -427,6 +428,7 @@ describe('change path, one torrent (spec 5.2)', () => {
     expect(changePathOpenStore.state.open).toBeNull()
     expect(env.maindataFetches).toBeGreaterThan(before)
     expect(toastCalls.failure).not.toHaveBeenCalled()
+    expect(moveRecordOf(A)?.target).toBe('/data/media/tv')
     // The local torrent is never edited.
     expect(env.torrents[0].save_path).toBe('/data/torrents/tv/')
   })

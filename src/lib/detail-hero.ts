@@ -10,6 +10,7 @@ import {
 import {
   errorLineOf,
   heroKindOf,
+  isMovingTorrent,
   progressFraction,
   showsProgress,
   statusOfHeroKind,
@@ -21,7 +22,8 @@ import type { TorrentStatusId } from '#/shared/torrent-status'
 // Story 2.5, EXPERIENCE 「詳情狀態區每種狀態寫什麼」: the detail hero's
 // headline (status colour) and its one muted summary line, pure. The row
 // comes from heroKindOf() in torrent-status.ts (never `torrent.state`);
-// every number goes through format.ts; names and categories stay plain text.
+// every number goes through format.ts; names, categories and the move's
+// target stay plain text.
 
 /** Before getTorrentDetail's first answer (same as the info list). */
 const LOADING = '…'
@@ -139,6 +141,18 @@ function summaryPartsOf(
   )
 }
 
+/**
+ * Story 5.3 (UX save-path-block, EXPERIENCE 搬移中): while moving the
+ * summary starts with 「搬移中」, then 「正在搬到 <movingTo>」 when the
+ * container knows the target (a move another client started has none).
+ */
+function movingPartsOf(torrent: SlimTorrent): Array<string> {
+  if (!isMovingTorrent(torrent)) return []
+  return torrent.movingTo === undefined
+    ? ['搬移中']
+    : ['搬移中', `正在搬到 ${torrent.movingTo}`]
+}
+
 export function detailHero(
   torrent: SlimTorrent,
   options: DetailHeroOptions,
@@ -149,7 +163,10 @@ export function detailHero(
   return {
     status,
     headline: headlineOf(kind, torrent),
-    summaryParts: summaryPartsOf(kind, torrent, options),
+    summaryParts: [
+      ...movingPartsOf(torrent),
+      ...summaryPartsOf(kind, torrent, options),
+    ],
     arcFraction: showsProgress(status)
       ? progressFraction(torrent.progress)
       : null,

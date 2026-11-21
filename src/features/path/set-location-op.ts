@@ -4,19 +4,25 @@ import {
   setLocationFailureText,
 } from '#/lib/error-text'
 import type { OperationFailureCode } from '#/lib/error-text'
+import type { Maindata } from '#/lib/maindata-merge'
 import type { BatchResult, SetLocationInput } from '#/shared/torrent-ops'
-import { refreshMaindata } from '#/state/maindata'
+import { MAINDATA_KEY, refreshMaindata } from '#/state/maindata'
 import {
   MOVE_PENDING_OP,
   clearPendingAll,
   markPendingAll,
+  moveToastKey,
+  recordMoves,
 } from '#/state/pending-ops'
 import type { TrackedOp } from '#/state/tracked-op'
 
 // Story 5.2 (AD-7, AD-14): one `setLocation` through `sendOp`. The hashes go
-// into `pendingOps` as `move` with their target on send; on success
-// maindata refreshes and nothing local is edited (the container records
-// `movingTo`, which the next maindata carries). A single torrent whose one
+// into `pendingOps` as `move` on send; on success maindata refreshes and
+// nothing local is edited (the container records `movingTo`, which the
+// next maindata carries). Story 5.3: on success each hash whose item is ok
+// gets a move record with the target and the `save_path` it leaves (from
+// maindata before the refresh; a refused item never toasts), which
+// src/state/move-outcomes.ts turns into the done or failed toast. A single torrent whose one
 // item failed is that item's code failing (the container's pre-check:
 // unknown is `invalid_input`, already moving `qbit_rejected`). The failure
 // toast 「改路徑失敗：…」 with 重試 sends the same body; connection codes are
@@ -24,15 +30,6 @@ import type { TrackedOp } from '#/state/tracked-op'
 // on failure (a timeout may still have started the move).
 
 export const MOVE_OP = 'set-location'
-
-/**
- * A move's failure toast key: not the bare hash, which pause and delete
- * toasts of the same torrent use, so the change-path screen closing its own
- * toast never closes theirs.
- */
-export function moveToastKey(hash: string): string {
-  return `move:${hash}`
-}
 
 export interface MoveVariables {
   hashes: ReadonlyArray<string>
@@ -58,9 +55,17 @@ export function setLocationOp(call: SetLocationCall): MoveOp {
     keysOf: ({ hashes }) => hashes.map(moveToastKey),
     failureCodes: OPERATION_FAILURE_CODES,
     failureText: (_variables, code) => setLocationFailureText(code),
-    onSend: ({ hashes, location }) =>
-      markPendingAll(hashes, MOVE_PENDING_OP, location),
-    onSuccess: (client) => {
+    onSend: ({ hashes }) => markPendingAll(hashes, MOVE_PENDING_OP),
+    onSuccess: (client, { location }, result) => {
+      const torrents = client.getQueryData<Maindata>(MAINDATA_KEY)?.torrents
+      recordMoves(
+        result.items.filter((item) => item.ok).map((item) => item.key),
+        location,
+        (hash) =>
+          torrents && Object.hasOwn(torrents, hash)
+            ? torrents[hash].save_path
+            : '',
+      )
       void refreshMaindata(client)
     },
     onFailure: ({ hashes }) => clearPendingAll(hashes),

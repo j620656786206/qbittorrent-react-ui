@@ -49,6 +49,13 @@ export const slimTorrentSchema = z.object({
 
 export type SlimTorrent = z.infer<typeof slimTorrentSchema>
 
+/**
+ * Stories 5.2 and 5.3: how long a move may go without showing (`moving`
+ * never seen, `save_path` unchanged) before the container drops its
+ * `movingTo` and the browser drops the tab's move record.
+ */
+export const MOVING_TO_EXPIRY_MS = 10 * 60_000
+
 export const TORRENT_FIELDS = Object.freeze(
   Object.keys(slimTorrentSchema.shape) as Array<keyof SlimTorrent>,
 )

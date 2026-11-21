@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { isErroredTorrent } from '#/lib/error-reason'
-import { isMovingTorrent } from '#/lib/torrent-status'
+import { isMovingTorrent, isQbitMoving } from '#/lib/torrent-status'
 import { log as defaultLog } from '#/server/log'
 import type { Logger } from '#/server/log'
 import { BadMaindata } from '#/server/qbit/bad-maindata'
@@ -234,7 +234,7 @@ export function createSyncer(options: SyncerOptions): Syncer {
     const errored: Array<ErrorCandidate> = []
     table.forEach((torrent) => {
       names.set(torrent.name, (names.get(torrent.name) ?? 0) + 1)
-      if (isErroredTorrent(torrent, {}) || isMovingTorrent(torrent)) {
+      if (isErroredTorrent(torrent, {}) || isQbitMoving(torrent)) {
         errored.push({
           hash: torrent.hash,
           name: torrent.name,
@@ -260,10 +260,8 @@ export function createSyncer(options: SyncerOptions): Syncer {
     for (const hash of hashes) {
       const torrent = table.get(hash)
       if (torrent) {
-        found.set(
-          hash,
-          torrent.movingTo !== undefined || isMovingTorrent(torrent),
-        )
+        // `movingTo` set or qBittorrent's `moving`.
+        found.set(hash, isMovingTorrent(torrent))
       }
     }
     return found

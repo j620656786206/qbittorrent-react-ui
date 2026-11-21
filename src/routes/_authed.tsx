@@ -53,6 +53,7 @@ import { CategoryTabsContext, ListViewContext } from '#/state/list-view'
 import type { ListView } from '#/state/list-view'
 import { loginStore } from '#/state/login-required'
 import { MAINDATA_KEY, useCategoryCounts } from '#/state/maindata'
+import { useMoveOutcomes } from '#/state/move-outcomes'
 import { useOpenWhenAddedUpkeep } from '#/state/open-when-added'
 import { useFollowRememberedSort } from '#/state/remembered-sort'
 import { useResumeLastPlace } from '#/state/resume-last-place'
@@ -121,7 +122,9 @@ import { ViewedHashContext } from '#/state/viewed-hash'
 // is tracked against the URL's `hash` (src/state/detail-outside.ts).
 // Story 5.2: the change-path screen is mounted here too (features/path,
 // opened through src/state/change-path-open.ts), with the bound
-// `setLocation` and `addCommonPath` calls.
+// `setLocation` and `addCommonPath` calls. Story 5.3: the move outcome
+// toasts (src/state/move-outcomes.ts) run here, their 重試 bound to the
+// same move op.
 export const Route = createFileRoute('/_authed')({
   ssr: false,
   validateSearch: listSearchSchema,
@@ -531,6 +534,14 @@ function AuthedLayout() {
   useDetailOutsideUpkeep(hash ?? null)
   // Story 4.7: 「去看」 outlives the add screen.
   useOpenWhenAddedUpkeep(category, hash ?? null, setHash)
+  // Story 5.3: 「沒有搬到 …」's 重試 sends the same hash and target.
+  const resendMove = useCallback(
+    (moved: string, target: string) => {
+      void sendOp(moveOp, client, { hashes: [moved], location: target })
+    },
+    [client],
+  )
+  useMoveOutcomes(resendMove)
   // The op reads how many common paths are listed for its failure text.
   const addPathOp = useMemo(
     () => addCommonPathOp((values) => callFn(addCommonPath, values), client),

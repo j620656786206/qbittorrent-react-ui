@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { detailHero } from '#/lib/detail-hero'
+import { isMovingTorrent } from '#/lib/torrent-status'
 import { reasonOf } from '#/lib/error-reason'
 import type { DetailHero } from '#/lib/detail-hero'
 import { getTorrentDetail } from '#/server/functions/get-torrent-detail'
@@ -85,6 +86,7 @@ export function Overview({
         key={torrent.hash}
         hash={torrent.hash}
         path={torrent.save_path}
+        moving={isMovingTorrent(torrent)}
         phone={phone}
       />
       <InfoList torrent={torrent} today={clock.today} detail={detail} />
@@ -223,16 +225,21 @@ const PILL_OUTLINE = 'border-border bg-surface text-text hover-outline'
  * Story 5.2: 改路徑 opens the change-path screen for this torrent
  * (src/state/change-path-open.ts). 「☆ 加到常用」 (5.4) and 改檔名 (5.6 to
  * 5.8) still wait: native `disabled` (50%, not-allowed, no hover, not
- * focusable). Desktop: the path's `title` is the full path; phone: tapping
- * the path wraps it, tapping again cuts it again.
+ * focusable). Story 5.3: while the torrent moves (isMovingTorrent, from
+ * maindata's `movingTo` or `moving`, so a closed screen, a reload and
+ * another device agree) all four are `disabled` the same way. Desktop:
+ * the path's `title` is the full path; phone: tapping the path wraps it,
+ * tapping again cuts it again.
  */
 function SavePathBlock({
   hash,
   path,
+  moving,
   phone,
 }: {
   hash: string
   path: string
+  moving: boolean
   phone: boolean
 }) {
   const sectionRef = useRef<HTMLElement>(null)
@@ -293,6 +300,7 @@ function SavePathBlock({
       >
         <button
           type="button"
+          disabled={moving}
           onClick={() => void copy()}
           className={cn(PILL, PILL_OUTLINE, size)}
         >
@@ -303,6 +311,7 @@ function SavePathBlock({
         </button>
         <button
           type="button"
+          disabled={moving}
           onClick={() => openChangePath([hash])}
           className={cn(
             PILL,

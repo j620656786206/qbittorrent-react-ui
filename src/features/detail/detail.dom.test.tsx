@@ -947,6 +947,47 @@ describe('the overview (story 2.5)', () => {
     expect(changePathOpenStore.state.open).toEqual({ hashes: [h(11)] })
   })
 
+  it('spec 5.3 M1 movingTo: the summary starts 搬移中 · 正在搬到 (plain text), all four pills disabled', async () => {
+    const TARGET = '/data/media/<b>tv</b> & "x"'
+    const data = board().map((torrent) =>
+      torrent.hash === h(11) ? { ...torrent, movingTo: TARGET } : torrent,
+    )
+    await openSeed(data)
+    const headline = q('[role="tabpanel"] p') as HTMLElement
+    const summary = headline.nextElementSibling as HTMLElement
+    expect(
+      summary.textContent.startsWith(`搬移中 · 正在搬到 ${TARGET} · `),
+    ).toBe(true)
+    // The target is a text node, never markup: one span holds it as text,
+    // with no element inside, and no <b> was parsed anywhere.
+    const part = [...summary.querySelectorAll('span')].find(
+      (span) => span.textContent === `正在搬到 ${TARGET}`,
+    )
+    expect(part).toBeDefined()
+    expect(part?.children).toHaveLength(0)
+    expect(summary.querySelector('b')).toBeNull()
+    expect(pills().map((pill) => pill.disabled)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ])
+    await act(async () => pills()[2].click())
+    expect(changePathOpenStore.state.open).toBeNull()
+  })
+
+  it('spec 5.3 M2 moving with no movingTo: 搬移中 with no target, pills disabled', async () => {
+    const data = board().map((torrent) =>
+      torrent.hash === h(11) ? { ...torrent, state: 'moving' } : torrent,
+    )
+    await openSeed(data)
+    const headline = q('[role="tabpanel"] p') as HTMLElement
+    const summary = headline.nextElementSibling as HTMLElement
+    expect(summary.textContent).toMatch(/^搬移中 · /)
+    expect(summary.textContent).not.toContain('正在搬到')
+    expect(pills().every((pill) => pill.disabled)).toBe(true)
+  })
+
   it('story 5.1 save path: the tag shows the common path name, purple for a media library', async () => {
     const data = board().map((torrent) =>
       torrent.hash === h(11) ? { ...torrent, save_path: LONG_PATH } : torrent,
@@ -1257,9 +1298,7 @@ describe('the ⋯ menu (story 2.6)', () => {
 
   it('story 5.2: a pending move leaves 暫停 usable; a pending delete still disables it', async () => {
     await render(<BoardDetailPanel />, { hash: h(1) })
-    await act(async () =>
-      markPendingAll([h(1)], MOVE_PENDING_OP, '/data/media/tv'),
-    )
+    await act(async () => markPendingAll([h(1)], MOVE_PENDING_OP))
     await openMenu()
     expect(item().getAttribute('aria-disabled')).toBeNull()
     await act(async () => markPendingAll([h(1)], 'delete'))

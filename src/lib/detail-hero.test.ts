@@ -192,7 +192,7 @@ describe('H1 the 12 hero rows', () => {
     expect([seeding.status, seeding.arcFraction]).toEqual(['seeding', null])
   })
 
-  it('a moving torrent keeps the row it had before (no 搬移中 text: Epic 5)', () => {
+  it('a moving torrent keeps the row it had before', () => {
     const torrent = t({ state: 'moving', progress: 0.87 })
     const remembered = detailHero(torrent, {
       ...OPTIONS,
@@ -203,6 +203,63 @@ describe('H1 the 12 hero rows', () => {
     expect(
       detailHero(t({ state: 'moving', progress: 1 }), OPTIONS).headline,
     ).toBe('做種 不到 1 分')
+  })
+})
+
+describe('spec 5.3 moving summary', () => {
+  it('M1 movingTo before qBittorrent moves: 搬移中, the target, then the usual parts', () => {
+    const hero = detailHero(
+      t({
+        ...TV,
+        state: 'downloading',
+        progress: 0.87,
+        eta: 34 * 60,
+        dlspeed: 6.21 * MIB,
+        movingTo: '/data/media/tv',
+      }),
+      OPTIONS,
+    )
+    expect(hero.headline).toBe('下載中\u300087%')
+    expect(hero.status).toBe('downloading')
+    expect(hero.summaryParts.join(' · ')).toBe(
+      '搬移中 · 正在搬到 /data/media/tv · 剩 34 分 · ↓ 6.21 MB/s · 85 GB · mteam-tv',
+    )
+  })
+
+  it('M1 moving with movingTo and a remembered state', () => {
+    const torrent = t({
+      ...TV,
+      state: 'moving',
+      progress: 1,
+      movingTo: '/data/media/tv',
+    })
+    const hero = detailHero(torrent, {
+      ...OPTIONS,
+      stateBeforeMove: { [torrent.hash]: 'pausedUP' },
+    })
+    expect(hero.headline).toBe('已完成')
+    expect(hero.summaryParts.slice(0, 2)).toEqual([
+      '搬移中',
+      '正在搬到 /data/media/tv',
+    ])
+  })
+
+  it('M2 moving with no movingTo (another client): 搬移中 with no target part', () => {
+    const torrent = t({ ...TV, state: 'moving', progress: 1 })
+    const hero = detailHero(torrent, {
+      ...OPTIONS,
+      stateBeforeMove: { [torrent.hash]: 'uploading' },
+    })
+    expect(hero.status).toBe('seeding')
+    expect(hero.summaryParts[0]).toBe('搬移中')
+    expect(hero.summaryParts.some((part) => part.startsWith('正在搬到'))).toBe(
+      false,
+    )
+  })
+
+  it('M3 not moving: no prefix', () => {
+    const hero = detailHero(t({ ...TV, state: 'queuedDL' }), OPTIONS)
+    expect(hero.summaryParts.join(' · ')).toBe('85 GB · mteam-tv')
   })
 })
 
