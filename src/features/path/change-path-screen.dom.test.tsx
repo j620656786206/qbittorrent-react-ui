@@ -12,7 +12,9 @@ import { defaultSettings } from '#/shared/settings'
 import type {
   AddCommonPathInput,
   CommonPath,
+  RemoveCommonPathInput,
   Settings,
+  UpdateCommonPathInput,
 } from '#/shared/settings'
 import type { BatchResult, SetLocationInput } from '#/shared/torrent-ops'
 import { BottomSheet } from '#/shared/ui/bottom-sheet'
@@ -27,13 +29,14 @@ import {
 import { clearLoginRequired } from '#/state/login-required'
 import { MAINDATA_KEY } from '#/state/maindata'
 import { resetOrderFreeze } from '#/state/order-freeze'
-import {
-  moveRecordOf,
-  pendingOpOf,
-  resetPendingOps,
-} from '#/state/pending-ops'
+import { moveRecordOf, pendingOpOf, resetPendingOps } from '#/state/pending-ops'
 import { createQueryClient } from '#/state/query-client'
-import { SETTINGS_KEY, addCommonPathOp } from '#/state/settings'
+import {
+  SETTINGS_KEY,
+  addCommonPathOp,
+  removeCommonPathOp,
+  updateCommonPathOp,
+} from '#/state/settings'
 import { resetShortcuts } from '#/state/shortcuts'
 import { ChangePathScreen } from '#/features/path/change-path-screen'
 import { setLocationOp } from '#/features/path/set-location-op'
@@ -43,7 +46,9 @@ import { setLocationOp } from '#/features/path/set-location-op'
 // reasons, 「加到常用」, the send (one call, the normalized path, pending,
 // the move record on success, the refresh, the close), the sending lock, the failure
 // toast with 重試 (same body), connection codes, the phone sheet over a
-// detail sheet. The server functions are fakes passed in (AD-15).
+// detail sheet. The server functions are fakes passed in (AD-15). Spec 5.4
+// rows E1 to E4, A1 and D2's opening: edit mode, inline rename, 「媒體庫」,
+// ✕, the per-row locks.
 
 const toastCalls = vi.hoisted(() => ({
   plain: vi.fn((_text: string) => {}),
@@ -90,6 +95,10 @@ interface Env {
   moveAnswer: (input: SetLocationInput) => Promise<BatchResult>
   addSent: Array<AddCommonPathInput>
   addAnswer: (input: AddCommonPathInput) => Promise<Settings>
+  updateSent: Array<UpdateCommonPathInput>
+  updateAnswer: (input: UpdateCommonPathInput) => Promise<Settings>
+  removeSent: Array<RemoveCommonPathInput>
+  removeAnswer: (input: RemoveCommonPathInput) => Promise<Settings>
   maindataFetches: number
   client: QueryClient
   withDetailSheet: boolean
@@ -111,6 +120,18 @@ function Tree() {
       return env.addAnswer(input)
     }, env.client),
   )
+  const [updatePathOp] = useState(() =>
+    updateCommonPathOp((input) => {
+      env.updateSent.push(input)
+      return env.updateAnswer(input)
+    }),
+  )
+  const [removePathOp] = useState(() =>
+    removeCommonPathOp((input) => {
+      env.removeSent.push(input)
+      return env.removeAnswer(input)
+    }),
+  )
   return (
     <>
       {env.withDetailSheet && (
@@ -120,7 +141,12 @@ function Tree() {
           </button>
         </BottomSheet>
       )}
-      <ChangePathScreen moveOp={moveOp} addPathOp={addPathOp} />
+      <ChangePathScreen
+        moveOp={moveOp}
+        addPathOp={addPathOp}
+        updatePathOp={updatePathOp}
+        removePathOp={removePathOp}
+      />
     </>
   )
 }
@@ -189,13 +215,57 @@ const addRow = () =>
     each.textContent.startsWith('加到常用'),
   ) as HTMLButtonElement
 const input = () =>
-  dialog()?.querySelector<HTMLInputElement>('input') as HTMLInputElement
+  dialog()?.querySelector<HTMLInputElement>(
+    'input:not([data-rename-input])',
+  ) as HTMLInputElement
 const reason = () =>
   input().getAttribute('aria-describedby')
     ? document.getElementById(input().getAttribute('aria-describedby') ?? '')
         ?.textContent
     : null
 const lastFailure = () => toastCalls.failure.mock.lastCall
+const editPill = () =>
+  dialog()?.querySelector<HTMLButtonElement>(
+    '[data-edit-pill]',
+  ) as HTMLButtonElement
+const editRows = () => [
+  ...(dialog()?.querySelectorAll<HTMLElement>('[data-edit-row]') ?? []),
+]
+const editRowNamed = (name: string) =>
+  editRows().find((row) =>
+    row.querySelector('[data-path-name]')
+      ? row.querySelector('[data-path-name]')?.textContent === name
+      : row.querySelector<HTMLInputElement>('[data-rename-input]')?.value ===
+        name,
+  ) as HTMLElement
+const nameButton = (name: string) =>
+  editRowNamed(name).querySelector<HTMLButtonElement>(
+    '[data-path-name]',
+  ) as HTMLButtonElement
+const checkboxOf = (row: HTMLElement) =>
+  row.querySelector<HTMLButtonElement>('[role="checkbox"]') as HTMLButtonElement
+const removeOf = (row: HTMLElement) =>
+  row.querySelector<HTMLButtonElement>(
+    'button[title="從常用拿掉（不動檔案）"]',
+  ) as HTMLButtonElement
+const renameInput = () =>
+  dialog()?.querySelector<HTMLInputElement>('[data-rename-input]') ?? null
+
+async function typeInto(element: HTMLInputElement, text: string) {
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    setter?.call(element, text)
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+async function enterEditMode() {
+  await click(editPill())
+  expect(editPill().textContent).toBe('完成')
+}
 
 async function type(text: string) {
   await act(async () => {
@@ -261,11 +331,43 @@ beforeEach(() => {
       items: values.hashes.map((key) => ({ key, ok: true as const })),
     })
   env.addSent = []
-  env.addAnswer = (values) =>
-    Promise.resolve({
+  env.addAnswer = (values) => {
+    env.settings = {
       ...env.settings,
       commonPaths: [...env.settings.commonPaths, values],
-    })
+    }
+    return Promise.resolve(env.settings)
+  }
+  env.updateSent = []
+  env.updateAnswer = (values) => {
+    env.settings = {
+      ...env.settings,
+      commonPaths: env.settings.commonPaths.map((common) =>
+        common.path === values.path
+          ? {
+              ...common,
+              ...(values.name === undefined
+                ? {}
+                : { name: values.name.trim() }),
+              ...(values.mediaLibrary === undefined
+                ? {}
+                : { mediaLibrary: values.mediaLibrary }),
+            }
+          : common,
+      ),
+    }
+    return Promise.resolve(env.settings)
+  }
+  env.removeSent = []
+  env.removeAnswer = (values) => {
+    env.settings = {
+      ...env.settings,
+      commonPaths: env.settings.commonPaths.filter(
+        (common) => common.path !== values.path,
+      ),
+    }
+    return Promise.resolve(env.settings)
+  }
   env.maindataFetches = 0
   env.withDetailSheet = false
   for (const mock of Object.values(toastCalls)) mock.mockClear()
@@ -314,8 +416,8 @@ describe('change path, one torrent (spec 5.2)', () => {
     // The path is listed: 加到常用 is disabled with the note.
     expect(addRow().disabled).toBe(true)
     expect(addRow().textContent).toContain('框裡的路徑已經在清單裡')
-    // No 編輯 pill in 5.2.
-    expect(buttonNamed('編輯')).toBeUndefined()
+    // Story 5.4: the 編輯 pill, normal mode.
+    expect(editPill().textContent).toBe('編輯')
   })
 
   it('the media library rows carry one 「媒體庫」 tag, read once; 「目前」 is only an outline tag', async () => {
@@ -645,6 +747,9 @@ describe('change path, one torrent (spec 5.2)', () => {
     expect(env.addSent).toEqual([
       { path: '/data/media/anime', name: 'media/anime', mediaLibrary: false },
     ])
+    // Story 5.4: the new row's name opens for renaming; Enter keeps it.
+    await press('Enter', renameInput())
+    await settle()
     expect(rows()).toHaveLength(4)
     expect(selectedNames()).toEqual(['media/anime'])
     expect(
@@ -682,7 +787,7 @@ describe('change path, one torrent (spec 5.2)', () => {
       }),
     )
     await settle()
-    expect(rows()).toHaveLength(4)
+    expect(dialog()?.querySelectorAll('[data-path-row]')).toHaveLength(4)
   })
 
   it('加到常用 refused with 50 listed: 「常用路徑最多 50 個」', async () => {
@@ -804,5 +909,539 @@ describe('change path on the phone (spec 5.2)', () => {
     expect(outside(detail)?.hasAttribute('inert')).toBe(false)
     expect(detail.textContent).toContain('改路徑')
     expect(document.activeElement).toBe(opener)
+  })
+})
+
+describe('edit mode (spec 5.4)', () => {
+  it('E1 編輯: 完成 (700), no radios, dotted names, a 媒體庫 checkbox and a ✕ per row, 加到常用 hidden; 完成 brings the radios back', async () => {
+    await render()
+    await openFor()
+    expect(editPill().className).toContain('h-7')
+    expect(editPill().className).toContain('font-semibold')
+    expect(editPill().className).toContain('border')
+    await enterEditMode()
+    expect(editPill().className).toContain('font-bold')
+    expect(rows()).toEqual([])
+    expect(dialog()?.querySelector('[role="radiogroup"]')).toBeNull()
+    expect(editRows()).toHaveLength(3)
+    for (const row of editRows()) {
+      expect(row.className).toContain('min-h-[52px]')
+      const name = row.querySelector('[data-path-name]') as HTMLElement
+      expect(name.className).toContain('decoration-dotted')
+      expect(name.getAttribute('aria-label')).toBe(`改名：${name.textContent}`)
+      expect(checkboxOf(row).getAttribute('aria-label')).toBe(
+        `媒體庫：${name.textContent}`,
+      )
+      expect(checkboxOf(row).className).toContain('size-5')
+      expect(removeOf(row).className).toContain('size-8')
+      expect(removeOf(row).getAttribute('aria-label')).toBe(
+        `從常用拿掉：${name.textContent}`,
+      )
+    }
+    expect(
+      editRows().map((row) => checkboxOf(row).getAttribute('aria-checked')),
+    ).toEqual(['false', 'true', 'true'])
+    // 「目前」 stays beside the name; no 媒體庫 tag (the checkbox says it).
+    expect(
+      editRowNamed('下載區（影集）').querySelector('[data-current-tag]'),
+    ).not.toBeNull()
+    expect(dialog()?.querySelector('[data-media-library]')).toBeNull()
+    expect(addRow()).toBeUndefined()
+    await click(editPill())
+    expect(editPill().textContent).toBe('編輯')
+    expect(rows()).toHaveLength(3)
+    expect(addRow()).toBeDefined()
+    expect(selectedNames()).toEqual(['下載區（影集）'])
+  })
+
+  it('E1 a row click in edit mode does not fill the box', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    const row = editRowNamed('影集媒體庫')
+    await click(row)
+    await click(row.querySelector('[title="/data/media/tv"]') as HTMLElement)
+    expect(input().value).toBe('/data/torrents/tv/')
+  })
+
+  it('E2 rename with Enter: the name becomes an input (text selected), one updateCommonPath with the trimmed name, then the new name with focus back', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(nameButton('影集媒體庫'))
+    const field = renameInput() as HTMLInputElement
+    expect(field.value).toBe('影集媒體庫')
+    expect(document.activeElement).toBe(field)
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 5])
+    expect(field.className).toContain('h-9')
+    expect(field.getAttribute('aria-label')).toBe('/data/media/tv 的名稱')
+    await typeInto(field, '  影集  ')
+    await press('Enter', field)
+    await settle()
+    expect(env.updateSent).toEqual([{ path: '/data/media/tv', name: '影集' }])
+    expect(renameInput()).toBeNull()
+    expect(nameButton('影集').textContent).toBe('影集')
+    expect(document.activeElement).toBe(nameButton('影集'))
+    expect(dialog()).not.toBeNull()
+  })
+
+  it('E2 blur saves like Enter; an unchanged name sends nothing', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(nameButton('電影媒體庫'))
+    await act(async () => (renameInput() as HTMLInputElement).blur())
+    await settle()
+    expect(renameInput()).toBeNull()
+    expect(env.updateSent).toEqual([])
+    await click(nameButton('電影媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '電影')
+    await act(async () => (renameInput() as HTMLInputElement).blur())
+    await settle()
+    expect(env.updateSent).toEqual([
+      { path: '/data/media/movies', name: '電影' },
+    ])
+    expect(nameButton('電影').textContent).toBe('電影')
+  })
+
+  it.each([
+    ['blank', '   '],
+    ['51 characters', 'n'.repeat(51)],
+  ])(
+    'E2 a %s name: the delete border, not sent, the input stays',
+    async (_name, text) => {
+      await render()
+      await openFor()
+      await enterEditMode()
+      await click(nameButton('影集媒體庫'))
+      const field = renameInput() as HTMLInputElement
+      await typeInto(field, text)
+      expect(field.getAttribute('aria-invalid')).toBe('true')
+      expect(field.className).toContain('aria-invalid:border-destructive')
+      await press('Enter', field)
+      await act(async () => field.blur())
+      await settle()
+      expect(env.updateSent).toEqual([])
+      expect(renameInput()?.value).toBe(text)
+    },
+  )
+
+  it('E2 Esc cancels that rename only: the name back, nothing sent, the screen open', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(nameButton('影集媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '別的名字')
+    await press('Escape', renameInput())
+    await settle()
+    expect(renameInput()).toBeNull()
+    expect(nameButton('影集媒體庫').textContent).toBe('影集媒體庫')
+    expect(document.activeElement).toBe(nameButton('影集媒體庫'))
+    expect(env.updateSent).toEqual([])
+    expect(dialog()).not.toBeNull()
+    expect(changePathOpenStore.state.open).not.toBeNull()
+    // The next Esc closes the screen.
+    await press('Escape', nameButton('影集媒體庫'))
+    await settle()
+    expect(dialog()).toBeNull()
+  })
+
+  it('E2 a failed rename: the toast with 重試, the input keeps the typed name; 重試 sends it again and closes the input', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    const answer = env.updateAnswer
+    env.updateAnswer = () =>
+      Promise.reject(new AppError('settings_write_failed'))
+    await click(nameButton('影集媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '影集')
+    await press('Enter', renameInput())
+    await settle()
+    expect(lastFailure()?.[0]).toBe('名稱沒改到：設定檔寫不進去')
+    expect(lastFailure()?.[1].keys).toEqual([
+      'settings:common-path:/data/media/tv',
+    ])
+    expect(renameInput()?.value).toBe('影集')
+    expect(renameInput()?.disabled).toBe(false)
+    env.updateAnswer = answer
+    await act(async () => lastFailure()?.[1].onRetry())
+    await settle()
+    expect(env.updateSent).toEqual([
+      { path: '/data/media/tv', name: '影集' },
+      { path: '/data/media/tv', name: '影集' },
+    ])
+    expect(renameInput()).toBeNull()
+    expect(nameButton('影集').textContent).toBe('影集')
+  })
+
+  it('ticking 媒體庫 saves at once; the list follows the answer', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(checkboxOf(editRowNamed('下載區（影集）')))
+    await settle()
+    expect(env.updateSent).toEqual([
+      { path: '/data/torrents/tv', mediaLibrary: true },
+    ])
+    expect(
+      checkboxOf(editRowNamed('下載區（影集）')).getAttribute('aria-checked'),
+    ).toBe('true')
+    await click(checkboxOf(editRowNamed('電影媒體庫')))
+    await settle()
+    expect(env.updateSent[1]).toEqual({
+      path: '/data/media/movies',
+      mediaLibrary: false,
+    })
+    await click(editPill())
+    expect(
+      rowNamed('下載區（影集）').querySelector('[data-media-library]'),
+    ).not.toBeNull()
+    expect(
+      rowNamed('電影媒體庫').querySelector('[data-media-library]'),
+    ).toBeNull()
+  })
+
+  it('a failed tick: 「媒體庫沒改到：…」 with 重試, the box unticked', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    env.updateAnswer = () => Promise.reject(new AppError('timeout'))
+    await click(checkboxOf(editRowNamed('下載區（影集）')))
+    await settle()
+    expect(lastFailure()?.[0]).toBe('媒體庫沒改到：容器沒有回應，請再試一次')
+    expect(
+      checkboxOf(editRowNamed('下載區（影集）')).getAttribute('aria-checked'),
+    ).toBe('false')
+  })
+
+  it('E3 ✕ on the selected row: no confirmation, the entry gone, the box keeps its path, no row selected', async () => {
+    await render()
+    await openFor()
+    expect(selectedNames()).toEqual(['下載區（影集）'])
+    await enterEditMode()
+    await click(removeOf(editRowNamed('下載區（影集）')))
+    await settle()
+    expect(env.removeSent).toEqual([{ path: '/data/torrents/tv' }])
+    expect(editRows()).toHaveLength(2)
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(input().value).toBe('/data/torrents/tv/')
+    await click(editPill())
+    expect(rows()).toHaveLength(2)
+    expect(selectedNames()).toEqual([])
+    expect(addRow().disabled).toBe(false)
+  })
+
+  it('E3 a failed ✕: 「沒從常用拿掉：…」 with 重試, the row stays', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    env.removeAnswer = () =>
+      Promise.reject(new AppError('settings_write_failed'))
+    await click(removeOf(editRowNamed('影集媒體庫')))
+    await settle()
+    expect(lastFailure()?.[0]).toBe('沒從常用拿掉：設定檔寫不進去')
+    expect(editRows()).toHaveLength(3)
+  })
+
+  it("E4 while a row's write is in flight its name, checkbox and ✕ are disabled; other rows are not", async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    let finish: (value: Settings) => void = () => {}
+    env.updateAnswer = () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+    await click(checkboxOf(editRowNamed('影集媒體庫')))
+    const busy = editRowNamed('影集媒體庫')
+    expect(nameButton('影集媒體庫').disabled).toBe(true)
+    expect(checkboxOf(busy).disabled).toBe(true)
+    expect(removeOf(busy).disabled).toBe(true)
+    const other = editRowNamed('電影媒體庫')
+    expect(checkboxOf(other).disabled).toBe(false)
+    expect(removeOf(other).disabled).toBe(false)
+    // A second press on the busy row sends nothing.
+    await click(removeOf(busy))
+    expect(env.removeSent).toEqual([])
+    await act(async () =>
+      finish({
+        ...env.settings,
+        commonPaths: [
+          TV_DOWNLOADS,
+          { ...TV_LIBRARY, mediaLibrary: false },
+          MOVIE_LIBRARY,
+        ],
+      }),
+    )
+    await settle()
+    expect(checkboxOf(editRowNamed('影集媒體庫')).disabled).toBe(false)
+  })
+
+  it('E4 a rename in flight disables its input', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    let finish: (value: Settings) => void = () => {}
+    env.updateAnswer = () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+    await click(nameButton('影集媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '影集')
+    await press('Enter', renameInput())
+    expect(renameInput()?.disabled).toBe(true)
+    expect(checkboxOf(editRows()[1]).disabled).toBe(true)
+    // A blur meanwhile sends nothing more.
+    await act(async () => (renameInput() as HTMLInputElement).blur())
+    expect(env.updateSent).toHaveLength(1)
+    await act(async () =>
+      finish({
+        ...env.settings,
+        commonPaths: [
+          TV_DOWNLOADS,
+          { ...TV_LIBRARY, name: '影集' },
+          MOVIE_LIBRARY,
+        ],
+      }),
+    )
+    await settle()
+    expect(renameInput()).toBeNull()
+    expect(nameButton('影集').disabled).toBe(false)
+  })
+
+  it("A1 加到常用 succeeded: the new row's name is an input with its text selected; leaving it unchanged keeps the name", async () => {
+    await render()
+    await openFor()
+    await type('/data/media/anime/')
+    await click(addRow())
+    await settle()
+    const field = renameInput() as HTMLInputElement
+    expect(field.value).toBe('media/anime')
+    expect(document.activeElement).toBe(field)
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 11])
+    // Normal mode: the row keeps its selected look (no radio button).
+    const row = field.closest('[data-path-row]') as HTMLElement
+    expect(row.dataset.selected).toBe('true')
+    expect(row.getAttribute('role')).toBeNull()
+    await press('Enter', field)
+    await settle()
+    expect(env.updateSent).toEqual([])
+    expect(renameInput()).toBeNull()
+    expect(selectedNames()).toEqual(['media/anime'])
+    expect(document.activeElement).toBe(rowNamed('media/anime'))
+  })
+
+  it('A1 renaming right after 加到常用 sends updateCommonPath for the new path', async () => {
+    await render()
+    await openFor()
+    await type('/data/media/anime')
+    await click(addRow())
+    await settle()
+    await typeInto(renameInput() as HTMLInputElement, '動畫媒體庫')
+    await press('Enter', renameInput())
+    await settle()
+    expect(env.updateSent).toEqual([
+      { path: '/data/media/anime', name: '動畫媒體庫' },
+    ])
+    expect(rowNamed('動畫媒體庫').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('A1 arrow keys step over a row whose rename stays open (an invalid name)', async () => {
+    await render()
+    await openFor()
+    await type('/data/media/anime')
+    await click(addRow())
+    await settle()
+    // Blank: the blur below keeps the input.
+    await typeInto(renameInput() as HTMLInputElement, ' ')
+    const last = rowNamed('電影媒體庫')
+    await act(async () => last.focus())
+    await press('ArrowDown', last)
+    expect(renameInput()).not.toBeNull()
+    // Wraps to the first radio, past the renaming row.
+    expect(input().value).toBe('/data/torrents/tv')
+  })
+
+  it("D2 an open with editPath: edit mode, that row's name input focused; a plain open is normal mode", async () => {
+    await render()
+    await act(async () => openChangePath([A], { editPath: '/data/media/tv/' }))
+    await settle()
+    expect(editPill().textContent).toBe('完成')
+    const field = renameInput() as HTMLInputElement
+    expect(field.value).toBe('影集媒體庫')
+    expect(document.activeElement).toBe(field)
+    await press('Escape', field)
+    await settle()
+    expect(dialog()).not.toBeNull()
+    await press('Escape')
+    await settle()
+    expect(dialog()).toBeNull()
+    await openFor()
+    expect(editPill().textContent).toBe('編輯')
+    expect(renameInput()).toBeNull()
+    expect(rows()).toHaveLength(3)
+  })
+
+  it('a failed rename gives focus back to its input (it lost focus while disabled), so Esc cancels only the rename', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    let fail: (error: Error) => void = () => {}
+    env.updateAnswer = () =>
+      new Promise((_resolve, reject) => {
+        fail = reject
+      })
+    await click(nameButton('影集媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '影集')
+    await press('Enter', renameInput())
+    // Disabled while out, a browser moves focus off it (happy-dom keeps it,
+    // so the lost focus is stubbed and the refocus is watched).
+    const field = renameInput() as HTMLInputElement
+    const focus = vi.spyOn(field, 'focus')
+    const active = vi
+      .spyOn(document, 'activeElement', 'get')
+      .mockReturnValue(document.body)
+    await act(async () => fail(new AppError('settings_write_failed')))
+    active.mockRestore()
+    await settle()
+    expect(focus).toHaveBeenCalled()
+    expect(document.activeElement).toBe(renameInput())
+    expect(renameInput()?.value).toBe('影集')
+    await press('Escape', renameInput())
+    await settle()
+    expect(dialog()).not.toBeNull()
+    expect(renameInput()).toBeNull()
+    expect(env.updateSent).toHaveLength(1)
+  })
+
+  it('a failed ✕ gives focus back to the ✕', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    let fail: (error: Error) => void = () => {}
+    env.removeAnswer = () =>
+      new Promise((_resolve, reject) => {
+        fail = reject
+      })
+    const remove = removeOf(editRowNamed('影集媒體庫'))
+    await click(remove)
+    const focus = vi.spyOn(remove, 'focus')
+    const active = vi
+      .spyOn(document, 'activeElement', 'get')
+      .mockReturnValue(document.body)
+    await act(async () => fail(new AppError('settings_write_failed')))
+    active.mockRestore()
+    await settle()
+    expect(focus).toHaveBeenCalled()
+    expect(document.activeElement).toBe(removeOf(editRowNamed('影集媒體庫')))
+  })
+
+  it('closing and opening again dismiss the common-path failure toasts of the listed paths', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    env.updateAnswer = () =>
+      Promise.reject(new AppError('settings_write_failed'))
+    await click(checkboxOf(editRowNamed('影集媒體庫')))
+    await settle()
+    expect(lastFailure()?.[1].keys).toEqual([
+      'settings:common-path:/data/media/tv',
+    ])
+    const dismissedTv = () =>
+      toastCalls.dismissFor.mock.calls.filter(
+        ([key]) => key === 'settings:common-path:/data/media/tv',
+      ).length
+    const before = dismissedTv()
+    await click(buttonNamed('取消') as HTMLButtonElement)
+    expect(dialog()).toBeNull()
+    expect(dismissedTv()).toBe(before + 1)
+    expect(toastCalls.dismissFor).toHaveBeenCalledWith(
+      'settings:common-path:/data/torrents/tv',
+    )
+    await openFor()
+    expect(dismissedTv()).toBe(before + 2)
+  })
+
+  it('完成 closes an open rename without saving (an invalid name too)', async () => {
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(nameButton('影集媒體庫'))
+    await typeInto(renameInput() as HTMLInputElement, '   ')
+    await click(editPill())
+    expect(editPill().textContent).toBe('編輯')
+    expect(renameInput()).toBeNull()
+    expect(rowNamed('影集媒體庫')).toBeDefined()
+    // Into edit mode again: no input left over.
+    await click(editPill())
+    expect(renameInput()).toBeNull()
+    expect(env.updateSent).toEqual([])
+  })
+
+  it('no common paths: 編輯 is disabled; removing the last one leaves edit mode', async () => {
+    env.settings = { ...defaultSettings(), commonPaths: [TV_LIBRARY] }
+    env.settingsAnswer = Promise.resolve(env.settings)
+    await render()
+    await openFor()
+    await enterEditMode()
+    await click(removeOf(editRowNamed('影集媒體庫')))
+    await settle()
+    expect(editPill().textContent).toBe('編輯')
+    expect(editPill().disabled).toBe(true)
+    expect(editRows()).toEqual([])
+    expect(addRow()).toBeDefined()
+  })
+
+  it('the selected row being renamed: the first radio is the tab stop', async () => {
+    await render()
+    await openFor()
+    await type('/data/media/anime')
+    await click(addRow())
+    await settle()
+    expect(renameInput()).not.toBeNull()
+    expect(rows().map((row) => row.tabIndex)).toEqual([0, -1, -1])
+  })
+
+  it('the 編輯 pill is disabled before settings answer', async () => {
+    env.settingsAnswer = null
+    await render()
+    await openFor()
+    expect(editPill().disabled).toBe(true)
+  })
+})
+
+describe('edit mode on the phone (spec 5.4)', () => {
+  beforeEach(() => {
+    env.desktop = false
+  })
+
+  it('a 44px pill, 56px rows, a 44px 16px name input', async () => {
+    await render()
+    await openFor()
+    expect(editPill().className).toContain('h-11')
+    await enterEditMode()
+    expect(editRows()[0].className).toContain('min-h-14')
+    await click(nameButton('影集媒體庫'))
+    const field = renameInput() as HTMLInputElement
+    expect(field.className).toContain('h-11')
+    expect(field.className).toContain('text-[16px]')
+    expect(document.activeElement).toBe(field)
+    // Esc cancels the rename; the sheet stays.
+    await press('Escape', field)
+    await settle()
+    expect(renameInput()).toBeNull()
+    expect(dialog()).not.toBeNull()
+  })
+
+  it("D2 on the phone: the sheet opens in edit mode with that row's input focused", async () => {
+    await render()
+    await act(async () =>
+      openChangePath([A], { editPath: '/data/media/movies' }),
+    )
+    await settle()
+    await settle()
+    const field = renameInput() as HTMLInputElement
+    expect(field.value).toBe('電影媒體庫')
+    expect(document.activeElement).toBe(field)
   })
 })

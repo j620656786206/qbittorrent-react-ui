@@ -94,6 +94,35 @@ export const addCommonPathInputSchema = z.strictObject({
 export type AddCommonPathInput = z.input<typeof addCommonPathInputSchema>
 
 /**
+ * Story 5.4: `updateCommonPath`. `path` names the entry (normalized, the
+ * first match); `name` (trimmed, then the name schema) and `mediaLibrary`
+ * are the changes, at least one of them.
+ */
+export const updateCommonPathInputSchema = z
+  .strictObject({
+    path: savePathSchema,
+    name: z
+      .string()
+      .transform((name) => name.trim())
+      .pipe(commonPathNameSchema)
+      .optional(),
+    mediaLibrary: z.boolean().optional(),
+  })
+  .refine(
+    (values) => values.name !== undefined || values.mediaLibrary !== undefined,
+    'nothing to change',
+  )
+
+export type UpdateCommonPathInput = z.input<typeof updateCommonPathInputSchema>
+
+/** Story 5.4: `removeCommonPath`; `path` names the entry (normalized). */
+export const removeCommonPathInputSchema = z.strictObject({
+  path: savePathSchema,
+})
+
+export type RemoveCommonPathInput = z.input<typeof removeCommonPathInputSchema>
+
+/**
  * Story 3.3: the whole new tab order (`setCategoryOrder`). Each entry is a
  * `categoryOrder` entry (never `ALL`), no name twice, and the list fits the
  * settings file's 256 KB bound; anything else is `invalid_input`.

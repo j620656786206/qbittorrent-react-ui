@@ -82,7 +82,7 @@ jobs:
       fail-fast: false
       matrix:
         # Keep this a one-line array: scripts/verify-shards.mjs reads it.
-        shard: [delete, detail, smoke, rest]
+        shard: [delete, detail, smoke, path, rest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

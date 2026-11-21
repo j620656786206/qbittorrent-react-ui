@@ -70,7 +70,7 @@ describe('server function discovery', () => {
     expect(await auditServerFunctions(realModules)).toEqual([])
   })
 
-  it('finds the real login, getSession, getMaindata, getSortKeys, getTorrentDetail, stopTorrents, startTorrents, deleteTorrents, addTorrents, getFiles, setFilePriority, getErrorReasons, getSettings, setCategorySort, setCategoryOrder, setLocation and addCommonPath functions', () => {
+  it('finds the real login, getSession, getMaindata, getSortKeys, getTorrentDetail, stopTorrents, startTorrents, deleteTorrents, addTorrents, getFiles, setFilePriority, getErrorReasons, getSettings, setCategorySort, setCategoryOrder, setLocation, addCommonPath, updateCommonPath and removeCommonPath functions', () => {
     const found = Object.entries(realModules).flatMap(([file, exports]) =>
       Object.keys(exports).map((name) => `${file}#${name}`),
     )
@@ -91,6 +91,8 @@ describe('server function discovery', () => {
     expect(found).toContain('./set-category-order.ts#setCategoryOrder')
     expect(found).toContain('./set-location.ts#setLocation')
     expect(found).toContain('./add-common-path.ts#addCommonPath')
+    expect(found).toContain('./update-common-path.ts#updateCommonPath')
+    expect(found).toContain('./remove-common-path.ts#removeCommonPath')
     expect(guardedOf(realModules['./login.ts'].login)?.spec.auth).toBe('public')
   })
 

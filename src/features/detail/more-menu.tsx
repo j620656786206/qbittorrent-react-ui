@@ -26,11 +26,7 @@ import {
   selectStateBeforeMove,
   useMaindata,
 } from '#/state/maindata'
-import {
-  clearPending,
-  markPending,
-  usePendingOp,
-} from '#/state/pending-ops'
+import { clearPending, markPending, usePendingOp } from '#/state/pending-ops'
 import { sendOp, useOpsInFlight } from '#/state/tracked-op'
 import type { TrackedOp } from '#/state/tracked-op'
 

@@ -65,6 +65,11 @@ export interface ConfirmShellProps {
   onCancel: () => void
   /** Focused on close; by default what had focus when it opened. */
   returnFocus?: () => HTMLElement | null
+  /**
+   * Story 5.4: focused on open instead of the default (desktop the cancel,
+   * phone the ✕), when it answers an element.
+   */
+  initialFocus?: () => HTMLElement | null
   role?: 'dialog' | 'alertdialog'
   /** The desktop width, a Tailwind class (`w-[512px]` for delete). */
   desktopWidthClass?: string
@@ -89,6 +94,13 @@ const TONE_CLASS = {
 
 const WAITING_CLASS = 'm-0 text-meta text-text-muted'
 
+/** Story 5.4: `target` is inside an element that handles Esc itself. */
+function ownsEscape(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest('[data-own-escape]') !== null
+  )
+}
+
 export function ConfirmShell({
   open,
   desktop,
@@ -105,6 +117,7 @@ export function ConfirmShell({
   sending,
   onCancel,
   returnFocus,
+  initialFocus,
   role = 'dialog',
   desktopWidthClass = 'w-[512px]',
 }: ConfirmShellProps) {
@@ -151,6 +164,7 @@ export function ConfirmShell({
         closeLabel={closeLabel}
         locked={sending}
         returnFocus={returnFocus}
+        initialFocus={initialFocus}
         describedBy={bodyId}
         footer={
           <div className="flex flex-col px-4 pt-2 pb-4">
@@ -195,10 +209,13 @@ export function ConfirmShell({
         onOpenAutoFocus={(event) => {
           // The least destructive button first (APG alertdialog).
           event.preventDefault()
-          cancelRef.current?.focus({ preventScroll: true })
+          const first = initialFocus?.() ?? cancelRef.current
+          first?.focus({ preventScroll: true })
         }}
         onEscapeKeyDown={(event) => {
-          if (sending) event.preventDefault()
+          // Story 5.4: an element marked `data-own-escape` (an inline
+          // rename) handles Esc itself, and the dialog stays open.
+          if (sending || ownsEscape(event.target)) event.preventDefault()
         }}
         className={cn(
           'flex max-h-[calc(100dvh-40px)] max-w-[calc(100%-40px)] flex-col gap-3.5 overflow-hidden p-6 sm:max-w-[calc(100%-40px)]',

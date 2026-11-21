@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   MOVING_NOTE,
-  addCommonPathInput,
   changePathView,
+  renameOutcome,
 } from '#/features/path/change-path-model'
 
 // Spec 5.2: the change-path screen's pure parts.
@@ -98,20 +98,31 @@ it('outer spaces of a pasted path are trimmed before matching and sending', () =
   ).toBe(true)
 })
 
-describe('addCommonPathInput', () => {
-  it('names the path by its last two folders, not a media library', () => {
-    expect(addCommonPathInput('/data/media/anime')).toEqual({
-      path: '/data/media/anime',
-      name: 'media/anime',
-      mediaLibrary: false,
+describe('renameOutcome (spec 5.4)', () => {
+  it('the same name (after trimming) sends nothing', () => {
+    expect(renameOutcome('media/tv', 'media/tv')).toEqual({ kind: 'unchanged' })
+    expect(renameOutcome('  media/tv ', 'media/tv')).toEqual({
+      kind: 'unchanged',
     })
   })
 
-  it('cuts a long name to 50 characters without splitting one', () => {
-    const long = `/data/${'a'.repeat(30)}/${'😀'.repeat(20)}`
-    const { name } = addCommonPathInput(long)
-    expect(name.length).toBeLessThanOrEqual(50)
-    expect(name.startsWith('a'.repeat(30))).toBe(true)
-    expect(name.endsWith('😀')).toBe(true)
+  it('a changed valid name is sent trimmed', () => {
+    expect(renameOutcome('  影集  ', 'media/tv')).toEqual({
+      kind: 'send',
+      name: '影集',
+    })
+    expect(renameOutcome('n'.repeat(50), 'x')).toEqual({
+      kind: 'send',
+      name: 'n'.repeat(50),
+    })
+  })
+
+  it.each([
+    ['blank', '   '],
+    ['empty', ''],
+    ['51 characters', 'n'.repeat(51)],
+    ['a line break', 'a\nb'],
+  ])('%s is invalid and not sent', (_name, text) => {
+    expect(renameOutcome(text, 'media/tv')).toEqual({ kind: 'invalid' })
   })
 })

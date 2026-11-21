@@ -17,9 +17,11 @@ import {
   fileActionFailureText,
   orderSaveFailureText,
   pauseActionFailureText,
+  removeCommonPathFailureText,
   savePathFormatReason,
   setLocationFailureText,
   sortSaveFailureText,
+  updateCommonPathFailureText,
 } from '#/lib/error-text'
 import { ERROR_CODES } from '#/shared/errors'
 import type { ErrorCode } from '#/shared/errors'
@@ -192,6 +194,24 @@ describe('change path texts (spec 5.2)', () => {
     )
     expect(addCommonPathFailureText('timeout', false)).toBe(
       '沒加到常用：容器沒有回應，請再試一次',
+    )
+  })
+
+  it('story 5.4 rename, tick and remove a common path: the settings-write reason', () => {
+    expect(updateCommonPathFailureText('settings_write_failed', 'name')).toBe(
+      '名稱沒改到：設定檔寫不進去',
+    )
+    expect(updateCommonPathFailureText('timeout', 'mediaLibrary')).toBe(
+      '媒體庫沒改到：容器沒有回應，請再試一次',
+    )
+    expect(updateCommonPathFailureText('invalid_input', 'name')).toBe(
+      `名稱沒改到：${errorText('invalid_input')}`,
+    )
+    expect(removeCommonPathFailureText('settings_write_failed')).toBe(
+      '沒從常用拿掉：設定檔寫不進去',
+    )
+    expect(removeCommonPathFailureText('timeout')).toBe(
+      '沒從常用拿掉：容器沒有回應，請再試一次',
     )
   })
 

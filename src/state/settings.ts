@@ -4,7 +4,9 @@ import {
   SETTINGS_WRITE_FAILURE_CODES,
   addCommonPathFailureText,
   orderSaveFailureText,
+  removeCommonPathFailureText,
   sortSaveFailureText,
+  updateCommonPathFailureText,
 } from '#/lib/error-text'
 import type { SettingsWriteFailureCode } from '#/lib/error-text'
 import { categoryOrderRowsOf, orderAfterMove } from '#/lib/category-order'
@@ -13,9 +15,11 @@ import { MAX_COMMON_PATHS } from '#/shared/settings'
 import type {
   AddCommonPathInput,
   GetSettingsInput,
+  RemoveCommonPathInput,
   SetCategoryOrderInput,
   SetCategorySortInput,
   Settings,
+  UpdateCommonPathInput,
 } from '#/shared/settings'
 import { callFn } from '#/state/call-fn'
 import { isLoginRequired, unlessLoginRequired } from '#/state/login-required'
@@ -249,7 +253,9 @@ export type AddCommonPathCall = (input: AddCommonPathInput) => Promise<Settings>
  * Its failure codes are a settings write's: the toast with 「重試」 (same
  * call); an `invalid_input` while 50 paths are listed reads
  * 「常用路徑最多 50 個」 (`client` tells how many are listed). No success
- * toast (5.4 adds rename).
+ * toast from the op itself: the change-path screen opens the new row's
+ * name for renaming, the detail's 「☆ 加到常用」 shows its own toast
+ * (story 5.4).
  */
 export function addCommonPathOp(
   call: AddCommonPathCall,
@@ -258,7 +264,7 @@ export function addCommonPathOp(
   return {
     name: ADD_COMMON_PATH_OP,
     call,
-    keysOf: ({ path }) => [`settings:common-path:${path}`],
+    keysOf: ({ path }) => [commonPathToastKey(path)],
     scopeOf: () => SETTINGS_WRITE_SCOPE,
     failureCodes: SETTINGS_WRITE_FAILURE_CODES,
     failureText: (_variables, code) => {
@@ -268,5 +274,76 @@ export function addCommonPathOp(
     },
     onSuccess: (queryClient, _variables, settings) =>
       applySettings(queryClient, settings),
+  }
+}
+
+/**
+ * What a common-path write is about: one path (its toast key). Story 5.4:
+ * the change-path screen closes these toasts on open and close.
+ */
+export function commonPathToastKey(path: string): string {
+  return `settings:common-path:${path}`
+}
+
+export const UPDATE_COMMON_PATH_OP = 'update-common-path'
+
+export type UpdateCommonPathCall = (
+  input: UpdateCommonPathInput,
+) => Promise<Settings>
+
+/**
+ * Story 5.4: renaming a common path or ticking its 「媒體庫」
+ * (`updateCommonPath`) through `sendOp`. Idempotent on the container (a
+ * path no longer listed succeeds unchanged); the answer, the whole new
+ * settings, becomes `['settings']`, so the list and the location tags
+ * follow it (no optimistic change, AD-7). In the settings write queue
+ * (SETTINGS_WRITE_SCOPE), keyed by the path like 「加到常用」, so a newer
+ * write about the same path closes an older failure toast. Failure: the
+ * toast 「名稱沒改到：…」 or 「媒體庫沒改到：…」 with 「重試」 (same call).
+ */
+export function updateCommonPathOp(
+  call: UpdateCommonPathCall,
+): TrackedOp<UpdateCommonPathInput, SettingsWriteFailureCode, Settings> {
+  return {
+    name: UPDATE_COMMON_PATH_OP,
+    call,
+    keysOf: ({ path }) => [commonPathToastKey(path)],
+    scopeOf: () => SETTINGS_WRITE_SCOPE,
+    failureCodes: SETTINGS_WRITE_FAILURE_CODES,
+    failureText: (variables, code) =>
+      updateCommonPathFailureText(
+        code,
+        variables.name === undefined ? 'mediaLibrary' : 'name',
+      ),
+    onSuccess: (client, _variables, settings) =>
+      applySettings(client, settings),
+  }
+}
+
+export const REMOVE_COMMON_PATH_OP = 'remove-common-path'
+
+export type RemoveCommonPathCall = (
+  input: RemoveCommonPathInput,
+) => Promise<Settings>
+
+/**
+ * Story 5.4: ✕ in the change-path screen's edit mode (`removeCommonPath`)
+ * through `sendOp`, with no confirmation: only the shortcut goes, never a
+ * file. Idempotent (a missing path succeeds); the answer becomes
+ * `['settings']`. In the settings write queue, keyed by the path. Failure:
+ * the toast 「沒從常用拿掉：…」 with 「重試」.
+ */
+export function removeCommonPathOp(
+  call: RemoveCommonPathCall,
+): TrackedOp<RemoveCommonPathInput, SettingsWriteFailureCode, Settings> {
+  return {
+    name: REMOVE_COMMON_PATH_OP,
+    call,
+    keysOf: ({ path }) => [commonPathToastKey(path)],
+    scopeOf: () => SETTINGS_WRITE_SCOPE,
+    failureCodes: SETTINGS_WRITE_FAILURE_CODES,
+    failureText: (_variables, code) => removeCommonPathFailureText(code),
+    onSuccess: (client, _variables, settings) =>
+      applySettings(client, settings),
   }
 }

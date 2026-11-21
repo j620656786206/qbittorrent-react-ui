@@ -846,7 +846,7 @@ test.describe('story 2.5 overview', () => {
     await expect(cut).toHaveText(LONG_SAVE_PATH)
     await expect(cut.locator('..')).toHaveAttribute('title', LONG_SAVE_PATH)
     await expectOneLine(cut)
-    // Story 5.2: 改路徑 works; 「☆ 加到常用」 (5.4) and 改檔名 still wait.
+    // Story 5.2: 改路徑 works; story 5.4: 「☆ 加到常用」 too; 改檔名 still waits.
     await expect(
       savePath(panel(page)).getByRole('button', { name: '改路徑' }),
     ).toBeEnabled()

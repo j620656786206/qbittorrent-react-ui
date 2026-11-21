@@ -11,9 +11,11 @@ import { ALL } from '#/shared/categories'
 import { MAX_COMMON_PATHS, defaultSettings } from '#/shared/settings'
 import type {
   AddCommonPathInput,
+  RemoveCommonPathInput,
   SetCategoryOrderInput,
   SetCategorySortInput,
   Settings,
+  UpdateCommonPathInput,
 } from '#/shared/settings'
 import { clearConnectionErrors, getConnectionErrors } from '#/state/connection'
 import { clearLoginRequired, markLoginRequired } from '#/state/login-required'
@@ -29,6 +31,8 @@ import {
   categorySortOp,
   isSavingSort,
   refreshSettings,
+  removeCommonPathOp,
+  updateCommonPathOp,
 } from '#/state/settings'
 import type { FetchSettings, GetSettingsFn } from '#/state/settings'
 import { sendOp } from '#/state/tracked-op'
@@ -630,6 +634,164 @@ describe('addCommonPathOp (spec 5.2)', () => {
     await flush()
     const call = vi.fn(() => Promise.reject(new AppError('home_unreachable')))
     sendOp(addCommonPathOp(call, client), client, input)
+    await flush()
+    await flush()
+    expect(toastCalls.failures).toEqual([])
+  })
+})
+
+describe('updateCommonPathOp and removeCommonPathOp (spec 5.4)', () => {
+  const TV = { path: '/data/media/tv', name: 'media/tv', mediaLibrary: false }
+  const MOVIES = {
+    path: '/data/media/movies',
+    name: '電影媒體庫',
+    mediaLibrary: true,
+  }
+  const listed: Settings = { ...defaultSettings(), commonPaths: [TV, MOVIES] }
+
+  it('rename: the answer becomes ["settings"], in the settings write queue, keyed by the path', async () => {
+    const client = setup(async () => listed).client
+    await flush()
+    const answer: Settings = {
+      ...listed,
+      commonPaths: [{ ...TV, name: '影集' }, MOVIES],
+    }
+    const call = vi.fn((_values: UpdateCommonPathInput) =>
+      Promise.resolve(answer),
+    )
+    const op = updateCommonPathOp(call)
+    const input = { path: TV.path, name: '影集' }
+    expect(op.scopeOf?.(input)).toBe('settings-write')
+    sendOp(op, client, input)
+    await flush()
+    await flush()
+    expect(call.mock.calls[0][0]).toEqual(input)
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(answer)
+    expect(toastCalls.dismissed).toEqual([
+      'settings:common-path:/data/media/tv',
+    ])
+    expect(toastCalls.failures).toEqual([])
+  })
+
+  it.each([
+    [
+      { path: TV.path, name: '影集' },
+      'settings_write_failed',
+      '名稱沒改到：設定檔寫不進去',
+    ],
+    [
+      { path: TV.path, mediaLibrary: true },
+      'timeout',
+      '媒體庫沒改到：容器沒有回應，請再試一次',
+    ],
+  ] as const)(
+    'update %o failing with %s: the toast reads %s, 重試 sends the same call',
+    async (input, code, text) => {
+      const client = setup(async () => listed).client
+      await flush()
+      const call = vi
+        .fn<(values: UpdateCommonPathInput) => Promise<Settings>>()
+        .mockRejectedValueOnce(new AppError(code))
+        .mockResolvedValue(listed)
+      sendOp(updateCommonPathOp(call), client, input)
+      await flush()
+      await flush()
+      expect(toastCalls.failures).toHaveLength(1)
+      expect(toastCalls.failures[0].text).toBe(text)
+      expect(toastCalls.failures[0].keys).toEqual([
+        'settings:common-path:/data/media/tv',
+      ])
+      toastCalls.failures[0].onRetry()
+      await flush()
+      await flush()
+      expect(call).toHaveBeenCalledTimes(2)
+      expect(call.mock.calls[1][0]).toEqual(input)
+    },
+  )
+
+  it('remove: the answer becomes ["settings"], in the settings write queue', async () => {
+    const client = setup(async () => listed).client
+    await flush()
+    const answer: Settings = { ...listed, commonPaths: [MOVIES] }
+    const call = vi.fn((_values: RemoveCommonPathInput) =>
+      Promise.resolve(answer),
+    )
+    const op = removeCommonPathOp(call)
+    expect(op.scopeOf?.({ path: TV.path })).toBe('settings-write')
+    sendOp(op, client, { path: TV.path })
+    await flush()
+    await flush()
+    expect(client.getQueryData(SETTINGS_KEY)).toEqual(answer)
+    expect(toastCalls.dismissed).toEqual([
+      'settings:common-path:/data/media/tv',
+    ])
+  })
+
+  it('remove failing: 「沒從常用拿掉：…」 with 重試 (same call)', async () => {
+    const client = setup(async () => listed).client
+    await flush()
+    const call = vi
+      .fn<(values: RemoveCommonPathInput) => Promise<Settings>>()
+      .mockRejectedValueOnce(new AppError('settings_write_failed'))
+      .mockResolvedValue({ ...listed, commonPaths: [MOVIES] })
+    sendOp(removeCommonPathOp(call), client, { path: TV.path })
+    await flush()
+    await flush()
+    expect(toastCalls.failures[0].text).toBe('沒從常用拿掉：設定檔寫不進去')
+    toastCalls.failures[0].onRetry()
+    await flush()
+    await flush()
+    expect(call.mock.calls.map((each) => each[0])).toEqual([
+      { path: TV.path },
+      { path: TV.path },
+    ])
+    expect(client.getQueryData<Settings>(SETTINGS_KEY)?.commonPaths).toEqual([
+      MOVIES,
+    ])
+  })
+
+  it('a rename and a remove of different paths run one after another, the later answer last', async () => {
+    const client = setup(async () => listed).client
+    await flush()
+    let finishRename: (value: Settings) => void = () => {}
+    const renamed: Settings = {
+      ...listed,
+      commonPaths: [{ ...TV, name: '影集' }, MOVIES],
+    }
+    const rename = vi.fn(
+      () =>
+        new Promise<Settings>((resolve) => {
+          finishRename = resolve
+        }),
+    )
+    const remove = vi.fn(() =>
+      Promise.resolve({ ...listed, commonPaths: [{ ...TV, name: '影集' }] }),
+    )
+    sendOp(updateCommonPathOp(rename), client, { path: TV.path, name: '影集' })
+    sendOp(removeCommonPathOp(remove), client, { path: MOVIES.path })
+    await flush()
+    expect(rename).toHaveBeenCalledTimes(1)
+    expect(remove).not.toHaveBeenCalled()
+    finishRename(renamed)
+    await flush()
+    await flush()
+    await flush()
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(client.getQueryData<Settings>(SETTINGS_KEY)?.commonPaths).toEqual([
+      { ...TV, name: '影集' },
+    ])
+  })
+
+  it('a connection code: no toast (the global handler)', async () => {
+    const client = setup(async () => listed).client
+    await flush()
+    sendOp(
+      removeCommonPathOp(() =>
+        Promise.reject(new AppError('home_unreachable')),
+      ),
+      client,
+      { path: TV.path },
+    )
     await flush()
     await flush()
     expect(toastCalls.failures).toEqual([])

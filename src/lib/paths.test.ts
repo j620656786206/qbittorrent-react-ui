@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addCommonPathInput,
   LOCATION_CACHE_LIMIT,
   NO_COMMON_PATHS_RESOLVER,
   createLocationResolver,
@@ -245,5 +246,29 @@ describe('listedCommonPath (spec 5.2)', () => {
     expect(listedCommonPath('/data//media/tv', [b, a])).toBe(b)
     expect(listedCommonPath('/data/media/tv/x', [a])).toBeNull()
     expect(listedCommonPath('/data/media', [a])).toBeNull()
+  })
+})
+
+describe('addCommonPathInput (spec 5.2, 5.4)', () => {
+  it('names the path by its last two folders, not a media library', () => {
+    expect(addCommonPathInput('/data/media/anime')).toEqual({
+      path: '/data/media/anime',
+      name: 'media/anime',
+      mediaLibrary: false,
+    })
+  })
+
+  it('normalizes the path first (a trailing slash)', () => {
+    expect(addCommonPathInput('/data/media/anime/').path).toBe(
+      '/data/media/anime',
+    )
+  })
+
+  it('cuts a long name to 50 characters without splitting one', () => {
+    const long = `/data/${'a'.repeat(30)}/${'😀'.repeat(20)}`
+    const { name } = addCommonPathInput(long)
+    expect(name.length).toBeLessThanOrEqual(50)
+    expect(name.startsWith('a'.repeat(30))).toBe(true)
+    expect(name.endsWith('😀')).toBe(true)
   })
 })
