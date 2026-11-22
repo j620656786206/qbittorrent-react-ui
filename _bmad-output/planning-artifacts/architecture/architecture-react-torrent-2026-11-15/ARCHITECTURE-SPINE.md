@@ -198,7 +198,7 @@ flowchart TD
 | 每分類記住的排序、分類順序、常用路徑 | `settings.json`（AD-8） |
 | 上次看的分類、每分類上次看的種子、自動收合開關 | localStorage，每台各自；key 表只在 `src/lib/prefs.ts` |
 | 勾選（有序 hash 陣列，最早勾的在前）、`pendingOps`、快捷鍵登記、凍結狀態 | `src/state/` |
-| 深色模式 | 跟系統（`prefers-color-scheme`），不做切換、不存偏好 |
+| 深色模式 | 設定頁的「外觀」三選一：跟系統（預設，照 `prefers-color-scheme`）、淺色、深色。選擇存 localStorage，每台各自，key 在 `src/lib/prefs.ts`。2026-11-22 Alex 改，原本只跟系統、不做切換 |
 
   - 「目前看得到的那串種子」只由 `src/lib` 的 `selectVisibleTorrents(maindata, view)` 算，回傳排好的 hash 陣列；排序比較和同分規則（再比 `added_on`，再比 `hash`）只在這裡。凍結順序（滑鼠停在列表、有勾選、手機在捲、動畫中）由 `src/state` 一個 hook 持有。列表、看板、詳情的「第 N 個」、鍵盤上下鍵、刪除後換下一個全部用它。功能裡不准自己 `sort()` 種子。
   - 勾選由 `src/state/selection` 管：換分類、改搜尋時清掉；每次 maindata 更新後拿掉已不存在的 hash。

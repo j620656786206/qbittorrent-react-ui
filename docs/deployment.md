@@ -8,7 +8,7 @@
 
 在 repo 的 Settings 做，只要做一次。
 
-1. **main 分支保護**：Settings > Branches 新增規則，套用到 `main`。勾「合併前要通過狀態檢查」（Require status checks to pass before merging），選 CI 的 `check`，同時勾「Require branches to be up to date before merging」，這樣 CI 測過的就是合併後的內容。勾「禁止 force push」。
+1. **main 分支保護**：Settings > Branches 新增規則，套用到 `main`。勾「合併前要通過狀態檢查」（Require status checks to pass before merging），選 CI 的 `ci-ok`（它會等全部的 job 都過），同時勾「Require branches to be up to date before merging」，這樣 CI 測過的就是合併後的內容。勾「禁止 force push」。
 2. **Dependabot**：Settings > Code security，打開 Dependabot alerts 和 Dependabot security updates。目前兩個都是關的。
 3. **依賴更新 PR 要自己看**：自動流程（/ship）只合併 `story/` 開頭的分支。Dependabot 開的 PR 分支是 `dependabot/` 開頭，不會被自動合併，要你自己看過再合併。每月會有三個：正式依賴、開發依賴、GitHub Actions 加 Node 基底映像。安全性更新不分組，隨時會開。
 

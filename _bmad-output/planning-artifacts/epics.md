@@ -89,7 +89,7 @@ inputDocuments:
 - NFR-3：動畫只動 `transform` 和 `opacity`，數值照規格，在真的手機上不掉格（目標 60fps）（PRD §5）
 - NFR-4：系統開了減少動態時，所有動畫都關掉，功能照常（PRD §5）
 - NFR-5：寬度 1024px 以上是電腦版、以下是手機版；10 張畫面兩種版面都能用；手機不會橫向捲動（PRD §5）
-- NFR-6：跟系統的深淺色，顏色照角色用；每張畫面在深藍夜截圖檢查一次（PRD §5）
+- NFR-6：預設跟系統的深淺色，設定頁可以手動選淺色或深色（2026-11-22 Alex 改）；顏色照角色用；每張畫面在深藍夜截圖檢查一次（PRD §5）
 - NFR-7：狀態用顏色加圖示、圖示按鈕有 `aria-label`、焦點外框、手機點擊範圍 44px、對比 4.5 和 3（PRD §5）
 - NFR-8：畫面文字直接寫繁體中文台灣用語，用句號或冒號斷句，不露原始狀態碼和 Unix 時間（PRD §5）
 - NFR-9：在家走 http 也全部能用；複製和算 info hash 不依賴只有 https 才有的 API（PRD §5）
@@ -174,7 +174,7 @@ inputDocuments:
 
 **前端狀態**
 
-- AR-49：狀態主人：目前分類、搜尋、手動選的排序、目前看的 hash 放 URL search params（zod 驗）；每分類排序、分類順序、常用路徑放 `settings.json`；上次看的分類、每分類上次看的種子、自動收合開關放 localStorage（key 表只在 `src/lib/prefs.ts`）；勾選、`pendingOps`、快捷鍵、凍結放 `src/state`；深色跟系統。（AD-13）
+- AR-49：狀態主人：目前分類、搜尋、手動選的排序、目前看的 hash 放 URL search params（zod 驗）；每分類排序、分類順序、常用路徑放 `settings.json`；上次看的分類、每分類上次看的種子、自動收合開關放 localStorage（key 表只在 `src/lib/prefs.ts`）；勾選、`pendingOps`、快捷鍵、凍結放 `src/state`；外觀（跟系統、淺色、深色）放 localStorage，每台各自，預設跟系統（2026-11-22 Alex 改）。（AD-13）
 - AR-50：凍結順序由 `src/state` 一個 hook 持有（滑鼠停在列表、有勾選、手機在捲、動畫中）；列表、看板、「第 N 個」、鍵盤上下鍵、刪除後換下一個全部用它。（AD-13）
 - AR-51：勾選由 `src/state/selection` 管：有序 hash 陣列，最早勾的在前；換分類、改搜尋時清掉；每次 maindata 更新後拿掉不存在的 hash。（AD-13）
 - AR-52：快捷鍵只在 `src/state` 一份表登記；焦點在輸入框時只認 `Esc`；`Esc` 依序關對話框、搜尋、詳情；說明視窗和 tooltip 從同一份表產生。（AD-13）
@@ -219,7 +219,7 @@ inputDocuments:
 - UX-DR3：狀態 7 色加圖示（淺／深）：`status-downloading` #2F6FDF／#5AA9E0 向下箭頭；`status-seeding` #278A4F／#7FBF8E 向上箭頭；`status-done` #141414／#7D8BA0 打勾；`status-paused` #B26F0C／#E0AD62 兩條直線；`status-stalled` #C9581E／#E3925F 沙漏；`status-error` #D93A3A／#E0707F 驚嘆號；`status-archived` #65655F／#95A1B2 封存盒。圓圈裡的圖示用 `status-icon` #FFFFFF／#0F1720。
 - UX-DR4：shadcn 變數對照：`background`→`surface-page`、`foreground`→`text`、`card`／`popover`→`surface`、`primary`→品牌 `accent`、`primary-foreground`→`accent-foreground`、`secondary`／`muted`→`surface-muted`、`muted-foreground`→`text-muted`、shadcn `accent`→`surface-muted`、`destructive`→`delete`、`border`／`input`→`border`、`ring`→品牌 `accent`。`DialogContent` 的底色從 `bg-background` 換成 `surface`。
 - UX-DR5：顏色用法：狀態一律顏色加圖示；警告借 `status-stalled`，只用在圖示和 1px 外框，字用 `text`；撞名借 `status-error`；紫色只表示媒體庫；紅色只用在錯誤和刪除；不加角色以外的顏色。
-- UX-DR6：主題跟系統 `prefers-color-scheme`，不做切換、不存偏好；陰影和遮罩深色沿用淺色的值。已知例外不調：深色選取列上的刪除按鈕對選取列底 2.65:1。
+- UX-DR6：主題預設跟系統 `prefers-color-scheme`，設定頁的「外觀」可以選跟系統、淺色、深色，存在這台裝置（2026-11-22 Alex 改，原本不做切換）；陰影和遮罩深色沿用淺色的值。已知例外不調：深色選取列上的刪除按鈕對選取列底 2.65:1。
 - UX-DR7：字型兩種：介面用 `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif`；路徑用 `'SF Mono', ui-monospace, Menlo, monospace`。不載入外部字型。
 - UX-DR8：字級 12 個角色（大小／粗細／行高）：`page-title` 26/700/1.2、`detail-hero` 28/700/1.2、`stat-value` 20/700/1.2、`row-value` 18/700/1.2、`card-value` 電腦 17 手機 22/700/1.2、`detail-name` 16/700/1.2、`column-title` 15/700/1.2、`body` 13/400/1.4、`row-name` 13/600/1.4、`meta` 12/400/1.4、`tag` 11/400/1.4、`path` 12/400/1.5 等寬字。數字一律 `tabular-nums`。
 - UX-DR9：圓角：`xs` 6px（勾選框）、`bar` 9px（進度條）、`row` 14px（列表列、狀態分頁選中格）、`card` 16px（卡片、數字小卡、儲存位置區塊、toast、提示條、對話框清單框）、`panel` 22px（看板欄、詳情面板、對話框、登入卡片、手機選取列）、`sheet` 28px（底部面板上緣）、`full`（按鈕、分頁、標籤、輸入框、選取列都是膠囊）。
@@ -301,7 +301,7 @@ inputDocuments:
 - UX-DR67：改檔名 rename 版面：標題「改檔名」加種子名稱；劇名（拉滿）和第幾季（88px）兩個 36px 輸入框並排；下面「會放到 <路徑>/<劇名>/season1/」（等寬 12px）；預覽清單框最上面 11px `text-muted` 欄名「列」「集數」「原本　→　改成」；每列三欄 24px／60px／剩下：右對齊列號（12px、`text-muted`），60×30px 膠囊集數輸入框前面淡色「E」，名字兩行（上面原檔名等寬 12px `text-muted`，下面「→」加新檔名等寬 12px `text` 600）。
 - UX-DR68：改檔名標示：猜的集數在「→」的位置換成 `status-stalled` 驚嘆號圖示，字還是 `text`；字幕列的集數欄寫「字幕」；不動的檔案只有原檔名，右邊寫「不動」；撞名列的集數外框、新檔名、「跟第 N 列同名」都用 `status-error`；底部左邊撞名時 13px／600 `status-error`「有 N 列撞名」加圖示，有猜的時 12px `text`「N 個集數是猜的，確定前看一下」加 `status-stalled` 圖示；右邊取消和「確定」，撞名時不能按。單檔時只有「新檔名」欄位，有外層資料夾時多「資料夾名稱」。
 - UX-DR69：手機改檔名：全螢幕面板，上緣沒有圓角、沒有遮罩，頂端留安全區，把手留著；輸入框 44px；最下面拉滿的「確定」；沒有取消按鈕。
-- UX-DR70：設定頁：沿用舊設定頁的位置和樣式（程式重寫），只有兩項：分類分頁順序（「全部」固定第一，其他用上下箭頭排）、「捲動時自動收合其他欄」開關（預設開；手機旁邊一行 `text-muted`「只在電腦版有用」）。沒有常用路徑、快捷鍵自訂、深淺色切換。
+- UX-DR70：設定頁：沿用舊設定頁的位置和樣式（程式重寫），只有三項：分類分頁順序（「全部」固定第一，其他用上下箭頭排）、「捲動時自動收合其他欄」開關（預設開；手機旁邊一行 `text-muted`「只在電腦版有用」）、「外觀」三選一（跟系統、淺色、深色，預設跟系統；2026-11-22 Alex 加，Story 5.9 做）。沒有常用路徑、快捷鍵自訂。
 
 **RWD**
 
@@ -447,7 +447,7 @@ Alex 改一個或一批種子的儲存路徑，用常用路徑一鍵選目標並
 
 **FRs covered:** FR-40、FR-41、FR-42、FR-43、FR-44、FR-45、FR-46、FR-47、FR-48、FR-49、FR-50
 
-**備註：** FR-58 的多選改路徑部分失敗在這裡補上。改名用整批 renameFiles（AD-14）。
+**備註：** FR-58 的多選改路徑部分失敗在這裡補上。改名用整批 renameFiles（AD-14）。Story 5.9（手動切深淺色）不屬於整理檔案，是 2026-11-22 Alex 裝到 NAS 後加的，放在這個 epic 最後做。
 
 ## Epic 1：打開就看得到所有種子
 
@@ -2469,3 +2469,37 @@ Alex 從詳情改一個種子的儲存路徑，或從選取列一次搬好幾個
 **Then** repo 裡有一份驗收清單，照根目錄 DESIGN.md 的 7 件事各寫一到三個步驟和預期結果：看下載進度、篩選分類、刪除種子、新增種子、排序、改儲存路徑、改檔名／資料夾；加上兩個例外（暫停繼續、檔案勾選和優先順序）和旅程 1（移到媒體庫）從頭到尾一次
 **And** 自動流程和 CI 照樣只用假的 qBittorrent 回應，不對真的 qBittorrent 寫入（NFR-15）
 **And** （Alex 在 NAS 上驗收）部署這一版後，照清單在真的 qBittorrent 上逐件做一次，7 件事都做得到才算 SM-1 達成；做不到的那一件照 PRD §7 先叫 `red-team`
+
+### Story 5.9：手動切深淺色
+
+身為 Alex，我想要在設定頁自己選淺色或深色，這樣不用改系統設定也能換 App 的顏色。
+
+**涵蓋：** NFR-6（2026-11-22 改）、FR-54 的「外觀」、UX-DR6、UX-DR70、AR-49
+**規格：** PRD FR-54、NFR-6；EXPERIENCE〔Foundation〕主題、〔Information Architecture〕設定頁那段；AD-13
+
+**Acceptance Criteria:**
+
+**Given** 設定頁
+**When** 打開
+**Then** 現有兩項下面多一項「外觀」，三個選項：跟系統、淺色、深色，單選，預設「跟系統」
+**And** 電腦和手機 390px 都照現有設定頁的列排，不加新的元件樣式
+
+**Given** 「外觀」
+**When** 點一個選項
+**Then** 整個 App 馬上換成那一套顏色，不用重新整理；選擇存在這台裝置的 localStorage，key 加進 `src/lib/prefs.ts`
+**And** 選了淺色或深色時，系統的深淺色改變不影響 App；選「跟系統」時照常跟著系統變
+
+**Given** 重新整理或重開 App
+**When** 畫面第一次畫出來
+**Then** 直接是存好的那一套，不先閃一下另一套顏色；做法要符合現有的 CSP，不能為了這個放寬 `script-src`
+**And** localStorage 讀寫失敗或值不認得時當作「跟系統」，不報錯
+
+**Given** 顏色變數
+**When** 加上手動切換
+**Then** UX-DR1 到 UX-DR3 的顏色還是只寫淺色、深色兩套，不複製第三份；vitest 檢查手動選深色和系統深色用的是同一組值
+**And** 對話框、底部面板、toast、tooltip、捲軸和表單元件（`color-scheme`）也跟著換
+
+**Given** 鍵盤操作
+**When** Tab 到「外觀」
+**Then** 有焦點外框，方向鍵能換選項
+**And** PR 附電腦和手機 390px 的截圖：系統淺色但選深色、系統深色但選淺色，用假的 qBittorrent 回應

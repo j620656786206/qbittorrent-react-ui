@@ -90,6 +90,7 @@ development_status:
   5-6-改檔名的預覽計畫和-renamefiles: backlog
   5-7-改檔名畫面-整季批次: backlog
   5-8-單檔改名-接著改檔名-7-件事驗收: backlog
+  5-9-手動切深淺色: backlog # 2026-11-22 Alex 加：設定頁的「外觀」選跟系統、淺色、深色
   epic-5-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-run-docs-deployment-md-section-7-on-the"
